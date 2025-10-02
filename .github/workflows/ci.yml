@@ -44,8 +44,12 @@ jobs:
       # this means that one would need to re-download and re-process gradle files for every run. Which is very time consuming.
       #
       # To avoid that, we cache the the gradle folder to reuse it later.
-      - name: Gradle cache
-        uses: gradle/actions/setup-gradle@v3
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/caches
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
+          restore-keys: ${{ runner.os }}-gradle
 
       # Cache the Emulator, if the cache does not hit, create the emulator
       - name: AVD cache
@@ -59,7 +63,7 @@ jobs:
 
       - name: create AVD and generate snapshot for caching
         if: steps.avd-cache.outputs.cache-hit != 'true'
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@1dcd0090116d15e7c562f8db72807de5e036a4ed
         with:
           api-level: 34
           target: google_apis
@@ -92,7 +96,7 @@ jobs:
 
       # Run connected tests on the emulator
       - name: run tests
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@1dcd0090116d15e7c562f8db72807de5e036a4ed
         with:
           api-level: 34
           target: google_apis
@@ -107,9 +111,16 @@ jobs:
         run: |
           ./gradlew jacocoTestReport
 
+      - name: Cache SonarQube packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
       # Upload the various reports to sonar
       - name: Upload report to SonarCloud
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: ./gradlew sonar --parallel --build-cache
+        run: ./gradlew sonar --parallel --build-cache --stacktrace --info
