@@ -1,4 +1,4 @@
-package com.android.sample
+package ch.epfl.euler
 
 import kotlin.math.sqrt
 

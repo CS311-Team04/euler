@@ -1,4 +1,4 @@
-package com.android.sample.ui.theme
+package ch.epfl.euler.ui.theme
 
 import android.app.Activity
 import android.os.Build

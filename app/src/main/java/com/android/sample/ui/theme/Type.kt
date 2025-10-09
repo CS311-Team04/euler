@@ -1,4 +1,4 @@
-package com.android.sample.ui.theme
+package ch.epfl.euler.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
