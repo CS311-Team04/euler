@@ -12,7 +12,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import ch.epfl.euler.R
 import ch.epfl.euler.auth.AuthState
 import ch.epfl.euler.ui.theme.SampleAppTheme
 import ch.epfl.euler.viewmodel.AuthViewModel
