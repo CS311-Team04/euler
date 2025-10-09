@@ -1,4 +1,4 @@
-package com.android.sample.ui.theme
+package ch.epfl.euler.theme
 
 import androidx.compose.ui.graphics.Color
 

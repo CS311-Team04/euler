@@ -1,0 +1,14 @@
+{
+  "client_id" : "45ca64a4-bf4b-4fc2-b59d-3d4769157d58",
+  "authorization_user_agent" : "DEFAULT",
+  "redirect_uri" : "msauth://ch.epfl.euler/X4jeBxPLAxY0pAf/Ys2uu7hnsjs=",
+  "authorities" : [
+    {
+      "type": "AAD",
+      "audience": {
+        "type": "AzureADMyOrg",
+        "tenant_id": "7526e0f9-0dcf-4152-afc0-fed84b0c0360"
+      }
+    }
+  ]
+}

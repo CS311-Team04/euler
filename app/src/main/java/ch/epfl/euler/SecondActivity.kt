@@ -1,4 +1,4 @@
-package com.android.sample
+package ch.epfl.euler
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -12,21 +12,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.tooling.preview.Preview
-import com.android.sample.resources.C
-import com.android.sample.ui.theme.SampleAppTheme
+import ch.epfl.euler.resources.C
+import ch.epfl.euler.theme.SampleAppTheme
 
 class SecondActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     setContent {
-      SampleAppTheme {
-        // A surface container using the 'background' color from the theme
-        Surface(
-            modifier = Modifier.fillMaxSize().semantics { testTag = C.Tag.second_screen_container },
-            color = MaterialTheme.colorScheme.background) {
-              GreetingRobo("Robolectric")
+        SampleAppTheme {
+            // A surface container using the 'background' color from the theme
+            Surface(
+                modifier = Modifier.fillMaxSize()
+                    .semantics { testTag = C.Tag.second_screen_container },
+                color = MaterialTheme.colorScheme.background
+            ) {
+                GreetingRobo("Robolectric")
             }
-      }
+        }
     }
   }
 }
@@ -39,5 +41,5 @@ fun GreetingRobo(name: String, modifier: Modifier = Modifier) {
 @Preview(showBackground = true)
 @Composable
 fun GreetingPreview2() {
-  SampleAppTheme { GreetingRobo("Robolectric") }
+    SampleAppTheme { GreetingRobo("Robolectric") }
 }

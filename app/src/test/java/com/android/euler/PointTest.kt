@@ -1,5 +1,6 @@
-package com.android.sample
+package com.android.euler
 
+import ch.epfl.euler.Point
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
