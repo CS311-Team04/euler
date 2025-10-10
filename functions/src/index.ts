@@ -141,3 +141,163 @@ async function qdrantSearch(vector: number[], topK = 5) {
   return (j.result ?? []) as Array<{ id: string | number; score: number; payload?: any }>;
 }
 
+/* =========================================================
+ *            UTIL EMBEDDINGS (via fetch + logs)
+ * ======================================================= */
+const MAX_CHARS = 8000; // limite prudente
+
+function sanitizeTexts(arr: string[]): string[] {
+  return arr
+    .map((s) => (typeof s === "string" ? s : String(s ?? "")))
+    .map((s) => s.trim())
+    .map((s) => (s.length > MAX_CHARS ? s.slice(0, MAX_CHARS) : s))
+    .filter((s) => s.length > 0);
+}
+
+async function embedBatch(texts: string[]): Promise<number[][]> {
+  const clean = sanitizeTexts(texts);
+  if (clean.length === 0) throw new Error("No valid texts to embed (empty after sanitize).");
+
+  const body = JSON.stringify({ model: EMBED_MODEL, input: clean });
+  const res = await fetch(EMBED_URL, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${EMBED_KEY}`,
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "User-Agent": "euler-mvp/1.0 (contact: you@example.com)",
+    },
+    body,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    logger.error("Embed error", {
+      status: res.status,
+      url: EMBED_URL,
+      model: EMBED_MODEL,
+      sampleInputLen: clean[0]?.length,
+      batchSize: clean.length,
+      bodyPreview: body.slice(0, 2000),
+      responseTextPreview: text.slice(0, 2000),
+    });
+    throw new Error(`${res.status} ${text || "(no body)"}`);
+  }
+
+  const json = await res.json();
+  return (json.data ?? []).map((d: any) => d.embedding as number[]);
+}
+
+async function sleep(ms: number) {
+  return new Promise((res) => setTimeout(res, ms));
+}
+
+async function embedInBatches(allTexts: string[], batchSize = 16, pauseMs = 150): Promise<number[][]> {
+  const out: number[][] = [];
+  for (let i = 0; i < allTexts.length; i += batchSize) {
+    const slice = allTexts.slice(i, i + batchSize);
+    if (i > 0 && pauseMs > 0) await sleep(pauseMs);
+    const vecs = await embedBatch(slice);
+    out.push(...vecs);
+  }
+  return out;
+}
+
+/* =========================================================
+ *            INGESTION DIRECTE DE CHUNKS: indexChunks
+ * ======================================================= */
+export const indexChunks = ai.defineFlow(
+  {
+    name: "indexChunks",
+    inputSchema: z.object({
+      chunks: z.array(z.object({
+        id: z.string(),               // libre: on normalise en uint/UUID pour Qdrant
+        text: z.string(),             // contenu du chunk
+        title: z.string().optional(),
+        url: z.string().optional(),
+        payload: z.record(z.any()).optional(),
+      })),
+    }),
+    outputSchema: z.object({ count: z.number(), dim: z.number() }),
+  },
+  async ({ chunks }) => {
+    if (!chunks.length) return { count: 0, dim: 0 };
+
+    const texts = chunks.map((c) => c.text);
+    const vectors = await embedInBatches(texts, 16, 150);
+    const dim = vectors[0].length;
+
+    await qdrantEnsureCollection(dim);
+
+    const points: QdrantPoint[] = vectors.map((v, i) => ({
+      id: normalizePointId(chunks[i].id),
+      vector: v,
+      payload: {
+        original_id: chunks[i].id,
+        text: chunks[i].text,
+        title: chunks[i].title,
+        url: chunks[i].url,
+        ...(chunks[i].payload ?? {}),
+      },
+    }));
+    await qdrantUpsert(points);
+
+    logger.info("indexChunks", { count: chunks.length, dim });
+    return { count: chunks.length, dim };
+  }
+);
+export const indexChunksFn = onCallGenkit({ cors: true }, indexChunks);
+
+/* =========================================================
+ *                REQUÊTE: answerWithRag
+ * ======================================================= */
+export const answerWithRag = ai.defineFlow(
+  {
+    name: "answerWithRag",
+    inputSchema: z.object({
+      question: z.string(),
+      topK: z.number().optional(),
+      model: z.string().optional(),
+    }),
+    outputSchema: z.object({
+      reply: z.string(),
+      sources: z.array(z.object({
+        id: z.union([z.string(), z.number()]),
+        score: z.number(),
+        payload: z.record(z.any()).optional(),
+      })),
+    }),
+  },
+  async ({ question, topK, model }) => {
+    // 1) embed de la question
+    const [queryVec] = await embedInBatches([question], 1, 0);
+
+    // 2) recherche vectorielle
+    const hits = await qdrantSearch(queryVec, topK ?? 5);
+    const context = hits
+      .map((h) => `• ${h.payload?.title ? `[${h.payload.title}] ` : ""}${h.payload?.text ?? ""}`)
+      .join("\n\n");
+
+    // 3) PROMPT: un seul message user
+    const prompt = [
+      "Tu es un assistant concis. Réponds uniquement en t'appuyant sur le contexte fourni et tu t'appelles euler.",
+      context ? `\nContexte:\n${context}\n` : "\n(Contexte vide)\n",
+      `Question: ${question}`,
+      "\nSi l'information n'est pas dans le contexte, dis que tu ne sais pas."
+    ].join("\n");
+
+    const messages = [{ role: "user" as const, content: prompt }];
+
+    const chat = await chatClient.chat.completions.create({
+      model: model ?? process.env.APERTUS_MODEL_ID!,
+      messages,
+      temperature: 0.2,
+    });
+
+    return {
+      reply: chat.choices?.[0]?.message?.content ?? "",
+      sources: hits.map((h) => ({ id: h.id, score: h.score, payload: h.payload })),
+    };
+  }
+);
+export const answerWithRagFn = onCallGenkit({ cors: true }, answerWithRag);
