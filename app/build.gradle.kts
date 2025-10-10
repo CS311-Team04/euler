@@ -6,15 +6,15 @@ plugins {
 }
 
 android {
-    namespace = "com.android.sample"
+    namespace = "ch.epfl.euler"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.android.sample"
+        applicationId = "ch.epfl.euler"
         minSdk = 28
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -96,12 +96,29 @@ fun DependencyHandlerScope.globalTestImplementation(dep: Any) {
     testImplementation(dep)
 }
 
+configurations.all {
+    exclude(group = "com.microsoft.device.display", module = "display-mask")
+}
+
 dependencies {
+    // Constraints pour gérer les dépendances MSAL
+    constraints {
+        implementation("io.opentelemetry:opentelemetry-bom:1.18.0") {
+            attributes {
+                attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.REGULAR_PLATFORM))
+            }
+        }
+    }
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(platform(libs.compose.bom))
+
+    // MSAL
+    implementation("com.microsoft.identity.client:msal:5.0.0")
+
     testImplementation(libs.junit)
     globalTestImplementation(libs.androidx.junit)
     globalTestImplementation(libs.androidx.espresso.core)
@@ -119,6 +136,9 @@ dependencies {
     implementation(libs.compose.activity)
     // Integration with ViewModels
     implementation(libs.compose.viewmodel)
+    // Lifecycle compose
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
     // Android Studio Preview support
     implementation(libs.compose.preview)
     debugImplementation(libs.compose.tooling)

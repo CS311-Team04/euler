@@ -1,4 +1,4 @@
-package com.android.sample.resources
+package ch.epfl.euler.resources
 
 // Like R, but C
 object C {
