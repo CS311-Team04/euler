@@ -15,6 +15,9 @@ lifecycleRuntimeKtx = "2.7.0"
 kaspresso = "1.5.5"
 robolectric = "4.11.1"
 sonar = "4.4.1.3373"
+navigationComposeAndroid = "2.9.5"
+uiToolingPreview = "1.9.2"
+uiTooling = "1.9.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -40,6 +43,9 @@ kaspresso = { group = "com.kaspersky.android-components", name = "kaspresso", ve
 kaspresso-compose = { group = "com.kaspersky.android-components", name = "kaspresso-compose-support", version.ref = "kaspresso" }
 
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+androidx-navigation-compose-android = { group = "androidx.navigation", name = "navigation-compose-android", version.ref = "navigationComposeAndroid" }
+androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview", version.ref = "uiToolingPreview" }
+androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling", version.ref = "uiTooling" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

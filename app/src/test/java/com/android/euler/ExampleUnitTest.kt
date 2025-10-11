@@ -1,4 +1,4 @@
-package com.android.sample
+package com.android.euler
 
 import org.junit.Assert.*
 import org.junit.Test

@@ -1,8 +1,9 @@
-package com.android.sample
+package com.android.euler
 
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.android.sample.screen.SecondScreen
+import ch.epfl.euler.SecondActivity
+import com.android.euler.screen.SecondScreen
 import com.kaspersky.kaspresso.testcases.api.testcase.TestCase
 import io.github.kakaocup.compose.node.element.ComposeScreen
 import org.junit.Rule
