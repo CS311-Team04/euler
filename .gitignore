@@ -7,3 +7,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Gradle verification temporary files
+gradle/verification-metadata.dryrun.xml

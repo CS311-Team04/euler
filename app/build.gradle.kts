@@ -88,6 +88,13 @@ android {
         res.setSrcDirs(emptyList<File>())
         resources.setSrcDirs(emptyList<File>())
     }
+
+    // Disable release unit tests since all tests are in debug
+    sourceSets.getByName("testRelease") {
+        java.setSrcDirs(emptyList<File>())
+        res.setSrcDirs(emptyList<File>())
+        resources.setSrcDirs(emptyList<File>())
+    }
 }
 
 // When a library is used both by robolectric and connected tests, use this function
@@ -101,6 +108,7 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.kotlinx.coroutines.android)
     implementation(platform(libs.compose.bom))
     testImplementation(libs.junit)
     globalTestImplementation(libs.androidx.junit)
@@ -115,6 +123,10 @@ dependencies {
     implementation(libs.compose.ui.graphics)
     // Material Design 3
     implementation(libs.compose.material3)
+    // Material Icons Extended
+    implementation(libs.compose.material.icons.extended)
+    // Navigation for Compose
+    implementation(libs.compose.navigation)
     // Integration with activities
     implementation(libs.compose.activity)
     // Integration with ViewModels
@@ -140,6 +152,11 @@ tasks.withType<Test> {
         isIncludeNoLocationClasses = true
         excludes = listOf("jdk.internal.*")
     }
+}
+
+// Disable release unit tests - all tests run in debug only
+afterEvaluate {
+    tasks.findByName("testReleaseUnitTest")?.enabled = false
 }
 
 tasks.register("jacocoTestReport", JacocoReport::class) {
