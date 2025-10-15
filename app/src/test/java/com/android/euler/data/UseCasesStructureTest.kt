@@ -21,14 +21,20 @@ class UseCasesStructureTest {
     fun `UseCases test class should exist`() {
         // Test que la classe de test existe
         assertNotNull("Test class should not be null", this)
-        assertTrue("Should be UseCasesStructureTest", this::class.simpleName == "UseCasesStructureTest")
+        assertTrue(
+            "Should be UseCasesStructureTest",
+            this::class.simpleName == "UseCasesStructureTest"
+        )
     }
 
     @Test
     fun `UseCases test should have basic structure`() {
         // Test de la structure de base
         val className = this::class.java.name
-        assertTrue("Should contain UseCasesStructureTest", className.contains("UseCasesStructureTest"))
+        assertTrue(
+            "Should contain UseCasesStructureTest",
+            className.contains("UseCasesStructureTest")
+        )
         assertTrue("Should be in data package", className.contains("data"))
     }
 
