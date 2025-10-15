@@ -1,0 +1,14 @@
+{
+  "client_id" : "e07bcd07-7214-416b-9676-f9dac3152507",
+  "authorization_user_agent" : "DEFAULT",
+  "redirect_uri" : "msauth://com.android.sample/auth",
+  "authorities" : [
+    {
+      "type": "AAD",
+      "audience": {
+        "type": "AzureADMultipleOrgs",
+        "tenant_id": "organizations"
+      }
+    }
+  ]
+}

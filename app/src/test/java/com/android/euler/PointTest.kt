@@ -1,10 +1,10 @@
-package com.android.sample
+package com.android.euler
 
+import com.android.sample.Point
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class PointTest {
-
     @Test
     fun checkSimpleDistance() {
         val p1 = Point(2.5, 4.0)
