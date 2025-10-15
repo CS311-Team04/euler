@@ -1,3 +1,6 @@
 node_modules/
 *.local
 .env
+lib/index.js.map
+lib/index.js
+firebase-debug.log
