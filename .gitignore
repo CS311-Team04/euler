@@ -1,5 +1,18 @@
-/.idea/
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Crawler state and data
+.crawler_state/
+tools/epfl_scraper/.crawler_state/
+data/
+tools/epfl_scraper/data/
+
+# macOS
 .DS_Store
+
+# Android
 .gradle
 /local.properties
 /build
