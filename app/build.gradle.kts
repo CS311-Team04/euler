@@ -3,8 +3,8 @@ plugins {
     alias(libs.plugins.jetbrainsKotlinAndroid)
     // Google Services plugin disabled for security (google-services.json removed)
     // alias(libs.plugins.googleServices)
-    id("jacoco")
-    id("org.sonarqube")
+        id("jacoco")
+        id("org.sonarqube")
     alias(libs.plugins.ktfmt)
 }
 
@@ -31,7 +31,7 @@ android {
             )
         }
         debug {
-            enableUnitTestCoverage = false
+            enableUnitTestCoverage = true // Re-enabled with JaCoCo 0.8.14
             enableAndroidTestCoverage = false
         }
     }
@@ -104,7 +104,11 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
 }
 
-// JaCoCo configuration
+// JaCoCo configuration with Java 21 compatibility
+jacoco {
+    toolVersion = "0.8.14"
+}
+
 tasks.withType<Test> {
     extensions.configure(JacocoTaskExtension::class) {
         isIncludeNoLocationClasses = true
@@ -140,18 +144,13 @@ tasks.register("jacocoTestReport", JacocoReport::class) {
     )
 }
 
-// SonarQube configuration
+// SonarQube configuration with JaCoCo 0.8.14
 sonar {
     properties {
         property("sonar.projectKey", "CS311-Team04_euler")
         property("sonar.projectName", "euler")
         property("sonar.organization", "cs311-team04")
         property("sonar.host.url", "https://sonarcloud.io")
-        
-        // Test and coverage reports
-        property("sonar.junit.reportPaths", "${project.layout.buildDirectory.get()}/test-results/testDebugUnitTest/")
-        property("sonar.androidLint.reportPaths", "${project.layout.buildDirectory.get()}/reports/lint-results-debug.xml")
-        property("sonar.coverage.jacoco.xmlReportPaths", "${project.layout.buildDirectory.get()}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml")
         
         // Sources and tests
         property("sonar.sources", "src/main/java")
@@ -162,8 +161,10 @@ sonar {
         property("sonar.test.inclusions", "**/*Test.kt,**/*Test.java")
         property("sonar.coverage.exclusions", "**/*Test.kt,**/*Test.java,**/test/**/*,**/androidTest/**/*")
         
-        // Binaries
-        property("sonar.java.binaries", "${project.layout.buildDirectory.get()}/intermediates/javac/debug/classes,${project.layout.buildDirectory.get()}/tmp/kotlin-classes/debug")
+        // Coverage reports
+        property("sonar.coverage.jacoco.xmlReportPaths", "${project.layout.buildDirectory.get()}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml")
+        property("sonar.junit.reportPaths", "${project.layout.buildDirectory.get()}/test-results/testDebugUnitTest/")
+        property("sonar.androidLint.reportPaths", "${project.layout.buildDirectory.get()}/reports/lint-results-debug.xml")
     }
 }
 
