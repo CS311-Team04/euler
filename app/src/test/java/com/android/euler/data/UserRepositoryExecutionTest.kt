@@ -17,14 +17,13 @@ class UserRepositoryExecutionTest {
         try {
             val userRepositoryClass = Class.forName("com.android.sample.data.UserRepository")
             val methods = userRepositoryClass.methods
-            
+
             // Vérifier qu'il y a des méthodes dans UserRepository
             assertTrue("UserRepository should have methods", methods.isNotEmpty())
-            
+
             // Chercher la méthode uid ou toute méthode publique
             val publicMethods = methods.filter { java.lang.reflect.Modifier.isPublic(it.modifiers) }
             assertTrue("Should have public methods", publicMethods.isNotEmpty())
-            
         } catch (e: ClassNotFoundException) {
             assertTrue("UserRepository class should exist", true)
         }
@@ -36,10 +35,9 @@ class UserRepositoryExecutionTest {
         try {
             val userRepositoryClass = Class.forName("com.android.sample.data.UserRepository")
             val methods = userRepositoryClass.methods
-            
+
             val upsertProfileMethod = methods.find { it.name == "upsertProfile" }
             assertNotNull("upsertProfile method should exist", upsertProfileMethod)
-            
         } catch (e: ClassNotFoundException) {
             assertTrue("UserRepository methods should exist", true)
         }
@@ -51,10 +49,9 @@ class UserRepositoryExecutionTest {
         try {
             val userRepositoryClass = Class.forName("com.android.sample.data.UserRepository")
             val methods = userRepositoryClass.methods
-            
+
             val getProfileMethod = methods.find { it.name == "getProfile" }
             assertNotNull("getProfile method should exist", getProfileMethod)
-            
         } catch (e: ClassNotFoundException) {
             assertTrue("UserRepository methods should exist", true)
         }
@@ -68,7 +65,6 @@ class UserRepositoryExecutionTest {
                 // Simuler l'exécution d'une fonction suspend
                 val result = executeSuspendFunction()
                 assertTrue("Suspend function should execute", result)
-                
             } catch (e: Exception) {
                 assertTrue("Suspend function execution attempted", true)
             }
@@ -82,11 +78,10 @@ class UserRepositoryExecutionTest {
             // Simuler les opérations Firebase
             val firebaseOperations = listOf("auth", "firestore", "analytics")
             assertTrue("Should handle Firebase operations", firebaseOperations.isNotEmpty())
-            
+
             // Simuler une opération d'authentification
             val authResult = simulateAuthOperation()
             assertTrue("Should perform auth operations", authResult)
-            
         } catch (e: Exception) {
             assertTrue("Firebase operations attempted", true)
         }
@@ -100,7 +95,6 @@ class UserRepositoryExecutionTest {
             val userData = UserData("test-uid", "test@example.com")
             val processedData = processUserData(userData)
             assertEquals("Should process user data", "processed: test-uid", processedData)
-            
         } catch (e: Exception) {
             assertTrue("User data management attempted", true)
         }
@@ -113,11 +107,10 @@ class UserRepositoryExecutionTest {
             // Simuler les opérations CRUD
             val crudOperations = listOf("create", "read", "update", "delete")
             assertTrue("Should handle CRUD operations", crudOperations.isNotEmpty())
-            
+
             // Simuler une opération de création
             val createResult = simulateCreateOperation()
             assertTrue("Should perform create operations", createResult)
-            
         } catch (e: Exception) {
             assertTrue("CRUD operations attempted", true)
         }
@@ -130,7 +123,6 @@ class UserRepositoryExecutionTest {
             // Simuler la persistance des données
             val persistenceResult = validateDataPersistence()
             assertTrue("Should validate data persistence", persistenceResult)
-            
         } catch (e: Exception) {
             assertTrue("Data persistence validation attempted", true)
         }
@@ -144,7 +136,6 @@ class UserRepositoryExecutionTest {
             val authState = AuthenticationState.LOGGED_IN
             val stateResult = manageAuthState(authState)
             assertTrue("Should manage auth state", stateResult)
-            
         } catch (e: Exception) {
             assertTrue("Auth state management attempted", true)
         }
@@ -178,8 +169,10 @@ class UserRepositoryExecutionTest {
 
     // Classes utilitaires pour les tests
     private data class UserData(val uid: String, val email: String)
-    
+
     private enum class AuthenticationState {
-        LOGGED_IN, LOGGED_OUT, UNKNOWN
+        LOGGED_IN,
+        LOGGED_OUT,
+        UNKNOWN
     }
 }
