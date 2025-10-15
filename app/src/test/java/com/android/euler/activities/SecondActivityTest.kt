@@ -1,18 +1,15 @@
 package com.android.euler.activities
 
 import android.content.Context
-import android.os.Bundle
 import com.android.sample.SecondActivity
-import com.android.sample.GreetingRobo
-import com.android.sample.GreetingPreview2
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -39,7 +36,7 @@ class SecondActivityTest {
         // Test de la structure de classe
         assertNotNull("SecondActivity should be created", activity)
         assertTrue("Should be ComponentActivity", activity is androidx.activity.ComponentActivity)
-        
+
         // Test que l'activité a les bonnes méthodes
         val methods = SecondActivity::class.java.declaredMethods
         assertTrue("Should have methods", methods.isNotEmpty())
@@ -49,9 +46,12 @@ class SecondActivityTest {
     fun `SecondActivity should handle basic functionality`() {
         // Test de fonctionnalité basique
         assertNotNull("Activity should exist", activity)
-        
+
         // Test que l'activité peut être utilisée
-        assertTrue("Activity should be usable", activity.isFinishing == false || activity.isFinishing == true)
+        assertTrue(
+            "Activity should be usable",
+            activity.isFinishing == false || activity.isFinishing == true
+        )
     }
 
     @Test
@@ -106,7 +106,7 @@ class SecondActivityTest {
         try {
             val activity1 = Robolectric.setupActivity(SecondActivity::class.java)
             val activity2 = Robolectric.setupActivity(SecondActivity::class.java)
-            
+
             assertNotNull("First activity should exist", activity1)
             assertNotNull("Second activity should exist", activity2)
             assertNotEquals("Should be different instances", activity1, activity2)
@@ -121,7 +121,11 @@ class SecondActivityTest {
         try {
             val clazz = SecondActivity::class.java
             assertNotNull("Class should be loadable", clazz)
-            assertEquals("Should have correct name", "com.android.sample.SecondActivity", clazz.name)
+            assertEquals(
+                "Should have correct name",
+                "com.android.sample.SecondActivity",
+                clazz.name
+            )
         } catch (e: Exception) {
             assertTrue("Class loading should be handled", true)
         }
@@ -134,7 +138,7 @@ class SecondActivityTest {
             val clazz = SecondActivity::class.java
             val methods = clazz.declaredMethods
             val fields = clazz.declaredFields
-            
+
             assertTrue("Should have methods", methods.isNotEmpty())
             assertTrue("Should have fields", fields.isNotEmpty())
         } catch (e: Exception) {
@@ -148,7 +152,10 @@ class SecondActivityTest {
         val mainActivity = Robolectric.setupActivity(com.android.sample.MainActivity::class.java)
         assertNotNull("MainActivity should exist", mainActivity)
         assertNotNull("SecondActivity should exist", activity)
-        assertNotEquals("Should be different classes", 
-            com.android.sample.MainActivity::class.java, SecondActivity::class.java)
+        assertNotEquals(
+            "Should be different classes",
+            com.android.sample.MainActivity::class.java,
+            SecondActivity::class.java
+        )
     }
 }

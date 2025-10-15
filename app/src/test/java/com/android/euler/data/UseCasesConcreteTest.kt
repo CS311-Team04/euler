@@ -4,7 +4,6 @@ import com.android.sample.data.UserRepository
 import com.android.sample.data.ensureProfile
 import com.android.sample.data.logRag
 import com.android.sample.data.models
-import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import io.mockk.*
@@ -39,7 +38,7 @@ class UseCasesConcreteTest {
         every { mockUser.email } returns "test@example.com"
         every { mockUser.displayName } returns "Test User"
         every { mockUser.photoUrl } returns null
-        
+
         coEvery { mockRepo.upsertProfile(any()) } just Runs
 
         // Act
@@ -48,11 +47,11 @@ class UseCasesConcreteTest {
         // Assert
         coVerify { mockRepo.upsertProfile(any()) }
         coVerify { mockAuth.currentUser }
-        
+
         // Vérifier les paramètres exacts
         val capturedProfile = slot<models.UserProfile>()
         coVerify { mockRepo.upsertProfile(capture(capturedProfile)) }
-        
+
         val profile = capturedProfile.captured
         assertEquals("test-uid-123", profile.uid)
         assertEquals("test@example.com", profile.email)
@@ -83,7 +82,7 @@ class UseCasesConcreteTest {
         every { mockUser.displayName } returns "User With Photo"
         every { mockUser.photoUrl } returns photoUrl
         every { photoUrl.toString() } returns "https://example.com/photo.jpg"
-        
+
         coEvery { mockRepo.upsertProfile(any()) } just Runs
 
         // Act
@@ -92,7 +91,7 @@ class UseCasesConcreteTest {
         // Assert
         val capturedProfile = slot<models.UserProfile>()
         coVerify { mockRepo.upsertProfile(capture(capturedProfile)) }
-        
+
         val profile = capturedProfile.captured
         assertEquals("test-uid-456", profile.uid)
         assertEquals("user@example.com", profile.email)
@@ -108,7 +107,7 @@ class UseCasesConcreteTest {
         val tokensOut = 25
         val sources = listOf("source1", "source2", "source3")
         val resultId = "result-123"
-        
+
         coEvery { mockRepo.logQuery(any()) } just Runs
 
         // Act
@@ -116,11 +115,11 @@ class UseCasesConcreteTest {
 
         // Assert
         coVerify { mockRepo.logQuery(any()) }
-        
+
         // Vérifier les paramètres exacts
         val capturedLog = slot<models.QueryLog>()
         coVerify { mockRepo.logQuery(capture(capturedLog)) }
-        
+
         val queryLog = capturedLog.captured
         assertEquals(prompt, queryLog.prompt)
         assertEquals(tokensIn, queryLog.tokensIn)
@@ -138,7 +137,7 @@ class UseCasesConcreteTest {
         val tokensOut = 15
         val sources = listOf("single_source")
         val resultId = null
-        
+
         coEvery { mockRepo.logQuery(any()) } just Runs
 
         // Act
@@ -147,7 +146,7 @@ class UseCasesConcreteTest {
         // Assert
         val capturedLog = slot<models.QueryLog>()
         coVerify { mockRepo.logQuery(capture(capturedLog)) }
-        
+
         val queryLog = capturedLog.captured
         assertEquals(prompt, queryLog.prompt)
         assertEquals(tokensIn, queryLog.tokensIn)
@@ -164,7 +163,7 @@ class UseCasesConcreteTest {
         val tokensOut = 8
         val sources = emptyList<String>()
         val resultId = "result-456"
-        
+
         coEvery { mockRepo.logQuery(any()) } just Runs
 
         // Act
@@ -173,7 +172,7 @@ class UseCasesConcreteTest {
         // Assert
         val capturedLog = slot<models.QueryLog>()
         coVerify { mockRepo.logQuery(capture(capturedLog)) }
-        
+
         val queryLog = capturedLog.captured
         assertEquals(prompt, queryLog.prompt)
         assertEquals(tokensIn, queryLog.tokensIn)
@@ -190,7 +189,7 @@ class UseCasesConcreteTest {
         val tokensOut = 0
         val sources = listOf("source1")
         val resultId = "result-789"
-        
+
         coEvery { mockRepo.logQuery(any()) } just Runs
 
         // Act
@@ -199,7 +198,7 @@ class UseCasesConcreteTest {
         // Assert
         val capturedLog = slot<models.QueryLog>()
         coVerify { mockRepo.logQuery(capture(capturedLog)) }
-        
+
         val queryLog = capturedLog.captured
         assertEquals(prompt, queryLog.prompt)
         assertEquals(0, queryLog.tokensIn)
@@ -216,7 +215,7 @@ class UseCasesConcreteTest {
         every { mockUser.email } returns "test@example.com"
         every { mockUser.displayName } returns "Test User"
         every { mockUser.photoUrl } returns null
-        
+
         coEvery { mockRepo.upsertProfile(any()) } throws Exception("Database error")
 
         // Act & Assert
@@ -226,7 +225,7 @@ class UseCasesConcreteTest {
         } catch (e: Exception) {
             assertEquals("Database error", e.message)
         }
-        
+
         coVerify { mockRepo.upsertProfile(any()) }
     }
 
@@ -242,7 +241,7 @@ class UseCasesConcreteTest {
         } catch (e: Exception) {
             assertEquals("Logging error", e.message)
         }
-        
+
         coVerify { mockRepo.logQuery(any()) }
     }
 
@@ -254,7 +253,7 @@ class UseCasesConcreteTest {
         every { mockUser.email } returns "test@example.com"
         every { mockUser.displayName } returns "Test User"
         every { mockUser.photoUrl } returns null
-        
+
         coEvery { mockRepo.upsertProfile(any()) } just Runs
 
         // Act

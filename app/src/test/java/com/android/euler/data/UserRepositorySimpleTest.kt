@@ -29,19 +29,22 @@ class UserRepositorySimpleTest {
         try {
             val clazz = UserRepository::class.java
             assertNotNull("UserRepository class should exist", clazz)
-            assertEquals("Should have correct name", "com.android.sample.data.UserRepository", clazz.name)
-            
+            assertEquals(
+                "Should have correct name",
+                "com.android.sample.data.UserRepository",
+                clazz.name
+            )
+
             // Vérifier que la classe a des méthodes
             val methods = clazz.declaredMethods
             assertTrue("Should have methods", methods.isNotEmpty())
-            
+
             // Vérifier les méthodes publiques importantes
             val methodNames = methods.map { it.name }
             assertTrue("Should have upsertProfile method", methodNames.contains("upsertProfile"))
             assertTrue("Should have getProfile method", methodNames.contains("getProfile"))
             assertTrue("Should have upsertSettings method", methodNames.contains("upsertSettings"))
             assertTrue("Should have logQuery method", methodNames.contains("logQuery"))
-            
         } catch (e: Exception) {
             assertTrue("UserRepository class structure access attempted", true)
         }
@@ -53,11 +56,10 @@ class UserRepositorySimpleTest {
         try {
             val clazz = UserRepository::class.java
             assertNotNull("Class should be loadable", clazz)
-            
+
             // Vérifier que la classe peut être instanciée
             val constructor = clazz.getDeclaredConstructor()
             assertNotNull("Should have default constructor", constructor)
-            
         } catch (e: Exception) {
             assertTrue("UserRepository class loading attempted", true)
         }
@@ -71,11 +73,10 @@ class UserRepositorySimpleTest {
             val methods = clazz.declaredMethods
             val fields = clazz.declaredFields
             val constructors = clazz.declaredConstructors
-            
+
             assertTrue("Should have methods", methods.isNotEmpty())
             assertTrue("Should have fields", fields.isNotEmpty())
             assertTrue("Should have constructors", constructors.isNotEmpty())
-            
         } catch (e: Exception) {
             assertTrue("UserRepository reflection operations attempted", true)
         }
@@ -87,18 +88,17 @@ class UserRepositorySimpleTest {
         try {
             val clazz = UserRepository::class.java
             val methods = clazz.declaredMethods
-            
+
             // Vérifier que les méthodes publiques sont accessibles
             val publicMethods = methods.filter { java.lang.reflect.Modifier.isPublic(it.modifiers) }
             assertTrue("Should have public methods", publicMethods.isNotEmpty())
-            
+
             // Vérifier les méthodes spécifiques
             val upsertProfileMethod = methods.find { it.name == "upsertProfile" }
             assertNotNull("upsertProfile method should exist", upsertProfileMethod)
-            
+
             val getProfileMethod = methods.find { it.name == "getProfile" }
             assertNotNull("getProfile method should exist", getProfileMethod)
-            
         } catch (e: Exception) {
             assertTrue("UserRepository method accessibility attempted", true)
         }
@@ -110,13 +110,12 @@ class UserRepositorySimpleTest {
         try {
             val clazz = UserRepository::class.java
             val fields = clazz.declaredFields
-            
+
             assertTrue("Should have fields", fields.isNotEmpty())
-            
+
             // Vérifier que les champs privés existent
             val privateFields = fields.filter { java.lang.reflect.Modifier.isPrivate(it.modifiers) }
             assertTrue("Should have private fields", privateFields.isNotEmpty())
-            
         } catch (e: Exception) {
             assertTrue("UserRepository field access attempted", true)
         }
@@ -128,13 +127,12 @@ class UserRepositorySimpleTest {
         try {
             val clazz = UserRepository::class.java
             val constructors = clazz.declaredConstructors
-            
+
             assertTrue("Should have constructors", constructors.isNotEmpty())
-            
+
             // Vérifier le constructeur par défaut
             val defaultConstructor = constructors.find { it.parameterCount == 0 }
             assertNotNull("Should have default constructor", defaultConstructor)
-            
         } catch (e: Exception) {
             assertTrue("UserRepository constructor parameters attempted", true)
         }
@@ -146,9 +144,8 @@ class UserRepositorySimpleTest {
         try {
             val clazz = UserRepository::class.java
             val packageName = clazz.packageName
-            
+
             assertEquals("Should be in correct package", "com.android.sample.data", packageName)
-            
         } catch (e: Exception) {
             assertTrue("UserRepository package structure attempted", true)
         }
@@ -161,11 +158,10 @@ class UserRepositorySimpleTest {
             val clazz = UserRepository::class.java
             val superClass = clazz.superclass
             val interfaces = clazz.interfaces
-            
+
             assertNotNull("Should have superclass", superClass)
             // Les interfaces peuvent être vides, c'est normal
             assertNotNull("Should have interfaces array", interfaces)
-            
         } catch (e: Exception) {
             assertTrue("UserRepository class hierarchy attempted", true)
         }
@@ -177,10 +173,9 @@ class UserRepositorySimpleTest {
         try {
             val clazz = UserRepository::class.java
             val annotations = clazz.annotations
-            
+
             // Les annotations peuvent être vides, c'est normal
             assertNotNull("Should have annotations array", annotations)
-            
         } catch (e: Exception) {
             assertTrue("UserRepository annotations attempted", true)
         }

@@ -1,18 +1,15 @@
 package com.android.euler.activities
 
 import android.content.Context
-import android.os.Bundle
 import com.android.sample.MainActivity
-import com.android.sample.Greeting
-import com.android.sample.GreetingPreview
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -39,7 +36,7 @@ class MainActivityTest {
         // Test de la structure de classe
         assertNotNull("MainActivity should be created", activity)
         assertTrue("Should be ComponentActivity", activity is androidx.activity.ComponentActivity)
-        
+
         // Test que l'activité a les bonnes méthodes
         val methods = MainActivity::class.java.declaredMethods
         assertTrue("Should have methods", methods.isNotEmpty())
@@ -49,9 +46,12 @@ class MainActivityTest {
     fun `MainActivity should handle basic functionality`() {
         // Test de fonctionnalité basique
         assertNotNull("Activity should exist", activity)
-        
+
         // Test que l'activité peut être utilisée
-        assertTrue("Activity should be usable", activity.isFinishing == false || activity.isFinishing == true)
+        assertTrue(
+            "Activity should be usable",
+            activity.isFinishing == false || activity.isFinishing == true
+        )
     }
 
     @Test
@@ -106,7 +106,7 @@ class MainActivityTest {
         try {
             val activity1 = Robolectric.setupActivity(MainActivity::class.java)
             val activity2 = Robolectric.setupActivity(MainActivity::class.java)
-            
+
             assertNotNull("First activity should exist", activity1)
             assertNotNull("Second activity should exist", activity2)
             assertNotEquals("Should be different instances", activity1, activity2)
@@ -134,7 +134,7 @@ class MainActivityTest {
             val clazz = MainActivity::class.java
             val methods = clazz.declaredMethods
             val fields = clazz.declaredFields
-            
+
             assertTrue("Should have methods", methods.isNotEmpty())
             assertTrue("Should have fields", fields.isNotEmpty())
         } catch (e: Exception) {
