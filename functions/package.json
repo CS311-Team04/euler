@@ -1,23 +1,28 @@
 {
   "name": "functions",
+  "private": true,
+  "version": "1.0.0",
   "description": "Cloud Functions for Firebase",
-  "scripts": {
-    "serve": "firebase emulators:start --only functions",
-    "shell": "firebase functions:shell",
-    "start": "npm run shell",
-    "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
-  },
+  "type": "commonjs",
+  "main": "lib/index.js",
   "engines": {
-    "node": "22"
+    "node": "20"
   },
-  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "serve": "firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions",
+    "clean": "rm -rf lib"
+  },
   "dependencies": {
-    "firebase-admin": "^12.6.0",
-    "firebase-functions": "^6.0.1"
+    "dotenv": "^16.6.1",
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^4.9.0",
+    "openai": "^4.104.0"
   },
   "devDependencies": {
-    "firebase-functions-test": "^3.1.0"
-  },
-  "private": true
+    "@types/node": "^20.11.0",
+    "firebase-functions-test": "^3.1.0",
+    "typescript": "^5.4.0"
+  }
 }
