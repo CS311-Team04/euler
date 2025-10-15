@@ -75,6 +75,7 @@ export async function apertusChatFnCore(
  * ======================================================= */
 type QdrantPoint = { id: string | number; vector: number[]; payload?: any };
 
+// make sure collection exists (no-op if already exists)  
 async function qdrantEnsureCollection(dimension: number) {
   const base = process.env.QDRANT_URL!;
   const key = process.env.QDRANT_API_KEY!;
@@ -94,6 +95,9 @@ async function qdrantEnsureCollection(dimension: number) {
   }
 }
 
+// upsert points (batch)
+// points: Array<{ id: string|number; vector: number[]; payload?: any }>
+//
 async function qdrantUpsert(points: QdrantPoint[]) {
   const res = await fetch(
     `${process.env.QDRANT_URL}/collections/${process.env.QDRANT_COLLECTION}/points?wait=true`,
@@ -112,6 +116,8 @@ async function qdrantUpsert(points: QdrantPoint[]) {
   }
 }
 
+// search points
+// returns Array<{ id: string|number; score: number; payload?: any }>
 async function qdrantSearch(vector: number[], topK = 5) {
   const r = await fetch(
     `${process.env.QDRANT_URL}/collections/${process.env.QDRANT_COLLECTION}/points/search`,
@@ -183,6 +189,8 @@ async function sleep(ms: number) {
   return new Promise((res) => setTimeout(res, ms));
 }
 
+// embed in batches with pauses
+// to avoid rate limits
 async function embedInBatches(allTexts: string[], batchSize = 16, pauseMs = 150): Promise<number[][]> {
   const out: number[][] = [];
   for (let i = 0; i < allTexts.length; i += batchSize) {
@@ -197,6 +205,10 @@ async function embedInBatches(allTexts: string[], batchSize = 16, pauseMs = 150)
 /* =========================================================
  *            INGESTION DIRECTE DE CHUNKS: indexChunks
  * ======================================================= */
+
+// index chunks (id, text, optional metadata) in Qdrant
+// input: { chunks: Array<{ id:string; text:string; title?:string; url?:string; payload?:any }> }
+// returns: { count: number of chunks indexed, dim: embedding dimension }
 export async function indexChunksCore(
   { chunks }: { chunks: Array<{id:string; text:string; title?:string; url?:string; payload?:any}> }
 ){
@@ -219,6 +231,10 @@ export async function indexChunksCore(
 /* =========================================================
  *                REQUÊTE: answerWithRag
  * ======================================================= */
+
+// answer question with RAG (retrieve & generate)
+// input: { question: string; topK?: number; model?: string }
+// returns: { reply: string; sources: Array<{ id: string|number; score: number; payload?: any }> }
 export async function answerWithRagCore(
   { question, topK, model }:{ question:string; topK?:number; model?:string }
 ){
@@ -252,6 +268,9 @@ export const ping = functions.https.onRequest((_req, res) => {
 type IndexChunksInput = { chunks: Array<{id:string; text:string; title?:string; url?:string; payload?:any}> };
 type AnswerWithRagInput = { question:string; topK?:number; model?:string };
 
+// index chunks (id, text, optional metadata) in Qdrant
+// input: { chunks: Array<{ id:string; text:string; title?:string; url?:string; payload?:any }> }
+// returns: { count: number of chunks indexed, dim: embedding dimension }
 export const indexChunksFn = functions.https.onCall(async (data: IndexChunksInput) => {
   const { chunks } = data || ({} as any);
   if (!Array.isArray(chunks) || chunks.length === 0) {
@@ -260,6 +279,9 @@ export const indexChunksFn = functions.https.onCall(async (data: IndexChunksInpu
   return await indexChunksCore({ chunks });
 });
 
+// answer question with RAG (retrieve & generate)
+// input: { question: string; topK?: number; model?: string }
+// returns: { reply: string; sources: Array<{ id: string|number; score: number; payload?: any }> }
 export const answerWithRagFn = functions.https.onCall(async (data: AnswerWithRagInput) => {
   const question = String(data?.question || "").trim();
   const topK = Number(data?.topK ?? 5);
