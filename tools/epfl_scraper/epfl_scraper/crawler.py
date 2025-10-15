@@ -4,6 +4,10 @@ import asyncio
 from collections import deque
 from typing import Deque, List, Optional, Set
 
+import logging
+import signal
+import time
+
 from .config import ScraperConfig
 from .fetch import PoliteHttpClient
 from .extract import extract_text
@@ -36,25 +40,77 @@ class Crawler:
         client = PoliteHttpClient(self.cfg)
         writer = JsonlWriter(self.cfg.output_jsonl)
         seen: Set[str] = set(queue)
+        logger = logging.getLogger("epfl_scraper.crawler")
+
+        start_ts = time.monotonic()
+        stop_requested = False
+
+        def _on_sigint(signum, frame):  # type: ignore[override]
+            nonlocal stop_requested
+            stop_requested = True
+            logger.info("SIGINT received; will checkpoint and stop soon…")
+
+        try:
+            signal.signal(signal.SIGINT, _on_sigint)
+        except Exception:
+            # Some platforms may not support signal in this context
+            pass
 
         try:
             pages_processed = 0
+            skipped_pages = 0
             while queue and pages_processed < self.cfg.max_pages:
+                if stop_requested:
+                    break
                 url = queue.popleft()
                 if url in self.visited:
                     continue
                 if not is_epfl_domain(url) or has_disallowed_extension(url) or not is_allowed_path(url, self.cfg.allow_paths):
                     self.visited.add(url)
+                    skipped_pages += 1
+                    # Periodic metrics
+                    if pages_processed and pages_processed % self.cfg.checkpoint_every == 0:
+                        elapsed = max(1e-6, time.monotonic() - start_ts)
+                        rate = pages_processed / elapsed
+                        logger.info(
+                            "processed=%d rate=%.2f/s skipped=%d frontier=%d",
+                            pages_processed,
+                            rate,
+                            skipped_pages,
+                            len(queue),
+                        )
                     continue
 
                 result = await client.fetch(url)
                 if result is None:
                     self.visited.add(url)
+                    skipped_pages += 1
+                    if pages_processed and pages_processed % self.cfg.checkpoint_every == 0:
+                        elapsed = max(1e-6, time.monotonic() - start_ts)
+                        rate = pages_processed / elapsed
+                        logger.info(
+                            "processed=%d rate=%.2f/s skipped=%d frontier=%d",
+                            pages_processed,
+                            rate,
+                            skipped_pages,
+                            len(queue),
+                        )
                     continue
 
                 # Filter content type
                 if not is_html_like_content_type(result.content_type):
                     self.visited.add(url)
+                    skipped_pages += 1
+                    if pages_processed and pages_processed % self.cfg.checkpoint_every == 0:
+                        elapsed = max(1e-6, time.monotonic() - start_ts)
+                        rate = pages_processed / elapsed
+                        logger.info(
+                            "processed=%d rate=%.2f/s skipped=%d frontier=%d",
+                            pages_processed,
+                            rate,
+                            skipped_pages,
+                            len(queue),
+                        )
                     continue
 
                 text, title, lang = (None, None, None)
@@ -92,8 +148,26 @@ class Crawler:
                 self.visited.add(url)
                 pages_processed += 1
 
-                if self.cfg.save_frontier:
+                # Periodic checkpoint and metrics
+                if self.cfg.save_frontier and (
+                    pages_processed % max(1, self.cfg.checkpoint_every) == 0
+                ):
                     self.frontier.save(queue)
+                    elapsed = max(1e-6, time.monotonic() - start_ts)
+                    rate = pages_processed / elapsed
+                    logger.info(
+                        "processed=%d rate=%.2f/s skipped=%d frontier=%d",
+                        pages_processed,
+                        rate,
+                        skipped_pages,
+                        len(queue),
+                    )
         finally:
             await client.close()
             writer.close()
+            # Final checkpoint on exit
+            try:
+                if self.cfg.save_frontier:
+                    self.frontier.save(queue)
+            except Exception:
+                pass

@@ -65,7 +65,10 @@ class PoliteHttpClient:
         now = time.monotonic()
         elapsed = now - self._last_request_ts
         if elapsed < min_interval:
-            await asyncio.sleep(min_interval - elapsed + random.uniform(0, self.cfg.jitter_s))
+            await asyncio.sleep(min_interval - elapsed)
+        # Apply small jitter once, after interval enforcement to avoid compounding delays
+        if self.cfg.jitter_s > 0:
+            await asyncio.sleep(random.uniform(0, self.cfg.jitter_s))
 
     async def fetch(self, url: str) -> Optional[FetchResult]:
         if self.cfg.obey_robots and not self._robots.allowed(self.cfg.user_agent, url):

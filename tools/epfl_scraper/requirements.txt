@@ -8,3 +8,4 @@ tqdm>=4.66,<5
 
 # Optional but helpful
 charset-normalizer>=3.3,<4
+rich>=13,<14

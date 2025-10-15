@@ -29,6 +29,7 @@ class ScraperConfig:
 
     # Advanced
     save_frontier: bool = True
+    checkpoint_every: int = 100  # pages
 
     def ensure_dirs(self) -> None:
         if self.mirror_dir:

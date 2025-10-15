@@ -38,13 +38,33 @@ python -m epfl_scraper \
   --rate 1.0
 ```
 
+### Language shortcut
+
+Switch between FR/EN presets without typing full URLs:
+
+```bash
+PYTHONPATH=tools/epfl_scraper python -m epfl_scraper --lang en --rate 1.5
+```
+
+This sets `--start` to `https://www.epfl.ch/education/` and `--allow-path` to `/education/`.
+
+### Checkpointing and restart
+
+The crawler periodically checkpoints the frontier every `--checkpoint-every` pages (default 100) and on Ctrl+C. State is kept in `--state-dir`.
+
+To restart a crawl, simply run the same command again; the frontier will be reloaded automatically.
+
+```bash
+PYTHONPATH=tools/epfl_scraper python -m epfl_scraper --lang fr --checkpoint-every 100
+```
+
 ## Output JSONL schema
 
 Each line is a JSON object with fields:
 
 - `url`, `canonical_url`, `fetched_at`, `status_code`, `content_type`, `title`, `lang`, `text`, `checksum`, `section`
 
-Example:
+Example output record:
 
 ```json
 {"url":"https://www.epfl.ch/education/admission/admission-2/bachelor-admission-criteria-and-application/","title":"Bachelor/CMS admission criteria & application","text":"In addition to this page, please consult...","fetched_at":"2025-10-09T12:00:00Z","status_code":200,"content_type":"text/html; charset=utf-8","lang":"en","canonical_url":null,"checksum":"<sha256>","section":"education"}
