@@ -108,6 +108,11 @@ class AuthUIScreenTest {
       }
     }
 
+    // Let enter animations settle on CI
+    composeRule.waitForIdle()
+    composeRule.mainClock.advanceTimeBy(1000)
+    composeRule.waitForIdle()
+
     // Le CircularProgressIndicator devrait être visible sur le bouton Microsoft
     composeRule.onNodeWithTag(AuthTags.MsProgress).assertIsDisplayed()
 
@@ -126,6 +131,11 @@ class AuthUIScreenTest {
             onSwitchEduLogin = {})
       }
     }
+
+    // Let enter animations settle on CI
+    composeRule.waitForIdle()
+    composeRule.mainClock.advanceTimeBy(1000)
+    composeRule.waitForIdle()
 
     // Le CircularProgressIndicator devrait être visible sur le bouton Switch
     composeRule.onNodeWithTag(AuthTags.SwitchProgress).assertIsDisplayed()
@@ -146,6 +156,11 @@ class AuthUIScreenTest {
             onSwitchEduLogin = {})
       }
     }
+
+    // Let enter animations settle on CI
+    composeRule.waitForIdle()
+    composeRule.mainClock.advanceTimeBy(1000)
+    composeRule.waitForIdle()
 
     // Vérifie que le progress indicator Microsoft est visible
     composeRule.onNodeWithTag(AuthTags.MsProgress).assertIsDisplayed()
