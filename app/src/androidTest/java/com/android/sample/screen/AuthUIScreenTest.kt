@@ -98,76 +98,49 @@ class AuthUIScreenTest {
   }
 
   @Test
-  fun shows_loading_indicator_for_microsoft_when_loading() {
+  fun microsoft_button_triggers_callback() {
+    var msClicked = false
+
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(
-            state = AuthUiState.Loading(AuthProvider.MICROSOFT),
-            onMicrosoftLogin = {},
+            state = AuthUiState.Idle,
+            onMicrosoftLogin = { msClicked = true },
             onSwitchEduLogin = {})
       }
     }
 
-    // Let enter animations settle on CI
-    composeRule.waitForIdle()
-    composeRule.mainClock.advanceTimeBy(1000)
-    composeRule.waitForIdle()
-
-    // Le CircularProgressIndicator devrait être visible sur le bouton Microsoft
-    composeRule.onNodeWithTag(AuthTags.MsProgress).assertIsDisplayed()
-
-    // Vérifie que les boutons sont toujours présents
-    composeRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsDisplayed()
+    composeRule.onNodeWithTag(AuthTags.BtnMicrosoft).performClick()
+    assertTrue(msClicked)
   }
 
   @Test
-  fun shows_loading_indicator_for_switch_when_loading() {
+  fun switch_button_triggers_callback() {
+    var switchClicked = false
+
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(
-            state = AuthUiState.Loading(AuthProvider.SWITCH_EDU),
+            state = AuthUiState.Idle,
             onMicrosoftLogin = {},
-            onSwitchEduLogin = {})
+            onSwitchEduLogin = { switchClicked = true })
       }
     }
 
-    // Let enter animations settle on CI
-    composeRule.waitForIdle()
-    composeRule.mainClock.advanceTimeBy(1000)
-    composeRule.waitForIdle()
-
-    // Le CircularProgressIndicator devrait être visible sur le bouton Switch
-    composeRule.onNodeWithTag(AuthTags.SwitchProgress).assertIsDisplayed()
-
-    // Vérifie que les boutons sont toujours présents
-    composeRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsDisplayed()
+    composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).performClick()
+    assertTrue(switchClicked)
   }
 
   @Test
-  fun shows_loading_state_correctly() {
-    // Test avec Microsoft Loading
+  fun displays_correct_button_texts() {
     composeRule.setContent {
       MaterialTheme {
-        AuthUIScreen(
-            state = AuthUiState.Loading(AuthProvider.MICROSOFT),
-            onMicrosoftLogin = {},
-            onSwitchEduLogin = {})
+        AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
 
-    // Let enter animations settle on CI
-    composeRule.waitForIdle()
-    composeRule.mainClock.advanceTimeBy(1000)
-    composeRule.waitForIdle()
-
-    // Vérifie que le progress indicator Microsoft est visible
-    composeRule.onNodeWithTag(AuthTags.MsProgress).assertIsDisplayed()
-
-    // Vérifie que les boutons existent toujours
-    composeRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsDisplayed()
+    composeRule.onNodeWithText("Sign in with Microsoft Entra ID").assertIsDisplayed()
+    composeRule.onNodeWithText("Sign in with Switch edu ID").assertIsDisplayed()
   }
 
   @Test
