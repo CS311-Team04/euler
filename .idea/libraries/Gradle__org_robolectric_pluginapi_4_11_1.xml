@@ -1,0 +1,14 @@
+<component name="libraryTable">
+  <library name="Gradle: org.robolectric:pluginapi:4.11.1" type="java-imported" external-system-id="GRADLE">
+    <properties groupId="org.robolectric" artifactId="pluginapi" version="4.11.1" baseVersion="4.11.1" />
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.robolectric/pluginapi/4.11.1/ca139a5a00fe48b5422a8de4954086f12567a432/pluginapi-4.11.1.jar!/" />
+    </CLASSES>
+    <JAVADOC>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.robolectric/pluginapi/4.11.1/db56cb71eb4c7f77afb3fbeb67a5279294c18e6a/pluginapi-4.11.1-javadoc.jar!/" />
+    </JAVADOC>
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.robolectric/pluginapi/4.11.1/15a59e2b49a37a05b32b73b94f9eee1cdc2781b8/pluginapi-4.11.1-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

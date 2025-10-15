@@ -1,0 +1,14 @@
+<component name="libraryTable">
+  <library name="Gradle: org.robolectric:shadows-versioning:4.11.1" type="java-imported" external-system-id="GRADLE">
+    <properties groupId="org.robolectric" artifactId="shadows-versioning" version="4.11.1" baseVersion="4.11.1" />
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.robolectric/shadows-versioning/4.11.1/21533a913d3e6c5f2733d9927ff2f21e0418825e/shadows-versioning-4.11.1.jar!/" />
+    </CLASSES>
+    <JAVADOC>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.robolectric/shadows-versioning/4.11.1/daffd58f4288ea96429501f4e858ec26adbddaf9/shadows-versioning-4.11.1-javadoc.jar!/" />
+    </JAVADOC>
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.robolectric/shadows-versioning/4.11.1/2685bc47b587300049ff496e249a4066c9704c9e/shadows-versioning-4.11.1-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>
