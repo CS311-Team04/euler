@@ -98,52 +98,6 @@ class AuthUIScreenTest {
   }
 
   @Test
-  fun microsoft_button_triggers_callback() {
-    var msClicked = false
-
-    composeRule.setContent {
-      MaterialTheme {
-        AuthUIScreen(
-            state = AuthUiState.Idle,
-            onMicrosoftLogin = { msClicked = true },
-            onSwitchEduLogin = {})
-      }
-    }
-
-    composeRule.onNodeWithTag(AuthTags.BtnMicrosoft).performClick()
-    assertTrue(msClicked)
-  }
-
-  @Test
-  fun switch_button_triggers_callback() {
-    var switchClicked = false
-
-    composeRule.setContent {
-      MaterialTheme {
-        AuthUIScreen(
-            state = AuthUiState.Idle,
-            onMicrosoftLogin = {},
-            onSwitchEduLogin = { switchClicked = true })
-      }
-    }
-
-    composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).performClick()
-    assertTrue(switchClicked)
-  }
-
-  @Test
-  fun displays_correct_button_texts() {
-    composeRule.setContent {
-      MaterialTheme {
-        AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
-      }
-    }
-
-    composeRule.onNodeWithText("Sign in with Microsoft Entra ID").assertIsDisplayed()
-    composeRule.onNodeWithText("Sign in with Switch edu ID").assertIsDisplayed()
-  }
-
-  @Test
   fun displays_correct_button_texts() {
     composeRule.setContent {
       MaterialTheme {
