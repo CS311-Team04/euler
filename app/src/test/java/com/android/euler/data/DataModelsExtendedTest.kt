@@ -1,8 +1,8 @@
 package com.android.euler.data
 
+import com.android.sample.data.models.QueryLog
 import com.android.sample.data.models.UserProfile
 import com.android.sample.data.models.UserSettings
-import com.android.sample.data.models.QueryLog
 import com.google.firebase.Timestamp
 import org.junit.Assert.*
 import org.junit.Test
@@ -18,16 +18,17 @@ class DataModelsExtendedTest {
     fun `UserProfile constructor with all parameters`() {
         val timestamp = Timestamp.now()
         val roles = listOf("admin", "user", "moderator")
-        
-        val profile = UserProfile(
-            uid = "test-uid-123",
-            email = "test@example.com",
-            displayName = "Test User Name",
-            photoUrl = "https://example.com/photo.jpg",
-            createdAt = timestamp,
-            roles = roles
-        )
-        
+
+        val profile =
+            UserProfile(
+                uid = "test-uid-123",
+                email = "test@example.com",
+                displayName = "Test User Name",
+                photoUrl = "https://example.com/photo.jpg",
+                createdAt = timestamp,
+                roles = roles
+            )
+
         assertEquals("test-uid-123", profile.uid)
         assertEquals("test@example.com", profile.email)
         assertEquals("Test User Name", profile.displayName)
@@ -41,16 +42,17 @@ class DataModelsExtendedTest {
     @Test
     fun `UserProfile with empty roles list`() {
         val timestamp = Timestamp.now()
-        
-        val profile = UserProfile(
-            uid = "empty-roles-uid",
-            email = "empty@example.com",
-            displayName = "Empty Roles User",
-            photoUrl = "",
-            createdAt = timestamp,
-            roles = emptyList()
-        )
-        
+
+        val profile =
+            UserProfile(
+                uid = "empty-roles-uid",
+                email = "empty@example.com",
+                displayName = "Empty Roles User",
+                photoUrl = "",
+                createdAt = timestamp,
+                roles = emptyList()
+            )
+
         assertTrue("Roles should be empty", profile.roles.isEmpty())
         assertEquals("", profile.photoUrl)
     }
@@ -58,21 +60,15 @@ class DataModelsExtendedTest {
     @Test
     fun `UserSettings with all boolean combinations`() {
         // Test avec notifications activées
-        val settingsEnabled = UserSettings(
-            language = "en",
-            notificationsEnabled = true,
-            theme = "light"
-        )
+        val settingsEnabled =
+            UserSettings(language = "en", notificationsEnabled = true, theme = "light")
         assertTrue("Notifications should be enabled", settingsEnabled.notificationsEnabled)
         assertEquals("en", settingsEnabled.language)
         assertEquals("light", settingsEnabled.theme)
-        
+
         // Test avec notifications désactivées
-        val settingsDisabled = UserSettings(
-            language = "fr",
-            notificationsEnabled = false,
-            theme = "dark"
-        )
+        val settingsDisabled =
+            UserSettings(language = "fr", notificationsEnabled = false, theme = "dark")
         assertFalse("Notifications should be disabled", settingsDisabled.notificationsEnabled)
         assertEquals("fr", settingsDisabled.language)
         assertEquals("dark", settingsDisabled.theme)
@@ -82,17 +78,18 @@ class DataModelsExtendedTest {
     fun `QueryLog with all fields populated`() {
         val timestamp = Timestamp.now()
         val sources = listOf("source1.pdf", "source2.txt", "source3.docx")
-        
-        val queryLog = QueryLog(
-            prompt = "What is the meaning of life?",
-            userUid = "user-123",
-            createdAt = timestamp,
-            tokensIn = 150,
-            tokensOut = 300,
-            sources = sources,
-            resultId = "result-456"
-        )
-        
+
+        val queryLog =
+            QueryLog(
+                prompt = "What is the meaning of life?",
+                userUid = "user-123",
+                createdAt = timestamp,
+                tokensIn = 150,
+                tokensOut = 300,
+                sources = sources,
+                resultId = "result-456"
+            )
+
         assertEquals("What is the meaning of life?", queryLog.prompt)
         assertEquals("user-123", queryLog.userUid)
         assertEquals(timestamp, queryLog.createdAt)
@@ -106,17 +103,18 @@ class DataModelsExtendedTest {
     @Test
     fun `QueryLog with zero tokens`() {
         val timestamp = Timestamp.now()
-        
-        val queryLog = QueryLog(
-            prompt = "Empty query",
-            userUid = "user-zero",
-            createdAt = timestamp,
-            tokensIn = 0,
-            tokensOut = 0,
-            sources = emptyList(),
-            resultId = "empty-result"
-        )
-        
+
+        val queryLog =
+            QueryLog(
+                prompt = "Empty query",
+                userUid = "user-zero",
+                createdAt = timestamp,
+                tokensIn = 0,
+                tokensOut = 0,
+                sources = emptyList(),
+                resultId = "empty-result"
+            )
+
         assertEquals(0, queryLog.tokensIn)
         assertEquals(0, queryLog.tokensOut)
         assertTrue("Sources should be empty", queryLog.sources.isEmpty())
@@ -125,17 +123,18 @@ class DataModelsExtendedTest {
     @Test
     fun `QueryLog with large token counts`() {
         val timestamp = Timestamp.now()
-        
-        val queryLog = QueryLog(
-            prompt = "Large query with many tokens",
-            userUid = "user-large",
-            createdAt = timestamp,
-            tokensIn = 10000,
-            tokensOut = 50000,
-            sources = listOf("large-document.pdf"),
-            resultId = "large-result"
-        )
-        
+
+        val queryLog =
+            QueryLog(
+                prompt = "Large query with many tokens",
+                userUid = "user-large",
+                createdAt = timestamp,
+                tokensIn = 10000,
+                tokensOut = 50000,
+                sources = listOf("large-document.pdf"),
+                resultId = "large-result"
+            )
+
         assertEquals(10000, queryLog.tokensIn)
         assertEquals(50000, queryLog.tokensOut)
         assertEquals(1, queryLog.sources.size)
