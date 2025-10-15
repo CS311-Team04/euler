@@ -6,7 +6,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import java.lang.reflect.Method
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -19,12 +18,14 @@ class EulerAppTest {
 
     @Test
     fun `EulerApp should have onCreate method`() {
-        val onCreateMethod = EulerApp::class.java.methods
-            .find { it.name == "onCreate" }
-        
+        val onCreateMethod = EulerApp::class.java.methods.find { it.name == "onCreate" }
+
         assertNotNull("onCreate method should exist", onCreateMethod)
-        assertEquals("onCreate should be public", java.lang.reflect.Modifier.PUBLIC, 
-            onCreateMethod!!.modifiers and java.lang.reflect.Modifier.PUBLIC)
+        assertEquals(
+            "onCreate should be public",
+            java.lang.reflect.Modifier.PUBLIC,
+            onCreateMethod!!.modifiers and java.lang.reflect.Modifier.PUBLIC
+        )
     }
 
     @Test
@@ -36,7 +37,7 @@ class EulerAppTest {
     @Test
     fun `EulerApp companion should have expected methods`() {
         val companionMethods = EulerApp.Companion::class.java.methods.map { it.name }
-        
+
         // Test that companion has methods (they might be private, but should exist)
         assertTrue("Companion should have methods", companionMethods.isNotEmpty())
     }
@@ -48,5 +49,3 @@ class EulerAppTest {
         assertEquals("Should extend Application", "android.app.Application", superclass!!.name)
     }
 }
-
-
