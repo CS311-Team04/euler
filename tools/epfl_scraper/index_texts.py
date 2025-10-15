@@ -1,7 +1,6 @@
 # tools/index_texts.py
 import os, requests, hashlib, nltk
 from pathlib import Path
-nltk.download("punkt", quiet=True)
 from nltk.tokenize import sent_tokenize #library used to break document into linguistic sentences, not arbitrary character spans.
 from dotenv import load_dotenv
 import os
@@ -20,7 +19,7 @@ def chunk_text(text, max_chars=1500, overlap=200):
             buf += " " + s
         else:
             chunks.append(buf.strip())
-            buf = s[-overlap:] if overlap < len(s) else s
+            buf = (buf[-overlap:].strip() + " " + s).strip() 
     if buf.strip():
         chunks.append(buf.strip())
     return chunks
