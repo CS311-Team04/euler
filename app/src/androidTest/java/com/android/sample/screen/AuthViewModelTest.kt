@@ -29,13 +29,13 @@ class AuthViewModelTest {
   }
 
   @Test
-  fun `initial state is Idle`() {
+  fun initial_state_is_Idle() {
     val vm = AuthViewModel()
     assertEquals(AuthUiState.Idle, vm.state.value)
   }
 
   @Test
-  fun `onMicrosoftLoginClick sets Loading state with Microsoft provider`() = runTest {
+  fun onMicrosoftLoginClick_sets_Loading_state_with_Microsoft_provider() = runTest {
     val vm = AuthViewModel()
 
     vm.onMicrosoftLoginClick()
@@ -47,7 +47,7 @@ class AuthViewModelTest {
   }
 
   @Test
-  fun `onSwitchEduLoginClick sets Loading state with SwitchEdu provider`() = runTest {
+  fun onSwitchEduLoginClick_sets_Loading_state_with_SwitchEdu_provider() = runTest {
     val vm = AuthViewModel()
 
     vm.onSwitchEduLoginClick()
@@ -59,7 +59,7 @@ class AuthViewModelTest {
   }
 
   @Test
-  fun `Microsoft login eventually becomes SignedIn after delay`() = runTest {
+  fun Microsoft_login_eventually_becomes_SignedIn_after_delay() = runTest {
     val vm = AuthViewModel()
 
     vm.onMicrosoftLoginClick()
@@ -76,7 +76,7 @@ class AuthViewModelTest {
   }
 
   @Test
-  fun `SwitchEdu login eventually becomes SignedIn after delay`() = runTest {
+  fun SwitchEdu_login_eventually_becomes_SignedIn_after_delay() = runTest {
     val vm = AuthViewModel()
 
     vm.onSwitchEduLoginClick()
@@ -93,7 +93,7 @@ class AuthViewModelTest {
   }
 
   @Test
-  fun `cannot trigger second login while already loading`() = runTest {
+  fun cannot_trigger_second_login_while_already_loading() = runTest {
     val vm = AuthViewModel()
 
     // Lance un login Microsoft
@@ -112,7 +112,7 @@ class AuthViewModelTest {
   }
 
   @Test
-  fun `multiple clicks on same provider while loading are ignored`() = runTest {
+  fun multiple_clicks_on_same_provider_while_loading_are_ignored() = runTest {
     val vm = AuthViewModel()
 
     vm.onMicrosoftLoginClick()
@@ -129,7 +129,7 @@ class AuthViewModelTest {
   }
 
   @Test
-  fun `state sequence is Idle to Loading to SignedIn`() = runTest {
+  fun state_sequence_is_Idle_to_Loading_to_SignedIn() = runTest {
     val vm = AuthViewModel()
     val states = mutableListOf<AuthUiState>()
 

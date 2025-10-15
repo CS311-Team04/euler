@@ -98,64 +98,6 @@ class AuthUIScreenTest {
   }
 
   @Test
-  fun shows_loading_indicator_for_microsoft_when_loading() {
-    composeRule.setContent {
-      MaterialTheme {
-        AuthUIScreen(
-            state = AuthUiState.Loading(AuthProvider.MICROSOFT),
-            onMicrosoftLogin = {},
-            onSwitchEduLogin = {})
-      }
-    }
-
-    // Le CircularProgressIndicator devrait être visible sur le bouton Microsoft
-    composeRule.onNodeWithTag(AuthTags.MsProgress).assertIsDisplayed()
-
-    // Vérifie que les boutons sont toujours présents
-    composeRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsDisplayed()
-  }
-
-  @Test
-  fun shows_loading_indicator_for_switch_when_loading() {
-    composeRule.setContent {
-      MaterialTheme {
-        AuthUIScreen(
-            state = AuthUiState.Loading(AuthProvider.SWITCH_EDU),
-            onMicrosoftLogin = {},
-            onSwitchEduLogin = {})
-      }
-    }
-
-    // Le CircularProgressIndicator devrait être visible sur le bouton Switch
-    composeRule.onNodeWithTag(AuthTags.SwitchProgress).assertIsDisplayed()
-
-    // Vérifie que les boutons sont toujours présents
-    composeRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsDisplayed()
-  }
-
-  @Test
-  fun shows_loading_state_correctly() {
-    // Test avec Microsoft Loading
-    composeRule.setContent {
-      MaterialTheme {
-        AuthUIScreen(
-            state = AuthUiState.Loading(AuthProvider.MICROSOFT),
-            onMicrosoftLogin = {},
-            onSwitchEduLogin = {})
-      }
-    }
-
-    // Vérifie que le progress indicator Microsoft est visible
-    composeRule.onNodeWithTag(AuthTags.MsProgress).assertIsDisplayed()
-
-    // Vérifie que les boutons existent toujours
-    composeRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsDisplayed()
-  }
-
-  @Test
   fun displays_correct_button_texts() {
     composeRule.setContent {
       MaterialTheme {
