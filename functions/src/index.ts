@@ -4,12 +4,13 @@ import path from "node:path";
 import dotenv from "dotenv";
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
-import { setGlobalOptions } from "firebase-functions";
+//import { setGlobalOptions } from "firebase-functions";
 import * as logger from "firebase-functions/logger";
-import { onCallGenkit } from "firebase-functions/https";
-import { genkit, z } from "genkit";
+//import { onCallGenkit } from "firebase-functions/https";
+//import { genkit, z } from "genkit";
 import OpenAI from "openai";
 import { randomUUID } from "node:crypto";
+
 
 /* ---------- helpers ---------- */
 function withV1(url?: string): string {
@@ -35,8 +36,8 @@ function normalizePointId(id: string | number): string | number {
 }
 
 /* ---------- clients ---------- */
-setGlobalOptions({ maxInstances: 10 });
-const ai = genkit({ plugins: [] });
+//setGlobalOptions({ maxInstances: 10 });
+//const ai = genkit({ plugins: [] });
 
 // Chat = PublicAI (Apertus)
 const chatClient = new OpenAI({
@@ -53,37 +54,28 @@ const EMBED_MODEL = process.env.EMBED_MODEL_ID!; // ex: "jina-embeddings-v3"
 /* =========================================================
  *                         CHAT (optionnel)
  * ======================================================= */
-export const apertusChat = ai.defineFlow(
-  {
-    name: "apertusChat",
-    inputSchema: z.object({
-      messages: z.array(z.object({
-        role: z.enum(["user", "assistant", "system"]),
-        content: z.string(),
-      })),
-      temperature: z.number().optional(),
-      model: z.string().optional(),
-    }),
-    outputSchema: z.object({ reply: z.string() }),
-  },
-  async ({ messages, model, temperature }) => {
-    const resp = await chatClient.chat.completions.create({
-      model: model ?? process.env.APERTUS_MODEL_ID!,
-      messages,
-      temperature: temperature ?? 0.2,
-    });
-    const reply = resp.choices?.[0]?.message?.content ?? "";
-    logger.info("apertusChat success", { length: reply.length });
-    return { reply };
-  }
-);
-export const apertusChatFn = onCallGenkit({ cors: true }, apertusChat);
+export async function apertusChatFnCore(
+  { messages, model, temperature }:
+  { messages: Array<{role:"user"|"assistant"|"system"; content:string}>;
+    model?: string; temperature?: number; }
+){
+  const resp = await chatClient.chat.completions.create({
+    model: model ?? process.env.APERTUS_MODEL_ID!,
+    messages,
+    temperature: temperature ?? 0.2,
+  });
+  const reply = resp.choices?.[0]?.message?.content ?? "";
+  logger.info("apertusChat success", { length: reply.length });
+  return { reply };
+}
+//export const apertusChatFn = onCallGenkit({ cors: true }, apertusChat);
 
 /* =========================================================
  *                   QDRANT HELPERS
  * ======================================================= */
 type QdrantPoint = { id: string | number; vector: number[]; payload?: any };
 
+// make sure collection exists (no-op if already exists)  
 async function qdrantEnsureCollection(dimension: number) {
   const base = process.env.QDRANT_URL!;
   const key = process.env.QDRANT_API_KEY!;
@@ -103,6 +95,9 @@ async function qdrantEnsureCollection(dimension: number) {
   }
 }
 
+// upsert points (batch)
+// points: Array<{ id: string|number; vector: number[]; payload?: any }>
+//
 async function qdrantUpsert(points: QdrantPoint[]) {
   const res = await fetch(
     `${process.env.QDRANT_URL}/collections/${process.env.QDRANT_COLLECTION}/points?wait=true`,
@@ -121,6 +116,8 @@ async function qdrantUpsert(points: QdrantPoint[]) {
   }
 }
 
+// search points
+// returns Array<{ id: string|number; score: number; payload?: any }>
 async function qdrantSearch(vector: number[], topK = 5) {
   const r = await fetch(
     `${process.env.QDRANT_URL}/collections/${process.env.QDRANT_COLLECTION}/points/search`,
@@ -192,6 +189,8 @@ async function sleep(ms: number) {
   return new Promise((res) => setTimeout(res, ms));
 }
 
+// embed in batches with pauses
+// to avoid rate limits
 async function embedInBatches(allTexts: string[], batchSize = 16, pauseMs = 150): Promise<number[][]> {
   const out: number[][] = [];
   for (let i = 0; i < allTexts.length; i += batchSize) {
@@ -206,98 +205,89 @@ async function embedInBatches(allTexts: string[], batchSize = 16, pauseMs = 150)
 /* =========================================================
  *            INGESTION DIRECTE DE CHUNKS: indexChunks
  * ======================================================= */
-export const indexChunks = ai.defineFlow(
-  {
-    name: "indexChunks",
-    inputSchema: z.object({
-      chunks: z.array(z.object({
-        id: z.string(),               // libre: on normalise en uint/UUID pour Qdrant
-        text: z.string(),             // contenu du chunk
-        title: z.string().optional(),
-        url: z.string().optional(),
-        payload: z.record(z.any()).optional(),
-      })),
-    }),
-    outputSchema: z.object({ count: z.number(), dim: z.number() }),
-  },
-  async ({ chunks }) => {
-    if (!chunks.length) return { count: 0, dim: 0 };
 
-    const texts = chunks.map((c) => c.text);
-    const vectors = await embedInBatches(texts, 16, 150);
-    const dim = vectors[0].length;
-
-    await qdrantEnsureCollection(dim);
-
-    const points: QdrantPoint[] = vectors.map((v, i) => ({
-      id: normalizePointId(chunks[i].id),
-      vector: v,
-      payload: {
-        original_id: chunks[i].id,
-        text: chunks[i].text,
-        title: chunks[i].title,
-        url: chunks[i].url,
-        ...(chunks[i].payload ?? {}),
-      },
-    }));
-    await qdrantUpsert(points);
-
-    logger.info("indexChunks", { count: chunks.length, dim });
-    return { count: chunks.length, dim };
-  }
-);
-export const indexChunksFn = onCallGenkit({ cors: true }, indexChunks);
+// index chunks (id, text, optional metadata) in Qdrant
+// input: { chunks: Array<{ id:string; text:string; title?:string; url?:string; payload?:any }> }
+// returns: { count: number of chunks indexed, dim: embedding dimension }
+export async function indexChunksCore(
+  { chunks }: { chunks: Array<{id:string; text:string; title?:string; url?:string; payload?:any}> }
+){
+  if (!chunks.length) return { count: 0, dim: 0 };
+  const texts = chunks.map((c) => c.text);
+  const vectors = await embedInBatches(texts, 16, 150);
+  const dim = vectors[0].length;
+  await qdrantEnsureCollection(dim);
+  const points = vectors.map((v, i) => ({
+    id: normalizePointId(chunks[i].id),
+    vector: v,
+    payload: { original_id: chunks[i].id, text: chunks[i].text, title: chunks[i].title, url: chunks[i].url, ...(chunks[i].payload ?? {}) },
+  }));
+  await qdrantUpsert(points);
+  logger.info("indexChunks", { count: chunks.length, dim });
+  return { count: chunks.length, dim };
+}
+//export const indexChunksFn = onCallGenkit({ cors: true }, indexChunks);
 
 /* =========================================================
  *                REQUÊTE: answerWithRag
  * ======================================================= */
-export const answerWithRag = ai.defineFlow(
-  {
-    name: "answerWithRag",
-    inputSchema: z.object({
-      question: z.string(),
-      topK: z.number().optional(),
-      model: z.string().optional(),
-    }),
-    outputSchema: z.object({
-      reply: z.string(),
-      sources: z.array(z.object({
-        id: z.union([z.string(), z.number()]),
-        score: z.number(),
-        payload: z.record(z.any()).optional(),
-      })),
-    }),
-  },
-  async ({ question, topK, model }) => {
-    // 1) embed de la question
-    const [queryVec] = await embedInBatches([question], 1, 0);
 
-    // 2) recherche vectorielle
-    const hits = await qdrantSearch(queryVec, topK ?? 5);
-    const context = hits
-      .map((h) => `• ${h.payload?.title ? `[${h.payload.title}] ` : ""}${h.payload?.text ?? ""}`)
-      .join("\n\n");
+// answer question with RAG (retrieve & generate)
+// input: { question: string; topK?: number; model?: string }
+// returns: { reply: string; sources: Array<{ id: string|number; score: number; payload?: any }> }
+export async function answerWithRagCore(
+  { question, topK, model }:{ question:string; topK?:number; model?:string }
+){
+  const [queryVec] = await embedInBatches([question], 1, 0);
+  const hits = await qdrantSearch(queryVec, topK ?? 5);
+  const context = hits.map(h => `• ${h.payload?.title ? `[${h.payload.title}] ` : ""}${h.payload?.text ?? ""}`).join("\n\n");
+  const prompt = [
+    "Tu es un assistant concis. Réponds uniquement en t'appuyant sur le contexte fourni et tu t'appelles euler.",
+    context ? `\nContexte:\n${context}\n` : "\n(Contexte vide)\n",
+    `Question: ${question}`,
+    "\nSi l'information n'est pas dans le contexte, dis que tu ne sais pas."
+  ].join("\n");
+  const chat = await chatClient.chat.completions.create({
+    model: model ?? process.env.APERTUS_MODEL_ID!,
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.2,
+  });
+  return {
+    reply: chat.choices?.[0]?.message?.content ?? "",
+    sources: hits.map(h => ({ id: h.id, score: h.score, payload: h.payload })),
+  };
+}
+//export const answerWithRagFn = onCallGenkit({ cors: true }, answerWithRag);
 
-    // 3) PROMPT: un seul message user
-    const prompt = [
-      "Tu es un assistant concis. Réponds uniquement en t'appuyant sur le contexte fourni et tu t'appelles euler.",
-      context ? `\nContexte:\n${context}\n` : "\n(Contexte vide)\n",
-      `Question: ${question}`,
-      "\nSi l'information n'est pas dans le contexte, dis que tu ne sais pas."
-    ].join("\n");
+import * as functions from "firebase-functions/v1";
 
-    const messages = [{ role: "user" as const, content: prompt }];
+export const ping = functions.https.onRequest((_req, res) => {
+  res.status(200).send("pong");
+});
 
-    const chat = await chatClient.chat.completions.create({
-      model: model ?? process.env.APERTUS_MODEL_ID!,
-      messages,
-      temperature: 0.2,
-    });
+type IndexChunksInput = { chunks: Array<{id:string; text:string; title?:string; url?:string; payload?:any}> };
+type AnswerWithRagInput = { question:string; topK?:number; model?:string };
 
-    return {
-      reply: chat.choices?.[0]?.message?.content ?? "",
-      sources: hits.map((h) => ({ id: h.id, score: h.score, payload: h.payload })),
-    };
+// index chunks (id, text, optional metadata) in Qdrant
+// input: { chunks: Array<{ id:string; text:string; title?:string; url?:string; payload?:any }> }
+// returns: { count: number of chunks indexed, dim: embedding dimension }
+export const indexChunksFn = functions.https.onCall(async (data: IndexChunksInput) => {
+  const { chunks } = data || ({} as any);
+  if (!Array.isArray(chunks) || chunks.length === 0) {
+    throw new functions.https.HttpsError("invalid-argument", "Missing 'chunks'");
   }
-);
-export const answerWithRagFn = onCallGenkit({ cors: true }, answerWithRag);
+  return await indexChunksCore({ chunks });
+});
+
+// answer question with RAG (retrieve & generate)
+// input: { question: string; topK?: number; model?: string }
+// returns: { reply: string; sources: Array<{ id: string|number; score: number; payload?: any }> }
+export const answerWithRagFn = functions.https.onCall(async (data: AnswerWithRagInput) => {
+  const question = String(data?.question || "").trim();
+  const topK = Number(data?.topK ?? 5);
+  const model = data?.model;
+  if (!question) {
+    throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
+  }
+  return await answerWithRagCore({ question, topK, model });
+});
