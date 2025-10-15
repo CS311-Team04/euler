@@ -1,4 +1,4 @@
-package ch.epfl.euler.auth
+package com.android.sample.auth
 
 /** États possibles de l'authentification */
 sealed class AuthState {

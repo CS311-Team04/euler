@@ -1,14 +1,13 @@
 {
-  "client_id": "45ca64a4-bf4b-4fc2-b59d-3d4769157d58",
+  "client_id": "4ce3f083-dac7-4736-b3b7-fb64753e0654",
   "authorization_user_agent": "DEFAULT",
-  "account_mode": "SINGLE",
-  "redirect_uri": "msauth://ch.epfl.euler/X4jeBxPLAxY0pAf%2FYs2uu7hnsjs%3D",
+  "redirect_uri": "msauth://com.android.sample/X4jeBxPLAxY0pAf%2FYs2uu7hnsjs%3D",
   "authorities": [
     {
       "type": "AAD",
       "audience": {
-        "type": "AzureADMyOrg",
-        "tenant_id": "7526e0f9-0dcf-4152-afc0-fed84b0c0360"
+        "type": "AzureADandPersonalMicrosoftAccount",
+        "tenant_id": "common"
       }
     }
   ]

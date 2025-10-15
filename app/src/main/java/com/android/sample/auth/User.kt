@@ -1,4 +1,4 @@
-package ch.epfl.euler.auth
+package com.android.sample.auth
 
 /**
  * Modèle de données utilisateur
