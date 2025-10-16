@@ -17,17 +17,17 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class SecondActivityTest : TestCase() {
 
-    @get:Rule val composeTestRule = createAndroidComposeRule<SecondActivity>()
+  @get:Rule val composeTestRule = createAndroidComposeRule<SecondActivity>()
 
-    @Test
-    fun test() = run {
-        step("Start Second Activity") {
-            ComposeScreen.onComposeScreen<SecondScreen>(composeTestRule) {
-                simpleText {
-                    assertIsDisplayed()
-                    assertTextEquals("Hello Robolectric!")
-                }
-            }
+  @Test
+  fun test() = run {
+    step("Start Second Activity") {
+      ComposeScreen.onComposeScreen<SecondScreen>(composeTestRule) {
+        simpleText {
+          assertIsDisplayed()
+          assertTextEquals("Hello Robolectric!")
         }
+      }
     }
+  }
 }
