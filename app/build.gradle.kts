@@ -244,8 +244,3 @@ sonar {
         property("sonar.androidLint.reportPaths", "${project.layout.buildDirectory.get()}/reports/lint-results-debug.xml")
     }
 }
-
-// ktfmt configuration
-ktfmt {
-    kotlinLangStyle()
-}
