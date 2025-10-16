@@ -3,12 +3,14 @@ package com.android.sample.home
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.android.sample.TestConstants
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -19,6 +21,26 @@ import org.junit.runner.RunWith
 class HomeScreenTest {
 
   @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
+
+  @Test
+  fun renders_core_widgets() {
+    composeRule.setContent { MaterialTheme { HomeScreen() } }
+
+    // éléments app bar & actions
+    composeRule.onNodeWithTag(HomeTags.MenuBtn).assertIsDisplayed()
+    composeRule.onNodeWithTag(HomeTags.TopRightBtn).assertIsDisplayed()
+    composeRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed()
+    composeRule.onNodeWithTag(HomeTags.Action2Btn).assertIsDisplayed()
+
+    // champ + send
+    composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
+    composeRule.onNodeWithTag(HomeTags.SendBtn).assertIsDisplayed()
+
+    // logo au centre (Image avec contentDescription = "Euler")
+    composeRule
+        .onNode(hasContentDescription(TestConstants.ContentDescriptions.EULER))
+        .assertIsDisplayed()
+  }
 
   @Test
   fun typing_and_send_calls_callback_with_text() {
@@ -56,23 +78,39 @@ class HomeScreenTest {
   fun displays_correct_action_button_texts() {
     composeRule.setContent { MaterialTheme { HomeScreen() } }
 
-    composeRule.onNodeWithText("Find CS220 past exams").assertIsDisplayed()
-    composeRule.onNodeWithText("Check Ed Discussion").assertIsDisplayed()
+    composeRule.onNodeWithText(TestConstants.ButtonTexts.FIND_CS220_EXAMS).assertIsDisplayed()
+    composeRule.onNodeWithText(TestConstants.ButtonTexts.CHECK_ED_DISCUSSION).assertIsDisplayed()
   }
 
   @Test
   fun displays_correct_placeholder_text() {
     composeRule.setContent { MaterialTheme { HomeScreen() } }
 
-    composeRule.onNodeWithText("Message EULER").assertIsDisplayed()
+    composeRule.onNodeWithText(TestConstants.PlaceholderTexts.MESSAGE_EULER).assertIsDisplayed()
   }
 
   @Test
   fun displays_footer_text() {
     composeRule.setContent { MaterialTheme { HomeScreen() } }
 
+    composeRule.onNodeWithText(TestConstants.FooterTexts.POWERED_BY).assertIsDisplayed()
+  }
+
+  @Test
+  fun displays_icons_with_correct_content_descriptions() {
+    composeRule.setContent { MaterialTheme { HomeScreen() } }
+
     composeRule
-        .onNodeWithText("Powered by APERTUS Swiss LLM · MCP-enabled for 6 EPFL systems")
+        .onNode(hasContentDescription(TestConstants.ContentDescriptions.MENU))
+        .assertIsDisplayed()
+    composeRule
+        .onNode(hasContentDescription(TestConstants.ContentDescriptions.MORE))
+        .assertIsDisplayed()
+    composeRule
+        .onNode(hasContentDescription(TestConstants.ContentDescriptions.SEND))
+        .assertIsDisplayed()
+    composeRule
+        .onNode(hasContentDescription(TestConstants.ContentDescriptions.EULER))
         .assertIsDisplayed()
   }
 

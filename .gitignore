@@ -26,3 +26,8 @@ tools/epfl_scraper/data/
 /.github
 /build
 local.properties
+
+# Firebase debug files
+firestore-debug.log
+firebase-debug.log
+firebase-debug.*.log

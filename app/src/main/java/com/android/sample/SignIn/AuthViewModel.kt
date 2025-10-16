@@ -1,8 +1,9 @@
-package com.android.sample.authentification
+package com.android.sample.sign_in
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.delay
+import com.android.sample.authentification.AuthProvider
+import com.android.sample.authentification.AuthUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,7 +15,7 @@ class AuthViewModel : ViewModel() {
 
   fun onMicrosoftLoginClick() {
     if (_state.value is AuthUiState.Loading) return
-    startSignIn(AuthProvider.MICROSOFT)
+    _state.value = AuthUiState.Loading(AuthProvider.MICROSOFT)
   }
 
   fun onSwitchEduLoginClick() {
@@ -22,12 +23,20 @@ class AuthViewModel : ViewModel() {
     startSignIn(AuthProvider.SWITCH_EDU)
   }
 
+  fun onAuthenticationSuccess() {
+    _state.value = AuthUiState.SignedIn
+  }
+
+  fun onAuthenticationError(error: String) {
+    _state.value = AuthUiState.Error(error)
+  }
+
   private fun startSignIn(provider: AuthProvider) {
     _state.value = AuthUiState.Loading(provider)
     viewModelScope.launch {
       try {
-        // Simulate async work or hook real auth here
-        delay(1200)
+        // Simulate async work for other providers
+        kotlinx.coroutines.delay(1200)
         _state.value = AuthUiState.SignedIn
       } catch (t: Throwable) {
         _state.value = AuthUiState.Error(t.message ?: "Unknown error")

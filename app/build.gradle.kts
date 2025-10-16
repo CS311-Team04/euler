@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsKotlinAndroid)
-    // alias(libs.plugins.googleServices) // Temporarily disabled for CI
+    // alias(libs.plugins.googleServices) // Temporarily disabled for CI - missing google-services.json
     id("jacoco")
     id("org.sonarqube")
     alias(libs.plugins.ktfmt)
@@ -30,15 +30,12 @@ android {
         }
 
         debug {
-            enableUnitTestCoverage = false
+            enableUnitTestCoverage = true
             enableAndroidTestCoverage = false
         }
     }
 
 
-    testCoverage {
-        jacocoVersion = "0.8.14"
-    }
 
     buildFeatures {
         compose = true
@@ -166,6 +163,10 @@ dependencies {
 
     // ----------       Robolectric     ------------
     testImplementation(libs.robolectric)
+    
+    // ----------       Mockito         ------------
+    androidTestImplementation("org.mockito:mockito-android:5.8.0")
+    androidTestImplementation("org.mockito:mockito-core:5.8.0")
 
     implementation("com.microsoft.identity.client:msal:6.0.1")
 
@@ -184,6 +185,15 @@ jacoco {
     toolVersion = "0.8.14"
 }
 
+// Force JaCoCo version for all tasks
+configurations.all {
+    resolutionStrategy {
+        force("org.jacoco:org.jacoco.agent:0.8.14")
+        force("org.jacoco:org.jacoco.core:0.8.14")
+        force("org.jacoco:org.jacoco.report:0.8.14")
+    }
+}
+
 tasks.withType<Test> {
     // Configure Jacoco for each tests
     configure<JacocoTaskExtension> {
@@ -198,6 +208,7 @@ tasks.withType<Test> {
         )
     }
 }
+
 
 tasks.register("jacocoTestReport", JacocoReport::class) {
     mustRunAfter("testDebugUnitTest", "connectedDebugAndroidTest")
