@@ -26,21 +26,21 @@ fun AppNav(startOnSignedIn: Boolean = false) {
       navController = nav, startDestination = if (startOnSignedIn) Routes.Home else Routes.SignIn) {
         composable(Routes.SignIn) {
           // TODO: Add AuthUIScreen when authentication is implemented
-            AuthUIScreen(
-                state = AuthUiState.Idle,
-                onMicrosoftLogin = {
-                    // TODO: vrai login, puis si OK :
-                    nav.navigate(Routes.Home) {
-                        popUpTo(Routes.SignIn) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                },
-                onSwitchEduLogin = {
-                    nav.navigate(Routes.Home) {
-                        popUpTo(Routes.SignIn) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                })
+          AuthUIScreen(
+              state = AuthUiState.Idle,
+              onMicrosoftLogin = {
+                // TODO: vrai login, puis si OK :
+                nav.navigate(Routes.Home) {
+                  popUpTo(Routes.SignIn) { inclusive = true }
+                  launchSingleTop = true
+                }
+              },
+              onSwitchEduLogin = {
+                nav.navigate(Routes.Home) {
+                  popUpTo(Routes.SignIn) { inclusive = true }
+                  launchSingleTop = true
+                }
+              })
         }
         composable(Routes.Home) {
           HomeScreen(

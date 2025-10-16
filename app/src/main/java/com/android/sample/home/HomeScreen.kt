@@ -113,11 +113,13 @@ fun HomeScreen(
                           Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
                         }
                   },
-                  title = {Image(
-                      painter = painterResource(R.drawable.euler_logo),
-                      contentDescription = "Euler",
-                      modifier = Modifier.height(100.dp),
-                      contentScale = ContentScale.Fit)},
+                  title = {
+                    Image(
+                        painter = painterResource(R.drawable.euler_logo),
+                        contentDescription = "Euler",
+                        modifier = Modifier.height(100.dp),
+                        contentScale = ContentScale.Fit)
+                  },
                   actions = {
                     IconButton(
                         onClick = { viewModel.setTopRightOpen(true) },
