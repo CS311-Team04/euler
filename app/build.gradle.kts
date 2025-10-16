@@ -29,9 +29,14 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            buildConfigField "String", "API_KEY", "\"${project.findProperty("API_KEY") ?: ""}\""
+            buildConfigField "String", "ENDPOINT", "\"${project.findProperty("ENDPOINT") ?: ""}\""
+        }
         }
 
         debug {
+            buildConfigField "String", "API_KEY", "\"${project.findProperty("API_KEY") ?: ""}\""
+            buildConfigField "String", "ENDPOINT", "\"${project.findProperty("ENDPOINT") ?: ""}\""
             enableUnitTestCoverage = true
             enableAndroidTestCoverage = true
         }
