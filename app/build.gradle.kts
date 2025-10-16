@@ -31,7 +31,7 @@ android {
 
         debug {
             enableUnitTestCoverage = true
-            enableAndroidTestCoverage = true
+            enableAndroidTestCoverage = false
         }
     }
 
@@ -208,6 +208,8 @@ tasks.withType<Test> {
         )
     }
 }
+
+
 
 tasks.register("jacocoTestReport", JacocoReport::class) {
     mustRunAfter("testDebugUnitTest", "connectedDebugAndroidTest")
