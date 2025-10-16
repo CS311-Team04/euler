@@ -16,8 +16,8 @@ import java.net.URL
 import android.util.Log
 
 /**
- * Holds the UI state (HomeUiState) and exposes methods to update it. The UI (Compose) observes
- * uiState and updates automatically.
+ * Détient l'état UI (HomeUiState) et expose des méthodes pour le mettre à jour. L'UI (Compose)
+ * observe uiState et se met à jour automatiquement.
  */
 class HomeViewModel : ViewModel() {
 

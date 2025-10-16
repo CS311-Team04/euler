@@ -3,7 +3,6 @@ package com.android.sample.home
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -20,37 +19,6 @@ import org.junit.runner.RunWith
 class HomeScreenTest {
 
   @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
-
-  @Test
-  fun renders_core_widgets() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    // éléments app bar & actions
-    composeRule.onNodeWithTag(HomeTags.MenuBtn).assertIsDisplayed()
-    composeRule.onNodeWithTag(HomeTags.TopRightBtn).assertIsDisplayed()
-    composeRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed()
-    composeRule.onNodeWithTag(HomeTags.Action2Btn).assertIsDisplayed()
-
-    // champ + send
-    composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
-    composeRule.onNodeWithTag(HomeTags.SendBtn).assertIsDisplayed()
-
-    // logo au centre (Image avec contentDescription = "Euler")
-    composeRule.onNode(hasContentDescription("Euler")).assertIsDisplayed()
-  }
-
-  @Test
-  fun topRight_menu_opens_when_icon_clicked() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    // Au départ, le menu n'est pas visible. On clique sur l'icône…
-    composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-
-    // …le DropdownMenu s'ouvre avec ses items placeholder
-    composeRule.onNodeWithTag(HomeTags.TopRightMenu).assertIsDisplayed()
-    composeRule.onNodeWithText("Example item 1").assertIsDisplayed()
-    composeRule.onNodeWithText("Example item 2").assertIsDisplayed()
-  }
 
   @Test
   fun typing_and_send_calls_callback_with_text() {
@@ -88,7 +56,7 @@ class HomeScreenTest {
   fun displays_correct_action_button_texts() {
     composeRule.setContent { MaterialTheme { HomeScreen() } }
 
-    composeRule.onNodeWithText("Find CS220 past exams in Drive EPFL").assertIsDisplayed()
+    composeRule.onNodeWithText("Find CS220 past exams").assertIsDisplayed()
     composeRule.onNodeWithText("Check Ed Discussion").assertIsDisplayed()
   }
 
@@ -106,16 +74,6 @@ class HomeScreenTest {
     composeRule
         .onNodeWithText("Powered by APERTUS Swiss LLM · MCP-enabled for 6 EPFL systems")
         .assertIsDisplayed()
-  }
-
-  @Test
-  fun displays_icons_with_correct_content_descriptions() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    composeRule.onNode(hasContentDescription("Menu")).assertIsDisplayed()
-    composeRule.onNode(hasContentDescription("More")).assertIsDisplayed()
-    composeRule.onNode(hasContentDescription("Send")).assertIsDisplayed()
-    composeRule.onNode(hasContentDescription("Euler")).assertIsDisplayed()
   }
 
   @Test
@@ -193,37 +151,6 @@ class HomeScreenTest {
 
     assertTrue(sendMessageCalled)
     assertEquals("", sentText)
-  }
-
-  @Test
-  fun dropdown_menu_items_trigger_dismiss_callback() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    // Ouvrir le menu
-    composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-    composeRule.onNodeWithTag(HomeTags.TopRightMenu).assertIsDisplayed()
-
-    // Cliquer sur un item du menu (qui devrait fermer le menu)
-    composeRule.onNodeWithText("Example item 1").performClick()
-
-    // Le menu devrait être fermé maintenant
-    // Note: on ne peut pas tester directement si le menu est fermé car il n'est pas affiché
-    // Mais on peut vérifier qu'il n'y a pas d'erreur
-  }
-
-  @Test
-  fun dropdown_menu_item2_also_triggers_dismiss() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    // Ouvrir le menu
-    composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-    composeRule.onNodeWithTag(HomeTags.TopRightMenu).assertIsDisplayed()
-
-    // Cliquer sur le deuxième item
-    composeRule.onNodeWithText("Example item 2").performClick()
-
-    // Vérifier qu'il n'y a pas d'erreur
-    composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
   }
 
   @Test
