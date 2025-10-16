@@ -1,5 +1,6 @@
 package com.android.sample.home
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -13,12 +14,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.android.sample.R
 import kotlinx.coroutines.launch
 
 object HomeTags {
@@ -109,7 +113,11 @@ fun HomeScreen(
                           Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
                         }
                   },
-                  title = {},
+                  title = {Image(
+                      painter = painterResource(R.drawable.euler_logo),
+                      contentDescription = "Euler",
+                      modifier = Modifier.height(100.dp),
+                      contentScale = ContentScale.Fit)},
                   actions = {
                     IconButton(
                         onClick = { viewModel.setTopRightOpen(true) },
@@ -147,7 +155,7 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.padding(horizontal = 16.dp)) {
                           ActionButton(
-                              label = "Find CS220 past exams in Drive EPFL",
+                              label = "Find CS220 past exams",
                               modifier =
                                   Modifier.weight(1f).height(50.dp).testTag(HomeTags.Action1Btn),
                               onClick = onAction1Click)
