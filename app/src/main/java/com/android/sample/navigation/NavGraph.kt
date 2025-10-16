@@ -12,8 +12,8 @@ import androidx.navigation.compose.rememberNavController
 import com.android.sample.authentification.AuthUIScreen
 import com.android.sample.authentification.AuthUiState
 import com.android.sample.home.HomeScreen
-import com.android.sample.sign_in.AuthViewModel
 import com.android.sample.settings.SettingsPage
+import com.android.sample.sign_in.AuthViewModel
 
 object Routes {
   const val SignIn = "signin"
