@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <!-- Autoriser les connexions HTTPS vers les serveurs Microsoft pour l'authentification -->
+        <domain includeSubdomains="true">login.microsoftonline.com</domain>
+        <domain includeSubdomains="true">graph.microsoft.com</domain>
+        <domain includeSubdomains="true">login.live.com</domain>
+        <domain includeSubdomains="true">graph.windows.net</domain>
+        
+        <!-- Certificats de confiance pour les serveurs Microsoft -->
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </domain-config>
+    
+    <!-- Configuration par défaut - HTTPS uniquement -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+</network-security-config>
