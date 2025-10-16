@@ -25,6 +25,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.android.sample.R
 import kotlinx.coroutines.launch
 
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+
 object HomeTags {
   const val Root = "home_root"
   const val MenuBtn = "home_menu_btn"
@@ -188,10 +191,28 @@ fun HomeScreen(
           // Central content (visual placeholder)
           Box(
               modifier = Modifier.fillMaxSize().padding(padding).background(Color.Black),
-              contentAlignment = Alignment.Center) {
-                // Here you can display a dashboard, timeline, etc.
+              contentAlignment = Alignment.Center)
+          {
+              LazyColumn(
+                  modifier = Modifier.fillMaxSize().padding(16.dp)
+              ) {
+                  items(ui.recent) { item ->
+                      Text(
+                          text = item.title,
+                          color = Color.White,
+                          fontSize = 14.sp,
+                          modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                      )
+                  }
               }
-        }
+              if (ui.isLoading) {
+                  CircularProgressIndicator(
+                      modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp),
+                      color = Color.Gray
+                  )
+              }
+          }
+    }
   }
 }
 
