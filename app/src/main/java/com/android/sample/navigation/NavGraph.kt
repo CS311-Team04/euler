@@ -35,13 +35,12 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: android.app.Activity) {
     when (currentState) {
       is AuthUiState.Loading -> {
         if (currentState.provider == com.android.sample.authentification.AuthProvider.MICROSOFT) {
-          // Handle Microsoft authentication at UI level
+          // Handle Microsoft authentication using Firebase Auth
           MicrosoftAuth.signIn(
               activity = activity,
               onSuccess = { authViewModel.onAuthenticationSuccess() },
               onError = { exception ->
-                authViewModel.onAuthenticationError(
-                    exception.message ?: "Microsoft authentication failed")
+                authViewModel.onAuthenticationError(exception.message ?: "Authentication failed")
               })
         }
       }
