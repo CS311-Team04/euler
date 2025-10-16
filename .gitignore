@@ -21,3 +21,8 @@ tools/epfl_scraper/data/
 
 # macOS
 .DS_Store
+/.gradle
+/.idea
+/.github
+/build
+local.properties

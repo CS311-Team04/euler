@@ -26,22 +26,18 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            isMinifyEnabled = false
         }
 
         debug {
-            enableUnitTestCoverage = true
-            enableAndroidTestCoverage = true
+            enableUnitTestCoverage = false
+            enableAndroidTestCoverage = false
         }
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-        freeCompilerArgs += listOf("-Xsuppress-version-warnings", "-Xskip-metadata-version-check")
+
+    testCoverage {
+        jacocoVersion = "0.8.14"
     }
 
     buildFeatures {
@@ -51,6 +47,7 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.10"
     }
+
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -64,6 +61,17 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "/META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+            excludes += "/META-INF/MANIFEST.MF"
+            excludes += "/META-INF/DEPENDENCIES"
+            excludes += "/META-INF/LICENSE"
+            excludes += "/META-INF/LICENSE.txt"
+            excludes += "/META-INF/license.txt"
+            excludes += "/META-INF/NOTICE"
+            excludes += "/META-INF/NOTICE.txt"
+            excludes += "/META-INF/notice.txt"
+            excludes += "/META-INF/ASL2.0"
+            excludes += "/META-INF/*.kotlin_module"
         }
     }
 
@@ -74,10 +82,23 @@ android {
         }
     }
 
-    // Robolectric needs to be run only in debug. But its tests are placed in the shared source set (test)
-    // The next lines transfers the src/test/* from shared to the testDebug one
-    //
-    // This prevent errors from occurring during unit tests
+    // Correctif JaCoCo : exclure les libs du SDK et BouncyCastle
+    // pour éviter les erreurs d'instrumentation pendant les tests
+    tasks.withType<Test> {
+        configure<JacocoTaskExtension> {
+            isIncludeNoLocationClasses = true
+            excludes = listOf(
+                "jdk.internal.*", 
+                "org.bouncycastle.*",
+                "com.microsoft.identity.*",
+                "com.google.crypto.tink.*",
+                "com.google.auto.value.*",
+                "com.google.code.findbugs.*"
+            )
+        }
+    }
+
+    // Robolectric setup
     sourceSets.getByName("testDebug") {
         val test = sourceSets.getByName("test")
 
@@ -145,13 +166,36 @@ dependencies {
 
     // ----------       Robolectric     ------------
     testImplementation(libs.robolectric)
+
+    implementation("com.microsoft.identity.client:msal:6.0.1")
+
+    // --- Dépendances de sécurité manquantes requises par MSAL ---
+    implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
+    implementation("com.google.crypto.tink:tink-android:1.12.0")
+    implementation("com.google.auto.value:auto-value-annotations:1.10.4")
+    implementation("com.google.code.findbugs:jsr305:3.0.2")
+    implementation("com.github.spotbugs:spotbugs-annotations:4.8.3")
+
+}
+
+// JaCoCo configuration with Java 17 compatibility
+jacoco {
+    toolVersion = "0.8.14"
 }
 
 tasks.withType<Test> {
     // Configure Jacoco for each tests
     configure<JacocoTaskExtension> {
         isIncludeNoLocationClasses = true
-        excludes = listOf("jdk.internal.*")
+        excludes = listOf(
+            "jdk.internal.*",
+            "org.bouncycastle.*",
+            "com.microsoft.identity.*",
+            "com.google.crypto.tink.*",
+            "com.google.auto.value.*",
+            "com.google.code.findbugs.*"
+        )
     }
 }
 
@@ -183,11 +227,6 @@ tasks.register("jacocoTestReport", JacocoReport::class) {
         include("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec")
         include("outputs/code_coverage/debugAndroidTest/connected/*/coverage.ec")
     })
-}
-
-// JaCoCo configuration with Java 21 compatibility
-jacoco {
-    toolVersion = "0.8.14"
 }
 
 // SonarQube configuration with JaCoCo 0.8.14
