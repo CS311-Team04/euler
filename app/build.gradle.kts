@@ -210,7 +210,6 @@ tasks.withType<Test> {
 }
 
 
-
 tasks.register("jacocoTestReport", JacocoReport::class) {
     mustRunAfter("testDebugUnitTest", "connectedDebugAndroidTest")
 

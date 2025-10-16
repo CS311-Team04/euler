@@ -75,7 +75,7 @@ class HomeScreenTest {
   fun displays_correct_action_button_texts() {
     composeRule.setContent { MaterialTheme { HomeScreen() } }
 
-    composeRule.onNodeWithText("Find CS220 past exams in Drive EPFL").assertIsDisplayed()
+    composeRule.onNodeWithText("Find CS220 past exams").assertIsDisplayed()
     composeRule.onNodeWithText("Check Ed Discussion").assertIsDisplayed()
   }
 

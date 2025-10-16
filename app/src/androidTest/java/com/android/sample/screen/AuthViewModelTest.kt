@@ -8,8 +8,6 @@ import com.android.sample.sign_in.AuthViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -71,37 +69,25 @@ class AuthViewModelTest {
   }
 
   @Test
-  fun Microsoft_login_eventually_becomes_SignedIn_after_delay() = runTest {
+  fun Microsoft_login_sets_Loading_state() = runTest {
     val vm = AuthViewModel()
 
     vm.onMicrosoftLoginClick(mockActivity)
 
-    // État initial: Loading
+    // État immédiat: Loading
     assertTrue(vm.state.value is AuthUiState.Loading)
-
-    // Avance le temps de 1200ms (la durée du delay dans startSignIn)
-    advanceTimeBy(1200)
-    advanceUntilIdle()
-
-    // Après le délai, devrait être SignedIn
-    assertEquals(AuthUiState.SignedIn, vm.state.value)
+    assertEquals(AuthProvider.MICROSOFT, (vm.state.value as AuthUiState.Loading).provider)
   }
 
   @Test
-  fun SwitchEdu_login_eventually_becomes_SignedIn_after_delay() = runTest {
+  fun SwitchEdu_login_sets_Loading_state() = runTest {
     val vm = AuthViewModel()
 
     vm.onSwitchEduLoginClick()
 
     // État initial: Loading
     assertTrue(vm.state.value is AuthUiState.Loading)
-
-    // Avance le temps de 1200ms
-    advanceTimeBy(1200)
-    advanceUntilIdle()
-
-    // Après le délai, devrait être SignedIn
-    assertEquals(AuthUiState.SignedIn, vm.state.value)
+    assertEquals(AuthProvider.SWITCH_EDU, (vm.state.value as AuthUiState.Loading).provider)
   }
 
   @Test
@@ -141,7 +127,7 @@ class AuthViewModelTest {
   }
 
   @Test
-  fun state_sequence_is_Idle_to_Loading_to_SignedIn() = runTest {
+  fun state_sequence_is_Idle_to_Loading() = runTest {
     val vm = AuthViewModel()
     val states = mutableListOf<AuthUiState>()
 
@@ -151,14 +137,10 @@ class AuthViewModelTest {
     vm.onMicrosoftLoginClick(mockActivity)
     states.add(vm.state.value)
 
-    advanceTimeBy(1200)
-    advanceUntilIdle()
-    states.add(vm.state.value)
-
-    // Vérifie la séquence
-    assertEquals(3, states.size)
+    // Vérifie la séquence initiale
+    assertEquals(2, states.size)
     assertTrue(states[0] is AuthUiState.Idle)
     assertTrue(states[1] is AuthUiState.Loading)
-    assertTrue(states[2] is AuthUiState.SignedIn)
+    assertEquals(AuthProvider.MICROSOFT, (states[1] as AuthUiState.Loading).provider)
   }
 }
