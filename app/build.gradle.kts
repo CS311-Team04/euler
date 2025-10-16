@@ -30,15 +30,12 @@ android {
         }
 
         debug {
-            enableUnitTestCoverage = false
-            enableAndroidTestCoverage = false
+            enableUnitTestCoverage = true
+            enableAndroidTestCoverage = true
         }
     }
 
 
-    testCoverage {
-        jacocoVersion = "0.8.14"
-    }
 
     buildFeatures {
         compose = true
@@ -186,6 +183,15 @@ dependencies {
 // JaCoCo configuration with Java 17 compatibility
 jacoco {
     toolVersion = "0.8.14"
+}
+
+// Force JaCoCo version for all tasks
+configurations.all {
+    resolutionStrategy {
+        force("org.jacoco:org.jacoco.agent:0.8.14")
+        force("org.jacoco:org.jacoco.core:0.8.14")
+        force("org.jacoco:org.jacoco.report:0.8.14")
+    }
 }
 
 tasks.withType<Test> {
