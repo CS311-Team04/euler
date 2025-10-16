@@ -16,28 +16,32 @@ import com.android.sample.resources.C
 import com.android.sample.ui.theme.SampleAppTheme
 
 class SecondActivity : ComponentActivity() {
-  override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
-    setContent {
-      SampleAppTheme {
-        // A surface container using the 'background' color from the theme
-        Surface(
-            modifier = Modifier.fillMaxSize().semantics { testTag = C.Tag.second_screen_container },
-            color = MaterialTheme.colorScheme.background) {
-              GreetingRobo("Robolectric")
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            SampleAppTheme {
+                // A surface container using the 'background' color from the theme
+                Surface(
+                    modifier =
+                        Modifier.fillMaxSize().semantics {
+                            testTag = C.Tag.second_screen_container
+                        },
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    GreetingRobo("Robolectric")
+                }
             }
-      }
+        }
     }
-  }
 }
 
 @Composable
 fun GreetingRobo(name: String, modifier: Modifier = Modifier) {
-  Text(text = "Hello $name!", modifier = modifier.semantics { testTag = C.Tag.greeting_robo })
+    Text(text = "Hello $name!", modifier = modifier.semantics { testTag = C.Tag.greeting_robo })
 }
 
 @Preview(showBackground = true)
 @Composable
 fun GreetingPreview2() {
-  SampleAppTheme { GreetingRobo("Robolectric") }
+    SampleAppTheme { GreetingRobo("Robolectric") }
 }
