@@ -45,18 +45,28 @@ fun HomeScreen(
     onAction1Click: () -> Unit = {},
     onAction2Click: () -> Unit = {},
     onSendMessage: (String) -> Unit = {},
-    onSignOut: () -> Unit = {}
+    onSignOut: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
+    openDrawerOnStart: Boolean = false
 ) {
   val ui by viewModel.uiState.collectAsState()
   val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
   val scope = rememberCoroutineScope()
 
-  // Synchronize ViewModel state <-> Drawer component
+  // Synchronise l'état ViewModel <-> composant Drawer
   LaunchedEffect(ui.isDrawerOpen) {
     if (ui.isDrawerOpen && !drawerState.isOpen) {
       drawerState.open()
     } else if (!ui.isDrawerOpen && drawerState.isOpen) {
       drawerState.close()
+    }
+  }
+
+  // Open drawer when returning from settings
+  LaunchedEffect(openDrawerOnStart) {
+    if (openDrawerOnStart) {
+      drawerState.open()
+      viewModel.toggleDrawer()
     }
   }
 
@@ -76,6 +86,7 @@ fun HomeScreen(
             onSettingsClick = {
               scope.launch { drawerState.close() }
               if (ui.isDrawerOpen) viewModel.toggleDrawer()
+              onSettingsClick()
             },
             onClose = {
               scope.launch { drawerState.close() }
@@ -122,7 +133,7 @@ fun HomeScreen(
                               tint = Color.White)
                         }
 
-                    // Top-right menu (placeholder)
+                    // Menu haut-droite (placeholder)
                     DropdownMenu(
                         expanded = ui.isTopRightOpen,
                         onDismissRequest = { viewModel.setTopRightOpen(false) },
@@ -141,12 +152,12 @@ fun HomeScreen(
               Column(
                   Modifier.fillMaxWidth().background(Color.Black).padding(bottom = 16.dp),
                   horizontalAlignment = Alignment.CenterHorizontally) {
-                    // Action buttons
+                    // Boutons d'action
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.padding(horizontal = 16.dp)) {
                           ActionButton(
-                              label = "Find CS220 past exams in Drive EPFL",
+                              label = "Find CS220 past exams",
                               modifier =
                                   Modifier.weight(1f).height(50.dp).testTag(HomeTags.Action1Btn),
                               onClick = onAction1Click)
@@ -159,7 +170,7 @@ fun HomeScreen(
 
                     Spacer(Modifier.height(16.dp))
 
-                    // Message field connected to ViewModel
+                    // Champ de message branché au ViewModel
                     OutlinedTextField(
                         value = ui.messageDraft,
                         onValueChange = { viewModel.updateMessageDraft(it) },
@@ -177,7 +188,7 @@ fun HomeScreen(
                               },
                               modifier = Modifier.testTag(HomeTags.SendBtn)) {
                                 Icon(
-                                    imageVector = Icons.Filled.Send,
+                                    Icons.Default.Send,
                                     contentDescription = "Send",
                                     tint = Color.Gray)
                               }
@@ -185,7 +196,7 @@ fun HomeScreen(
                         shape = RoundedCornerShape(50),
                         colors =
                             OutlinedTextFieldDefaults.colors(
-                                // text
+                                // texte
                                 focusedTextColor = Color.White,
                                 unfocusedTextColor = Color.White,
                                 disabledTextColor = Color.LightGray,
@@ -195,7 +206,7 @@ fun HomeScreen(
                                 focusedPlaceholderColor = Color.Gray,
                                 unfocusedPlaceholderColor = Color.Gray,
 
-                                // borders + background
+                                // bordures + fond
                                 focusedBorderColor = Color.DarkGray,
                                 unfocusedBorderColor = Color.DarkGray,
                                 focusedContainerColor = Color(0xFF121212),
@@ -211,11 +222,11 @@ fun HomeScreen(
                         modifier = Modifier.padding(horizontal = 16.dp))
                   }
             }) { padding ->
-              // Central content (visual placeholder)
+              // Contenu central (placeholder visuel)
               Box(
                   modifier = Modifier.fillMaxSize().padding(padding).background(Color.Black),
                   contentAlignment = Alignment.Center) {
-                    // Here you can display a dashboard, timeline, etc.
+                    // Ici tu pourras afficher un dashboard, une timeline, etc.
                   }
             }
       }
@@ -232,12 +243,12 @@ private fun ActionButton(label: String, modifier: Modifier = Modifier, onClick: 
       }
 }
 
-/* ----- Placeholders for external components (drawer + top-right panel) ----- */
+/* ----- Placeholders pour compo externes (drawer + panneau top-right) ----- */
 
 @Composable
 private fun TopRightPanelPlaceholder(onDismiss: () -> Unit) {
-  DropdownMenuItem(text = { Text("Example item 1") }, onClick = onDismiss)
-  DropdownMenuItem(text = { Text("Example item 2") }, onClick = onDismiss)
+  DropdownMenuItem(text = { Text("Share") }, onClick = onDismiss)
+  DropdownMenuItem(text = { Text("Delete") }, onClick = onDismiss)
 }
 
 @Preview(showBackground = true, backgroundColor = 0x000000)
