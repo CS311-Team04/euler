@@ -60,139 +60,165 @@ fun HomeScreen(
     }
   }
 
-  ModalNavigationDrawer(drawerState = drawerState, drawerContent = {}) {
-    Scaffold(
-        modifier = modifier.fillMaxSize().background(Color.Black).testTag(HomeTags.Root),
-        containerColor = Color.Black,
-        topBar = {
-          CenterAlignedTopAppBar(
-              navigationIcon = {
-                IconButton(
-                    onClick = {
-                      viewModel.toggleDrawer()
-                      scope.launch {
-                        if (!drawerState.isOpen) drawerState.open() else drawerState.close()
-                      }
-                    },
-                    modifier =
-                        Modifier.size(40.dp)
-                            .background(Color(0x22FFFFFF), CircleShape)
-                            .testTag(HomeTags.MenuBtn)) {
-                      Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
-                    }
-              },
-              title = {
-                Image(
-                    painter = painterResource(R.drawable.euler_logo),
-                    contentDescription = "Euler",
-                    modifier = Modifier.height(100.dp),
-                    contentScale = ContentScale.Fit)
-              },
-              actions = {
-                IconButton(
-                    onClick = { viewModel.setTopRightOpen(true) },
-                    modifier =
-                        Modifier.size(40.dp)
-                            .background(Color(0x22FFFFFF), CircleShape)
-                            .testTag(HomeTags.TopRightBtn)) {
-                      Icon(Icons.Default.MoreVert, contentDescription = "More", tint = Color.White)
-                    }
-
-                // Top-right menu (placeholder)
-                DropdownMenu(
-                    expanded = ui.isTopRightOpen,
-                    onDismissRequest = { viewModel.setTopRightOpen(false) },
-                    modifier = Modifier.testTag(HomeTags.TopRightMenu)) {
-                      TopRightPanelPlaceholder(onDismiss = { viewModel.setTopRightOpen(false) })
-                    }
-              },
-              colors =
-                  TopAppBarDefaults.topAppBarColors(
-                      containerColor = Color.Black,
-                      titleContentColor = Color.White,
-                      navigationIconContentColor = Color.White,
-                      actionIconContentColor = Color.White))
-        },
-        bottomBar = {
-          Column(
-              Modifier.fillMaxWidth().background(Color.Black).padding(bottom = 16.dp),
-              horizontalAlignment = Alignment.CenterHorizontally) {
-                // Action buttons
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.padding(horizontal = 16.dp)) {
-                      ActionButton(
-                          label = "Find CS220 past exams in Drive EPFL",
-                          modifier = Modifier.weight(1f).height(50.dp).testTag(HomeTags.Action1Btn),
-                          onClick = onAction1Click)
-                      ActionButton(
-                          label = "Check Ed Discussion",
-                          modifier = Modifier.weight(1f).height(50.dp).testTag(HomeTags.Action2Btn),
-                          onClick = onAction2Click)
-                    }
-
-                Spacer(Modifier.height(16.dp))
-
-                // Message field connected to ViewModel
-                OutlinedTextField(
-                    value = ui.messageDraft,
-                    onValueChange = { viewModel.updateMessageDraft(it) },
-                    placeholder = { Text("Message EULER", color = Color.Gray) },
-                    modifier =
-                        Modifier.fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .height(56.dp)
-                            .testTag(HomeTags.MessageField),
-                    trailingIcon = {
-                      IconButton(
-                          onClick = {
-                            onSendMessage(ui.messageDraft)
-                            viewModel.sendMessage()
-                          },
-                          modifier = Modifier.testTag(HomeTags.SendBtn)) {
-                            Icon(
-                                imageVector = Icons.Filled.Send,
-                                contentDescription = "Send",
-                                tint = Color.Gray)
+  ModalNavigationDrawer(
+      drawerState = drawerState,
+      drawerContent = {
+        DrawerContent(
+            ui = ui,
+            onToggleSystem = { id -> viewModel.toggleSystemConnection(id) },
+            onSignOut = {
+              // TODO: brancher ton sign-out réel
+              // Ferme le drawer visuellement + sync VM
+              scope.launch { drawerState.close() }
+              if (ui.isDrawerOpen) viewModel.toggleDrawer()
+              onSignOut()
+            },
+            onSettingsClick = {
+              scope.launch { drawerState.close() }
+              if (ui.isDrawerOpen) viewModel.toggleDrawer()
+            },
+            onClose = {
+              scope.launch { drawerState.close() }
+              if (ui.isDrawerOpen) viewModel.toggleDrawer()
+            })
+      }) {
+        Scaffold(
+            modifier = modifier.fillMaxSize().background(Color.Black).testTag(HomeTags.Root),
+            containerColor = Color.Black,
+            topBar = {
+              CenterAlignedTopAppBar(
+                  navigationIcon = {
+                    IconButton(
+                        onClick = {
+                          viewModel.toggleDrawer()
+                          scope.launch {
+                            if (!drawerState.isOpen) drawerState.open() else drawerState.close()
                           }
-                    },
-                    shape = RoundedCornerShape(50),
-                    colors =
-                        OutlinedTextFieldDefaults.colors(
-                            // text
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            disabledTextColor = Color.LightGray,
-                            cursorColor = Color.White,
+                        },
+                        modifier =
+                            Modifier.size(40.dp)
+                                .background(Color(0x22FFFFFF), CircleShape)
+                                .testTag(HomeTags.MenuBtn)) {
+                          Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+                        }
+                  },
+                  title = {
+                    Image(
+                        painter = painterResource(R.drawable.euler_logo),
+                        contentDescription = "Euler",
+                        modifier = Modifier.height(100.dp),
+                        contentScale = ContentScale.Fit)
+                  },
+                  actions = {
+                    IconButton(
+                        onClick = { viewModel.setTopRightOpen(true) },
+                        modifier =
+                            Modifier.size(40.dp)
+                                .background(Color(0x22FFFFFF), CircleShape)
+                                .testTag(HomeTags.TopRightBtn)) {
+                          Icon(
+                              Icons.Default.MoreVert,
+                              contentDescription = "More",
+                              tint = Color.White)
+                        }
 
-                            // placeholder
-                            focusedPlaceholderColor = Color.Gray,
-                            unfocusedPlaceholderColor = Color.Gray,
+                    // Top-right menu (placeholder)
+                    DropdownMenu(
+                        expanded = ui.isTopRightOpen,
+                        onDismissRequest = { viewModel.setTopRightOpen(false) },
+                        modifier = Modifier.testTag(HomeTags.TopRightMenu)) {
+                          TopRightPanelPlaceholder(onDismiss = { viewModel.setTopRightOpen(false) })
+                        }
+                  },
+                  colors =
+                      TopAppBarDefaults.topAppBarColors(
+                          containerColor = Color.Black,
+                          titleContentColor = Color.White,
+                          navigationIconContentColor = Color.White,
+                          actionIconContentColor = Color.White))
+            },
+            bottomBar = {
+              Column(
+                  Modifier.fillMaxWidth().background(Color.Black).padding(bottom = 16.dp),
+                  horizontalAlignment = Alignment.CenterHorizontally) {
+                    // Action buttons
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp)) {
+                          ActionButton(
+                              label = "Find CS220 past exams in Drive EPFL",
+                              modifier =
+                                  Modifier.weight(1f).height(50.dp).testTag(HomeTags.Action1Btn),
+                              onClick = onAction1Click)
+                          ActionButton(
+                              label = "Check Ed Discussion",
+                              modifier =
+                                  Modifier.weight(1f).height(50.dp).testTag(HomeTags.Action2Btn),
+                              onClick = onAction2Click)
+                        }
 
-                            // borders + background
-                            focusedBorderColor = Color.DarkGray,
-                            unfocusedBorderColor = Color.DarkGray,
-                            focusedContainerColor = Color(0xFF121212),
-                            unfocusedContainerColor = Color(0xFF121212),
-                        ))
+                    Spacer(Modifier.height(16.dp))
 
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = "Powered by APERTUS Swiss LLM · MCP-enabled for 6 EPFL systems",
-                    color = Color.Gray,
-                    fontSize = 11.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 16.dp))
-              }
-        }) { padding ->
-          // Central content (visual placeholder)
-          Box(
-              modifier = Modifier.fillMaxSize().padding(padding).background(Color.Black),
-              contentAlignment = Alignment.Center) {
-                // Here you can display a dashboard, timeline, etc.
-              }
-        }
-  }
+                    // Message field connected to ViewModel
+                    OutlinedTextField(
+                        value = ui.messageDraft,
+                        onValueChange = { viewModel.updateMessageDraft(it) },
+                        placeholder = { Text("Message EULER", color = Color.Gray) },
+                        modifier =
+                            Modifier.fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .height(56.dp)
+                                .testTag(HomeTags.MessageField),
+                        trailingIcon = {
+                          IconButton(
+                              onClick = {
+                                onSendMessage(ui.messageDraft)
+                                viewModel.sendMessage()
+                              },
+                              modifier = Modifier.testTag(HomeTags.SendBtn)) {
+                                Icon(
+                                    imageVector = Icons.Filled.Send,
+                                    contentDescription = "Send",
+                                    tint = Color.Gray)
+                              }
+                        },
+                        shape = RoundedCornerShape(50),
+                        colors =
+                            OutlinedTextFieldDefaults.colors(
+                                // text
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                disabledTextColor = Color.LightGray,
+                                cursorColor = Color.White,
+
+                                // placeholder
+                                focusedPlaceholderColor = Color.Gray,
+                                unfocusedPlaceholderColor = Color.Gray,
+
+                                // borders + background
+                                focusedBorderColor = Color.DarkGray,
+                                unfocusedBorderColor = Color.DarkGray,
+                                focusedContainerColor = Color(0xFF121212),
+                                unfocusedContainerColor = Color(0xFF121212),
+                            ))
+
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "Powered by APERTUS Swiss LLM · MCP-enabled for 6 EPFL systems",
+                        color = Color.Gray,
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 16.dp))
+                  }
+            }) { padding ->
+              // Central content (visual placeholder)
+              Box(
+                  modifier = Modifier.fillMaxSize().padding(padding).background(Color.Black),
+                  contentAlignment = Alignment.Center) {
+                    // Here you can display a dashboard, timeline, etc.
+                  }
+            }
+      }
 }
 
 @Composable
@@ -210,8 +236,8 @@ private fun ActionButton(label: String, modifier: Modifier = Modifier, onClick: 
 
 @Composable
 private fun TopRightPanelPlaceholder(onDismiss: () -> Unit) {
-  DropdownMenuItem(text = { Text("Example item 1") }, onClick = onDismiss)
-  DropdownMenuItem(text = { Text("Example item 2") }, onClick = onDismiss)
+  DropdownMenuItem(text = { Text("Share") }, onClick = onDismiss)
+  DropdownMenuItem(text = { Text("Delete") }, onClick = onDismiss)
 }
 
 @Preview(showBackground = true, backgroundColor = 0x000000)
