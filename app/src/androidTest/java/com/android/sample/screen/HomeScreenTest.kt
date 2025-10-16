@@ -35,7 +35,6 @@ class HomeScreenTest {
     composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
     composeRule.onNodeWithTag(HomeTags.SendBtn).assertIsDisplayed()
 
-    // logo au centre (Image avec contentDescription = "Euler")
     composeRule.onNode(hasContentDescription("Euler")).assertIsDisplayed()
   }
 
