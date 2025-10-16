@@ -33,6 +33,16 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            
+            <!-- Microsoft OAuth redirect URI -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="msauth" 
+                      android:host="com.android.sample" 
+                      android:path="/auth" />
+            </intent-filter>
         </activity>
         
         <!-- MSAL BrowserTabActivity -->
