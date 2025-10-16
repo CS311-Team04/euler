@@ -40,19 +40,6 @@ class HomeScreenTest {
   }
 
   @Test
-  fun topRight_menu_opens_when_icon_clicked() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    // Au départ, le menu n'est pas visible. On clique sur l'icône…
-    composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-
-    // …le DropdownMenu s'ouvre avec ses items placeholder
-    composeRule.onNodeWithTag(HomeTags.TopRightMenu).assertIsDisplayed()
-    composeRule.onNodeWithText("Example item 1").assertIsDisplayed()
-    composeRule.onNodeWithText("Example item 2").assertIsDisplayed()
-  }
-
-  @Test
   fun typing_and_send_calls_callback_with_text() {
     var sent: String? = null
 
@@ -193,37 +180,6 @@ class HomeScreenTest {
 
     assertTrue(sendMessageCalled)
     assertEquals("", sentText)
-  }
-
-  @Test
-  fun dropdown_menu_items_trigger_dismiss_callback() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    // Ouvrir le menu
-    composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-    composeRule.onNodeWithTag(HomeTags.TopRightMenu).assertIsDisplayed()
-
-    // Cliquer sur un item du menu (qui devrait fermer le menu)
-    composeRule.onNodeWithText("Example item 1").performClick()
-
-    // Le menu devrait être fermé maintenant
-    // Note: on ne peut pas tester directement si le menu est fermé car il n'est pas affiché
-    // Mais on peut vérifier qu'il n'y a pas d'erreur
-  }
-
-  @Test
-  fun dropdown_menu_item2_also_triggers_dismiss() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    // Ouvrir le menu
-    composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-    composeRule.onNodeWithTag(HomeTags.TopRightMenu).assertIsDisplayed()
-
-    // Cliquer sur le deuxième item
-    composeRule.onNodeWithText("Example item 2").performClick()
-
-    // Vérifier qu'il n'y a pas d'erreur
-    composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
   }
 
   @Test

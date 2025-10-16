@@ -236,8 +236,8 @@ private fun ActionButton(label: String, modifier: Modifier = Modifier, onClick: 
 
 @Composable
 private fun TopRightPanelPlaceholder(onDismiss: () -> Unit) {
-  DropdownMenuItem(text = { Text("Share") }, onClick = onDismiss)
-  DropdownMenuItem(text = { Text("Delete") }, onClick = onDismiss)
+  DropdownMenuItem(text = { Text("Example item 1") }, onClick = onDismiss)
+  DropdownMenuItem(text = { Text("Example item 2") }, onClick = onDismiss)
 }
 
 @Preview(showBackground = true, backgroundColor = 0x000000)
