@@ -1,8 +1,10 @@
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsKotlinAndroid)
-    alias(libs.plugins.ktfmt)
+    // alias(libs.plugins.googleServices) // Temporarily disabled for CI
     id("jacoco")
+    id("org.sonarqube")
+    alias(libs.plugins.ktfmt)
 }
 
 android {
@@ -11,7 +13,7 @@ android {
 
     defaultConfig {
         applicationId = "com.android.sample"
-        minSdk = 28
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -37,8 +39,9 @@ android {
         }
     }
 
-    testCoverage {
-        jacocoVersion = "0.8.8"
+    kotlinOptions {
+        jvmTarget = "17"
+        freeCompilerArgs += listOf("-Xsuppress-version-warnings", "-Xskip-metadata-version-check")
     }
 
     buildFeatures {
@@ -97,6 +100,13 @@ fun DependencyHandlerScope.globalTestImplementation(dep: Any) {
 }
 
 dependencies {
+    // Firebase
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("com.google.firebase:firebase-analytics-ktx")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
@@ -173,4 +183,33 @@ tasks.register("jacocoTestReport", JacocoReport::class) {
         include("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec")
         include("outputs/code_coverage/debugAndroidTest/connected/*/coverage.ec")
     })
+}
+
+// JaCoCo configuration with Java 21 compatibility
+jacoco {
+    toolVersion = "0.8.14"
+}
+
+// SonarQube configuration with JaCoCo 0.8.14
+sonar {
+    properties {
+        property("sonar.projectKey", "CS311-Team04_euler")
+        property("sonar.projectName", "euler")
+        property("sonar.organization", "cs311-team04")
+        property("sonar.host.url", "https://sonarcloud.io")
+        
+        // Sources and tests
+        property("sonar.sources", "src/main/java")
+        property("sonar.tests", "src/test/java")
+        
+        // Exclusions
+        property("sonar.exclusions", "**/build/**,**/R.java,**/R.kt,**/BuildConfig.*,**/*.xml,**/res/**")
+        property("sonar.test.inclusions", "**/*Test.kt,**/*Test.java")
+        property("sonar.coverage.exclusions", "**/*Test.kt,**/*Test.java,**/test/**/*,**/androidTest/**/*")
+        
+        // Coverage reports
+        property("sonar.coverage.jacoco.xmlReportPaths", "${project.layout.buildDirectory.get()}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml")
+        property("sonar.junit.reportPaths", "${project.layout.buildDirectory.get()}/test-results/testDebugUnitTest/")
+        property("sonar.androidLint.reportPaths", "${project.layout.buildDirectory.get()}/reports/lint-results-debug.xml")
+    }
 }
