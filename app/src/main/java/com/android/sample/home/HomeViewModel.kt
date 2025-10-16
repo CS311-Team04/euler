@@ -7,8 +7,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Holds the UI state (HomeUiState) and exposes methods to update it. The UI (Compose) observes
- * uiState and updates automatically.
+ * Détient l'état UI (HomeUiState) et expose des méthodes pour le mettre à jour. L'UI (Compose)
+ * observe uiState et se met à jour automatiquement.
  */
 class HomeViewModel : ViewModel() {
 
@@ -41,7 +41,7 @@ class HomeViewModel : ViewModel() {
                   )))
   val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-  // --- State mutations ---
+  // --- Mutations d'état ---
 
   fun toggleDrawer() {
     _uiState.value = _uiState.value.copy(isDrawerOpen = !_uiState.value.isDrawerOpen)

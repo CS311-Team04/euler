@@ -1,6 +1,5 @@
 package com.android.sample.home
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -14,15 +13,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.android.sample.R
 import kotlinx.coroutines.launch
 
 object HomeTags {
@@ -45,18 +41,28 @@ fun HomeScreen(
     onAction1Click: () -> Unit = {},
     onAction2Click: () -> Unit = {},
     onSendMessage: (String) -> Unit = {},
-    onSignOut: () -> Unit = {}
+    onSignOut: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
+    openDrawerOnStart: Boolean = false
 ) {
   val ui by viewModel.uiState.collectAsState()
   val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
   val scope = rememberCoroutineScope()
 
-  // Synchronize ViewModel state <-> Drawer component
+  // Synchronise l'état ViewModel <-> composant Drawer
   LaunchedEffect(ui.isDrawerOpen) {
     if (ui.isDrawerOpen && !drawerState.isOpen) {
       drawerState.open()
     } else if (!ui.isDrawerOpen && drawerState.isOpen) {
       drawerState.close()
+    }
+  }
+
+  // Open drawer when returning from settings
+  LaunchedEffect(openDrawerOnStart) {
+    if (openDrawerOnStart) {
+      drawerState.open()
+      viewModel.toggleDrawer()
     }
   }
 
@@ -76,6 +82,7 @@ fun HomeScreen(
             onSettingsClick = {
               scope.launch { drawerState.close() }
               if (ui.isDrawerOpen) viewModel.toggleDrawer()
+              onSettingsClick()
             },
             onClose = {
               scope.launch { drawerState.close() }
@@ -102,13 +109,7 @@ fun HomeScreen(
                           Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
                         }
                   },
-                  title = {
-                    Image(
-                        painter = painterResource(R.drawable.euler_logo),
-                        contentDescription = "Euler",
-                        modifier = Modifier.height(100.dp),
-                        contentScale = ContentScale.Fit)
-                  },
+                  title = {},
                   actions = {
                     IconButton(
                         onClick = { viewModel.setTopRightOpen(true) },
@@ -122,7 +123,7 @@ fun HomeScreen(
                               tint = Color.White)
                         }
 
-                    // Top-right menu (placeholder)
+                    // Menu haut-droite (placeholder)
                     DropdownMenu(
                         expanded = ui.isTopRightOpen,
                         onDismissRequest = { viewModel.setTopRightOpen(false) },
@@ -141,7 +142,7 @@ fun HomeScreen(
               Column(
                   Modifier.fillMaxWidth().background(Color.Black).padding(bottom = 16.dp),
                   horizontalAlignment = Alignment.CenterHorizontally) {
-                    // Action buttons
+                    // Boutons d'action
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -159,7 +160,7 @@ fun HomeScreen(
 
                     Spacer(Modifier.height(16.dp))
 
-                    // Message field connected to ViewModel
+                    // Champ de message branché au ViewModel
                     OutlinedTextField(
                         value = ui.messageDraft,
                         onValueChange = { viewModel.updateMessageDraft(it) },
@@ -177,7 +178,7 @@ fun HomeScreen(
                               },
                               modifier = Modifier.testTag(HomeTags.SendBtn)) {
                                 Icon(
-                                    imageVector = Icons.Filled.Send,
+                                    Icons.Default.Send,
                                     contentDescription = "Send",
                                     tint = Color.Gray)
                               }
@@ -185,7 +186,7 @@ fun HomeScreen(
                         shape = RoundedCornerShape(50),
                         colors =
                             OutlinedTextFieldDefaults.colors(
-                                // text
+                                // texte
                                 focusedTextColor = Color.White,
                                 unfocusedTextColor = Color.White,
                                 disabledTextColor = Color.LightGray,
@@ -195,7 +196,7 @@ fun HomeScreen(
                                 focusedPlaceholderColor = Color.Gray,
                                 unfocusedPlaceholderColor = Color.Gray,
 
-                                // borders + background
+                                // bordures + fond
                                 focusedBorderColor = Color.DarkGray,
                                 unfocusedBorderColor = Color.DarkGray,
                                 focusedContainerColor = Color(0xFF121212),
@@ -211,11 +212,11 @@ fun HomeScreen(
                         modifier = Modifier.padding(horizontal = 16.dp))
                   }
             }) { padding ->
-              // Central content (visual placeholder)
+              // Contenu central (placeholder visuel)
               Box(
                   modifier = Modifier.fillMaxSize().padding(padding).background(Color.Black),
                   contentAlignment = Alignment.Center) {
-                    // Here you can display a dashboard, timeline, etc.
+                    // Ici tu pourras afficher un dashboard, une timeline, etc.
                   }
             }
       }
@@ -232,12 +233,12 @@ private fun ActionButton(label: String, modifier: Modifier = Modifier, onClick: 
       }
 }
 
-/* ----- Placeholders for external components (drawer + top-right panel) ----- */
+/* ----- Placeholders pour compo externes (drawer + panneau top-right) ----- */
 
 @Composable
 private fun TopRightPanelPlaceholder(onDismiss: () -> Unit) {
-  DropdownMenuItem(text = { Text("Example item 1") }, onClick = onDismiss)
-  DropdownMenuItem(text = { Text("Example item 2") }, onClick = onDismiss)
+  DropdownMenuItem(text = { Text("Share") }, onClick = onDismiss)
+  DropdownMenuItem(text = { Text("Delete") }, onClick = onDismiss)
 }
 
 @Preview(showBackground = true, backgroundColor = 0x000000)
