@@ -4,9 +4,20 @@ import android.app.Activity
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
-import com.microsoft.identity.client.*
+import com.microsoft.identity.client.AcquireTokenSilentParameters
+import com.microsoft.identity.client.AuthenticationCallback
+import com.microsoft.identity.client.IAuthenticationResult
+import com.microsoft.identity.client.IMultipleAccountPublicClientApplication
+import com.microsoft.identity.client.IPublicClientApplication
+import com.microsoft.identity.client.PublicClientApplication
+import com.microsoft.identity.client.SilentAuthenticationCallback
 import com.microsoft.identity.client.exception.MsalException
+import java.net.HttpURLConnection
+import java.net.InetAddress
+import java.net.URL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,7 +62,7 @@ class MsalAuthRepository private constructor() : AuthRepository {
           .map { it.values.toList() }
           .stateIn(
               scope = CoroutineScope(Dispatchers.Main),
-              started = SharingStarted.WhileSubscribed(5000),
+              started = SharingStarted.Companion.WhileSubscribed(5000),
               initialValue = emptyList())
 
   override fun initialize(context: Context, configResourceId: Int) {
@@ -416,8 +427,7 @@ class MsalAuthRepository private constructor() : AuthRepository {
   /** Automatically retries connection after network loss */
   private fun retryAfterNetworkRestore() {
     // Wait a bit for connection to stabilize
-    android.os
-        .Handler(android.os.Looper.getMainLooper())
+    Handler(Looper.getMainLooper())
         .postDelayed(
             {
               if (isNetworkAvailable()) {
@@ -609,7 +619,7 @@ class MsalAuthRepository private constructor() : AuthRepository {
 
     // Simple DNS resolution test
     try {
-      val addresses = java.net.InetAddress.getAllByName("login.microsoftonline.com")
+      val addresses = InetAddress.getAllByName("login.microsoftonline.com")
       Log.d(
           TAG, "✓ DNS resolved for login.microsoftonline.com: ${addresses.map { it.hostAddress }}")
     } catch (e: Exception) {
@@ -617,7 +627,7 @@ class MsalAuthRepository private constructor() : AuthRepository {
     }
 
     try {
-      val addresses = java.net.InetAddress.getAllByName("graph.microsoft.com")
+      val addresses = InetAddress.getAllByName("graph.microsoft.com")
       Log.d(TAG, "✓ DNS resolved for graph.microsoft.com: ${addresses.map { it.hostAddress }}")
     } catch (e: Exception) {
       Log.e(TAG, "✗ DNS resolution error for graph.microsoft.com", e)
@@ -631,9 +641,8 @@ class MsalAuthRepository private constructor() : AuthRepository {
     Log.d(TAG, "Basic HTTP connectivity test...")
 
     try {
-      val url =
-          java.net.URL("https://login.microsoftonline.com/common/.well-known/openid_configuration")
-      val connection = url.openConnection() as java.net.HttpURLConnection
+      val url = URL("https://login.microsoftonline.com/common/.well-known/openid_configuration")
+      val connection = url.openConnection() as HttpURLConnection
       connection.requestMethod = "HEAD"
       connection.connectTimeout = 5000
       connection.readTimeout = 5000
@@ -709,7 +718,7 @@ class MsalAuthRepository private constructor() : AuthRepository {
 
     testHosts.forEach { host ->
       try {
-        val addresses = java.net.InetAddress.getAllByName(host)
+        val addresses = InetAddress.getAllByName(host)
         Log.d(TAG, "✓ $host resolved: ${addresses.map { it.hostAddress }}")
       } catch (e: Exception) {
         Log.e(TAG, "✗ $host not resolved: ${e.message}")
