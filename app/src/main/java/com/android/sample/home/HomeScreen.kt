@@ -26,15 +26,15 @@ import com.android.sample.R
 import kotlinx.coroutines.launch
 
 object HomeTags {
-    const val Root = "home_root"
-    const val MenuBtn = "home_menu_btn"
-    const val TopRightBtn = "home_topright_btn"
-    const val Action1Btn = "home_action1_btn"
-    const val Action2Btn = "home_action2_btn"
-    const val MessageField = "home_message_field"
-    const val SendBtn = "home_send_btn"
-    const val Drawer = "home_drawer"
-    const val TopRightMenu = "home_topright_menu"
+  const val Root = "home_root"
+  const val MenuBtn = "home_menu_btn"
+  const val TopRightBtn = "home_topright_btn"
+  const val Action1Btn = "home_action1_btn"
+  const val Action2Btn = "home_action2_btn"
+  const val MessageField = "home_message_field"
+  const val SendBtn = "home_send_btn"
+  const val Drawer = "home_drawer"
+  const val TopRightMenu = "home_topright_menu"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,112 +47,115 @@ fun HomeScreen(
     onSendMessage: (String) -> Unit = {},
     onSignOut: () -> Unit = {}
 ) {
-    val ui by viewModel.uiState.collectAsState()
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
+  val ui by viewModel.uiState.collectAsState()
+  val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+  val scope = rememberCoroutineScope()
 
-    // Synchronize ViewModel state <-> Drawer component
-    LaunchedEffect(ui.isDrawerOpen) {
-        if (ui.isDrawerOpen && !drawerState.isOpen) {
-            drawerState.open()
-        } else if (!ui.isDrawerOpen && drawerState.isOpen) {
-            drawerState.close()
-        }
+  // Synchronize ViewModel state <-> Drawer component
+  LaunchedEffect(ui.isDrawerOpen) {
+    if (ui.isDrawerOpen && !drawerState.isOpen) {
+      drawerState.open()
+    } else if (!ui.isDrawerOpen && drawerState.isOpen) {
+      drawerState.close()
     }
+  }
 
-    ModalNavigationDrawer(drawerState = drawerState, drawerContent = {}) {
+  ModalNavigationDrawer(
+      drawerState = drawerState,
+      drawerContent = {
+        DrawerContent(
+            ui = ui,
+            onToggleSystem = { id -> viewModel.toggleSystemConnection(id) },
+            onSignOut = {
+              // TODO: brancher ton sign-out réel
+              // Ferme le drawer visuellement + sync VM
+              scope.launch { drawerState.close() }
+              if (ui.isDrawerOpen) viewModel.toggleDrawer()
+              onSignOut()
+            },
+            onSettingsClick = {
+              scope.launch { drawerState.close() }
+              if (ui.isDrawerOpen) viewModel.toggleDrawer()
+            },
+            onClose = {
+              scope.launch { drawerState.close() }
+              if (ui.isDrawerOpen) viewModel.toggleDrawer()
+            })
+      }) {
         Scaffold(
             modifier = modifier.fillMaxSize().background(Color.Black).testTag(HomeTags.Root),
             containerColor = Color.Black,
             topBar = {
-                CenterAlignedTopAppBar(
-                    navigationIcon = {
-                        IconButton(
-                            onClick = {
-                                viewModel.toggleDrawer()
-                                scope.launch {
-                                    if (!drawerState.isOpen) drawerState.open()
-                                    else drawerState.close()
-                                }
-                            },
-                            modifier =
-                                Modifier.size(40.dp)
-                                    .background(Color(0x22FFFFFF), CircleShape)
-                                    .testTag(HomeTags.MenuBtn)
-                        ) {
-                            Icon(
-                                Icons.Default.Menu,
-                                contentDescription = "Menu",
-                                tint = Color.White
-                            )
+              CenterAlignedTopAppBar(
+                  navigationIcon = {
+                    IconButton(
+                        onClick = {
+                          viewModel.toggleDrawer()
+                          scope.launch {
+                            if (!drawerState.isOpen) drawerState.open() else drawerState.close()
+                          }
+                        },
+                        modifier =
+                            Modifier.size(40.dp)
+                                .background(Color(0x22FFFFFF), CircleShape)
+                                .testTag(HomeTags.MenuBtn)) {
+                          Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
                         }
-                    },
-                    title = {
-                        Image(
-                            painter = painterResource(R.drawable.euler_logo),
-                            contentDescription = "Euler",
-                            modifier = Modifier.height(100.dp),
-                            contentScale = ContentScale.Fit
-                        )
-                    },
-                    actions = {
-                        IconButton(
-                            onClick = { viewModel.setTopRightOpen(true) },
-                            modifier =
-                                Modifier.size(40.dp)
-                                    .background(Color(0x22FFFFFF), CircleShape)
-                                    .testTag(HomeTags.TopRightBtn)
-                        ) {
-                            Icon(
-                                Icons.Default.MoreVert,
-                                contentDescription = "More",
-                                tint = Color.White
-                            )
+                  },
+                  title = {
+                    Image(
+                        painter = painterResource(R.drawable.euler_logo),
+                        contentDescription = "Euler",
+                        modifier = Modifier.height(100.dp),
+                        contentScale = ContentScale.Fit)
+                  },
+                  actions = {
+                    IconButton(
+                        onClick = { viewModel.setTopRightOpen(true) },
+                        modifier =
+                            Modifier.size(40.dp)
+                                .background(Color(0x22FFFFFF), CircleShape)
+                                .testTag(HomeTags.TopRightBtn)) {
+                          Icon(
+                              Icons.Default.MoreVert,
+                              contentDescription = "More",
+                              tint = Color.White)
                         }
 
-                        // Top-right menu (placeholder)
-                        DropdownMenu(
-                            expanded = ui.isTopRightOpen,
-                            onDismissRequest = { viewModel.setTopRightOpen(false) },
-                            modifier = Modifier.testTag(HomeTags.TopRightMenu)
-                        ) {
-                            TopRightPanelPlaceholder(
-                                onDismiss = { viewModel.setTopRightOpen(false) }
-                            )
+                    // Top-right menu (placeholder)
+                    DropdownMenu(
+                        expanded = ui.isTopRightOpen,
+                        onDismissRequest = { viewModel.setTopRightOpen(false) },
+                        modifier = Modifier.testTag(HomeTags.TopRightMenu)) {
+                          TopRightPanelPlaceholder(onDismiss = { viewModel.setTopRightOpen(false) })
                         }
-                    },
-                    colors =
-                        TopAppBarDefaults.topAppBarColors(
-                            containerColor = Color.Black,
-                            titleContentColor = Color.White,
-                            navigationIconContentColor = Color.White,
-                            actionIconContentColor = Color.White
-                        )
-                )
+                  },
+                  colors =
+                      TopAppBarDefaults.topAppBarColors(
+                          containerColor = Color.Black,
+                          titleContentColor = Color.White,
+                          navigationIconContentColor = Color.White,
+                          actionIconContentColor = Color.White))
             },
             bottomBar = {
-                Column(
-                    Modifier.fillMaxWidth().background(Color.Black).padding(bottom = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
+              Column(
+                  Modifier.fillMaxWidth().background(Color.Black).padding(bottom = 16.dp),
+                  horizontalAlignment = Alignment.CenterHorizontally) {
                     // Action buttons
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    ) {
-                        ActionButton(
-                            label = "Find CS220 past exams in Drive EPFL",
-                            modifier =
-                                Modifier.weight(1f).height(50.dp).testTag(HomeTags.Action1Btn),
-                            onClick = onAction1Click
-                        )
-                        ActionButton(
-                            label = "Check Ed Discussion",
-                            modifier =
-                                Modifier.weight(1f).height(50.dp).testTag(HomeTags.Action2Btn),
-                            onClick = onAction2Click
-                        )
-                    }
+                        modifier = Modifier.padding(horizontal = 16.dp)) {
+                          ActionButton(
+                              label = "Find CS220 past exams in Drive EPFL",
+                              modifier =
+                                  Modifier.weight(1f).height(50.dp).testTag(HomeTags.Action1Btn),
+                              onClick = onAction1Click)
+                          ActionButton(
+                              label = "Check Ed Discussion",
+                              modifier =
+                                  Modifier.weight(1f).height(50.dp).testTag(HomeTags.Action2Btn),
+                              onClick = onAction2Click)
+                        }
 
                     Spacer(Modifier.height(16.dp))
 
@@ -167,19 +170,17 @@ fun HomeScreen(
                                 .height(56.dp)
                                 .testTag(HomeTags.MessageField),
                         trailingIcon = {
-                            IconButton(
-                                onClick = {
-                                    onSendMessage(ui.messageDraft)
-                                    viewModel.sendMessage()
-                                },
-                                modifier = Modifier.testTag(HomeTags.SendBtn)
-                            ) {
+                          IconButton(
+                              onClick = {
+                                onSendMessage(ui.messageDraft)
+                                viewModel.sendMessage()
+                              },
+                              modifier = Modifier.testTag(HomeTags.SendBtn)) {
                                 Icon(
                                     imageVector = Icons.Filled.Send,
                                     contentDescription = "Send",
-                                    tint = Color.Gray
-                                )
-                            }
+                                    tint = Color.Gray)
+                              }
                         },
                         shape = RoundedCornerShape(50),
                         colors =
@@ -199,8 +200,7 @@ fun HomeScreen(
                                 unfocusedBorderColor = Color.DarkGray,
                                 focusedContainerColor = Color(0xFF121212),
                                 unfocusedContainerColor = Color(0xFF121212),
-                            )
-                    )
+                            ))
 
                     Spacer(Modifier.height(8.dp))
                     Text(
@@ -208,44 +208,40 @@ fun HomeScreen(
                         color = Color.Gray,
                         fontSize = 11.sp,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
-                }
+                        modifier = Modifier.padding(horizontal = 16.dp))
+                  }
+            }) { padding ->
+              // Central content (visual placeholder)
+              Box(
+                  modifier = Modifier.fillMaxSize().padding(padding).background(Color.Black),
+                  contentAlignment = Alignment.Center) {
+                    // Here you can display a dashboard, timeline, etc.
+                  }
             }
-        ) { padding ->
-            // Central content (visual placeholder)
-            Box(
-                modifier = Modifier.fillMaxSize().padding(padding).background(Color.Black),
-                contentAlignment = Alignment.Center
-            ) {
-                // Here you can display a dashboard, timeline, etc.
-            }
-        }
-    }
+      }
 }
 
 @Composable
 private fun ActionButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        shape = RoundedCornerShape(50),
-        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E1E1E)),
-        modifier = modifier
-    ) {
+  Button(
+      onClick = onClick,
+      shape = RoundedCornerShape(50),
+      colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E1E1E)),
+      modifier = modifier) {
         Text(label, color = Color.White, textAlign = TextAlign.Center)
-    }
+      }
 }
 
 /* ----- Placeholders for external components (drawer + top-right panel) ----- */
 
 @Composable
 private fun TopRightPanelPlaceholder(onDismiss: () -> Unit) {
-    DropdownMenuItem(text = { Text("Example item 1") }, onClick = onDismiss)
-    DropdownMenuItem(text = { Text("Example item 2") }, onClick = onDismiss)
+  DropdownMenuItem(text = { Text("Example item 1") }, onClick = onDismiss)
+  DropdownMenuItem(text = { Text("Example item 2") }, onClick = onDismiss)
 }
 
 @Preview(showBackground = true, backgroundColor = 0x000000)
 @Composable
 private fun HomeScreenPreview() {
-    MaterialTheme { HomeScreen() }
+  MaterialTheme { HomeScreen() }
 }
