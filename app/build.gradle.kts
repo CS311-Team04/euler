@@ -17,8 +17,11 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        vectorDrawables { useSupportLibrary = true }
+        vectorDrawables {
+            useSupportLibrary = true
+        }
     }
 
     buildTypes {
@@ -29,10 +32,16 @@ android {
                 "proguard-rules.pro"
             )
         }
+
         debug {
-            enableUnitTestCoverage = true // Re-enabled with JaCoCo 0.8.14
-            enableAndroidTestCoverage = false
+            enableUnitTestCoverage = true
+            enableAndroidTestCoverage = true
         }
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+        freeCompilerArgs += listOf("-Xsuppress-version-warnings", "-Xskip-metadata-version-check")
     }
 
     buildFeatures {
@@ -40,7 +49,7 @@ android {
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.4.3"
+        kotlinCompilerExtensionVersion = "1.5.10"
     }
 
     compileOptions {
@@ -50,7 +59,6 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
-        freeCompilerArgs += listOf("-Xsuppress-version-warnings", "-Xskip-metadata-version-check")
     }
 
     packaging {
@@ -62,8 +70,33 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
+            isReturnDefaultValues = true
         }
     }
+
+    // Robolectric needs to be run only in debug. But its tests are placed in the shared source set (test)
+    // The next lines transfers the src/test/* from shared to the testDebug one
+    //
+    // This prevent errors from occurring during unit tests
+    sourceSets.getByName("testDebug") {
+        val test = sourceSets.getByName("test")
+
+        java.setSrcDirs(test.java.srcDirs)
+        res.setSrcDirs(test.res.srcDirs)
+        resources.setSrcDirs(test.resources.srcDirs)
+    }
+
+    sourceSets.getByName("test") {
+        java.setSrcDirs(emptyList<File>())
+        res.setSrcDirs(emptyList<File>())
+        resources.setSrcDirs(emptyList<File>())
+    }
+}
+
+// When a library is used both by robolectric and connected tests, use this function
+fun DependencyHandlerScope.globalTestImplementation(dep: Any) {
+    androidTestImplementation(dep)
+    testImplementation(dep)
 }
 
 dependencies {
@@ -74,52 +107,57 @@ dependencies {
     implementation("com.google.firebase:firebase-analytics-ktx")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
 
-    // Compose
-    implementation(platform("androidx.compose:compose-bom:2024.10.01"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
-    implementation(libs.compose.preview)
-    debugImplementation(libs.compose.tooling)
-
-    // Navigation & Lifecycle
-    implementation("androidx.navigation:navigation-compose:2.7.6")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-
-    // Core Android
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-
-    // Testing
+    implementation(platform(libs.compose.bom))
     testImplementation(libs.junit)
-    testImplementation("io.mockk:mockk:1.13.8")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
-    testImplementation(libs.robolectric)
-    
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-}
+    globalTestImplementation(libs.androidx.junit)
+    globalTestImplementation(libs.androidx.espresso.core)
 
-// JaCoCo configuration with Java 21 compatibility
-jacoco {
-    toolVersion = "0.8.14"
+    // ------------- Jetpack Compose ------------------
+    val composeBom = platform(libs.compose.bom)
+    implementation(composeBom)
+    globalTestImplementation(composeBom)
+
+    implementation(libs.compose.ui)
+    implementation(libs.compose.ui.graphics)
+    // Material Design 3
+    implementation(libs.compose.material3)
+    // Integration with activities
+    implementation(libs.compose.activity)
+    // Integration with ViewModels
+    implementation(libs.compose.viewmodel)
+    // Android Studio Preview support
+    implementation(libs.compose.preview)
+    debugImplementation(libs.compose.tooling)
+    // UI Tests
+    globalTestImplementation(libs.compose.test.junit)
+    debugImplementation(libs.compose.test.manifest)
+
+    // --------- Kaspresso test framework ----------
+    globalTestImplementation(libs.kaspresso)
+    globalTestImplementation(libs.kaspresso.compose)
+
+    // ----------       Robolectric     ------------
+    testImplementation(libs.robolectric)
 }
 
 tasks.withType<Test> {
-    extensions.configure(JacocoTaskExtension::class) {
+    // Configure Jacoco for each tests
+    configure<JacocoTaskExtension> {
         isIncludeNoLocationClasses = true
         excludes = listOf("jdk.internal.*")
     }
 }
 
 tasks.register("jacocoTestReport", JacocoReport::class) {
-    dependsOn("testDebugUnitTest")
+    mustRunAfter("testDebugUnitTest", "connectedDebugAndroidTest")
+
     reports {
-        xml.required.set(true)
-        html.required.set(true)
+        xml.required = true
+        html.required = true
     }
 
     val fileFilter = listOf(
@@ -128,19 +166,25 @@ tasks.register("jacocoTestReport", JacocoReport::class) {
         "**/BuildConfig.*",
         "**/Manifest*.*",
         "**/*Test*.*",
-        "android/**/*.*"
+        "android/**/*.*",
     )
+
     val debugTree = fileTree("${project.layout.buildDirectory.get()}/tmp/kotlin-classes/debug") {
         exclude(fileFilter)
     }
 
-    sourceDirectories.setFrom(files("${project.layout.projectDirectory}/src/main/java"))
+    val mainSrc = "${project.layout.projectDirectory}/src/main/java"
+    sourceDirectories.setFrom(files(mainSrc))
     classDirectories.setFrom(files(debugTree))
-    executionData.setFrom(
-        fileTree(project.layout.buildDirectory.get()) {
-            include("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec")
-        }
-    )
+    executionData.setFrom(fileTree(project.layout.buildDirectory.get()) {
+        include("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec")
+        include("outputs/code_coverage/debugAndroidTest/connected/*/coverage.ec")
+    })
+}
+
+// JaCoCo configuration with Java 21 compatibility
+jacoco {
+    toolVersion = "0.8.14"
 }
 
 // SonarQube configuration with JaCoCo 0.8.14
@@ -165,9 +209,4 @@ sonar {
         property("sonar.junit.reportPaths", "${project.layout.buildDirectory.get()}/test-results/testDebugUnitTest/")
         property("sonar.androidLint.reportPaths", "${project.layout.buildDirectory.get()}/reports/lint-results-debug.xml")
     }
-}
-
-// ktfmt configuration
-ktfmt {
-    kotlinLangStyle()
 }
