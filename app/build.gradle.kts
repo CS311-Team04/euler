@@ -4,6 +4,7 @@ plugins {
     // alias(libs.plugins.googleServices) // Temporarily disabled for CI
     id("jacoco")
     id("org.sonarqube")
+    alias(libs.plugins.ktfmt)
 }
 
 android {
