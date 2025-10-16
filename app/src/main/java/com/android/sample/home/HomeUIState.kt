@@ -1,8 +1,8 @@
 package com.android.sample.home
 
 /**
- * Immutable snapshot of everything the HomeScreen needs to display at a given moment. A change =
- * create a new copy via copy(...)
+ * Photo immuable de tout ce que la HomeScreen doit afficher à un instant t. Un changement = on crée
+ * une nouvelle copie via copy(...)
  */
 data class HomeUiState(
     val userName: String = "Student",
@@ -14,8 +14,8 @@ data class HomeUiState(
     val isLoading: Boolean = false
 )
 
-/** Represents an EPFL system (IS-Academia, Moodle, Drive, etc.) and its connection status. */
+/** Représente un système EPFL (IS-Academia, Moodle, Drive, etc.) et son état de connexion. */
 data class SystemItem(val id: String, val name: String, val isConnected: Boolean)
 
-/** Represents an entry in the recent actions timeline. */
+/** Représente une entrée dans la timeline des actions récentes. */
 data class ActionItem(val id: String, val title: String, val time: String)

@@ -13,11 +13,13 @@ import com.android.sample.authentification.AuthUIScreen
 import com.android.sample.authentification.AuthUiState
 import com.android.sample.home.HomeScreen
 import com.android.sample.sign_in.AuthViewModel
+import com.android.sample.settings.SettingsPage
 
 object Routes {
   const val SignIn = "signin"
   const val Home = "home"
   const val HomeWithDrawer = "home_with_drawer"
+  const val Settings = "settings"
 }
 
 @Composable
@@ -63,13 +65,28 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: android.app.Activity) {
                   popUpTo(Routes.Home) { inclusive = true }
                   launchSingleTop = true
                 }
-              })
+              },
+              onSettingsClick = { nav.navigate(Routes.Settings) })
         }
         composable(Routes.HomeWithDrawer) {
           HomeScreen(
               onAction1Click = { /* ... */},
               onAction2Click = { /* ... */},
               onSendMessage = { /* ... */},
+              onSignOut = {
+                nav.navigate(Routes.SignIn) {
+                  popUpTo(Routes.Home) { inclusive = true }
+                  launchSingleTop = true
+                }
+              },
+              onSettingsClick = { nav.navigate(Routes.Settings) },
+              openDrawerOnStart = true)
+        }
+        composable(Routes.Settings) {
+          SettingsPage(
+              onBackClick = {
+                nav.navigate(Routes.HomeWithDrawer) { popUpTo(Routes.Home) { inclusive = false } }
+              },
               onSignOut = {
                 nav.navigate(Routes.SignIn) {
                   popUpTo(Routes.Home) { inclusive = true }
