@@ -1,9 +1,6 @@
 package com.android.sample.screen
 
 import androidx.activity.ComponentActivity
-import com.android.sample.authentification.AuthUIScreen
-import com.android.sample.authentification.AuthUiState
-import com.android.sample.authentification.AuthTags
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -13,6 +10,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.android.sample.authentification.AuthTags
+import com.android.sample.authentification.AuthUIScreen
+import com.android.sample.authentification.AuthUiState
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test

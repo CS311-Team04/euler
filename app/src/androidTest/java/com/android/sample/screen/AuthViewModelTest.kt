@@ -1,11 +1,10 @@
 package com.android.sample.screen
 
-import com.android.sample.sign_in.AuthViewModel
-import com.android.sample.authentification.AuthUiState
-import com.android.sample.authentification.AuthProvider
-
 import android.app.Activity
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.android.sample.authentification.AuthProvider
+import com.android.sample.authentification.AuthUiState
+import com.android.sample.sign_in.AuthViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -27,9 +26,8 @@ import org.mockito.MockitoAnnotations
 class AuthViewModelTest {
 
   private val testDispatcher = UnconfinedTestDispatcher()
-  
-  @Mock
-  private lateinit var mockActivity: Activity
+
+  @Mock private lateinit var mockActivity: Activity
 
   @Before
   fun setup() {
