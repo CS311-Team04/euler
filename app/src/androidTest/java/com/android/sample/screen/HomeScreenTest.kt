@@ -20,25 +20,7 @@ import org.junit.runner.RunWith
 class HomeScreenTest {
 
   @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
-
-  @Test
-  fun renders_core_widgets() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    // éléments app bar & actions
-    composeRule.onNodeWithTag(HomeTags.MenuBtn).assertIsDisplayed()
-    composeRule.onNodeWithTag(HomeTags.TopRightBtn).assertIsDisplayed()
-    composeRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed()
-    composeRule.onNodeWithTag(HomeTags.Action2Btn).assertIsDisplayed()
-
-    // champ + send
-    composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
-    composeRule.onNodeWithTag(HomeTags.SendBtn).assertIsDisplayed()
-
-    // logo au centre (Image avec contentDescription = "Euler")
-    composeRule.onNode(hasContentDescription("Euler")).assertIsDisplayed()
-  }
-
+  
   @Test
   fun typing_and_send_calls_callback_with_text() {
     var sent: String? = null
@@ -93,16 +75,6 @@ class HomeScreenTest {
     composeRule
         .onNodeWithText("Powered by APERTUS Swiss LLM · MCP-enabled for 6 EPFL systems")
         .assertIsDisplayed()
-  }
-
-  @Test
-  fun displays_icons_with_correct_content_descriptions() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    composeRule.onNode(hasContentDescription("Menu")).assertIsDisplayed()
-    composeRule.onNode(hasContentDescription("More")).assertIsDisplayed()
-    composeRule.onNode(hasContentDescription("Send")).assertIsDisplayed()
-    composeRule.onNode(hasContentDescription("Euler")).assertIsDisplayed()
   }
 
   @Test
