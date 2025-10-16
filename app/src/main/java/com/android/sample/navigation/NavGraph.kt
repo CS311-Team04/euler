@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.android.sample.auth.MicrosoftAuth
 import com.android.sample.authentification.AuthUIScreen
 import com.android.sample.authentification.AuthUiState
 import com.android.sample.home.HomeScreen
@@ -28,20 +29,34 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: android.app.Activity) {
   val authViewModel = remember { AuthViewModel() }
   val authState by authViewModel.state.collectAsState()
 
-  // Handle authentication state changes
+  // Handle Microsoft authentication when loading
   LaunchedEffect(authState) {
-    when (authState) {
+    val currentState = authState
+    when (currentState) {
+      is AuthUiState.Loading -> {
+        if (currentState.provider == com.android.sample.authentification.AuthProvider.MICROSOFT) {
+          // Handle Microsoft authentication at UI level
+          MicrosoftAuth.signIn(
+              activity = activity,
+              onSuccess = { authViewModel.onAuthenticationSuccess() },
+              onError = { exception ->
+                authViewModel.onAuthenticationError(
+                    exception.message ?: "Microsoft authentication failed")
+              })
+        }
+      }
       is AuthUiState.SignedIn -> {
         nav.navigate(Routes.Home) {
           popUpTo(Routes.SignIn) { inclusive = true }
           launchSingleTop = true
+          restoreState = true
         }
       }
       is AuthUiState.Error -> {
         // Handle error state - could show snackbar or toast
       }
       else -> {
-        /* Loading or Idle states - no navigation */
+        /* Idle state - no navigation */
       }
     }
   }
@@ -51,7 +66,7 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: android.app.Activity) {
         composable(Routes.SignIn) {
           AuthUIScreen(
               state = authState,
-              onMicrosoftLogin = { authViewModel.onMicrosoftLoginClick(activity) },
+              onMicrosoftLogin = { authViewModel.onMicrosoftLoginClick() },
               onSwitchEduLogin = { authViewModel.onSwitchEduLoginClick() })
         }
         composable(Routes.Home) {

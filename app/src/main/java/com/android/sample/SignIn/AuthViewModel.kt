@@ -1,9 +1,7 @@
 package com.android.sample.sign_in
 
-import android.app.Activity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.android.sample.auth.MicrosoftAuth
 import com.android.sample.authentification.AuthProvider
 import com.android.sample.authentification.AuthUiState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,9 +13,9 @@ class AuthViewModel : ViewModel() {
   private val _state = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
   val state: StateFlow<AuthUiState> = _state.asStateFlow()
 
-  fun onMicrosoftLoginClick(activity: Activity) {
+  fun onMicrosoftLoginClick() {
     if (_state.value is AuthUiState.Loading) return
-    startMicrosoftSignIn(activity)
+    _state.value = AuthUiState.Loading(AuthProvider.MICROSOFT)
   }
 
   fun onSwitchEduLoginClick() {
@@ -25,15 +23,12 @@ class AuthViewModel : ViewModel() {
     startSignIn(AuthProvider.SWITCH_EDU)
   }
 
-  private fun startMicrosoftSignIn(activity: Activity) {
-    _state.value = AuthUiState.Loading(AuthProvider.MICROSOFT)
+  fun onAuthenticationSuccess() {
+    _state.value = AuthUiState.SignedIn
+  }
 
-    MicrosoftAuth.signIn(
-        activity = activity,
-        onSuccess = { _state.value = AuthUiState.SignedIn },
-        onError = { exception ->
-          _state.value = AuthUiState.Error(exception.message ?: "Microsoft authentication failed")
-        })
+  fun onAuthenticationError(error: String) {
+    _state.value = AuthUiState.Error(error)
   }
 
   private fun startSignIn(provider: AuthProvider) {

@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.android.sample.TestConstants
 import com.android.sample.authentification.AuthTags
 import com.android.sample.authentification.AuthUIScreen
 import com.android.sample.authentification.AuthUiState
@@ -49,9 +50,7 @@ class AuthUIScreenTest {
 
     // Vérifie le texte des conditions
     composeRule.onNodeWithTag(AuthTags.TermsText).assertIsDisplayed()
-    composeRule
-        .onNodeWithText("By signing in, you agree to our Terms of Service and Privacy Policy")
-        .assertIsDisplayed()
+    composeRule.onNodeWithText(TestConstants.TermsText.TERMS_AND_PRIVACY).assertIsDisplayed()
   }
 
   @Test
@@ -108,8 +107,8 @@ class AuthUIScreenTest {
       }
     }
 
-    composeRule.onNodeWithText("Sign in with Microsoft Entra ID").assertIsDisplayed()
-    composeRule.onNodeWithText("Sign in with Switch edu ID").assertIsDisplayed()
+    composeRule.onNodeWithText(TestConstants.ButtonTexts.MICROSOFT_LOGIN).assertIsDisplayed()
+    composeRule.onNodeWithText(TestConstants.ButtonTexts.SWITCH_LOGIN).assertIsDisplayed()
   }
 
   @Test
@@ -121,9 +120,15 @@ class AuthUIScreenTest {
     }
 
     // Vérifie que les images ont les bonnes descriptions
-    composeRule.onNode(hasContentDescription("EPFL Logo")).assertIsDisplayed()
-    composeRule.onNode(hasContentDescription("Separator Dot")).assertIsDisplayed()
-    composeRule.onNode(hasContentDescription("Euler Logo")).assertIsDisplayed()
+    composeRule
+        .onNode(hasContentDescription(TestConstants.ContentDescriptions.EPFL_LOGO))
+        .assertIsDisplayed()
+    composeRule
+        .onNode(hasContentDescription(TestConstants.ContentDescriptions.SEPARATOR_DOT))
+        .assertIsDisplayed()
+    composeRule
+        .onNode(hasContentDescription(TestConstants.ContentDescriptions.EULER_LOGO))
+        .assertIsDisplayed()
   }
 
   @Test
@@ -135,8 +140,12 @@ class AuthUIScreenTest {
     }
 
     // Les icônes ont des contentDescription spécifiques
-    composeRule.onNode(hasContentDescription("Microsoft Icon")).assertIsDisplayed()
-    composeRule.onNode(hasContentDescription("Switch Icon")).assertIsDisplayed()
+    composeRule
+        .onNode(hasContentDescription(TestConstants.ContentDescriptions.MICROSOFT_ICON))
+        .assertIsDisplayed()
+    composeRule
+        .onNode(hasContentDescription(TestConstants.ContentDescriptions.SWITCH_ICON))
+        .assertIsDisplayed()
   }
 
   @Test
