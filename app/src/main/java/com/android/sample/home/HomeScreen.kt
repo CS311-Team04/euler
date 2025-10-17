@@ -55,7 +55,6 @@ fun HomeScreen(
   val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
   val scope = rememberCoroutineScope()
 
-  // Synchronise l'état ViewModel <-> composant Drawer
   LaunchedEffect(ui.isDrawerOpen) {
     if (ui.isDrawerOpen && !drawerState.isOpen) {
       drawerState.open()
@@ -79,8 +78,6 @@ fun HomeScreen(
             ui = ui,
             onToggleSystem = { id -> viewModel.toggleSystemConnection(id) },
             onSignOut = {
-              // TODO: brancher ton sign-out réel
-              // Ferme le drawer visuellement + sync VM
               scope.launch { drawerState.close() }
               if (ui.isDrawerOpen) viewModel.toggleDrawer()
               onSignOut()
@@ -135,7 +132,6 @@ fun HomeScreen(
                               tint = Color.White)
                         }
 
-                    // Menu haut-droite (placeholder)
                     DropdownMenu(
                         expanded = ui.isTopRightOpen,
                         onDismissRequest = { viewModel.setTopRightOpen(false) },
@@ -154,7 +150,6 @@ fun HomeScreen(
               Column(
                   Modifier.fillMaxWidth().background(Color.Black).padding(bottom = 16.dp),
                   horizontalAlignment = Alignment.CenterHorizontally) {
-                    // Boutons d'action
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -172,7 +167,6 @@ fun HomeScreen(
 
                     Spacer(Modifier.height(16.dp))
 
-                    // Champ de message branché au ViewModel
                     OutlinedTextField(
                         value = ui.messageDraft,
                         onValueChange = { viewModel.updateMessageDraft(it) },
@@ -198,17 +192,14 @@ fun HomeScreen(
                         shape = RoundedCornerShape(50),
                         colors =
                             OutlinedTextFieldDefaults.colors(
-                                // texte
                                 focusedTextColor = Color.White,
                                 unfocusedTextColor = Color.White,
                                 disabledTextColor = Color.LightGray,
                                 cursorColor = Color.White,
 
-                                // placeholder
                                 focusedPlaceholderColor = Color.Gray,
                                 unfocusedPlaceholderColor = Color.Gray,
-
-                                // bordures + fond
+                              
                                 focusedBorderColor = Color.DarkGray,
                                 unfocusedBorderColor = Color.DarkGray,
                                 focusedContainerColor = Color(0xFF121212),
@@ -228,7 +219,6 @@ fun HomeScreen(
               Box(
                   modifier = Modifier.fillMaxSize().padding(padding).background(Color.Black),
                   contentAlignment = Alignment.Center) {
-                    // Ici tu pourras afficher un dashboard, une timeline, etc.
                     LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
                       items(ui.recent) { item ->
                         Text(
@@ -258,8 +248,6 @@ private fun ActionButton(label: String, modifier: Modifier = Modifier, onClick: 
         Text(label, color = Color.White, textAlign = TextAlign.Center)
       }
 }
-
-/* ----- Placeholders pour compo externes (drawer + panneau top-right) ----- */
 
 @Composable
 private fun TopRightPanelPlaceholder(onDismiss: () -> Unit) {
