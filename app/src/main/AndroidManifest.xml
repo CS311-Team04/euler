@@ -34,33 +34,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
             
-            <!-- Microsoft OAuth redirect URI -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="msauth" 
-                      android:host="com.android.sample" 
-                      android:path="/auth" />
-            </intent-filter>
         </activity>
-        
-        <!-- MSAL BrowserTabActivity -->
-        <activity
-            android:name="com.microsoft.identity.client.BrowserTabActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="msauth"
-                    android:host="com.android.sample"
-                    android:path="/X4jeBxPLAxY0pAf/Ys2uu7hnsjs=" />
-            </intent-filter>
-        </activity>
-
-
 
     </application>
 
