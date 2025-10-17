@@ -196,10 +196,8 @@ fun HomeScreen(
                                 unfocusedTextColor = Color.White,
                                 disabledTextColor = Color.LightGray,
                                 cursorColor = Color.White,
-
                                 focusedPlaceholderColor = Color.Gray,
                                 unfocusedPlaceholderColor = Color.Gray,
-                              
                                 focusedBorderColor = Color.DarkGray,
                                 unfocusedBorderColor = Color.DarkGray,
                                 focusedContainerColor = Color(0xFF121212),
