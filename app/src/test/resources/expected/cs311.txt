@@ -1,0 +1,25 @@
+CS-311 – The Software Enterprise
+Course information
+Semester: Autumn
+Credits: 4
+Lecturer: Professor Bertrand Meyer
+Language: English
+Category: Software engineering
+
+Course description
+This course introduces students to software project management, agile development, and teamwork in a simulated enterprise environment. Students collaborate in teams to design, implement, and deliver a software product.
+
+Objectives
+– Understand software project planning and organization
+– Apply agile and iterative development practices
+– Manage team collaboration using version control
+– Learn communication and documentation practices in an enterprise context
+
+Prerequisites
+Basic knowledge of programming and software engineering principles.
+
+Evaluation
+Assessment is based on project work, team reports, and presentations. Attendance and participation are required.
+
+Learning outcomes
+Students gain practical experience in team-based software development, project delivery, and communication skills relevant to professional environments.
