@@ -6,7 +6,7 @@
         <domain includeSubdomains="true">graph.microsoft.com</domain>
         <domain includeSubdomains="true">login.live.com</domain>
         <domain includeSubdomains="true">graph.windows.net</domain>
-        
+
         <!-- Certificats de confiance pour les serveurs Microsoft -->
         <trust-anchors>
             <certificates src="system"/>
@@ -14,7 +14,7 @@
     </domain-config>
     
     <!-- Configuration par défaut - HTTPS uniquement -->
-    <base-config cleartextTrafficPermitted="false">
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system"/>
         </trust-anchors>

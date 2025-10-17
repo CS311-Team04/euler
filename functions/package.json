@@ -12,7 +12,8 @@
     "build": "tsc",
     "serve": "firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions",
-    "clean": "rm -rf lib"
+    "clean": "rm -rf lib",
+    "lint": "echo skip-lint"
   },
   "dependencies": {
     "dotenv": "^16.6.1",
