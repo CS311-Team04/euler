@@ -88,16 +88,16 @@ object MicrosoftAuth {
       Log.d(TAG, "Credential: ${credential != null}")
       Log.d(TAG, "ID Token: ${credential?.idToken != null}")
       Log.d(TAG, "Access Token: ${credential?.accessToken != null}")
-      
+
       if (validateTenantIfRequired(credential)) {
         Log.d(TAG, "Tenant validation passed")
-        
+
         // Check Firebase auth state
         val currentUser = Firebase.auth.currentUser
         Log.d(TAG, "Firebase currentUser: ${currentUser?.uid}")
         Log.d(TAG, "Firebase currentUser email: ${currentUser?.email}")
         Log.d(TAG, "Firebase currentUser displayName: ${currentUser?.displayName}")
-        
+
         onSuccess()
       } else {
         Log.w(TAG, "Tenant validation failed - signing out user")

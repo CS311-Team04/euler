@@ -27,7 +27,7 @@ class AuthViewModel : ViewModel() {
     android.util.Log.d("AuthViewModel", "Current user: ${currentUser?.uid}")
     android.util.Log.d("AuthViewModel", "Current user email: ${currentUser?.email}")
     android.util.Log.d("AuthViewModel", "Current user displayName: ${currentUser?.displayName}")
-    
+
     if (currentUser != null) {
       android.util.Log.d("AuthViewModel", "User is signed in, setting state to SignedIn")
       _state.value = AuthUiState.SignedIn
