@@ -29,7 +29,8 @@ class AuthViewModel : ViewModel() {
       if (user != null) {
         android.util.Log.d("AuthViewModel", "User signed in: ${user.email}")
         _state.value = AuthUiState.SignedIn
-        setLoggedStatus(true)
+        // Don't call setLoggedStatus here - it will be called by onAuthenticationSuccess()
+        // when user actually signs in, not when we detect existing auth state
       } else {
         android.util.Log.d("AuthViewModel", "User signed out")
         _state.value = AuthUiState.Idle
@@ -48,6 +49,8 @@ class AuthViewModel : ViewModel() {
     if (currentUser != null) {
       android.util.Log.d("AuthViewModel", "User is signed in, setting state to SignedIn")
       _state.value = AuthUiState.SignedIn
+      // Update logged status for existing user (in case it was not set before)
+      setLoggedStatus(true)
     } else {
       android.util.Log.d("AuthViewModel", "No user found, setting state to Idle")
       _state.value = AuthUiState.Idle
