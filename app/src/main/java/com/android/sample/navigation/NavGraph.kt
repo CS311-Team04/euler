@@ -74,7 +74,9 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: android.app.Activity) {
               onAction2Click = { /* ... */},
               onSendMessage = { /* ... */},
               onSignOut = {
+                android.util.Log.d("NavGraph", "Sign out button clicked")
                 authViewModel.signOut()
+                android.util.Log.d("NavGraph", "Navigating to SignIn")
                 nav.navigate(Routes.SignIn) {
                   // retire Home pour ne pas pouvoir revenir en arrière
                   popUpTo(Routes.Home) { inclusive = true }
@@ -89,7 +91,9 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: android.app.Activity) {
               onAction2Click = { /* ... */},
               onSendMessage = { /* ... */},
               onSignOut = {
+                android.util.Log.d("NavGraph", "Sign out button clicked (HomeWithDrawer)")
                 authViewModel.signOut()
+                android.util.Log.d("NavGraph", "Navigating to SignIn (HomeWithDrawer)")
                 nav.navigate(Routes.SignIn) {
                   popUpTo(Routes.Home) { inclusive = true }
                   launchSingleTop = true
@@ -104,7 +108,9 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: android.app.Activity) {
                 nav.navigate(Routes.HomeWithDrawer) { popUpTo(Routes.Home) { inclusive = false } }
               },
               onSignOut = {
+                android.util.Log.d("NavGraph", "Sign out button clicked (Settings)")
                 authViewModel.signOut()
+                android.util.Log.d("NavGraph", "Navigating to SignIn (Settings)")
                 nav.navigate(Routes.SignIn) {
                   popUpTo(Routes.Home) { inclusive = true }
                   launchSingleTop = true

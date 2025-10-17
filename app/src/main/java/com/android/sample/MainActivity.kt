@@ -9,6 +9,7 @@ import com.android.sample.ui.theme.SampleAppTheme
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+
     setContent { SampleAppTheme { AppNav(startOnSignedIn = false, activity = this@MainActivity) } }
   }
 }
