@@ -210,6 +210,9 @@ tasks.withType<Test> {
     }
 }
 
+if (file("google-services.json").exists() || file("src/debug/google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
 
 tasks.register("jacocoTestReport", JacocoReport::class) {
     mustRunAfter("testDebugUnitTest", "connectedDebugAndroidTest")
