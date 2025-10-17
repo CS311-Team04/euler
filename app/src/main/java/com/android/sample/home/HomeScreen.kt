@@ -3,6 +3,8 @@ package com.android.sample.home
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -227,6 +229,20 @@ fun HomeScreen(
                   modifier = Modifier.fillMaxSize().padding(padding).background(Color.Black),
                   contentAlignment = Alignment.Center) {
                     // Ici tu pourras afficher un dashboard, une timeline, etc.
+                    LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                      items(ui.recent) { item ->
+                        Text(
+                            text = item.title,
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
+                      }
+                    }
+                    if (ui.isLoading) {
+                      CircularProgressIndicator(
+                          modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp),
+                          color = Color.Gray)
+                    }
                   }
             }
       }
