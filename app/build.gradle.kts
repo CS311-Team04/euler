@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsKotlinAndroid)
-    // alias(libs.plugins.googleServices) // Disabled for CI - google-services.json not available
+    alias(libs.plugins.googleServices) // Disabled for CI - google-services.json not available
     id("jacoco")
     id("org.sonarqube")
     alias(libs.plugins.ktfmt)
@@ -85,7 +85,7 @@ android {
         configure<JacocoTaskExtension> {
             isIncludeNoLocationClasses = true
             excludes = listOf(
-                "jdk.internal.*", 
+                "jdk.internal.*",
                 "org.bouncycastle.*",
                 "com.microsoft.identity.*",
                 "com.google.crypto.tink.*",
@@ -163,7 +163,7 @@ dependencies {
 
     // ----------       Robolectric     ------------
     testImplementation(libs.robolectric)
-    
+
     // ----------       Mockito         ------------
     androidTestImplementation("org.mockito:mockito-android:5.8.0")
     androidTestImplementation("org.mockito:mockito-core:5.8.0")
@@ -238,6 +238,16 @@ tasks.register("jacocoTestReport", JacocoReport::class) {
         include("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec")
         include("outputs/code_coverage/debugAndroidTest/connected/*/coverage.ec")
     })
+
+    doLast {
+        // Fix for JaCoCo coverage issue: remove lines with nr="65535" from XML report
+        val reportFile = reports.xml.outputLocation.asFile.get()
+        if (reportFile.exists()) {
+            val content = reportFile.readText()
+            val cleanedContent = content.replace("<line[^>]+nr=\"65535\"[^>]*>".toRegex(), "")
+            reportFile.writeText(cleanedContent)
+        }
+    }
 }
 
 // SonarQube configuration with JaCoCo 0.8.14
@@ -247,16 +257,16 @@ sonar {
         property("sonar.projectName", "euler")
         property("sonar.organization", "cs311-team04")
         property("sonar.host.url", "https://sonarcloud.io")
-        
+
         // Sources and tests
         property("sonar.sources", "src/main/java")
         property("sonar.tests", "src/test/java")
-        
+
         // Exclusions
         property("sonar.exclusions", "**/build/**,**/R.java,**/R.kt,**/BuildConfig.*,**/*.xml,**/res/**")
         property("sonar.test.inclusions", "**/*Test.kt,**/*Test.java")
         property("sonar.coverage.exclusions", "**/*Test.kt,**/*Test.java,**/test/**/*,**/androidTest/**/*")
-        
+
         // Coverage reports
         property("sonar.coverage.jacoco.xmlReportPaths", "${project.layout.buildDirectory.get()}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml")
         property("sonar.junit.reportPaths", "${project.layout.buildDirectory.get()}/test-results/testDebugUnitTest/")
