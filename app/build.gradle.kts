@@ -31,7 +31,7 @@ android {
 
         debug {
             enableUnitTestCoverage = true
-            enableAndroidTestCoverage = false
+            enableAndroidTestCoverage = true
         }
     }
 
@@ -258,18 +258,23 @@ sonar {
         property("sonar.organization", "cs311-team04")
         property("sonar.host.url", "https://sonarcloud.io")
 
-        // Sources and tests
-        property("sonar.sources", "src/main/java")
-        property("sonar.tests", "src/test/java")
+        // Sources and tests - corrected paths
+        property("sonar.sources", "app/src/main/java")
+        property("sonar.tests", "app/src/test/java")
 
         // Exclusions
-        property("sonar.exclusions", "**/build/**,**/R.java,**/R.kt,**/BuildConfig.*,**/*.xml,**/res/**")
+        property("sonar.exclusions", "**/build/**,**/R.java,**/R.kt,**/BuildConfig.*,**/*.xml,**/res/**,**/androidTest/**")
         property("sonar.test.inclusions", "**/*Test.kt,**/*Test.java")
         property("sonar.coverage.exclusions", "**/*Test.kt,**/*Test.java,**/test/**/*,**/androidTest/**/*")
 
-        // Coverage reports
+        // Coverage reports - corrected paths
         property("sonar.coverage.jacoco.xmlReportPaths", "${project.layout.buildDirectory.get()}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml")
         property("sonar.junit.reportPaths", "${project.layout.buildDirectory.get()}/test-results/testDebugUnitTest/")
         property("sonar.androidLint.reportPaths", "${project.layout.buildDirectory.get()}/reports/lint-results-debug.xml")
+        
+        // Force coverage calculation
+        property("sonar.coverage.jacoco.xmlReportPaths", "${project.layout.buildDirectory.get()}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml")
+        property("sonar.java.coveragePlugin", "jacoco")
+        property("sonar.dynamicAnalysis", "reuseReports")
     }
 }
