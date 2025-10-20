@@ -259,13 +259,13 @@ sonar {
         property("sonar.organization", "cs311-team04")
         property("sonar.host.url", "https://sonarcloud.io")
 
-        // Basic source configuration
-        property("sonar.sources", "app/src/main/java")
+        // Basic source configuration - relative to project root
+        property("sonar.sources", "src/main/java")
         
         // Only add tests if directory exists and has content
-        val testDir = file("app/src/test/java")
+        val testDir = file("src/test/java")
         if (testDir.exists() && testDir.listFiles()?.isNotEmpty() == true) {
-            property("sonar.tests", "app/src/test/java")
+            property("sonar.tests", "src/test/java")
         }
 
         // Basic exclusions
