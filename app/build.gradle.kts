@@ -251,7 +251,7 @@ tasks.register("jacocoTestReport", JacocoReport::class) {
     }
 }
 
-// SonarQube configuration with JaCoCo 0.8.14
+// SonarQube configuration - simplified for CI compatibility
 sonar {
     properties {
         property("sonar.projectKey", "CS311-Team04_euler")
@@ -259,27 +259,28 @@ sonar {
         property("sonar.organization", "cs311-team04")
         property("sonar.host.url", "https://sonarcloud.io")
 
-        // Sources - corrected paths
+        // Basic source configuration
         property("sonar.sources", "app/src/main/java")
         
-        // Tests - only if directory exists
+        // Only add tests if directory exists and has content
         val testDir = file("app/src/test/java")
-        if (testDir.exists()) {
+        if (testDir.exists() && testDir.listFiles()?.isNotEmpty() == true) {
             property("sonar.tests", "app/src/test/java")
         }
 
-        // Exclusions
-        property("sonar.exclusions", "**/build/**,**/R.java,**/R.kt,**/BuildConfig.*,**/*.xml,**/res/**,**/androidTest/**")
-        property("sonar.test.inclusions", "**/*Test.kt,**/*Test.java")
-        property("sonar.coverage.exclusions", "**/*Test.kt,**/*Test.java,**/test/**/*,**/androidTest/**/*")
-
-        // Coverage reports - corrected paths
-        property("sonar.coverage.jacoco.xmlReportPaths", "${project.layout.buildDirectory.get()}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml")
-        property("sonar.junit.reportPaths", "${project.layout.buildDirectory.get()}/test-results/testDebugUnitTest/")
-        property("sonar.androidLint.reportPaths", "${project.layout.buildDirectory.get()}/reports/lint-results-debug.xml")
+        // Basic exclusions
+        property("sonar.exclusions", "**/build/**,**/R.java,**/R.kt,**/BuildConfig.*,**/*.xml,**/res/**")
         
-        // Force coverage calculation
-        property("sonar.java.coveragePlugin", "jacoco")
-        property("sonar.dynamicAnalysis", "reuseReports")
+        // Coverage - only if report exists
+        val coverageReport = file("${project.layout.buildDirectory.get()}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml")
+        if (coverageReport.exists()) {
+            property("sonar.coverage.jacoco.xmlReportPaths", coverageReport.absolutePath)
+        }
+        
+        // Test results - only if exists
+        val testResults = file("${project.layout.buildDirectory.get()}/test-results/testDebugUnitTest")
+        if (testResults.exists()) {
+            property("sonar.junit.reportPaths", testResults.absolutePath)
+        }
     }
 }
