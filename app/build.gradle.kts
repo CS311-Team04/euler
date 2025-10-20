@@ -259,9 +259,14 @@ sonar {
         property("sonar.organization", "cs311-team04")
         property("sonar.host.url", "https://sonarcloud.io")
 
-        // Sources and tests - corrected paths
+        // Sources - corrected paths
         property("sonar.sources", "app/src/main/java")
-        property("sonar.tests", "app/src/test/java")
+        
+        // Tests - only if directory exists
+        val testDir = file("app/src/test/java")
+        if (testDir.exists()) {
+            property("sonar.tests", "app/src/test/java")
+        }
 
         // Exclusions
         property("sonar.exclusions", "**/build/**,**/R.java,**/R.kt,**/BuildConfig.*,**/*.xml,**/res/**,**/androidTest/**")
@@ -274,7 +279,6 @@ sonar {
         property("sonar.androidLint.reportPaths", "${project.layout.buildDirectory.get()}/reports/lint-results-debug.xml")
         
         // Force coverage calculation
-        property("sonar.coverage.jacoco.xmlReportPaths", "${project.layout.buildDirectory.get()}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml")
         property("sonar.java.coveragePlugin", "jacoco")
         property("sonar.dynamicAnalysis", "reuseReports")
     }
