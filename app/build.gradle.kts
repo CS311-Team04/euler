@@ -31,7 +31,7 @@ android {
 
         debug {
             enableUnitTestCoverage = true
-            enableAndroidTestCoverage = true
+            enableAndroidTestCoverage = false
         }
     }
 
@@ -236,7 +236,8 @@ tasks.register("jacocoTestReport", JacocoReport::class) {
     classDirectories.setFrom(files(debugTree))
     executionData.setFrom(fileTree(project.layout.buildDirectory.get()) {
         include("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec")
-        include("outputs/code_coverage/debugAndroidTest/connected/*/coverage.ec")
+        // Exclude Android test coverage to avoid JaCoCo conflicts
+        // include("outputs/code_coverage/debugAndroidTest/connected/*/coverage.ec")
     })
 
     doLast {
