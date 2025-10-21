@@ -85,7 +85,7 @@ android {
         configure<JacocoTaskExtension> {
             isIncludeNoLocationClasses = true
             excludes = listOf(
-                "jdk.internal.*", 
+                "jdk.internal.*",
                 "org.bouncycastle.*",
                 "com.microsoft.identity.*",
                 "com.google.crypto.tink.*",
@@ -163,7 +163,7 @@ dependencies {
 
     // ----------       Robolectric     ------------
     testImplementation(libs.robolectric)
-    
+
     // ----------       Mockito         ------------
     androidTestImplementation("org.mockito:mockito-android:5.8.0")
     androidTestImplementation("org.mockito:mockito-core:5.8.0")
@@ -236,30 +236,51 @@ tasks.register("jacocoTestReport", JacocoReport::class) {
     classDirectories.setFrom(files(debugTree))
     executionData.setFrom(fileTree(project.layout.buildDirectory.get()) {
         include("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec")
-        include("outputs/code_coverage/debugAndroidTest/connected/*/coverage.ec")
+        // Exclude Android test coverage to avoid JaCoCo conflicts
+        // include("outputs/code_coverage/debugAndroidTest/connected/*/coverage.ec")
     })
+
+    doLast {
+        // Fix for JaCoCo coverage issue: remove lines with nr="65535" from XML report
+        val reportFile = reports.xml.outputLocation.asFile.get()
+        if (reportFile.exists()) {
+            val content = reportFile.readText()
+            val cleanedContent = content.replace("<line[^>]+nr=\"65535\"[^>]*>".toRegex(), "")
+            reportFile.writeText(cleanedContent)
+        }
+    }
 }
 
-// SonarQube configuration with JaCoCo 0.8.14
+// SonarQube configuration - simplified for CI compatibility
 sonar {
     properties {
         property("sonar.projectKey", "CS311-Team04_euler")
         property("sonar.projectName", "euler")
         property("sonar.organization", "cs311-team04")
         property("sonar.host.url", "https://sonarcloud.io")
-        
-        // Sources and tests
+
+        // Basic source configuration - relative to project root
         property("sonar.sources", "src/main/java")
-        property("sonar.tests", "src/test/java")
         
-        // Exclusions
+        // Only add tests if directory exists and has content
+        val testDir = file("src/test/java")
+        if (testDir.exists() && testDir.listFiles()?.isNotEmpty() == true) {
+            property("sonar.tests", "src/test/java")
+        }
+
+        // Basic exclusions
         property("sonar.exclusions", "**/build/**,**/R.java,**/R.kt,**/BuildConfig.*,**/*.xml,**/res/**")
-        property("sonar.test.inclusions", "**/*Test.kt,**/*Test.java")
-        property("sonar.coverage.exclusions", "**/*Test.kt,**/*Test.java,**/test/**/*,**/androidTest/**/*")
         
-        // Coverage reports
-        property("sonar.coverage.jacoco.xmlReportPaths", "${project.layout.buildDirectory.get()}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml")
-        property("sonar.junit.reportPaths", "${project.layout.buildDirectory.get()}/test-results/testDebugUnitTest/")
-        property("sonar.androidLint.reportPaths", "${project.layout.buildDirectory.get()}/reports/lint-results-debug.xml")
+        // Coverage - only if report exists
+        val coverageReport = file("${project.layout.buildDirectory.get()}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml")
+        if (coverageReport.exists()) {
+            property("sonar.coverage.jacoco.xmlReportPaths", coverageReport.absolutePath)
+        }
+        
+        // Test results - only if exists
+        val testResults = file("${project.layout.buildDirectory.get()}/test-results/testDebugUnitTest")
+        if (testResults.exists()) {
+            property("sonar.junit.reportPaths", testResults.absolutePath)
+        }
     }
 }
