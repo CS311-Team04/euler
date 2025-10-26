@@ -11,7 +11,8 @@ data class HomeUiState(
     val messageDraft: String = "",
     val isDrawerOpen: Boolean = false,
     val isTopRightOpen: Boolean = false,
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val showDeleteConfirmation: Boolean = false
 )
 
 /** Représente un système EPFL (IS-Academia, Moodle, Drive, etc.) et son état de connexion. */

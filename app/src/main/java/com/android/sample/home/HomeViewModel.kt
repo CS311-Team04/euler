@@ -110,6 +110,18 @@ class HomeViewModel : ViewModel() {
     _uiState.value = _uiState.value.copy(isLoading = loading)
   }
 
+  fun clearChat() {
+    _uiState.value = _uiState.value.copy(recent = emptyList())
+  }
+
+  fun showDeleteConfirmation() {
+    _uiState.value = _uiState.value.copy(showDeleteConfirmation = true)
+  }
+
+  fun hideDeleteConfirmation() {
+    _uiState.value = _uiState.value.copy(showDeleteConfirmation = false)
+  }
+
   // New: simple HTTP call to Cloud Function
   private suspend fun queryAnswer(question: String): String =
       withContext(Dispatchers.IO) {

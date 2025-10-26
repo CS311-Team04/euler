@@ -307,4 +307,26 @@ class HomeScreenTest {
     composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
     composeRule.onNodeWithTag(HomeTags.MenuBtn).assertIsDisplayed()
   }
+
+  @Test
+  fun drawer_button_responds_correctly() {
+    composeRule.setContent { MaterialTheme { HomeScreen() } }
+
+    // Le drawer button devrait être visible et cliquable
+    composeRule.onNodeWithTag(HomeTags.MenuBtn).assertIsDisplayed()
+    
+    // Tester que le clic ne cause pas de crash
+    composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
+    
+    // Après le clic, le drawer devrait être synchronisé
+    composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
+    
+    // Tester plusieurs clicks rapides
+    for (i in 1..3) {
+      composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
+    }
+    
+    // Vérifier que tout fonctionne toujours
+    composeRule.onNodeWithTag(HomeTags.MenuBtn).assertIsDisplayed()
+  }
 }
