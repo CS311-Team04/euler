@@ -314,18 +314,18 @@ class HomeScreenTest {
 
     // Le drawer button devrait être visible et cliquable
     composeRule.onNodeWithTag(HomeTags.MenuBtn).assertIsDisplayed()
-    
+
     // Tester que le clic ne cause pas de crash
     composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
-    
+
     // Après le clic, le drawer devrait être synchronisé
     composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
-    
+
     // Tester plusieurs clicks rapides
     for (i in 1..3) {
       composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
     }
-    
+
     // Vérifier que tout fonctionne toujours
     composeRule.onNodeWithTag(HomeTags.MenuBtn).assertIsDisplayed()
   }
