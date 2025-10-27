@@ -205,7 +205,7 @@ class HomeUIStateTest {
     val sys1 = SystemItem("id1", "Name1", true)
     val sys2 = SystemItem("id1", "Name1", true)
     val sys3 = SystemItem("id1", "Name1", false)
-    
+
     assertEquals(sys1.hashCode(), sys2.hashCode())
     assertNotEquals(sys1.hashCode(), sys3.hashCode())
   }
@@ -215,7 +215,7 @@ class HomeUIStateTest {
     val action1 = ActionItem("id1", "Title1", "Time1")
     val action2 = ActionItem("id1", "Title1", "Time1")
     val action3 = ActionItem("id2", "Title1", "Time1")
-    
+
     assertEquals(action1.hashCode(), action2.hashCode())
     assertNotEquals(action1.hashCode(), action3.hashCode())
   }
@@ -224,7 +224,7 @@ class HomeUIStateTest {
   fun SystemItem_component_functions() {
     val system = SystemItem("test-id", "Test System", true)
     val (id, name, isConnected) = system
-    
+
     assertEquals("test-id", id)
     assertEquals("Test System", name)
     assertTrue(isConnected)
@@ -234,7 +234,7 @@ class HomeUIStateTest {
   fun ActionItem_component_functions() {
     val action = ActionItem("action-1", "Test Action", "Just now")
     val (id, title, time) = action
-    
+
     assertEquals("action-1", id)
     assertEquals("Test Action", title)
     assertEquals("Just now", time)
@@ -266,18 +266,18 @@ class HomeUIStateTest {
   fun HomeUiState_all_parameters_constructor() {
     val systems = listOf(SystemItem("id1", "System1", true))
     val recent = listOf(ActionItem("id1", "Action1", "1h"))
-    
-    val state = HomeUiState(
-      userName = "User",
-      systems = systems,
-      recent = recent,
-      messageDraft = "Draft",
-      isDrawerOpen = true,
-      isTopRightOpen = true,
-      isLoading = true,
-      showDeleteConfirmation = true
-    )
-    
+
+    val state =
+        HomeUiState(
+            userName = "User",
+            systems = systems,
+            recent = recent,
+            messageDraft = "Draft",
+            isDrawerOpen = true,
+            isTopRightOpen = true,
+            isLoading = true,
+            showDeleteConfirmation = true)
+
     assertEquals("User", state.userName)
     assertEquals(1, state.systems.size)
     assertEquals(1, state.recent.size)
@@ -304,7 +304,7 @@ class HomeUIStateTest {
   fun SystemItem_component3_returns_isConnected() {
     val system = SystemItem("id", "Name", true)
     assertTrue(system.component3())
-    
+
     val systemFalse = SystemItem("id", "Name", false)
     assertFalse(systemFalse.component3())
   }
@@ -357,7 +357,7 @@ class HomeUIStateTest {
   fun HomeUiState_copy_with_different_parameters() {
     val state1 = HomeUiState(userName = "User1")
     val state2 = state1.copy(userName = "User2")
-    
+
     assertEquals("User2", state2.userName)
     assertEquals("User1", state1.userName)
     assertNotEquals(state1, state2)
@@ -379,14 +379,19 @@ class HomeUIStateTest {
 
   @Test
   fun HomeUiState_component_decomposition() {
-    val state = HomeUiState(
-      userName = "TestUser",
-      messageDraft = "Draft",
-      isDrawerOpen = true
-    )
-    
-    val (userName, systems, recent, messageDraft, isDrawerOpen, isTopRightOpen, isLoading, showDeleteConfirmation) = state
-    
+    val state = HomeUiState(userName = "TestUser", messageDraft = "Draft", isDrawerOpen = true)
+
+    val (
+        userName,
+        systems,
+        recent,
+        messageDraft,
+        isDrawerOpen,
+        isTopRightOpen,
+        isLoading,
+        showDeleteConfirmation) =
+        state
+
     assertEquals("TestUser", userName)
     assertTrue(systems.isEmpty())
     assertTrue(recent.isEmpty())
@@ -401,7 +406,7 @@ class HomeUIStateTest {
   fun SystemItem_various_connection_states() {
     val connected = SystemItem("id", "Name", true)
     val disconnected = SystemItem("id", "Name", false)
-    
+
     assertTrue(connected.isConnected)
     assertFalse(disconnected.isConnected)
     assertNotEquals(connected, disconnected)
@@ -409,14 +414,14 @@ class HomeUIStateTest {
 
   @Test
   fun HomeUiState_edge_case_all_false() {
-    val state = HomeUiState(
-      userName = "User",
-      isDrawerOpen = false,
-      isTopRightOpen = false,
-      isLoading = false,
-      showDeleteConfirmation = false
-    )
-    
+    val state =
+        HomeUiState(
+            userName = "User",
+            isDrawerOpen = false,
+            isTopRightOpen = false,
+            isLoading = false,
+            showDeleteConfirmation = false)
+
     assertFalse(state.isDrawerOpen)
     assertFalse(state.isTopRightOpen)
     assertFalse(state.isLoading)
@@ -425,14 +430,14 @@ class HomeUIStateTest {
 
   @Test
   fun HomeUiState_edge_case_all_true() {
-    val state = HomeUiState(
-      userName = "User",
-      isDrawerOpen = true,
-      isTopRightOpen = true,
-      isLoading = true,
-      showDeleteConfirmation = true
-    )
-    
+    val state =
+        HomeUiState(
+            userName = "User",
+            isDrawerOpen = true,
+            isTopRightOpen = true,
+            isLoading = true,
+            showDeleteConfirmation = true)
+
     assertTrue(state.isDrawerOpen)
     assertTrue(state.isTopRightOpen)
     assertTrue(state.isLoading)
@@ -450,7 +455,7 @@ class HomeUIStateTest {
     val longTitle = "A".repeat(1000)
     val longTime = "B".repeat(500)
     val action = ActionItem("id", longTitle, longTime)
-    
+
     assertEquals(1000, action.title.length)
     assertEquals(500, action.time.length)
   }
@@ -466,7 +471,7 @@ class HomeUIStateTest {
   fun HomeUiState_hashCode_consistency() {
     val state1 = HomeUiState(userName = "User", isDrawerOpen = true)
     val state2 = HomeUiState(userName = "User", isDrawerOpen = true)
-    
+
     assertEquals(state1.hashCode(), state2.hashCode())
   }
 
@@ -474,7 +479,7 @@ class HomeUIStateTest {
   fun SystemItem_hashCode_with_different_states() {
     val sys1 = SystemItem("id", "Name", true)
     val sys2 = SystemItem("id", "Name", false)
-    
+
     assertNotEquals(sys1.hashCode(), sys2.hashCode())
   }
 
@@ -482,25 +487,21 @@ class HomeUIStateTest {
   fun ActionItem_hashCode_with_different_titles() {
     val action1 = ActionItem("id", "Title1", "Time")
     val action2 = ActionItem("id", "Title2", "Time")
-    
+
     assertNotEquals(action1.hashCode(), action2.hashCode())
   }
 
   @Test
   fun HomeUiState_with_multiple_systems_and_recent() {
-    val systems = listOf(
-      SystemItem("1", "S1", true),
-      SystemItem("2", "S2", false),
-      SystemItem("3", "S3", true)
-    )
-    val recent = listOf(
-      ActionItem("1", "A1", "1h"),
-      ActionItem("2", "A2", "2h"),
-      ActionItem("3", "A3", "3h")
-    )
-    
+    val systems =
+        listOf(
+            SystemItem("1", "S1", true), SystemItem("2", "S2", false), SystemItem("3", "S3", true))
+    val recent =
+        listOf(
+            ActionItem("1", "A1", "1h"), ActionItem("2", "A2", "2h"), ActionItem("3", "A3", "3h"))
+
     val state = HomeUiState(systems = systems, recent = recent)
-    
+
     assertEquals(3, state.systems.size)
     assertEquals(3, state.recent.size)
   }
@@ -509,7 +510,7 @@ class HomeUIStateTest {
   fun SystemItem_copy_all_parameters() {
     val original = SystemItem("old-id", "Old Name", false)
     val copied = original.copy(id = "new-id", name = "New Name", isConnected = true)
-    
+
     assertEquals("new-id", copied.id)
     assertEquals("New Name", copied.name)
     assertTrue(copied.isConnected)
@@ -519,7 +520,7 @@ class HomeUIStateTest {
   fun ActionItem_copy_all_parameters() {
     val original = ActionItem("old-id", "Old Title", "Old Time")
     val copied = original.copy(id = "new-id", title = "New Title", time = "New Time")
-    
+
     assertEquals("new-id", copied.id)
     assertEquals("New Title", copied.title)
     assertEquals("New Time", copied.time)
@@ -527,17 +528,17 @@ class HomeUIStateTest {
 
   @Test
   fun HomeUiState_componentN_functions() {
-    val state = HomeUiState(
-      userName = "User",
-      systems = listOf(SystemItem("1", "S", true)),
-      recent = listOf(ActionItem("1", "A", "1h")),
-      messageDraft = "Draft",
-      isDrawerOpen = true,
-      isTopRightOpen = true,
-      isLoading = true,
-      showDeleteConfirmation = true
-    )
-    
+    val state =
+        HomeUiState(
+            userName = "User",
+            systems = listOf(SystemItem("1", "S", true)),
+            recent = listOf(ActionItem("1", "A", "1h")),
+            messageDraft = "Draft",
+            isDrawerOpen = true,
+            isTopRightOpen = true,
+            isLoading = true,
+            showDeleteConfirmation = true)
+
     assertEquals("User", state.component1())
     assertEquals(1, state.component2().size)
     assertEquals(1, state.component3().size)

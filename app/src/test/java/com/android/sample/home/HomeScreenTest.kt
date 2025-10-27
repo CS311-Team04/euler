@@ -33,17 +33,17 @@ class HomeScreenTest {
 
   @Test
   fun HomeTags_constants_are_unique() {
-    val tags = listOf(
-      HomeTags.Root,
-      HomeTags.MenuBtn,
-      HomeTags.TopRightBtn,
-      HomeTags.Action1Btn,
-      HomeTags.Action2Btn,
-      HomeTags.MessageField,
-      HomeTags.SendBtn,
-      HomeTags.Drawer,
-      HomeTags.TopRightMenu
-    )
+    val tags =
+        listOf(
+            HomeTags.Root,
+            HomeTags.MenuBtn,
+            HomeTags.TopRightBtn,
+            HomeTags.Action1Btn,
+            HomeTags.Action2Btn,
+            HomeTags.MessageField,
+            HomeTags.SendBtn,
+            HomeTags.Drawer,
+            HomeTags.TopRightMenu)
 
     assertEquals(tags.size, tags.distinct().size)
   }
@@ -139,4 +139,3 @@ class HomeScreenTest {
     assertTrue(sendBtn.contains("btn"))
   }
 }
-

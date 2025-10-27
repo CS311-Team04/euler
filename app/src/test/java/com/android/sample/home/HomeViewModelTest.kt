@@ -542,7 +542,7 @@ class HomeViewModelTest {
     viewModel.toggleDrawer()
     viewModel.setTopRightOpen(true)
     viewModel.updateMessageDraft("Test")
-    
+
     val state = viewModel.uiState.first()
     assertTrue(state.isDrawerOpen)
     assertTrue(state.isTopRightOpen)
@@ -695,7 +695,7 @@ class HomeViewModelTest {
     val state = viewModel.uiState.first()
     val isa = state.systems.find { it.id == "isa" }
     assertEquals("IS-Academia", isa?.name)
-    
+
     val moodle = state.systems.find { it.id == "moodle" }
     assertEquals("Moodle", moodle?.name)
   }
