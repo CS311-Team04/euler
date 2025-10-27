@@ -26,10 +26,10 @@ fun OpeningScreen(
   LaunchedEffect(Unit) {
     delay(2500)
     // Navigate based on authentication state
-    if (authState is AuthUiState.SignedIn) {
-      onNavigateToHome()
-    } else {
-      onNavigateToSignIn()
+    val target = determineNavigationTarget(authState)
+    when (target) {
+      NavigationTarget.Home -> onNavigateToHome()
+      NavigationTarget.SignIn -> onNavigateToSignIn()
     }
   }
 
