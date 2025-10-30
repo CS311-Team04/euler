@@ -39,29 +39,31 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: android.app.Activity) {
   // Handle Microsoft authentication when loading
   LaunchedEffect(authState) {
     val currentState = authState
-    when (currentState) {
-      is AuthUiState.Loading -> {
-        if (currentState.provider == com.android.sample.authentification.AuthProvider.MICROSOFT) {
-          // Handle Microsoft authentication using Firebase Auth
-          MicrosoftAuth.signIn(
-              activity = activity,
-              onSuccess = { authViewModel.onAuthenticationSuccess() },
-              onError = { exception ->
-                authViewModel.onAuthenticationError(exception.message ?: "Authentication failed")
-              })
-        }
+    when {
+      shouldTriggerMicrosoftAuth(currentState) -> {
+        // Handle Microsoft authentication using Firebase Auth
+        MicrosoftAuth.signIn(
+            activity = activity,
+            onSuccess = { authViewModel.onAuthenticationSuccess() },
+            onError = { exception ->
+              val errorMessage =
+                  if (currentState is AuthUiState.Error) {
+                    getErrorMessage(currentState, exception.message ?: "Authentication failed")
+                  } else {
+                    exception.message ?: "Authentication failed"
+                  }
+              authViewModel.onAuthenticationError(errorMessage)
+            })
       }
-      is AuthUiState.SignedIn -> {
+      shouldNavigateToHomeFromSignIn(currentState, currentDestination) -> {
         // Only navigate to Home from SignIn screen, not from Opening screen
-        if (currentDestination == Routes.SignIn) {
-          nav.navigate(Routes.Home) {
-            popUpTo(Routes.SignIn) { inclusive = true }
-            launchSingleTop = true
-            restoreState = true
-          }
+        nav.navigate(Routes.Home) {
+          popUpTo(Routes.SignIn) { inclusive = true }
+          launchSingleTop = true
+          restoreState = true
         }
       }
-      is AuthUiState.Error -> {
+      isErrorState(currentState) -> {
         // Handle error state - could show snackbar or toast
       }
       else -> {
