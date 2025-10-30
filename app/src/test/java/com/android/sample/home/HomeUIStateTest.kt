@@ -6,6 +6,87 @@ import org.junit.Test
 class HomeUIStateTest {
 
   @Test
+  fun default_values_are_correct() {
+    val state = HomeUiState()
+
+    assertEquals("Student", state.userName)
+    assertTrue(state.systems.isEmpty())
+    assertTrue(state.recent.isEmpty())
+    assertEquals("", state.messageDraft)
+    assertFalse(state.isDrawerOpen)
+    assertFalse(state.isTopRightOpen)
+    assertFalse(state.isLoading)
+    assertFalse(state.showDeleteConfirmation)
+  }
+
+  @Test
+  fun copy_can_toggle_each_flag_independently() {
+    val base = HomeUiState()
+
+    val withDrawer = base.copy(isDrawerOpen = true)
+    assertTrue(withDrawer.isDrawerOpen)
+    assertFalse(withDrawer.isTopRightOpen)
+
+    val withTopRight = base.copy(isTopRightOpen = true)
+    assertTrue(withTopRight.isTopRightOpen)
+    assertFalse(withTopRight.isDrawerOpen)
+
+    val withLoading = base.copy(isLoading = true)
+    assertTrue(withLoading.isLoading)
+    assertFalse(withLoading.showDeleteConfirmation)
+
+    val withDelete = base.copy(showDeleteConfirmation = true)
+    assertTrue(withDelete.showDeleteConfirmation)
+    assertFalse(withDelete.isLoading)
+  }
+
+  @Test
+  fun copy_updates_messageDraft_and_lists_without_affecting_flags() {
+    val systems = listOf(SystemItem("isa", "IS-Academia", true))
+    val recent = listOf(ActionItem("1", "Test", "now"))
+    val base = HomeUiState()
+
+    val updated =
+        base.copy(systems = systems, recent = recent, messageDraft = "Hello", isDrawerOpen = true)
+
+    assertEquals("Hello", updated.messageDraft)
+    assertEquals(systems, updated.systems)
+    assertEquals(recent, updated.recent)
+    assertTrue(updated.isDrawerOpen)
+    assertFalse(updated.isTopRightOpen)
+    assertFalse(updated.isLoading)
+    assertFalse(updated.showDeleteConfirmation)
+  }
+
+  @Test
+  fun equality_and_hashCode_respect_all_properties() {
+    val a = HomeUiState()
+    val b = HomeUiState()
+    assertEquals(a, b)
+    assertEquals(a.hashCode(), b.hashCode())
+
+    val c = a.copy(isTopRightOpen = true)
+    assertNotEquals(a, c)
+    assertNotEquals(a.hashCode(), c.hashCode())
+  }
+
+  @Test
+  fun systemItem_and_actionItem_equality() {
+    val s1 = SystemItem("moodle", "Moodle", true)
+    val s2 = SystemItem("moodle", "Moodle", true)
+    assertEquals(s1, s2)
+    assertEquals(s1.hashCode(), s2.hashCode())
+
+    val a1 = ActionItem("id", "Title", "now")
+    val a2 = ActionItem("id", "Title", "now")
+    assertEquals(a1, a2)
+    assertEquals(a1.hashCode(), a2.hashCode())
+  }
+}
+
+class HomeUIStateMoreTest {
+
+  @Test
   fun default_HomeUiState_has_correct_values() {
     val state = HomeUiState()
 

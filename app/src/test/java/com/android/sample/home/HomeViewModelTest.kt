@@ -329,6 +329,85 @@ class HomeViewModelTest {
   }
 
   @Test
+  fun sendMessage_updates_state_synchronously_before_network() = runTest {
+    val viewModel = HomeViewModel()
+
+    // Prepare a non-empty draft
+    viewModel.updateMessageDraft("Hello")
+    val before = viewModel.uiState.first()
+    val beforeCount = before.recent.size
+
+    // Act
+    viewModel.sendMessage()
+
+    // Assert immediate state changes (prior to any async work)
+    val after = viewModel.uiState.first()
+    assertEquals(beforeCount + 1, after.recent.size)
+    assertTrue(after.isLoading)
+    assertEquals("", after.messageDraft)
+    assertTrue(after.recent.first().title.startsWith("You: \"Hello\""))
+  }
+
+  @Test
+  fun sendMessage_trims_whitespace_in_draft() = runTest {
+    val viewModel = HomeViewModel()
+
+    viewModel.updateMessageDraft("  hi  ")
+    viewModel.sendMessage()
+
+    val state = viewModel.uiState.first()
+    assertTrue(state.recent.first().title.startsWith("You: \"hi\""))
+  }
+
+  @Test
+  fun clearChat_does_not_affect_flags() = runTest {
+    val viewModel = HomeViewModel()
+
+    // Put some flags to true
+    viewModel.setTopRightOpen(true)
+    viewModel.setLoading(true)
+    viewModel.showDeleteConfirmation()
+
+    // Then clear chat
+    viewModel.clearChat()
+
+    val state = viewModel.uiState.first()
+    assertTrue(state.recent.isEmpty())
+    assertTrue(state.isTopRightOpen)
+    assertTrue(state.isLoading)
+    assertTrue(state.showDeleteConfirmation)
+  }
+
+  @Test
+  fun top_right_and_delete_confirmation_are_independent() = runTest {
+    val viewModel = HomeViewModel()
+
+    viewModel.setTopRightOpen(true)
+    val openState = viewModel.uiState.first()
+    assertTrue(openState.isTopRightOpen)
+    assertFalse(openState.showDeleteConfirmation)
+
+    viewModel.showDeleteConfirmation()
+    val bothState = viewModel.uiState.first()
+    assertTrue(bothState.isTopRightOpen)
+    assertTrue(bothState.showDeleteConfirmation)
+
+    viewModel.setTopRightOpen(false)
+    val finalState = viewModel.uiState.first()
+    assertFalse(finalState.isTopRightOpen)
+    assertTrue(finalState.showDeleteConfirmation)
+  }
+
+  @Test
+  fun ui_state_copy_keeps_immutability_contract() = runTest {
+    val viewModel = HomeViewModel()
+    val s1 = viewModel.uiState.first()
+    val s2 = s1.copy()
+    assertEquals(s1, s2)
+    assertNotSame(s1, s2)
+  }
+
+  @Test
   fun updateMessageDraft_can_be_updated() = runTest {
     val viewModel = HomeViewModel()
 
