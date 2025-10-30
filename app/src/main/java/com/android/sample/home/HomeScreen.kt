@@ -1,7 +1,9 @@
 package com.android.sample.home
 
+import androidx.compose.animation.*
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -113,11 +116,12 @@ fun HomeScreen(
                             if (!drawerState.isOpen) drawerState.open() else drawerState.close()
                           }
                         },
-                        modifier =
-                            Modifier.size(40.dp)
-                                .background(Color(0x22FFFFFF), CircleShape)
-                                .testTag(HomeTags.MenuBtn)) {
-                          Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+                        modifier = Modifier.size(48.dp).testTag(HomeTags.MenuBtn)) {
+                          Icon(
+                              Icons.Default.Menu,
+                              contentDescription = "Menu",
+                              tint = Color.White,
+                              modifier = Modifier.size(24.dp))
                         }
                   },
                   title = {
@@ -130,14 +134,12 @@ fun HomeScreen(
                   actions = {
                     IconButton(
                         onClick = { viewModel.setTopRightOpen(true) },
-                        modifier =
-                            Modifier.size(40.dp)
-                                .background(Color(0x22FFFFFF), CircleShape)
-                                .testTag(HomeTags.TopRightBtn)) {
+                        modifier = Modifier.size(48.dp).testTag(HomeTags.TopRightBtn)) {
                           Icon(
                               Icons.Default.MoreVert,
                               contentDescription = "More",
-                              tint = Color.White)
+                              tint = Color.White,
+                              modifier = Modifier.size(24.dp))
                         }
 
                     // Menu haut-droite (placeholder)
@@ -145,7 +147,9 @@ fun HomeScreen(
                         expanded = ui.isTopRightOpen,
                         onDismissRequest = { viewModel.setTopRightOpen(false) },
                         modifier = Modifier.testTag(HomeTags.TopRightMenu)) {
-                          TopRightPanelPlaceholder(onDismiss = { viewModel.setTopRightOpen(false) })
+                          TopRightPanelPlaceholder(
+                              onDismiss = { viewModel.setTopRightOpen(false) },
+                              onDeleteClick = { viewModel.showDeleteConfirmation() })
                         }
                   },
                   colors =
@@ -250,6 +254,20 @@ fun HomeScreen(
                   }
             }
       }
+
+  // Delete Confirmation Modal
+  AnimatedVisibility(
+      visible = ui.showDeleteConfirmation,
+      enter = fadeIn(tween(200)),
+      exit = fadeOut(tween(200)),
+      modifier = Modifier.fillMaxSize()) {
+        DeleteConfirmationModal(
+            onConfirm = {
+              viewModel.clearChat()
+              viewModel.hideDeleteConfirmation()
+            },
+            onCancel = { viewModel.hideDeleteConfirmation() })
+      }
 }
 
 @Composable
@@ -266,9 +284,70 @@ private fun ActionButton(label: String, modifier: Modifier = Modifier, onClick: 
 /* ----- Placeholders pour compo externes (drawer + panneau top-right) ----- */
 
 @Composable
-private fun TopRightPanelPlaceholder(onDismiss: () -> Unit) {
+private fun TopRightPanelPlaceholder(onDismiss: () -> Unit, onDeleteClick: () -> Unit) {
   DropdownMenuItem(text = { Text("Share") }, onClick = onDismiss)
-  DropdownMenuItem(text = { Text("Delete") }, onClick = onDismiss)
+  DropdownMenuItem(
+      text = { Text("Delete") },
+      onClick = {
+        onDeleteClick()
+        onDismiss()
+      })
+}
+
+@Composable
+private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit) {
+  Box(
+      modifier =
+          Modifier.fillMaxSize()
+              .background(Color.Black.copy(alpha = 0.7f))
+              .clickable(onClick = onCancel),
+      contentAlignment = Alignment.Center) {
+        Card(
+            modifier = Modifier.width(280.dp).padding(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+            shape = RoundedCornerShape(16.dp)) {
+              Column(
+                  modifier = Modifier.padding(24.dp),
+                  horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Clear Chat?",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold)
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "This will delete all messages. This action cannot be undone.",
+                        color = Color.Gray,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center)
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth()) {
+                          Button(
+                              onClick = onCancel,
+                              modifier = Modifier.weight(1f),
+                              colors =
+                                  ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A2A)),
+                              shape = RoundedCornerShape(8.dp)) {
+                                Text("Cancel", color = Color.White)
+                              }
+
+                          Button(
+                              onClick = onConfirm,
+                              modifier = Modifier.weight(1f),
+                              colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                              shape = RoundedCornerShape(8.dp)) {
+                                Text("Delete", color = Color.White, fontWeight = FontWeight.Bold)
+                              }
+                        }
+                  }
+            }
+      }
 }
 
 @Composable
@@ -331,7 +410,7 @@ private fun BubbleSendButton(
   val interaction = remember { MutableInteractionSource() }
 
   Surface(
-      modifier = Modifier.size(size).padding(end = 6.dp),
+      modifier = Modifier.size(size).padding(end = 6.dp).testTag(HomeTags.SendBtn),
       color = container,
       shape = CircleShape,
       tonalElevation = 0.dp,
@@ -341,6 +420,7 @@ private fun BubbleSendButton(
         modifier =
             Modifier.fillMaxSize()
                 .padding(6.dp)
+                .testTag(HomeTags.SendBtn)
                 .then(
                     if (enabled && !isSending)
                         Modifier.clickable(interactionSource = interaction, indication = null) {

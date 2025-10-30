@@ -11,6 +11,8 @@ data class HomeUiState(
     val messageDraft: String = "",
     val isDrawerOpen: Boolean = false,
     val isTopRightOpen: Boolean = false,
+    val isLoading: Boolean = false,
+    val showDeleteConfirmation: Boolean = false,
     val isSending: Boolean = false
 )
 
