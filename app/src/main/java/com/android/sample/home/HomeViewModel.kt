@@ -50,9 +50,7 @@ class HomeViewModel : ViewModel() {
   // private val endpoint = "http://10.0.2.2:5001/euler-e8edb/us-central1/answerWithRagHttp"
   // private val apiKey = "db8e16080302b511c256794b26a6e80089c80e1c15b7927193e754b7fd87fc4e"
   private val functions: FirebaseFunctions by lazy {
-      FirebaseFunctions.getInstance("us-central1").apply {
-          useEmulator("10.0.2.2", 5002)
-      }
+    FirebaseFunctions.getInstance("us-central1").apply { useEmulator("10.0.2.2", 5002) }
   }
   // --- Mutations d'état ---
 
