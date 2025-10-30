@@ -72,36 +72,35 @@ class HomeViewModel : ViewModel() {
   }
 
   fun sendMessage() {
-    val msg = _uiState.value.messageDraft.trim()
+    val current = _uiState.value
+    if (current.isSending) return
+    val msg = current.messageDraft.trim()
     if (msg.isEmpty()) return
 
     val userAction =
-        ActionItem(id = UUID.randomUUID().toString(), title = "You: \"$msg\"", time = "Just now")
+        ActionItem(UUID.randomUUID().toString(), title = "You: \"$msg\"", time = "Just now")
 
+    // Start sending
     _uiState.value =
-        _uiState.value.copy(
-            recent = listOf(userAction) + _uiState.value.recent,
-            isLoading = true,
-            messageDraft = "")
+        current.copy(
+            recent = listOf(userAction) + current.recent, isSending = true, messageDraft = "")
 
     viewModelScope.launch {
       try {
         val answer = callAnswerWithRag(msg)
         val botAction =
-            ActionItem(
-                id = UUID.randomUUID().toString(), title = "EULER: $answer", time = "Just now")
-        _uiState.value =
-            _uiState.value.copy(
-                recent = listOf(botAction) + _uiState.value.recent, isLoading = false)
+            ActionItem(UUID.randomUUID().toString(), title = "EULER: $answer", time = "Just now")
+        _uiState.value = _uiState.value.copy(recent = listOf(botAction) + _uiState.value.recent)
       } catch (e: Exception) {
         val errAction =
             ActionItem(
-                id = UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
                 title = "Error: ${e.message ?: "request failed"}",
                 time = "Just now")
-        _uiState.value =
-            _uiState.value.copy(
-                recent = listOf(errAction) + _uiState.value.recent, isLoading = false)
+        _uiState.value = _uiState.value.copy(recent = listOf(errAction) + _uiState.value.recent)
+      } finally {
+        // ALWAYS stop sending
+        _uiState.value = _uiState.value.copy(isSending = false)
       }
     }
   }
@@ -112,10 +111,6 @@ class HomeViewModel : ViewModel() {
           if (s.id == systemId) s.copy(isConnected = !s.isConnected) else s
         }
     _uiState.value = _uiState.value.copy(systems = updated)
-  }
-
-  fun setLoading(loading: Boolean) {
-    _uiState.value = _uiState.value.copy(isLoading = loading)
   }
 
   // New: simple HTTP call to Cloud Function

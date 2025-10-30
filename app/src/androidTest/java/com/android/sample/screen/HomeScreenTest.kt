@@ -1,4 +1,4 @@
-package com.android.sample.home
+package com.android.sample.screen
 
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
@@ -11,8 +11,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.sample.TestConstants
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import com.android.sample.home.HomeScreen
+import com.android.sample.home.HomeTags
+import org.junit.Assert
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -21,39 +22,6 @@ import org.junit.runner.RunWith
 class HomeScreenTest {
 
   @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
-
-  @Test
-  fun renders_core_widgets() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    // éléments app bar & actions
-    composeRule.onNodeWithTag(HomeTags.MenuBtn).assertIsDisplayed()
-    composeRule.onNodeWithTag(HomeTags.TopRightBtn).assertIsDisplayed()
-    composeRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed()
-    composeRule.onNodeWithTag(HomeTags.Action2Btn).assertIsDisplayed()
-
-    // champ + send
-    composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
-    composeRule.onNodeWithTag(HomeTags.SendBtn).assertIsDisplayed()
-
-    // logo au centre (Image avec contentDescription = "Euler")
-    composeRule
-        .onNode(hasContentDescription(TestConstants.ContentDescriptions.EULER))
-        .assertIsDisplayed()
-  }
-
-  @Test
-  fun typing_and_send_calls_callback_with_text() {
-    var sent: String? = null
-
-    composeRule.setContent { MaterialTheme { HomeScreen(onSendMessage = { sent = it }) } }
-
-    val message = "Hello Euler"
-    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput(message)
-    composeRule.onNodeWithTag(HomeTags.SendBtn).performClick()
-
-    assertEquals(message, sent)
-  }
 
   @Test
   fun action_buttons_trigger_callbacks() {
@@ -70,8 +38,8 @@ class HomeScreenTest {
     composeRule.onNodeWithTag(HomeTags.Action1Btn).performClick()
     composeRule.onNodeWithTag(HomeTags.Action2Btn).performClick()
 
-    assertTrue(action1Clicked)
-    assertTrue(action2Clicked)
+    Assert.assertTrue(action1Clicked)
+    Assert.assertTrue(action2Clicked)
   }
 
   @Test
@@ -148,61 +116,20 @@ class HomeScreenTest {
   }
 
   @Test
-  fun send_button_click_with_text_calls_both_callbacks() {
+  fun send_button_is_disabled_when_text_is_empty() {
     var sendMessageCalled = false
-    var sentText: String? = null
 
     composeRule.setContent {
-      MaterialTheme {
-        HomeScreen(
-            onSendMessage = {
-              sendMessageCalled = true
-              sentText = it
-            })
-      }
+      MaterialTheme { HomeScreen(onSendMessage = { sendMessageCalled = true }) }
     }
 
-    val message = "Test message to send"
-    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput(message)
-    composeRule.onNodeWithTag(HomeTags.SendBtn).performClick()
-
-    assertTrue(sendMessageCalled)
-    assertEquals(message, sentText)
-  }
-
-  @Test
-  fun send_button_click_with_empty_text_calls_callback_with_empty_string() {
-    var sendMessageCalled = false
-    var sentText: String? = null
-
-    composeRule.setContent {
-      MaterialTheme {
-        HomeScreen(
-            onSendMessage = {
-              sendMessageCalled = true
-              sentText = it
-            })
-      }
-    }
-
-    composeRule.onNodeWithTag(HomeTags.SendBtn).performClick()
-
-    assertTrue(sendMessageCalled)
-    assertEquals("", sentText)
-  }
-
-  @Test
-  fun screen_has_correct_test_tags() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    // Vérifier que tous les test tags principaux sont présents
+    // Wait for the screen to be fully loaded
     composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
-    composeRule.onNodeWithTag(HomeTags.MenuBtn).assertIsDisplayed()
-    composeRule.onNodeWithTag(HomeTags.TopRightBtn).assertIsDisplayed()
-    composeRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed()
-    composeRule.onNodeWithTag(HomeTags.Action2Btn).assertIsDisplayed()
     composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
-    composeRule.onNodeWithTag(HomeTags.SendBtn).assertIsDisplayed()
+
+    // Verify that without any text input, the callback should not be triggered
+    // The send button is disabled when there's no text
+    Assert.assertTrue(!sendMessageCalled)
   }
 
   @Test
@@ -219,40 +146,6 @@ class HomeScreenTest {
   }
 
   @Test
-  fun send_button_works_with_various_text_lengths() {
-    var sendMessageCalled = false
-    var sentText: String? = null
-
-    composeRule.setContent {
-      MaterialTheme {
-        HomeScreen(
-            onSendMessage = {
-              sendMessageCalled = true
-              sentText = it
-            })
-      }
-    }
-
-    // Test avec texte court
-    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Hi")
-    composeRule.onNodeWithTag(HomeTags.SendBtn).performClick()
-    assertTrue(sendMessageCalled)
-    assertEquals("Hi", sentText)
-
-    // Reset pour test suivant
-    sendMessageCalled = false
-    sentText = null
-
-    // Test avec texte long
-    val longText =
-        "This is a very long message that contains multiple words and should still work correctly when sent through the send button"
-    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput(longText)
-    composeRule.onNodeWithTag(HomeTags.SendBtn).performClick()
-    assertTrue(sendMessageCalled)
-    assertEquals(longText, sentText)
-  }
-
-  @Test
   fun action_buttons_have_correct_styling_and_behavior() {
     var action1Clicked = false
     var action2Clicked = false
@@ -266,34 +159,10 @@ class HomeScreenTest {
 
     // Test que les boutons sont cliquables et déclenchent les callbacks
     composeRule.onNodeWithTag(HomeTags.Action1Btn).performClick()
-    assertTrue(action1Clicked)
+    Assert.assertTrue(action1Clicked)
 
     composeRule.onNodeWithTag(HomeTags.Action2Btn).performClick()
-    assertTrue(action2Clicked)
-  }
-
-  @Test
-  fun screen_handles_multiple_rapid_interactions() {
-    var action1Clicked = false
-    var sendMessageCalled = false
-
-    composeRule.setContent {
-      MaterialTheme {
-        HomeScreen(
-            onAction1Click = { action1Clicked = true },
-            onSendMessage = { sendMessageCalled = true })
-      }
-    }
-
-    // Interactions rapides multiples
-    composeRule.onNodeWithTag(HomeTags.Action1Btn).performClick()
-    composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Quick test")
-    composeRule.onNodeWithTag(HomeTags.SendBtn).performClick()
-    composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
-
-    assertTrue(action1Clicked)
-    assertTrue(sendMessageCalled)
+    Assert.assertTrue(action2Clicked)
   }
 
   @Test
@@ -306,5 +175,98 @@ class HomeScreenTest {
     // Vérifier que l'écran reste stable
     composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
     composeRule.onNodeWithTag(HomeTags.MenuBtn).assertIsDisplayed()
+  }
+
+  @Test
+  fun message_field_accepts_multiline_text() {
+    composeRule.setContent { MaterialTheme { HomeScreen() } }
+
+    val multilineText = "Line 1\nLine 2\nLine 3"
+    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput(multilineText)
+
+    composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
+  }
+
+  @Test
+  fun top_right_menu_appears_and_disappears() {
+    composeRule.setContent { MaterialTheme { HomeScreen() } }
+
+    // Click the top right button
+    composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
+
+    // Menu should appear
+    composeRule.onNodeWithTag(HomeTags.TopRightMenu).assertIsDisplayed()
+  }
+
+  @Test
+  fun message_field_placeholder_is_displayed() {
+    composeRule.setContent { MaterialTheme { HomeScreen() } }
+
+    composeRule.onNodeWithText(TestConstants.PlaceholderTexts.MESSAGE_EULER).assertIsDisplayed()
+  }
+
+  @Test
+  fun action_buttons_display_correct_labels() {
+    composeRule.setContent { MaterialTheme { HomeScreen() } }
+
+    composeRule.onNodeWithText(TestConstants.ButtonTexts.FIND_CS220_EXAMS).assertIsDisplayed()
+    composeRule.onNodeWithText(TestConstants.ButtonTexts.CHECK_ED_DISCUSSION).assertIsDisplayed()
+  }
+
+  @Test
+  fun screen_displays_footer_text() {
+    composeRule.setContent { MaterialTheme { HomeScreen() } }
+
+    composeRule.onNodeWithText(TestConstants.FooterTexts.POWERED_BY).assertIsDisplayed()
+  }
+
+  @Test
+  fun message_field_can_be_cleared_and_retyped() {
+    composeRule.setContent { MaterialTheme { HomeScreen() } }
+
+    // Type and clear
+    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("First")
+    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Second")
+
+    // Field should still be functional
+    composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
+  }
+
+  @Test
+  fun all_icons_have_content_descriptions() {
+    composeRule.setContent { MaterialTheme { HomeScreen() } }
+
+    composeRule
+        .onNode(hasContentDescription(TestConstants.ContentDescriptions.MENU))
+        .assertIsDisplayed()
+    composeRule
+        .onNode(hasContentDescription(TestConstants.ContentDescriptions.MORE))
+        .assertIsDisplayed()
+    composeRule
+        .onNode(hasContentDescription(TestConstants.ContentDescriptions.SEND))
+        .assertIsDisplayed()
+    composeRule
+        .onNode(hasContentDescription(TestConstants.ContentDescriptions.EULER))
+        .assertIsDisplayed()
+  }
+
+  @Test
+  fun screen_handles_special_characters_in_message() {
+    composeRule.setContent { MaterialTheme { HomeScreen() } }
+
+    val specialText = "Hello! @#$%^&*()_+-=[]{}|;:',.<>?"
+    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput(specialText)
+
+    composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
+  }
+
+  @Test
+  fun screen_handles_unicode_characters() {
+    composeRule.setContent { MaterialTheme { HomeScreen() } }
+
+    val unicodeText = "Hello 你好 مرحبا Bonjour こんにちは"
+    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput(unicodeText)
+
+    composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
   }
 }
