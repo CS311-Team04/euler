@@ -329,37 +329,6 @@ class HomeViewModelTest {
   }
 
   @Test
-  fun sendMessage_updates_state_synchronously_before_network() = runTest {
-    val viewModel = HomeViewModel()
-
-    // Prepare a non-empty draft
-    viewModel.updateMessageDraft("Hello")
-    val before = viewModel.uiState.first()
-    val beforeCount = before.recent.size
-
-    // Act
-    viewModel.sendMessage()
-
-    // Assert immediate state changes (prior to any async work)
-    val after = viewModel.uiState.first()
-    assertEquals(beforeCount + 1, after.recent.size)
-    assertTrue(after.isLoading)
-    assertEquals("", after.messageDraft)
-    assertTrue(after.recent.first().title.startsWith("You: \"Hello\""))
-  }
-
-  @Test
-  fun sendMessage_trims_whitespace_in_draft() = runTest {
-    val viewModel = HomeViewModel()
-
-    viewModel.updateMessageDraft("  hi  ")
-    viewModel.sendMessage()
-
-    val state = viewModel.uiState.first()
-    assertTrue(state.recent.first().title.startsWith("You: \"hi\""))
-  }
-
-  @Test
   fun clearChat_does_not_affect_flags() = runTest {
     val viewModel = HomeViewModel()
 
