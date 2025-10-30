@@ -1,7 +1,8 @@
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsKotlinAndroid)
-    // alias(libs.plugins.googleServices) // Disabled for CI - google-services.json not available
+    alias(libs.plugins.googleServices) // Disabled for CI - google-services.json not available
+    //id("com.google.gms.google-services")
     id("jacoco")
     id("org.sonarqube")
     alias(libs.plugins.ktfmt)
@@ -123,6 +124,9 @@ dependencies {
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-analytics-ktx")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
+    implementation("com.google.firebase:firebase-functions-ktx")
+    implementation("com.google.firebase:firebase-auth-ktx")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
 
     implementation(libs.androidx.core.ktx)
