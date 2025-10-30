@@ -23,6 +23,9 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        buildConfigField ("String", "FUNCTIONS_HOST", "\"10.0.2.2\"")
+        buildConfigField ("int",    "FUNCTIONS_PORT", "5002")
+        buildConfigField ("boolean","USE_FUNCTIONS_EMULATOR", "true")
     }
 
     buildTypes {
@@ -40,6 +43,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {
