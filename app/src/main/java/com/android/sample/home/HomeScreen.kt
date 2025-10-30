@@ -5,6 +5,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -184,40 +188,35 @@ fun HomeScreen(
                         modifier =
                             Modifier.fillMaxWidth()
                                 .padding(horizontal = 16.dp)
-                                .height(56.dp)
+                                .height(60.dp)
                                 .testTag(HomeTags.MessageField),
+                        enabled = !ui.isSending,
                         trailingIcon = {
-                          IconButton(
+                          val canSend = ui.messageDraft.isNotBlank() && !ui.isSending
+                          BubbleSendButton(
+                              enabled = canSend,
+                              isSending = ui.isSending,
                               onClick = {
-                                onSendMessage(ui.messageDraft)
-                                viewModel.sendMessage()
-                              },
-                              modifier = Modifier.testTag(HomeTags.SendBtn)) {
-                                Icon(
-                                    Icons.Default.Send,
-                                    contentDescription = "Send",
-                                    tint = Color.Gray)
-                              }
+                                if (canSend) {
+                                  onSendMessage(ui.messageDraft)
+                                  viewModel.sendMessage()
+                                }
+                              })
                         },
                         shape = RoundedCornerShape(50),
                         colors =
                             OutlinedTextFieldDefaults.colors(
-                                // texte
                                 focusedTextColor = Color.White,
                                 unfocusedTextColor = Color.White,
                                 disabledTextColor = Color.LightGray,
                                 cursorColor = Color.White,
-
-                                // placeholder
                                 focusedPlaceholderColor = Color.Gray,
                                 unfocusedPlaceholderColor = Color.Gray,
-
-                                // bordures + fond
                                 focusedBorderColor = Color.DarkGray,
                                 unfocusedBorderColor = Color.DarkGray,
                                 focusedContainerColor = Color(0xFF121212),
                                 unfocusedContainerColor = Color(0xFF121212),
-                            ))
+                                disabledContainerColor = Color(0xFF121212)))
 
                     Spacer(Modifier.height(8.dp))
                     Text(
@@ -234,6 +233,15 @@ fun HomeScreen(
                   contentAlignment = Alignment.Center) {
                     // Ici tu pourras afficher un dashboard, une timeline, etc.
                     LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                      if (ui.isSending) {
+                        item {
+                          ThinkingIndicator(
+                              modifier =
+                                  Modifier.fillMaxWidth()
+                                      .padding(vertical = 8.dp)
+                                      .testTag("home_thinking_indicator"))
+                        }
+                      }
                       items(ui.recent) { item ->
                         Text(
                             text = item.title,
@@ -241,11 +249,6 @@ fun HomeScreen(
                             fontSize = 14.sp,
                             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
                       }
-                    }
-                    if (ui.isLoading) {
-                      CircularProgressIndicator(
-                          modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp),
-                          color = Color.Gray)
                     }
                   }
             }
@@ -344,6 +347,104 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
                   }
             }
       }
+}
+
+@Composable
+private fun ThinkingIndicator(modifier: Modifier = Modifier) {
+  var dots by remember { mutableStateOf(0) }
+  LaunchedEffect(Unit) {
+    while (true) {
+      kotlinx.coroutines.delay(450)
+      dots = (dots + 1) % 4
+    }
+  }
+  val text = "Euler is thinking" + ".".repeat(dots)
+  Surface(
+      modifier = modifier,
+      shape = RoundedCornerShape(12.dp),
+      color = Color(0x14FFFFFF),
+      tonalElevation = 0.dp) {
+        Row(
+            Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+              CircularProgressIndicator(
+                  strokeWidth = 2.dp, modifier = Modifier.size(16.dp), color = Color.Gray)
+              Spacer(Modifier.width(8.dp))
+              Text(text = text, color = Color.LightGray, fontSize = 13.sp)
+            }
+      }
+}
+
+@Composable
+private fun BubbleSendButton(
+    enabled: Boolean,
+    isSending: Boolean,
+    onClick: () -> Unit,
+) {
+  val targetSize =
+      when {
+        isSending -> 40.dp
+        enabled -> 42.dp
+        else -> 40.dp
+      }
+  val size by animateDpAsState(targetValue = targetSize, label = "bubble-size")
+
+  // Colors: bright red when enabled, deeper red while sending, neutral gray when disabled
+  val targetContainer =
+      when {
+        isSending -> Color(0xFFC62828) // deeper red
+        enabled -> Color(0xFFE53935) // bright red
+        else -> Color(0xFF3C3C3C) // gray
+      }
+  val container by animateColorAsState(targetValue = targetContainer, label = "bubble-color")
+
+  val borderColor =
+      when {
+        enabled || isSending -> Color(0x33FFFFFF) // subtle white ring for separation
+        else -> Color(0x22000000)
+      }
+  val elevation by
+      animateDpAsState(targetValue = if (enabled) 8.dp else 0.dp, label = "bubble-elev")
+
+  val interaction = remember { MutableInteractionSource() }
+
+  Surface(
+      modifier = Modifier.size(size).padding(end = 6.dp),
+      color = container,
+      shape = CircleShape,
+      tonalElevation = 0.dp,
+      shadowElevation = elevation,
+  ) {
+    Box(
+        modifier =
+            Modifier.fillMaxSize()
+                .padding(6.dp)
+                .then(
+                    if (enabled && !isSending)
+                        Modifier.clickable(interactionSource = interaction, indication = null) {
+                          onClick()
+                        }
+                    else Modifier),
+        contentAlignment = Alignment.Center) {
+          if (isSending) {
+            CircularProgressIndicator(
+                strokeWidth = 2.dp, modifier = Modifier.size(20.dp), color = Color.White)
+          } else {
+            val icon =
+                try {
+                  androidx.compose.material.icons.Icons.Rounded.Send
+                } catch (_: Throwable) {
+                  androidx.compose.material.icons.Icons.Default.Send
+                }
+            Icon(
+                imageVector = icon,
+                contentDescription = "Send",
+                tint = Color.White,
+                modifier = Modifier.size(22.dp) // larger arrow for visibility
+                )
+          }
+        }
+  }
 }
 
 @Preview(showBackground = true, backgroundColor = 0x000000)

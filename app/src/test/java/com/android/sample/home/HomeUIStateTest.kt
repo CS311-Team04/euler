@@ -96,7 +96,7 @@ class HomeUIStateMoreTest {
     assertEquals("", state.messageDraft)
     assertFalse(state.isDrawerOpen)
     assertFalse(state.isTopRightOpen)
-    assertFalse(state.isLoading)
+    assertFalse(state.isSending)
   }
 
   @Test
@@ -229,14 +229,14 @@ class HomeUIStateMoreTest {
             messageDraft = "Test message",
             isDrawerOpen = true,
             isTopRightOpen = true,
-            isLoading = true,
+            isSending = true,
         )
 
     assertEquals("TestUser", state.userName)
     assertEquals("Test message", state.messageDraft)
     assertTrue(state.isDrawerOpen)
     assertTrue(state.isTopRightOpen)
-    assertTrue(state.isLoading)
+    assertTrue(state.isSending)
   }
 
   @Test
@@ -244,12 +244,12 @@ class HomeUIStateMoreTest {
     val initial = HomeUiState(userName = "User")
     val step1 = initial.copy(messageDraft = "Message")
     val step2 = step1.copy(isDrawerOpen = true)
-    val step3 = step2.copy(isLoading = true)
+    val step3 = step2.copy(isSending = true)
 
     assertEquals("User", step3.userName)
     assertEquals("Message", step3.messageDraft)
     assertTrue(step3.isDrawerOpen)
-    assertTrue(step3.isLoading)
+    assertTrue(step3.isSending)
   }
 
   @Test

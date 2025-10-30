@@ -1,7 +1,8 @@
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsKotlinAndroid)
-    // alias(libs.plugins.googleServices) // Disabled for CI - google-services.json not available
+    //alias(libs.plugins.googleServices) // Disabled for CI - google-services.json not available
+    //id("com.google.gms.google-services")
     id("jacoco")
     id("org.sonarqube")
     alias(libs.plugins.ktfmt)
@@ -22,6 +23,9 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        buildConfigField ("String", "FUNCTIONS_HOST", "\"10.0.2.2\"")
+        buildConfigField ("int",    "FUNCTIONS_PORT", "5002")
+        buildConfigField ("boolean","USE_FUNCTIONS_EMULATOR", "true")
     }
 
     buildTypes {
@@ -39,6 +43,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {
@@ -123,6 +128,9 @@ dependencies {
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-analytics-ktx")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
+    implementation("com.google.firebase:firebase-functions-ktx")
+    implementation("com.google.firebase:firebase-auth-ktx")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
 
     implementation(libs.androidx.core.ktx)
