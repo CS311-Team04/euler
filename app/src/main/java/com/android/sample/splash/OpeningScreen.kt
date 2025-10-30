@@ -13,7 +13,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import com.android.sample.R
 import com.android.sample.authentification.AuthUiState
-import kotlinx.coroutines.delay
 
 @Composable
 fun OpeningScreen(
@@ -24,19 +23,16 @@ fun OpeningScreen(
 ) {
   // Navigate after 2.5 seconds
   LaunchedEffect(Unit) {
-    delay(2500)
-    // Navigate based on authentication state
-    val target = determineNavigationTarget(authState)
-    when (target) {
-      NavigationTarget.Home -> onNavigateToHome()
-      NavigationTarget.SignIn -> onNavigateToSignIn()
-    }
+    handleOpeningScreenNavigation(
+        authState = authState,
+        onNavigateToHome = onNavigateToHome,
+        onNavigateToSignIn = onNavigateToSignIn)
   }
 
   // Display the splash image from resources
   Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
     // Background color as fallback
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF121212)))
+    Box(modifier = Modifier.fillMaxSize().background(Color(getOpeningScreenBackgroundColor())))
 
     // Display the splash image
     Image(

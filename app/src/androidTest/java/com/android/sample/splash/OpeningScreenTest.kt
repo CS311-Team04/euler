@@ -8,6 +8,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.sample.authentification.AuthProvider
 import com.android.sample.authentification.AuthUiState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -97,5 +99,113 @@ class OpeningScreenTest {
     composeRule
         .onNodeWithContentDescription(OpeningScreenTestConstants.OPENING_SCREEN_CONTENT_DESCRIPTION)
         .assertIsDisplayed()
+  }
+
+  @Test
+  fun opening_screen_navigates_to_home_after_delay_when_signed_in() = runTest {
+    var homeCalled = false
+    var signInCalled = false
+
+    composeRule.setContent {
+      MaterialTheme {
+        OpeningScreen(
+            authState = AuthUiState.SignedIn,
+            onNavigateToSignIn = { signInCalled = true },
+            onNavigateToHome = { homeCalled = true })
+      }
+    }
+
+    // Verify screen is displayed
+    composeRule
+        .onNodeWithContentDescription(OpeningScreenTestConstants.OPENING_SCREEN_CONTENT_DESCRIPTION)
+        .assertIsDisplayed()
+
+    // Wait for navigation delay (2.5 seconds)
+    delay(2600)
+
+    // Verify navigation occurred
+    assertTrue("Should navigate to home when signed in", homeCalled)
+    assertFalse("Should not navigate to sign in when signed in", signInCalled)
+  }
+
+  @Test
+  fun opening_screen_navigates_to_signin_after_delay_when_idle() = runTest {
+    var homeCalled = false
+    var signInCalled = false
+
+    composeRule.setContent {
+      MaterialTheme {
+        OpeningScreen(
+            authState = AuthUiState.Idle,
+            onNavigateToSignIn = { signInCalled = true },
+            onNavigateToHome = { homeCalled = true })
+      }
+    }
+
+    // Verify screen is displayed
+    composeRule
+        .onNodeWithContentDescription(OpeningScreenTestConstants.OPENING_SCREEN_CONTENT_DESCRIPTION)
+        .assertIsDisplayed()
+
+    // Wait for navigation delay (2.5 seconds)
+    delay(2600)
+
+    // Verify navigation occurred
+    assertTrue("Should navigate to sign in when idle", signInCalled)
+    assertFalse("Should not navigate to home when idle", homeCalled)
+  }
+
+  @Test
+  fun opening_screen_navigates_to_signin_after_delay_when_loading() = runTest {
+    var homeCalled = false
+    var signInCalled = false
+
+    composeRule.setContent {
+      MaterialTheme {
+        OpeningScreen(
+            authState = AuthUiState.Loading(AuthProvider.MICROSOFT),
+            onNavigateToSignIn = { signInCalled = true },
+            onNavigateToHome = { homeCalled = true })
+      }
+    }
+
+    // Verify screen is displayed
+    composeRule
+        .onNodeWithContentDescription(OpeningScreenTestConstants.OPENING_SCREEN_CONTENT_DESCRIPTION)
+        .assertIsDisplayed()
+
+    // Wait for navigation delay (2.5 seconds)
+    delay(2600)
+
+    // Verify navigation occurred
+    assertTrue("Should navigate to sign in when loading", signInCalled)
+    assertFalse("Should not navigate to home when loading", homeCalled)
+  }
+
+  @Test
+  fun opening_screen_navigates_to_signin_after_delay_when_error() = runTest {
+    var homeCalled = false
+    var signInCalled = false
+
+    composeRule.setContent {
+      MaterialTheme {
+        OpeningScreen(
+            authState = AuthUiState.Error("Test error"),
+            onNavigateToSignIn = { signInCalled = true },
+            onNavigateToHome = { homeCalled = true })
+      }
+    }
+
+    // Verify screen is displayed
+    composeRule
+        .onNodeWithContentDescription(OpeningScreenTestConstants.OPENING_SCREEN_CONTENT_DESCRIPTION)
+        .assertIsDisplayed()
+
+    // Wait for navigation delay (2.5 seconds)
+    delay(2600)
+
+    // Verify navigation occurred
+    assertTrue("Should navigate to sign in when error", signInCalled)
+    assertFalse("Should not navigate to home when error", homeCalled)
   }
 }
