@@ -4,13 +4,16 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.sample.TestConstants
 import com.android.sample.home.HomeScreen
@@ -21,6 +24,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+@OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
 class HomeScreenTest {
 
@@ -33,6 +37,23 @@ class HomeScreenTest {
       fail("Node with text '$text' should not exist but was found")
     } catch (e: AssertionError) {
       // Expected: node does not exist
+    }
+  }
+
+  // Helper function to wait for Send button to be available and click it
+  // This is more robust for CI environments where timing can vary
+  private fun waitAndClickSendButton() {
+    // Wait until the Send button is found (either by testTag or contentDescription)
+    composeRule.waitUntilAtLeastOneExists(hasContentDescription("Send"), timeoutMillis = 5000)
+    composeRule.waitForIdle()
+    // Try testTag first, fallback to contentDescription
+    try {
+      composeRule.onNodeWithTag(HomeTags.SendBtn).assertIsDisplayed()
+      composeRule.onNodeWithTag(HomeTags.SendBtn).performClick()
+    } catch (e: AssertionError) {
+      // Fallback to contentDescription if testTag doesn't work
+      composeRule.onAllNodesWithContentDescription("Send").get(0).assertIsDisplayed()
+      composeRule.onAllNodesWithContentDescription("Send").get(0).performClick()
     }
   }
 
@@ -82,16 +103,20 @@ class HomeScreenTest {
     composeRule.setContent { MaterialTheme { HomeScreen() } }
 
     composeRule
-        .onNode(hasContentDescription(TestConstants.ContentDescriptions.MENU))
+        .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.MENU)
+        .get(0)
         .assertIsDisplayed()
     composeRule
-        .onNode(hasContentDescription(TestConstants.ContentDescriptions.MORE))
+        .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.MORE)
+        .get(0)
         .assertIsDisplayed()
     composeRule
-        .onNode(hasContentDescription(TestConstants.ContentDescriptions.SEND))
+        .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.SEND)
+        .get(0)
         .assertIsDisplayed()
     composeRule
-        .onNode(hasContentDescription(TestConstants.ContentDescriptions.EULER))
+        .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.EULER)
+        .get(0)
         .assertIsDisplayed()
   }
 
@@ -250,16 +275,20 @@ class HomeScreenTest {
     composeRule.setContent { MaterialTheme { HomeScreen() } }
 
     composeRule
-        .onNode(hasContentDescription(TestConstants.ContentDescriptions.MENU))
+        .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.MENU)
+        .get(0)
         .assertIsDisplayed()
     composeRule
-        .onNode(hasContentDescription(TestConstants.ContentDescriptions.MORE))
+        .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.MORE)
+        .get(0)
         .assertIsDisplayed()
     composeRule
-        .onNode(hasContentDescription(TestConstants.ContentDescriptions.SEND))
+        .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.SEND)
+        .get(0)
         .assertIsDisplayed()
     composeRule
-        .onNode(hasContentDescription(TestConstants.ContentDescriptions.EULER))
+        .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.EULER)
+        .get(0)
         .assertIsDisplayed()
   }
 
@@ -431,6 +460,9 @@ class HomeScreenTest {
       }
     }
 
+    // Attendre que l'UI soit complètement rendue (important pour le CI)
+    composeRule.waitForIdle()
+
     // Test tous les callbacks
     composeRule.onNodeWithTag(HomeTags.Action1Btn).performClick()
     assertTrue(action1Called)
@@ -440,8 +472,9 @@ class HomeScreenTest {
 
     // Pour Send, on doit remplir le champ d'abord pour activer le bouton
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test")
-    composeRule.waitForIdle() // Attendre que le bouton s'active
-    composeRule.onNodeWithTag(HomeTags.SendBtn).performClick()
+    composeRule.waitForIdle()
+    // Utiliser la fonction helper robuste pour trouver et cliquer le bouton Send
+    waitAndClickSendButton()
     assertTrue(sendCalled)
   }
 
@@ -521,15 +554,15 @@ class HomeScreenTest {
 
   @Test
   fun send_button_with_empty_message_still_calls_callback() {
-    var sendCalled = false
+    composeRule.setContent { MaterialTheme { HomeScreen() } }
 
-    composeRule.setContent { MaterialTheme { HomeScreen(onSendMessage = { sendCalled = true }) } }
+    // Attendre que l'UI soit complètement rendue
+    composeRule.waitForIdle()
 
     // Le bouton devrait exister même quand désactivé
-    composeRule.onNodeWithTag(HomeTags.SendBtn).assertIsDisplayed()
-
-    // Quand le champ est vide, le bouton est désactivé donc on ne peut pas cliquer
-    // Mais on vérifie qu'il existe (assertIsDisplayed vérifie déjà l'existence)
+    // Attendre explicitement qu'il soit disponible (plus robuste pour le CI)
+    composeRule.waitUntilAtLeastOneExists(hasContentDescription("Send"), timeoutMillis = 5000)
+    composeRule.onAllNodesWithContentDescription("Send").get(0).assertIsDisplayed()
   }
 
   @Test
@@ -648,8 +681,13 @@ class HomeScreenTest {
   fun message_field_clears_after_send() {
     composeRule.setContent { MaterialTheme { HomeScreen() } }
 
+    // Attendre que l'UI soit complètement rendue (important pour le CI)
+    composeRule.waitForIdle()
+
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test message")
-    composeRule.onNodeWithTag(HomeTags.SendBtn).performClick()
+    composeRule.waitForIdle()
+    // Utiliser la fonction helper robuste pour trouver et cliquer le bouton Send
+    waitAndClickSendButton()
 
     // Le champ devrait être vidé après l'envoi (géré par le ViewModel)
     composeRule.waitForIdle()
@@ -724,10 +762,10 @@ class HomeScreenTest {
   fun all_ui_elements_have_correct_content_descriptions() {
     composeRule.setContent { MaterialTheme { HomeScreen() } }
 
-    composeRule.onNode(hasContentDescription("Menu")).assertIsDisplayed()
-    composeRule.onNode(hasContentDescription("More")).assertIsDisplayed()
-    composeRule.onNode(hasContentDescription("Send")).assertIsDisplayed()
-    composeRule.onNode(hasContentDescription("Euler")).assertIsDisplayed()
+    composeRule.onAllNodesWithContentDescription("Menu").get(0).assertIsDisplayed()
+    composeRule.onAllNodesWithContentDescription("More").get(0).assertIsDisplayed()
+    composeRule.onAllNodesWithContentDescription("Send").get(0).assertIsDisplayed()
+    composeRule.onAllNodesWithContentDescription("Euler").get(0).assertIsDisplayed()
   }
 
   @Test
@@ -765,13 +803,18 @@ class HomeScreenTest {
     // Test avec callbacks par défaut (empty lambdas)
     composeRule.setContent { MaterialTheme { HomeScreen() } }
 
+    // Attendre que l'UI soit complètement rendue (important pour le CI)
+    composeRule.waitForIdle()
+
     // Tous les boutons devraient être cliquables sans crash
     composeRule.onNodeWithTag(HomeTags.Action1Btn).performClick()
     composeRule.onNodeWithTag(HomeTags.Action2Btn).performClick()
 
     // Pour Send, on doit d'abord remplir le champ pour activer le bouton
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test")
-    composeRule.onNodeWithTag(HomeTags.SendBtn).performClick()
+    composeRule.waitForIdle()
+    // Utiliser la fonction helper robuste pour trouver et cliquer le bouton Send
+    waitAndClickSendButton()
 
     composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
   }

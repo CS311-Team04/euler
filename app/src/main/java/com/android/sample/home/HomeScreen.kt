@@ -420,6 +420,7 @@ private fun BubbleSendButton(
         modifier =
             Modifier.fillMaxSize()
                 .padding(6.dp)
+                .testTag(HomeTags.SendBtn)
                 .then(
                     if (enabled && !isSending)
                         Modifier.clickable(interactionSource = interaction, indication = null) {
