@@ -4,7 +4,6 @@ import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -16,7 +15,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.sample.TestConstants
 import com.android.sample.home.HomeScreen
 import com.android.sample.home.HomeTags
-import org.junit.Assert
+import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -25,6 +25,16 @@ import org.junit.runner.RunWith
 class HomeScreenTest {
 
   @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
+
+  // Helper function to check if a node does not exist
+  private fun assertNodeDoesNotExist(text: String) {
+    try {
+      composeRule.onNodeWithText(text).assertIsDisplayed()
+      fail("Node with text '$text' should not exist but was found")
+    } catch (e: AssertionError) {
+      // Expected: node does not exist
+    }
+  }
 
   @Test
   fun action_buttons_trigger_callbacks() {
@@ -41,8 +51,8 @@ class HomeScreenTest {
     composeRule.onNodeWithTag(HomeTags.Action1Btn).performClick()
     composeRule.onNodeWithTag(HomeTags.Action2Btn).performClick()
 
-    Assert.assertTrue(action1Clicked)
-    Assert.assertTrue(action2Clicked)
+    assertTrue(action1Clicked)
+    assertTrue(action2Clicked)
   }
 
   @Test
@@ -132,7 +142,7 @@ class HomeScreenTest {
 
     // Verify that without any text input, the callback should not be triggered
     // The send button is disabled when there's no text
-    Assert.assertTrue(!sendMessageCalled)
+    assertTrue(!sendMessageCalled)
   }
 
   @Test
@@ -162,10 +172,10 @@ class HomeScreenTest {
 
     // Test que les boutons sont cliquables et déclenchent les callbacks
     composeRule.onNodeWithTag(HomeTags.Action1Btn).performClick()
-    Assert.assertTrue(action1Clicked)
+    assertTrue(action1Clicked)
 
     composeRule.onNodeWithTag(HomeTags.Action2Btn).performClick()
-    Assert.assertTrue(action2Clicked)
+    assertTrue(action2Clicked)
   }
 
   @Test
@@ -309,7 +319,7 @@ class HomeScreenTest {
 
     // Cancel should hide the modal
     composeRule.onNodeWithText("Cancel").performClick()
-    composeRule.onNodeWithText("Clear Chat?").assertDoesNotExist()
+    assertNodeDoesNotExist("Clear Chat?")
   }
 
   @Test
@@ -327,8 +337,8 @@ class HomeScreenTest {
     composeRule.onNodeWithText("Delete").performClick()
 
     // List should be cleared and modal closed
-    composeRule.onNodeWithText(defaultItem).assertDoesNotExist()
-    composeRule.onNodeWithText("Clear Chat?").assertDoesNotExist()
+    assertNodeDoesNotExist(defaultItem)
+    assertNodeDoesNotExist("Clear Chat?")
   }
 
   @Test
@@ -340,7 +350,7 @@ class HomeScreenTest {
     composeRule.onNodeWithText("Share").performClick()
 
     // Menu should be dismissed (its items disappear)
-    composeRule.onNodeWithText("Share").assertDoesNotExist()
+    assertNodeDoesNotExist("Share")
   }
 
   @Test
@@ -388,7 +398,7 @@ class HomeScreenTest {
 
     // Le callback ne sera appelé que si on clique sur sign out dans le drawer
     // On vérifie juste que le composant fonctionne
-    assertTrue(composeRule.onNodeWithTag(HomeTags.Root).exists())
+    composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
   }
 
   @Test
@@ -448,7 +458,7 @@ class HomeScreenTest {
     // Cliquer sur le background (Box clickable) devrait annuler
     // On ne peut pas cliquer directement sur le background, mais on peut tester via Cancel
     composeRule.onNodeWithText("Cancel").performClick()
-    composeRule.onNodeWithText("Clear Chat?").assertDoesNotExist()
+    assertNodeDoesNotExist("Clear Chat?")
   }
 
   @Test
@@ -564,7 +574,7 @@ class HomeScreenTest {
     // Les deux callbacks devraient être appelés: onDeleteClick (affiche modal) et onDismiss (ferme
     // menu)
     composeRule.onNodeWithText("Clear Chat?").assertIsDisplayed()
-    composeRule.onNodeWithText("Delete").assertDoesNotExist() // Le menu devrait être fermé
+    assertNodeDoesNotExist("Delete") // Le menu devrait être fermé
   }
 
   @Test
@@ -581,7 +591,7 @@ class HomeScreenTest {
     composeRule.onNodeWithText("Delete").performClick() // Confirmer dans le modal
 
     // Les messages devraient être supprimés
-    composeRule.onNodeWithText(defaultItem).assertDoesNotExist()
+    assertNodeDoesNotExist(defaultItem)
   }
 
   @Test
@@ -628,7 +638,7 @@ class HomeScreenTest {
       composeRule.onNodeWithText("Delete").performClick()
       composeRule.onNodeWithText("Clear Chat?").assertIsDisplayed()
       composeRule.onNodeWithText("Cancel").performClick()
-      composeRule.onNodeWithText("Clear Chat?").assertDoesNotExist()
+      assertNodeDoesNotExist("Clear Chat?")
     }
   }
 
@@ -730,7 +740,7 @@ class HomeScreenTest {
     // Le bouton Delete dans le modal devrait confirmer, pas fermer
     composeRule.onNodeWithText("Delete").performClick()
     // Le modal devrait se fermer après confirmation
-    composeRule.onNodeWithText("Clear Chat?").assertDoesNotExist()
+    assertNodeDoesNotExist("Clear Chat?")
   }
 
   @Test
@@ -738,7 +748,7 @@ class HomeScreenTest {
     composeRule.setContent { MaterialTheme { HomeScreen() } }
 
     // Le modal ne devrait pas être visible initialement
-    composeRule.onNodeWithText("Clear Chat?").assertDoesNotExist()
+    assertNodeDoesNotExist("Clear Chat?")
 
     // Ouvrir via le menu
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
@@ -800,7 +810,7 @@ class HomeScreenTest {
     composeRule.onNodeWithText("Clear Chat?").assertIsDisplayed()
     composeRule.onNodeWithText("Delete").performClick()
 
-    composeRule.onNodeWithText(defaultItem).assertDoesNotExist()
-    composeRule.onNodeWithText("Clear Chat?").assertDoesNotExist()
+    assertNodeDoesNotExist(defaultItem)
+    assertNodeDoesNotExist("Clear Chat?")
   }
 }
