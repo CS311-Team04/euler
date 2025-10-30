@@ -1,9 +1,9 @@
 package com.android.sample.screen
 
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -364,11 +364,10 @@ class HomeScreenTest {
 
   @Test
   fun homeScreen_with_custom_modifier() {
-    // Test le paramètre modifier
-    composeRule.setContent {
-      MaterialTheme { HomeScreen(modifier = Modifier.testTag("custom_modifier")) }
-    }
+    // Test le paramètre modifier - vérifier que le modifier est appliqué
+    composeRule.setContent { MaterialTheme { HomeScreen(modifier = Modifier.fillMaxSize()) } }
 
+    // Le Root devrait toujours être présent avec son testTag
     composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
   }
 
@@ -439,7 +438,9 @@ class HomeScreenTest {
     composeRule.onNodeWithTag(HomeTags.Action2Btn).performClick()
     assertTrue(action2Called)
 
+    // Pour Send, on doit remplir le champ d'abord pour activer le bouton
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test")
+    composeRule.waitForIdle() // Attendre que le bouton s'active
     composeRule.onNodeWithTag(HomeTags.SendBtn).performClick()
     assertTrue(sendCalled)
   }
@@ -524,10 +525,11 @@ class HomeScreenTest {
 
     composeRule.setContent { MaterialTheme { HomeScreen(onSendMessage = { sendCalled = true }) } }
 
-    // Ne pas remplir le champ, juste cliquer send
-    composeRule.onNodeWithTag(HomeTags.SendBtn).performClick()
+    // Le bouton devrait exister même quand désactivé
+    composeRule.onNodeWithTag(HomeTags.SendBtn).assertIsDisplayed()
 
-    assertTrue(sendCalled)
+    // Quand le champ est vide, le bouton est désactivé donc on ne peut pas cliquer
+    // Mais on vérifie qu'il existe (assertIsDisplayed vérifie déjà l'existence)
   }
 
   @Test
@@ -766,6 +768,9 @@ class HomeScreenTest {
     // Tous les boutons devraient être cliquables sans crash
     composeRule.onNodeWithTag(HomeTags.Action1Btn).performClick()
     composeRule.onNodeWithTag(HomeTags.Action2Btn).performClick()
+
+    // Pour Send, on doit d'abord remplir le champ pour activer le bouton
+    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test")
     composeRule.onNodeWithTag(HomeTags.SendBtn).performClick()
 
     composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()

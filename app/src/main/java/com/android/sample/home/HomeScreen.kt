@@ -410,7 +410,7 @@ private fun BubbleSendButton(
   val interaction = remember { MutableInteractionSource() }
 
   Surface(
-      modifier = Modifier.size(size).padding(end = 6.dp),
+      modifier = Modifier.size(size).padding(end = 6.dp).testTag(HomeTags.SendBtn),
       color = container,
       shape = CircleShape,
       tonalElevation = 0.dp,
