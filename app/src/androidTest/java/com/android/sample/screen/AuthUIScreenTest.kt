@@ -31,6 +31,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    composeRule.waitForIdle()
 
     // Vérifie la présence du root
     composeRule.onNodeWithTag(AuthTags.Root).assertIsDisplayed()
@@ -118,6 +119,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    composeRule.waitForIdle()
 
     // Vérifie que les images ont les bonnes descriptions
     composeRule
@@ -138,6 +140,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    composeRule.waitForIdle()
 
     // Les icônes ont des contentDescription spécifiques
     composeRule

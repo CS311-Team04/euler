@@ -141,7 +141,7 @@ fun AuthUIScreen(
 
                       // Microsoft Entra ID button
                       MicrosoftEntraButton(
-                          enabled = !isMicrosoftLoading && state !is AuthUiState.Loading,
+                          enabled = !isMicrosoftLoading,
                           isLoading = isMicrosoftLoading,
                           onClick = onMicrosoftLogin,
                           modifier = Modifier.testTag(AuthTags.BtnMicrosoft))
@@ -155,7 +155,7 @@ fun AuthUIScreen(
 
                       // Guest button
                       GuestButton(
-                          enabled = !isGuestLoading && state !is AuthUiState.Loading,
+                          enabled = !isGuestLoading,
                           isLoading = isGuestLoading,
                           onClick = onSwitchEduLogin,
                           modifier = Modifier.testTag(AuthTags.BtnSwitchEdu))

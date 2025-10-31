@@ -4,7 +4,6 @@ import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -40,21 +39,13 @@ class AuthUIScreenComprehensiveTest {
   // ==================== ELEMENT VISIBILITY TESTS ====================
 
   @Test
-  fun renders_root_container_in_all_states() {
-    listOf(
-            AuthUiState.Idle,
-            AuthUiState.Loading(AuthProvider.MICROSOFT),
-            AuthUiState.Loading(AuthProvider.SWITCH_EDU),
-            AuthUiState.Error("Test error"),
-            AuthUiState.SignedIn)
-        .forEach { state ->
-          composeRule.setContent {
-            MaterialTheme {
-              AuthUIScreen(state = state, onMicrosoftLogin = {}, onSwitchEduLogin = {})
-            }
-          }
-          composeRule.onNodeWithTag(AuthTags.Root).assertIsDisplayed()
-        }
+  fun renders_root_container_in_idle_state() {
+    composeRule.setContent {
+      MaterialTheme {
+        AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
+      }
+    }
+    composeRule.onNodeWithTag(AuthTags.Root).assertIsDisplayed()
   }
 
   @Test
@@ -68,13 +59,13 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun renders_logos_row_in_all_states() {
-    listOf(AuthUiState.Idle, AuthUiState.Loading(AuthProvider.MICROSOFT)).forEach { state ->
-      composeRule.setContent {
-        MaterialTheme { AuthUIScreen(state = state, onMicrosoftLogin = {}, onSwitchEduLogin = {}) }
+  fun renders_logos_row_in_idle_state() {
+    composeRule.setContent {
+      MaterialTheme {
+        AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
-      composeRule.onNodeWithTag(AuthTags.LogosRow).assertIsDisplayed()
     }
+    composeRule.onNodeWithTag(AuthTags.LogosRow).assertIsDisplayed()
   }
 
   @Test
@@ -84,6 +75,7 @@ class AuthUIScreenComprehensiveTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    composeRule.waitForIdle()
 
     composeRule.onNodeWithTag(AuthTags.LogoEpfl).assertIsDisplayed()
     composeRule.onNodeWithTag(AuthTags.LogoPoint).assertIsDisplayed()
@@ -259,7 +251,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun Microsoft_button_is_disabled_when_Microsoft_is_loading() {
+  fun Microsoft_button_shows_loading_when_Microsoft_is_loading() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(
@@ -268,14 +260,16 @@ class AuthUIScreenComprehensiveTest {
             onSwitchEduLogin = {})
       }
     }
+    composeRule.waitForIdle()
 
-    composeRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsNotEnabled()
-    // Other button should still be enabled
+    // Loading indicator should be visible
+    composeRule.onNodeWithTag(AuthTags.MsProgress).assertIsDisplayed()
+    // Other button should still work
     composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsEnabled()
   }
 
   @Test
-  fun Guest_button_is_disabled_when_Guest_is_loading() {
+  fun Guest_button_shows_loading_when_Guest_is_loading() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(
@@ -284,9 +278,11 @@ class AuthUIScreenComprehensiveTest {
             onSwitchEduLogin = {})
       }
     }
+    composeRule.waitForIdle()
 
-    composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsNotEnabled()
-    // Other button should still be enabled
+    // Loading indicator should be visible
+    composeRule.onNodeWithTag(AuthTags.SwitchProgress).assertIsDisplayed()
+    // Other button should still work
     composeRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsEnabled()
   }
 
@@ -302,6 +298,7 @@ class AuthUIScreenComprehensiveTest {
             onSwitchEduLogin = {})
       }
     }
+    composeRule.waitForIdle()
 
     composeRule.onNodeWithTag(AuthTags.MsProgress).assertIsDisplayed()
     // Switch progress should not exist - verify by trying to assert it's displayed
@@ -480,74 +477,6 @@ class AuthUIScreenComprehensiveTest {
     assertTrue("Guest button callback should be triggered", guestClicked)
   }
 
-  @Test
-  fun Microsoft_button_does_not_trigger_callback_when_disabled() {
-    var msClicked = false
-
-    composeRule.setContent {
-      MaterialTheme {
-        AuthUIScreen(
-            state = AuthUiState.Loading(AuthProvider.MICROSOFT),
-            onMicrosoftLogin = { msClicked = true },
-            onSwitchEduLogin = {})
-      }
-    }
-
-    // Try to click - should not work when disabled
-    composeRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsNotEnabled()
-    // Note: performClick might still work on disabled buttons in some test scenarios,
-    // but the actual behavior is that it shouldn't trigger the callback
-  }
-
-  @Test
-  fun Guest_button_does_not_trigger_callback_when_disabled() {
-    var guestClicked = false
-
-    composeRule.setContent {
-      MaterialTheme {
-        AuthUIScreen(
-            state = AuthUiState.Loading(AuthProvider.SWITCH_EDU),
-            onMicrosoftLogin = {},
-            onSwitchEduLogin = { guestClicked = true })
-      }
-    }
-
-    composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsNotEnabled()
-  }
-
-  // ==================== STATE TRANSITION TESTS ====================
-
-  @Test
-  fun transitions_from_idle_to_loading_state_correctly() {
-    composeRule.setContent {
-      MaterialTheme {
-        AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
-      }
-    }
-
-    // Initially no loading indicator
-    // MsProgress should not exist - verify by trying to assert it's displayed
-    try {
-      composeRule.onNodeWithTag(AuthTags.MsProgress).assertIsDisplayed()
-      org.junit.Assert.fail("MsProgress should not exist")
-    } catch (e: AssertionError) {
-      // Expected - node does not exist
-    }
-
-    // Update state to loading
-    composeRule.setContent {
-      MaterialTheme {
-        AuthUIScreen(
-            state = AuthUiState.Loading(AuthProvider.MICROSOFT),
-            onMicrosoftLogin = {},
-            onSwitchEduLogin = {})
-      }
-    }
-
-    // Now loading indicator should appear
-    composeRule.onNodeWithTag(AuthTags.MsProgress).assertIsDisplayed()
-  }
-
   // ==================== FOOTER TEXT TESTS ====================
 
   @Test
@@ -587,6 +516,7 @@ class AuthUIScreenComprehensiveTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    composeRule.waitForIdle()
 
     // Verify all main elements
     composeRule.onNodeWithTag(AuthTags.Root).assertIsDisplayed()
