@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.android.sample.auth.MicrosoftAuth
 import com.android.sample.authentification.AuthUIScreen
@@ -16,8 +17,10 @@ import com.android.sample.home.HomeScreen
 import com.android.sample.settings.SettingsPage
 import com.android.sample.sign_in.AuthViewModel
 import com.android.sample.speech.SpeechToTextHelper
+import com.android.sample.splash.OpeningScreen
 
 object Routes {
+  const val Opening = "opening"
   const val SignIn = "signin"
   const val Home = "home"
   const val HomeWithDrawer = "home_with_drawer"
@@ -34,29 +37,38 @@ fun AppNav(
   val authViewModel = remember { AuthViewModel() }
   val authState by authViewModel.state.collectAsState()
 
+  // Get current back stack entry
+  val navBackStackEntry by nav.currentBackStackEntryAsState()
+  val currentDestination = navBackStackEntry?.destination?.route
+
   // Handle Microsoft authentication when loading
   LaunchedEffect(authState) {
     val currentState = authState
-    when (currentState) {
-      is AuthUiState.Loading -> {
-        if (currentState.provider == com.android.sample.authentification.AuthProvider.MICROSOFT) {
-          // Handle Microsoft authentication using Firebase Auth
-          MicrosoftAuth.signIn(
-              activity = activity,
-              onSuccess = { authViewModel.onAuthenticationSuccess() },
-              onError = { exception ->
-                authViewModel.onAuthenticationError(exception.message ?: "Authentication failed")
-              })
-        }
+    when {
+      shouldTriggerMicrosoftAuth(currentState) -> {
+        // Handle Microsoft authentication using Firebase Auth
+        MicrosoftAuth.signIn(
+            activity = activity,
+            onSuccess = { authViewModel.onAuthenticationSuccess() },
+            onError = { exception ->
+              val errorMessage =
+                  if (currentState is AuthUiState.Error) {
+                    getErrorMessage(currentState, exception.message ?: "Authentication failed")
+                  } else {
+                    exception.message ?: "Authentication failed"
+                  }
+              authViewModel.onAuthenticationError(errorMessage)
+            })
       }
-      is AuthUiState.SignedIn -> {
+      shouldNavigateToHomeFromSignIn(currentState, currentDestination) -> {
+        // Only navigate to Home from SignIn screen, not from Opening screen
         nav.navigate(Routes.Home) {
           popUpTo(Routes.SignIn) { inclusive = true }
           launchSingleTop = true
           restoreState = true
         }
       }
-      is AuthUiState.Error -> {
+      isErrorState(currentState) -> {
         // Handle error state - could show snackbar or toast
       }
       else -> {
@@ -66,13 +78,35 @@ fun AppNav(
   }
 
   NavHost(
-      navController = nav, startDestination = if (startOnSignedIn) Routes.Home else Routes.SignIn) {
+      navController = nav,
+      startDestination = if (startOnSignedIn) Routes.Home else Routes.Opening) {
+        // Opening Screen (nouvelle logique)
+        composable(Routes.Opening) {
+          OpeningScreen(
+              authState = authState,
+              onNavigateToSignIn = {
+                nav.navigate(Routes.SignIn) {
+                  popUpTo(Routes.Opening) { inclusive = true }
+                  launchSingleTop = true
+                }
+              },
+              onNavigateToHome = {
+                nav.navigate(Routes.Home) {
+                  popUpTo(Routes.Opening) { inclusive = true }
+                  launchSingleTop = true
+                }
+              })
+        }
+
+        // SignIn Screen
         composable(Routes.SignIn) {
           AuthUIScreen(
               state = authState,
               onMicrosoftLogin = { authViewModel.onMicrosoftLoginClick() },
               onSwitchEduLogin = { authViewModel.onSwitchEduLoginClick() })
         }
+
+        // Home Screen
         composable(Routes.Home) {
           HomeScreen(
               onAction1Click = { /* ... */},
@@ -84,13 +118,14 @@ fun AppNav(
                 authViewModel.signOut()
                 android.util.Log.d("NavGraph", "Navigating to SignIn")
                 nav.navigate(Routes.SignIn) {
-                  // retire Home pour ne pas pouvoir revenir en arrière
                   popUpTo(Routes.Home) { inclusive = true }
                   launchSingleTop = true
                 }
               },
               onSettingsClick = { nav.navigate(Routes.Settings) })
         }
+
+        // Home With Drawer
         composable(Routes.HomeWithDrawer) {
           HomeScreen(
               onAction1Click = { /* ... */},
@@ -109,6 +144,8 @@ fun AppNav(
               onSettingsClick = { nav.navigate(Routes.Settings) },
               openDrawerOnStart = true)
         }
+
+        // Settings
         composable(Routes.Settings) {
           SettingsPage(
               onBackClick = {
