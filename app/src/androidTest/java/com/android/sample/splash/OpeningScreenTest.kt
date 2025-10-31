@@ -8,8 +8,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.sample.authentification.AuthProvider
 import com.android.sample.authentification.AuthUiState
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -104,7 +102,7 @@ class OpeningScreenTest {
   }
 
   @Test
-  fun opening_screen_navigates_to_home_after_delay_when_signed_in() = runBlocking {
+  fun opening_screen_navigates_to_home_after_delay_when_signed_in() {
     var homeCalled = false
     var signInCalled = false
 
@@ -122,8 +120,14 @@ class OpeningScreenTest {
         .onNodeWithContentDescription(OpeningScreenTestConstants.OPENING_SCREEN_CONTENT_DESCRIPTION)
         .assertIsDisplayed()
 
-    // Wait for navigation delay (2.5 seconds)
-    delay(2600)
+    // Wait for Compose to be idle
+    composeRule.waitForIdle()
+
+    // Wait for navigation callback with timeout (up to 3 seconds)
+    val startTime = System.currentTimeMillis()
+    while (!homeCalled && !signInCalled && (System.currentTimeMillis() - startTime) < 3000) {
+      Thread.sleep(50)
+    }
 
     // Verify navigation occurred
     assertTrue("Should navigate to home when signed in", homeCalled)
@@ -131,7 +135,7 @@ class OpeningScreenTest {
   }
 
   @Test
-  fun opening_screen_navigates_to_signin_after_delay_when_idle() = runBlocking {
+  fun opening_screen_navigates_to_signin_after_delay_when_idle() {
     var homeCalled = false
     var signInCalled = false
 
@@ -149,8 +153,14 @@ class OpeningScreenTest {
         .onNodeWithContentDescription(OpeningScreenTestConstants.OPENING_SCREEN_CONTENT_DESCRIPTION)
         .assertIsDisplayed()
 
-    // Wait for navigation delay (2.5 seconds)
-    delay(2600)
+    // Wait for Compose to be idle
+    composeRule.waitForIdle()
+
+    // Wait for navigation callback with timeout (up to 3 seconds)
+    val startTime = System.currentTimeMillis()
+    while (!homeCalled && !signInCalled && (System.currentTimeMillis() - startTime) < 3000) {
+      Thread.sleep(50)
+    }
 
     // Verify navigation occurred
     assertTrue("Should navigate to sign in when idle", signInCalled)
@@ -158,7 +168,7 @@ class OpeningScreenTest {
   }
 
   @Test
-  fun opening_screen_navigates_to_signin_after_delay_when_loading() = runBlocking {
+  fun opening_screen_navigates_to_signin_after_delay_when_loading() {
     var homeCalled = false
     var signInCalled = false
 
@@ -176,8 +186,14 @@ class OpeningScreenTest {
         .onNodeWithContentDescription(OpeningScreenTestConstants.OPENING_SCREEN_CONTENT_DESCRIPTION)
         .assertIsDisplayed()
 
-    // Wait for navigation delay (2.5 seconds)
-    delay(2600)
+    // Wait for Compose to be idle
+    composeRule.waitForIdle()
+
+    // Wait for navigation callback with timeout (up to 3 seconds)
+    val startTime = System.currentTimeMillis()
+    while (!homeCalled && !signInCalled && (System.currentTimeMillis() - startTime) < 3000) {
+      Thread.sleep(50)
+    }
 
     // Verify navigation occurred
     assertTrue("Should navigate to sign in when loading", signInCalled)
@@ -185,7 +201,7 @@ class OpeningScreenTest {
   }
 
   @Test
-  fun opening_screen_navigates_to_signin_after_delay_when_error() = runBlocking {
+  fun opening_screen_navigates_to_signin_after_delay_when_error() {
     var homeCalled = false
     var signInCalled = false
 
@@ -203,8 +219,14 @@ class OpeningScreenTest {
         .onNodeWithContentDescription(OpeningScreenTestConstants.OPENING_SCREEN_CONTENT_DESCRIPTION)
         .assertIsDisplayed()
 
-    // Wait for navigation delay (2.5 seconds)
-    delay(2600)
+    // Wait for Compose to be idle
+    composeRule.waitForIdle()
+
+    // Wait for navigation callback with timeout (up to 3 seconds)
+    val startTime = System.currentTimeMillis()
+    while (!homeCalled && !signInCalled && (System.currentTimeMillis() - startTime) < 3000) {
+      Thread.sleep(50)
+    }
 
     // Verify navigation occurred
     assertTrue("Should navigate to sign in when error", signInCalled)
