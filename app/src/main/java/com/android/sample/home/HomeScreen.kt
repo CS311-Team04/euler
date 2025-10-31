@@ -1,16 +1,24 @@
 package com.android.sample.home
 
+import androidx.compose.animation.*
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -35,6 +44,7 @@ object HomeTags {
   const val Action2Btn = "home_action2_btn"
   const val MessageField = "home_message_field"
   const val SendBtn = "home_send_btn"
+  const val MicBtn = "home_mic_btn"
   const val Drawer = "home_drawer"
   const val TopRightMenu = "home_topright_menu"
 }
@@ -49,7 +59,8 @@ fun HomeScreen(
     onSendMessage: (String) -> Unit = {},
     onSignOut: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
-    openDrawerOnStart: Boolean = false
+    openDrawerOnStart: Boolean = false,
+    speechHelper: com.android.sample.speech.SpeechToTextHelper? = null
 ) {
   val ui by viewModel.uiState.collectAsState()
   val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -108,11 +119,12 @@ fun HomeScreen(
                             if (!drawerState.isOpen) drawerState.open() else drawerState.close()
                           }
                         },
-                        modifier =
-                            Modifier.size(40.dp)
-                                .background(Color(0x22FFFFFF), CircleShape)
-                                .testTag(HomeTags.MenuBtn)) {
-                          Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+                        modifier = Modifier.size(48.dp).testTag(HomeTags.MenuBtn)) {
+                          Icon(
+                              Icons.Default.Menu,
+                              contentDescription = "Menu",
+                              tint = Color.White,
+                              modifier = Modifier.size(24.dp))
                         }
                   },
                   title = {
@@ -125,14 +137,12 @@ fun HomeScreen(
                   actions = {
                     IconButton(
                         onClick = { viewModel.setTopRightOpen(true) },
-                        modifier =
-                            Modifier.size(40.dp)
-                                .background(Color(0x22FFFFFF), CircleShape)
-                                .testTag(HomeTags.TopRightBtn)) {
+                        modifier = Modifier.size(48.dp).testTag(HomeTags.TopRightBtn)) {
                           Icon(
                               Icons.Default.MoreVert,
                               contentDescription = "More",
-                              tint = Color.White)
+                              tint = Color.White,
+                              modifier = Modifier.size(24.dp))
                         }
 
                     // Menu haut-droite (placeholder)
@@ -140,7 +150,9 @@ fun HomeScreen(
                         expanded = ui.isTopRightOpen,
                         onDismissRequest = { viewModel.setTopRightOpen(false) },
                         modifier = Modifier.testTag(HomeTags.TopRightMenu)) {
-                          TopRightPanelPlaceholder(onDismiss = { viewModel.setTopRightOpen(false) })
+                          TopRightPanelPlaceholder(
+                              onDismiss = { viewModel.setTopRightOpen(false) },
+                              onDeleteClick = { viewModel.showDeleteConfirmation() })
                         }
                   },
                   colors =
@@ -180,40 +192,50 @@ fun HomeScreen(
                         modifier =
                             Modifier.fillMaxWidth()
                                 .padding(horizontal = 16.dp)
-                                .height(56.dp)
+                                .height(60.dp)
                                 .testTag(HomeTags.MessageField),
+                        enabled = !ui.isSending,
                         trailingIcon = {
-                          IconButton(
-                              onClick = {
-                                onSendMessage(ui.messageDraft)
-                                viewModel.sendMessage()
-                              },
-                              modifier = Modifier.testTag(HomeTags.SendBtn)) {
-                                Icon(
-                                    Icons.Default.Send,
-                                    contentDescription = "Send",
-                                    tint = Color.Gray)
-                              }
+                          Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            IconButton(
+                                onClick = {
+                                  speechHelper?.startListening { recognized ->
+                                    viewModel.updateMessageDraft(recognized)
+                                  }
+                                },
+                                enabled = speechHelper != null,
+                                modifier = Modifier.testTag(HomeTags.MicBtn)) {
+                                  Icon(
+                                      Icons.Default.Call,
+                                      contentDescription = "Speak",
+                                      tint = Color.Gray)
+                                }
+                            val canSend = ui.messageDraft.isNotBlank() && !ui.isSending
+                            BubbleSendButton(
+                                enabled = canSend,
+                                isSending = ui.isSending,
+                                onClick = {
+                                  if (canSend) {
+                                    onSendMessage(ui.messageDraft)
+                                    viewModel.sendMessage()
+                                  }
+                                })
+                          }
                         },
                         shape = RoundedCornerShape(50),
                         colors =
                             OutlinedTextFieldDefaults.colors(
-                                // texte
                                 focusedTextColor = Color.White,
                                 unfocusedTextColor = Color.White,
                                 disabledTextColor = Color.LightGray,
                                 cursorColor = Color.White,
-
-                                // placeholder
                                 focusedPlaceholderColor = Color.Gray,
                                 unfocusedPlaceholderColor = Color.Gray,
-
-                                // bordures + fond
                                 focusedBorderColor = Color.DarkGray,
                                 unfocusedBorderColor = Color.DarkGray,
                                 focusedContainerColor = Color(0xFF121212),
                                 unfocusedContainerColor = Color(0xFF121212),
-                            ))
+                                disabledContainerColor = Color(0xFF121212)))
 
                     Spacer(Modifier.height(8.dp))
                     Text(
@@ -230,6 +252,15 @@ fun HomeScreen(
                   contentAlignment = Alignment.Center) {
                     // Ici tu pourras afficher un dashboard, une timeline, etc.
                     LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                      if (ui.isSending) {
+                        item {
+                          ThinkingIndicator(
+                              modifier =
+                                  Modifier.fillMaxWidth()
+                                      .padding(vertical = 8.dp)
+                                      .testTag("home_thinking_indicator"))
+                        }
+                      }
                       items(ui.recent) { item ->
                         Text(
                             text = item.title,
@@ -238,13 +269,22 @@ fun HomeScreen(
                             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
                       }
                     }
-                    if (ui.isLoading) {
-                      CircularProgressIndicator(
-                          modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp),
-                          color = Color.Gray)
-                    }
                   }
             }
+      }
+
+  // Delete Confirmation Modal
+  AnimatedVisibility(
+      visible = ui.showDeleteConfirmation,
+      enter = fadeIn(tween(200)),
+      exit = fadeOut(tween(200)),
+      modifier = Modifier.fillMaxSize()) {
+        DeleteConfirmationModal(
+            onConfirm = {
+              viewModel.clearChat()
+              viewModel.hideDeleteConfirmation()
+            },
+            onCancel = { viewModel.hideDeleteConfirmation() })
       }
 }
 
@@ -262,9 +302,169 @@ private fun ActionButton(label: String, modifier: Modifier = Modifier, onClick: 
 /* ----- Placeholders pour compo externes (drawer + panneau top-right) ----- */
 
 @Composable
-private fun TopRightPanelPlaceholder(onDismiss: () -> Unit) {
+private fun TopRightPanelPlaceholder(onDismiss: () -> Unit, onDeleteClick: () -> Unit) {
   DropdownMenuItem(text = { Text("Share") }, onClick = onDismiss)
-  DropdownMenuItem(text = { Text("Delete") }, onClick = onDismiss)
+  DropdownMenuItem(
+      text = { Text("Delete") },
+      onClick = {
+        onDeleteClick()
+        onDismiss()
+      })
+}
+
+@Composable
+private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit) {
+  Box(
+      modifier =
+          Modifier.fillMaxSize()
+              .background(Color.Black.copy(alpha = 0.7f))
+              .clickable(onClick = onCancel),
+      contentAlignment = Alignment.Center) {
+        Card(
+            modifier = Modifier.width(280.dp).padding(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+            shape = RoundedCornerShape(16.dp)) {
+              Column(
+                  modifier = Modifier.padding(24.dp),
+                  horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Clear Chat?",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold)
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "This will delete all messages. This action cannot be undone.",
+                        color = Color.Gray,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center)
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth()) {
+                          Button(
+                              onClick = onCancel,
+                              modifier = Modifier.weight(1f),
+                              colors =
+                                  ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A2A)),
+                              shape = RoundedCornerShape(8.dp)) {
+                                Text("Cancel", color = Color.White)
+                              }
+
+                          Button(
+                              onClick = onConfirm,
+                              modifier = Modifier.weight(1f),
+                              colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                              shape = RoundedCornerShape(8.dp)) {
+                                Text("Delete", color = Color.White, fontWeight = FontWeight.Bold)
+                              }
+                        }
+                  }
+            }
+      }
+}
+
+@Composable
+private fun ThinkingIndicator(modifier: Modifier = Modifier) {
+  var dots by remember { mutableStateOf(0) }
+  LaunchedEffect(Unit) {
+    while (true) {
+      kotlinx.coroutines.delay(450)
+      dots = (dots + 1) % 4
+    }
+  }
+  val text = "Euler is thinking" + ".".repeat(dots)
+  Surface(
+      modifier = modifier,
+      shape = RoundedCornerShape(12.dp),
+      color = Color(0x14FFFFFF),
+      tonalElevation = 0.dp) {
+        Row(
+            Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+              CircularProgressIndicator(
+                  strokeWidth = 2.dp, modifier = Modifier.size(16.dp), color = Color.Gray)
+              Spacer(Modifier.width(8.dp))
+              Text(text = text, color = Color.LightGray, fontSize = 13.sp)
+            }
+      }
+}
+
+@Composable
+private fun BubbleSendButton(
+    enabled: Boolean,
+    isSending: Boolean,
+    onClick: () -> Unit,
+) {
+  val targetSize =
+      when {
+        isSending -> 40.dp
+        enabled -> 42.dp
+        else -> 40.dp
+      }
+  val size by animateDpAsState(targetValue = targetSize, label = "bubble-size")
+
+  // Colors: bright red when enabled, deeper red while sending, neutral gray when disabled
+  val targetContainer =
+      when {
+        isSending -> Color(0xFFC62828) // deeper red
+        enabled -> Color(0xFFE53935) // bright red
+        else -> Color(0xFF3C3C3C) // gray
+      }
+  val container by animateColorAsState(targetValue = targetContainer, label = "bubble-color")
+
+  val borderColor =
+      when {
+        enabled || isSending -> Color(0x33FFFFFF) // subtle white ring for separation
+        else -> Color(0x22000000)
+      }
+  val elevation by
+      animateDpAsState(targetValue = if (enabled) 8.dp else 0.dp, label = "bubble-elev")
+
+  val interaction = remember { MutableInteractionSource() }
+
+  Surface(
+      modifier = Modifier.size(size).padding(end = 6.dp).testTag(HomeTags.SendBtn),
+      color = container,
+      shape = CircleShape,
+      tonalElevation = 0.dp,
+      shadowElevation = elevation,
+  ) {
+    Box(
+        modifier =
+            Modifier.fillMaxSize()
+                .padding(6.dp)
+                .testTag(HomeTags.SendBtn)
+                .then(
+                    if (enabled && !isSending)
+                        Modifier.clickable(interactionSource = interaction, indication = null) {
+                          onClick()
+                        }
+                    else Modifier),
+        contentAlignment = Alignment.Center) {
+          if (isSending) {
+            CircularProgressIndicator(
+                strokeWidth = 2.dp, modifier = Modifier.size(20.dp), color = Color.White)
+          } else {
+            val icon =
+                try {
+                  androidx.compose.material.icons.Icons.Rounded.Send
+                } catch (_: Throwable) {
+                  androidx.compose.material.icons.Icons.Default.Send
+                }
+            Icon(
+                imageVector = icon,
+                contentDescription = "Send",
+                tint = Color.White,
+                modifier = Modifier.size(22.dp) // larger arrow for visibility
+                )
+          }
+        }
+  }
 }
 
 @Preview(showBackground = true, backgroundColor = 0x000000)
