@@ -521,10 +521,7 @@ class AuthUIScreenComprehensiveTest {
   fun `transitions from idle to loading state correctly`() {
     composeRule.setContent {
       MaterialTheme {
-        AuthUIScreen(
-            state = AuthUiState.Idle,
-            onMicrosoftLogin = {},
-            onSwitchEduLogin = {})
+        AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
 
