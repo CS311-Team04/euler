@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- 
+    Official Microsoft Logo Specifications:
+    - 4 equal squares in 2×2 grid, centered in 24×24dp box
+    - Each square: 10dp × 10dp with 2dp corner radius
+    - Gap between squares: 2dp
+    - Padding: 1dp on all sides (centered)
+    - Colors: Top-left #F25022, Top-right #7FBA00, Bottom-left #00A4EF, Bottom-right #FFB900
+    -->
+    
+    <!-- Top-left square - Red #F25022 -->
+    <!-- Position: (1,1), Size: 10×10, Corner radius: 2dp -->
+    <path
+        android:fillColor="#F25022"
+        android:pathData="M3,1 L11,1 Q13,1 13,3 L13,11 Q13,13 11,13 L3,13 Q1,13 1,11 L1,3 Q1,1 3,1 Z"/>
+    
+    <!-- Top-right square - Green #7FBA00 -->
+    <!-- Position: (13,1), Size: 10×10, Corner radius: 2dp -->
+    <path
+        android:fillColor="#7FBA00"
+        android:pathData="M15,1 L23,1 Q24,1 24,3 L24,11 Q24,13 23,13 L15,13 Q13,13 13,11 L13,3 Q13,1 15,1 Z"/>
+    
+    <!-- Bottom-left square - Blue #00A4EF -->
+    <!-- Position: (1,13), Size: 10×10, Corner radius: 2dp -->
+    <path
+        android:fillColor="#00A4EF"
+        android:pathData="M3,13 L11,13 Q13,13 13,15 L13,23 Q13,24 11,24 L3,24 Q1,24 1,23 L1,15 Q1,13 3,13 Z"/>
+    
+    <!-- Bottom-right square - Yellow #FFB900 -->
+    <!-- Position: (13,13), Size: 10×10, Corner radius: 2dp -->
+    <path
+        android:fillColor="#FFB900"
+        android:pathData="M15,13 L23,13 Q24,13 24,15 L24,23 Q24,24 23,24 L15,24 Q13,24 13,23 L13,15 Q13,13 15,13 Z"/>
+</vector>

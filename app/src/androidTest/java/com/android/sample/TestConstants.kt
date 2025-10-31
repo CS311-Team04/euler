@@ -9,7 +9,7 @@ object TestConstants {
     const val MORE = "More"
     const val SEND = "Send"
     const val EULER = "Euler"
-    const val MICROSOFT_ICON = "Microsoft Icon"
+    const val MICROSOFT_ICON = "Microsoft Logo"
     const val SWITCH_ICON = "Switch Icon"
     const val EPFL_LOGO = "EPFL Logo"
     const val SEPARATOR_DOT = "Separator Dot"
@@ -19,10 +19,20 @@ object TestConstants {
 
   // Button texts
   object ButtonTexts {
-    const val MICROSOFT_LOGIN = "Sign in with Microsoft Entra ID"
-    const val SWITCH_LOGIN = "Sign in with Switch edu ID"
+    const val MICROSOFT_LOGIN = "Continue with Microsoft Entra ID"
+    const val SWITCH_LOGIN = "Continue as a guest"
     const val FIND_CS220_EXAMS = "Find CS220 past exams"
     const val CHECK_ED_DISCUSSION = "Check Ed Discussion"
+  }
+
+  // Screen texts
+  object ScreenTexts {
+    const val TITLE = "Ask anything, do everything"
+    const val SUBTITLE = "Welcome to EULER"
+    const val OR_SEPARATOR = "OR"
+    const val BY_EPFL = "BY EPFL"
+    const val PRIVACY_POLICY_PREFIX = "By continuing, you acknowledge EPFL's "
+    const val PRIVACY_POLICY_LINK = "Privacy Policy"
   }
 
   // Placeholder texts
@@ -39,5 +49,6 @@ object TestConstants {
   object TermsText {
     const val TERMS_AND_PRIVACY =
         "By signing in, you agree to our Terms of Service and Privacy Policy"
+    const val PRIVACY_POLICY_FULL = "By continuing, you acknowledge EPFL's Privacy Policy"
   }
 }
