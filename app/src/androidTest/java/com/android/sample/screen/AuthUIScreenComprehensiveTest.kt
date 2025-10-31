@@ -40,7 +40,7 @@ class AuthUIScreenComprehensiveTest {
   // ==================== ELEMENT VISIBILITY TESTS ====================
 
   @Test
-  fun `renders root container in all states`() {
+  fun renders_root_container_in_all_states() {
     listOf(
             AuthUiState.Idle,
             AuthUiState.Loading(AuthProvider.MICROSOFT),
@@ -58,7 +58,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `renders card container in all states`() {
+  fun renders_card_container_in_all_states() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -68,7 +68,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `renders logos row in all states`() {
+  fun renders_logos_row_in_all_states() {
     listOf(AuthUiState.Idle, AuthUiState.Loading(AuthProvider.MICROSOFT)).forEach { state ->
       composeRule.setContent {
         MaterialTheme { AuthUIScreen(state = state, onMicrosoftLogin = {}, onSwitchEduLogin = {}) }
@@ -78,7 +78,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `renders all logo elements`() {
+  fun renders_all_logo_elements() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -91,7 +91,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `renders title text`() {
+  fun renders_title_text() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -103,7 +103,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `renders subtitle text`() {
+  fun renders_subtitle_text() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -115,7 +115,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `renders OR separator`() {
+  fun renders_OR_separator() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -127,7 +127,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `renders both authentication buttons`() {
+  fun renders_both_authentication_buttons() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -139,7 +139,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `renders footer elements`() {
+  fun renders_footer_elements() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -154,7 +154,7 @@ class AuthUIScreenComprehensiveTest {
   // ==================== BUTTON TEXT CONTENT TESTS ====================
 
   @Test
-  fun `displays correct Microsoft button text`() {
+  fun displays_correct_Microsoft_button_text() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -165,7 +165,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `displays correct Guest button text`() {
+  fun displays_correct_Guest_button_text() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -178,7 +178,7 @@ class AuthUIScreenComprehensiveTest {
   // ==================== ACCESSIBILITY TESTS ====================
 
   @Test
-  fun `logos have correct content descriptions`() {
+  fun logos_have_correct_content_descriptions() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -194,7 +194,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `Microsoft button contains Microsoft logo with content description`() {
+  fun Microsoft_button_contains_Microsoft_logo_with_content_description() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -207,7 +207,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `Guest button contains arrow icon with content description`() {
+  fun Guest_button_contains_arrow_icon_with_content_description() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -222,7 +222,7 @@ class AuthUIScreenComprehensiveTest {
   // ==================== BUTTON STATE TESTS ====================
 
   @Test
-  fun `buttons are enabled in idle state`() {
+  fun buttons_are_enabled_in_idle_state() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -234,7 +234,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `buttons are enabled in error state`() {
+  fun buttons_are_enabled_in_error_state() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(
@@ -247,7 +247,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `buttons are enabled in signed in state`() {
+  fun buttons_are_enabled_in_signed_in_state() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.SignedIn, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -259,7 +259,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `Microsoft button is disabled when Microsoft is loading`() {
+  fun Microsoft_button_is_disabled_when_Microsoft_is_loading() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(
@@ -275,7 +275,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `Guest button is disabled when Guest is loading`() {
+  fun Guest_button_is_disabled_when_Guest_is_loading() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(
@@ -293,7 +293,7 @@ class AuthUIScreenComprehensiveTest {
   // ==================== LOADING INDICATOR TESTS ====================
 
   @Test
-  fun `shows Microsoft loading indicator when Microsoft is loading`() {
+  fun shows_Microsoft_loading_indicator_when_Microsoft_is_loading() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(
@@ -314,7 +314,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `shows Guest loading indicator when Guest is loading`() {
+  fun shows_Guest_loading_indicator_when_Guest_is_loading() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(
@@ -335,7 +335,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `does not show loading indicators in idle state`() {
+  fun does_not_show_loading_indicators_in_idle_state() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -359,7 +359,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `does not show loading indicators in error state`() {
+  fun does_not_show_loading_indicators_in_error_state() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(
@@ -384,7 +384,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `does not show loading indicators in signed in state`() {
+  fun does_not_show_loading_indicators_in_signed_in_state() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.SignedIn, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -408,7 +408,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `hides arrow icon in Guest button when loading`() {
+  fun hides_arrow_icon_in_Guest_button_when_loading() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(
@@ -424,7 +424,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `shows arrow icon in Guest button when not loading`() {
+  fun shows_arrow_icon_in_Guest_button_when_not_loading() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -447,7 +447,7 @@ class AuthUIScreenComprehensiveTest {
   // ==================== INTERACTION TESTS ====================
 
   @Test
-  fun `Microsoft button triggers callback on click`() {
+  fun Microsoft_button_triggers_callback_on_click() {
     var msClicked = false
 
     composeRule.setContent {
@@ -464,7 +464,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `Guest button triggers callback on click`() {
+  fun Guest_button_triggers_callback_on_click() {
     var guestClicked = false
 
     composeRule.setContent {
@@ -481,7 +481,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `Microsoft button does not trigger callback when disabled`() {
+  fun Microsoft_button_does_not_trigger_callback_when_disabled() {
     var msClicked = false
 
     composeRule.setContent {
@@ -500,7 +500,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `Guest button does not trigger callback when disabled`() {
+  fun Guest_button_does_not_trigger_callback_when_disabled() {
     var guestClicked = false
 
     composeRule.setContent {
@@ -518,7 +518,7 @@ class AuthUIScreenComprehensiveTest {
   // ==================== STATE TRANSITION TESTS ====================
 
   @Test
-  fun `transitions from idle to loading state correctly`() {
+  fun transitions_from_idle_to_loading_state_correctly() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -551,7 +551,7 @@ class AuthUIScreenComprehensiveTest {
   // ==================== FOOTER TEXT TESTS ====================
 
   @Test
-  fun `footer displays privacy policy text`() {
+  fun footer_displays_privacy_policy_text() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -568,7 +568,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `footer displays BY EPFL text`() {
+  fun footer_displays_BY_EPFL_text() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -581,7 +581,7 @@ class AuthUIScreenComprehensiveTest {
   // ==================== COMPREHENSIVE STATE COVERAGE ====================
 
   @Test
-  fun `all elements visible in idle state`() {
+  fun all_elements_visible_in_idle_state() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -605,7 +605,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `all elements visible in error state`() {
+  fun all_elements_visible_in_error_state() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(
@@ -620,7 +620,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `all elements visible in signed in state`() {
+  fun all_elements_visible_in_signed_in_state() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.SignedIn, onMicrosoftLogin = {}, onSwitchEduLogin = {})
@@ -636,7 +636,7 @@ class AuthUIScreenComprehensiveTest {
   // ==================== EDGE CASES ====================
 
   @Test
-  fun `handles multiple rapid clicks gracefully`() {
+  fun handles_multiple_rapid_clicks_gracefully() {
     var clickCount = 0
 
     composeRule.setContent {
@@ -654,7 +654,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun `privacy policy text is clickable`() {
+  fun privacy_policy_text_is_clickable() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
