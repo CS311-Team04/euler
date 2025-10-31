@@ -9,7 +9,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.sample.authentification.AuthProvider
 import com.android.sample.authentification.AuthUiState
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -104,7 +104,7 @@ class OpeningScreenTest {
   }
 
   @Test
-  fun opening_screen_navigates_to_home_after_delay_when_signed_in() = runTest {
+  fun opening_screen_navigates_to_home_after_delay_when_signed_in() = runBlocking {
     var homeCalled = false
     var signInCalled = false
 
@@ -131,7 +131,7 @@ class OpeningScreenTest {
   }
 
   @Test
-  fun opening_screen_navigates_to_signin_after_delay_when_idle() = runTest {
+  fun opening_screen_navigates_to_signin_after_delay_when_idle() = runBlocking {
     var homeCalled = false
     var signInCalled = false
 
@@ -158,7 +158,7 @@ class OpeningScreenTest {
   }
 
   @Test
-  fun opening_screen_navigates_to_signin_after_delay_when_loading() = runTest {
+  fun opening_screen_navigates_to_signin_after_delay_when_loading() = runBlocking {
     var homeCalled = false
     var signInCalled = false
 
@@ -185,7 +185,7 @@ class OpeningScreenTest {
   }
 
   @Test
-  fun opening_screen_navigates_to_signin_after_delay_when_error() = runTest {
+  fun opening_screen_navigates_to_signin_after_delay_when_error() = runBlocking {
     var homeCalled = false
     var signInCalled = false
 
