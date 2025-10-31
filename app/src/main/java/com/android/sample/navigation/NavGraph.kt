@@ -15,6 +15,7 @@ import com.android.sample.authentification.AuthUiState
 import com.android.sample.home.HomeScreen
 import com.android.sample.settings.SettingsPage
 import com.android.sample.sign_in.AuthViewModel
+import com.android.sample.speech.SpeechToTextHelper
 
 object Routes {
   const val SignIn = "signin"
@@ -24,7 +25,11 @@ object Routes {
 }
 
 @Composable
-fun AppNav(startOnSignedIn: Boolean = false, activity: android.app.Activity) {
+fun AppNav(
+    startOnSignedIn: Boolean = false,
+    activity: android.app.Activity,
+    speechHelper: SpeechToTextHelper
+) {
   val nav = rememberNavController()
   val authViewModel = remember { AuthViewModel() }
   val authState by authViewModel.state.collectAsState()
@@ -73,6 +78,7 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: android.app.Activity) {
               onAction1Click = { /* ... */},
               onAction2Click = { /* ... */},
               onSendMessage = { /* ... */},
+              speechHelper = speechHelper,
               onSignOut = {
                 android.util.Log.d("NavGraph", "Sign out button clicked")
                 authViewModel.signOut()
@@ -90,6 +96,7 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: android.app.Activity) {
               onAction1Click = { /* ... */},
               onAction2Click = { /* ... */},
               onSendMessage = { /* ... */},
+              speechHelper = speechHelper,
               onSignOut = {
                 android.util.Log.d("NavGraph", "Sign out button clicked (HomeWithDrawer)")
                 authViewModel.signOut()

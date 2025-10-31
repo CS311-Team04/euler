@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Send
@@ -43,6 +44,7 @@ object HomeTags {
   const val Action2Btn = "home_action2_btn"
   const val MessageField = "home_message_field"
   const val SendBtn = "home_send_btn"
+  const val MicBtn = "home_mic_btn"
   const val Drawer = "home_drawer"
   const val TopRightMenu = "home_topright_menu"
 }
@@ -57,7 +59,8 @@ fun HomeScreen(
     onSendMessage: (String) -> Unit = {},
     onSignOut: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
-    openDrawerOnStart: Boolean = false
+    openDrawerOnStart: Boolean = false,
+    speechHelper: com.android.sample.speech.SpeechToTextHelper? = null
 ) {
   val ui by viewModel.uiState.collectAsState()
   val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -193,16 +196,31 @@ fun HomeScreen(
                                 .testTag(HomeTags.MessageField),
                         enabled = !ui.isSending,
                         trailingIcon = {
-                          val canSend = ui.messageDraft.isNotBlank() && !ui.isSending
-                          BubbleSendButton(
-                              enabled = canSend,
-                              isSending = ui.isSending,
-                              onClick = {
-                                if (canSend) {
-                                  onSendMessage(ui.messageDraft)
-                                  viewModel.sendMessage()
+                          Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            IconButton(
+                                onClick = {
+                                  speechHelper?.startListening { recognized ->
+                                    viewModel.updateMessageDraft(recognized)
+                                  }
+                                },
+                                enabled = speechHelper != null,
+                                modifier = Modifier.testTag(HomeTags.MicBtn)) {
+                                  Icon(
+                                      Icons.Default.Call,
+                                      contentDescription = "Speak",
+                                      tint = Color.Gray)
                                 }
-                              })
+                            val canSend = ui.messageDraft.isNotBlank() && !ui.isSending
+                            BubbleSendButton(
+                                enabled = canSend,
+                                isSending = ui.isSending,
+                                onClick = {
+                                  if (canSend) {
+                                    onSendMessage(ui.messageDraft)
+                                    viewModel.sendMessage()
+                                  }
+                                })
+                          }
                         },
                         shape = RoundedCornerShape(50),
                         colors =
