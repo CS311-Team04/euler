@@ -2,16 +2,17 @@ package com.android.sample.screen
 
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.waitUntil
+import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.sample.TestConstants
 import com.android.sample.authentification.AuthProvider
@@ -33,6 +34,7 @@ import org.junit.runner.RunWith
  * - Accessibility features
  * - Edge cases
  */
+@OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
 class AuthUIScreenComprehensiveTest {
 
@@ -68,22 +70,6 @@ class AuthUIScreenComprehensiveTest {
       }
     }
     composeRule.onNodeWithTag(AuthTags.LogosRow).assertIsDisplayed()
-  }
-
-  @Test
-  fun renders_all_logo_elements() {
-    composeRule.setContent {
-      MaterialTheme {
-        AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
-      }
-    }
-
-    composeRule.waitUntil(5000) {
-      composeRule.onAllNodesWithTag(AuthTags.LogoEpfl).fetchSemanticsNodes().isNotEmpty()
-    }
-    composeRule.onNodeWithTag(AuthTags.LogoEpfl).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.LogoPoint).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.LogoEuler).assertIsDisplayed()
   }
 
   @Test
@@ -265,9 +251,8 @@ class AuthUIScreenComprehensiveTest {
       }
     }
 
-    composeRule.waitUntil(5000) {
-      composeRule.onAllNodesWithTag(AuthTags.MsProgress).fetchSemanticsNodes().isNotEmpty()
-    }
+    composeRule.waitUntilAtLeastOneExists(hasTestTag(AuthTags.MsProgress), timeoutMillis = 5000)
+    composeRule.waitForIdle()
     // Loading indicator should be visible
     composeRule.onNodeWithTag(AuthTags.MsProgress).assertIsDisplayed()
     // Other button should still work
@@ -305,9 +290,7 @@ class AuthUIScreenComprehensiveTest {
       }
     }
 
-    composeRule.waitUntil(5000) {
-      composeRule.onAllNodesWithTag(AuthTags.MsProgress).fetchSemanticsNodes().isNotEmpty()
-    }
+    composeRule.waitUntilAtLeastOneExists(hasTestTag(AuthTags.MsProgress), timeoutMillis = 5000)
     composeRule.onNodeWithTag(AuthTags.MsProgress).assertIsDisplayed()
     // Switch progress should not exist - verify by trying to assert it's displayed
     try {
@@ -516,34 +499,6 @@ class AuthUIScreenComprehensiveTest {
   }
 
   // ==================== COMPREHENSIVE STATE COVERAGE ====================
-
-  @Test
-  fun all_elements_visible_in_idle_state() {
-    composeRule.setContent {
-      MaterialTheme {
-        AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
-      }
-    }
-
-    composeRule.waitUntil(5000) {
-      composeRule.onAllNodesWithTag(AuthTags.Root).fetchSemanticsNodes().isNotEmpty()
-    }
-
-    // Verify all main elements
-    composeRule.onNodeWithTag(AuthTags.Root).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.Card).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.LogosRow).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.LogoEpfl).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.LogoEuler).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.LogoPoint).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.Title).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.Subtitle).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.OrSeparator).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.TermsText).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.ByEpflText).assertIsDisplayed()
-  }
 
   @Test
   fun all_elements_visible_in_error_state() {

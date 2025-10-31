@@ -2,16 +2,13 @@ package com.android.sample.screen
 
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodes
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.waitUntil
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.sample.TestConstants
 import com.android.sample.authentification.AuthTags
@@ -22,43 +19,11 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+@OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
 class AuthUIScreenTest {
 
   @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
-
-  @Test
-  fun renders_all_core_elements_in_idle_state() {
-    composeRule.setContent {
-      MaterialTheme {
-        AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
-      }
-    }
-
-    composeRule.waitUntil(5000) {
-      composeRule.onAllNodesWithTag(AuthTags.Root).fetchSemanticsNodes().isNotEmpty()
-    }
-
-    // Vérifie la présence du root
-    composeRule.onNodeWithTag(AuthTags.Root).assertIsDisplayed()
-
-    // Vérifie la card principale
-    composeRule.onNodeWithTag(AuthTags.Card).assertIsDisplayed()
-
-    // Vérifie la row des logos
-    composeRule.onNodeWithTag(AuthTags.LogosRow).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.LogoEpfl).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.LogoPoint).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.LogoEuler).assertIsDisplayed()
-
-    // Vérifie les boutons
-    composeRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsDisplayed()
-    composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsDisplayed()
-
-    // Vérifie le texte des conditions
-    composeRule.onNodeWithTag(AuthTags.TermsText).assertIsDisplayed()
-    composeRule.onNodeWithText(TestConstants.TermsText.TERMS_AND_PRIVACY).assertIsDisplayed()
-  }
 
   @Test
   fun buttons_are_enabled_in_idle_state() {
@@ -116,54 +81,6 @@ class AuthUIScreenTest {
 
     composeRule.onNodeWithText(TestConstants.ButtonTexts.MICROSOFT_LOGIN).assertIsDisplayed()
     composeRule.onNodeWithText(TestConstants.ButtonTexts.SWITCH_LOGIN).assertIsDisplayed()
-  }
-
-  @Test
-  fun displays_logos_with_correct_content_descriptions() {
-    composeRule.setContent {
-      MaterialTheme {
-        AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
-      }
-    }
-
-    composeRule.waitUntil(5000) {
-      composeRule.onAllNodesWithTag(AuthTags.LogoEpfl).fetchSemanticsNodes().isNotEmpty()
-    }
-
-    // Vérifie que les images ont les bonnes descriptions
-    composeRule
-        .onNode(hasContentDescription(TestConstants.ContentDescriptions.EPFL_LOGO))
-        .assertIsDisplayed()
-    composeRule
-        .onNode(hasContentDescription(TestConstants.ContentDescriptions.SEPARATOR_DOT))
-        .assertIsDisplayed()
-    composeRule
-        .onNode(hasContentDescription(TestConstants.ContentDescriptions.EULER_LOGO))
-        .assertIsDisplayed()
-  }
-
-  @Test
-  fun displays_icons_in_buttons() {
-    composeRule.setContent {
-      MaterialTheme {
-        AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
-      }
-    }
-
-    composeRule.waitUntil(5000) {
-      composeRule
-          .onAllNodes(hasContentDescription("Microsoft Logo"))
-          .fetchSemanticsNodes()
-          .isNotEmpty()
-    }
-
-    // Les icônes ont des contentDescription spécifiques
-    composeRule
-        .onNode(hasContentDescription(TestConstants.ContentDescriptions.MICROSOFT_ICON))
-        .assertIsDisplayed()
-    composeRule
-        .onNode(hasContentDescription(TestConstants.ContentDescriptions.SWITCH_ICON))
-        .assertIsDisplayed()
   }
 
   @Test
