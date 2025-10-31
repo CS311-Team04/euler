@@ -7,9 +7,11 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.waitUntil
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.sample.TestConstants
 import com.android.sample.authentification.AuthProvider
@@ -75,8 +77,10 @@ class AuthUIScreenComprehensiveTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
-    composeRule.waitForIdle()
 
+    composeRule.waitUntil(5000) {
+      composeRule.onAllNodesWithTag(AuthTags.LogoEpfl).fetchSemanticsNodes().isNotEmpty()
+    }
     composeRule.onNodeWithTag(AuthTags.LogoEpfl).assertIsDisplayed()
     composeRule.onNodeWithTag(AuthTags.LogoPoint).assertIsDisplayed()
     composeRule.onNodeWithTag(AuthTags.LogoEuler).assertIsDisplayed()
@@ -260,8 +264,10 @@ class AuthUIScreenComprehensiveTest {
             onSwitchEduLogin = {})
       }
     }
-    composeRule.waitForIdle()
 
+    composeRule.waitUntil(5000) {
+      composeRule.onAllNodesWithTag(AuthTags.MsProgress).fetchSemanticsNodes().isNotEmpty()
+    }
     // Loading indicator should be visible
     composeRule.onNodeWithTag(AuthTags.MsProgress).assertIsDisplayed()
     // Other button should still work
@@ -298,8 +304,10 @@ class AuthUIScreenComprehensiveTest {
             onSwitchEduLogin = {})
       }
     }
-    composeRule.waitForIdle()
 
+    composeRule.waitUntil(5000) {
+      composeRule.onAllNodesWithTag(AuthTags.MsProgress).fetchSemanticsNodes().isNotEmpty()
+    }
     composeRule.onNodeWithTag(AuthTags.MsProgress).assertIsDisplayed()
     // Switch progress should not exist - verify by trying to assert it's displayed
     try {
@@ -516,7 +524,10 @@ class AuthUIScreenComprehensiveTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
-    composeRule.waitForIdle()
+
+    composeRule.waitUntil(5000) {
+      composeRule.onAllNodesWithTag(AuthTags.Root).fetchSemanticsNodes().isNotEmpty()
+    }
 
     // Verify all main elements
     composeRule.onNodeWithTag(AuthTags.Root).assertIsDisplayed()

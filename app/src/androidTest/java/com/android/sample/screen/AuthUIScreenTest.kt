@@ -6,9 +6,12 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodes
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.waitUntil
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.sample.TestConstants
 import com.android.sample.authentification.AuthTags
@@ -31,7 +34,10 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
-    composeRule.waitForIdle()
+
+    composeRule.waitUntil(5000) {
+      composeRule.onAllNodesWithTag(AuthTags.Root).fetchSemanticsNodes().isNotEmpty()
+    }
 
     // Vérifie la présence du root
     composeRule.onNodeWithTag(AuthTags.Root).assertIsDisplayed()
@@ -119,7 +125,10 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
-    composeRule.waitForIdle()
+
+    composeRule.waitUntil(5000) {
+      composeRule.onAllNodesWithTag(AuthTags.LogoEpfl).fetchSemanticsNodes().isNotEmpty()
+    }
 
     // Vérifie que les images ont les bonnes descriptions
     composeRule
@@ -140,7 +149,13 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
-    composeRule.waitForIdle()
+
+    composeRule.waitUntil(5000) {
+      composeRule
+          .onAllNodes(hasContentDescription("Microsoft Logo"))
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+    }
 
     // Les icônes ont des contentDescription spécifiques
     composeRule
