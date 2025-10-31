@@ -16,9 +16,8 @@ import com.android.sample.authentification.AuthUiState
 import com.android.sample.home.HomeScreen
 import com.android.sample.settings.SettingsPage
 import com.android.sample.sign_in.AuthViewModel
-import com.android.sample.splash.OpeningScreen
 import com.android.sample.speech.SpeechToTextHelper
-
+import com.android.sample.splash.OpeningScreen
 
 object Routes {
   const val Opening = "opening"
@@ -78,94 +77,89 @@ fun AppNav(
     }
   }
 
-NavHost(
-    navController = nav,
-    startDestination = if (startOnSignedIn) Routes.Home else Routes.Opening
-) {
-    // Opening Screen (nouvelle logique)
-    composable(Routes.Opening) {
-        OpeningScreen(
-            authState = authState,
-            onNavigateToSignIn = {
+  NavHost(
+      navController = nav,
+      startDestination = if (startOnSignedIn) Routes.Home else Routes.Opening) {
+        // Opening Screen (nouvelle logique)
+        composable(Routes.Opening) {
+          OpeningScreen(
+              authState = authState,
+              onNavigateToSignIn = {
                 nav.navigate(Routes.SignIn) {
-                    popUpTo(Routes.Opening) { inclusive = true }
-                    launchSingleTop = true
+                  popUpTo(Routes.Opening) { inclusive = true }
+                  launchSingleTop = true
                 }
-            },
-            onNavigateToHome = {
+              },
+              onNavigateToHome = {
                 nav.navigate(Routes.Home) {
-                    popUpTo(Routes.Opening) { inclusive = true }
-                    launchSingleTop = true
+                  popUpTo(Routes.Opening) { inclusive = true }
+                  launchSingleTop = true
                 }
-            }
-        )
-    }
+              })
+        }
 
-    // SignIn Screen
-    composable(Routes.SignIn) {
-        AuthUIScreen(
-            state = authState,
-            onMicrosoftLogin = { authViewModel.onMicrosoftLoginClick() },
-            onSwitchEduLogin = { authViewModel.onSwitchEduLoginClick() }
-        )
-    }
+        // SignIn Screen
+        composable(Routes.SignIn) {
+          AuthUIScreen(
+              state = authState,
+              onMicrosoftLogin = { authViewModel.onMicrosoftLoginClick() },
+              onSwitchEduLogin = { authViewModel.onSwitchEduLoginClick() })
+        }
 
-    // Home Screen
-    composable(Routes.Home) {
-        HomeScreen(
-            onAction1Click = { /* ... */ },
-            onAction2Click = { /* ... */ },
-            onSendMessage = { /* ... */ },
-            speechHelper = speechHelper,
-            onSignOut = {
+        // Home Screen
+        composable(Routes.Home) {
+          HomeScreen(
+              onAction1Click = { /* ... */},
+              onAction2Click = { /* ... */},
+              onSendMessage = { /* ... */},
+              speechHelper = speechHelper,
+              onSignOut = {
                 android.util.Log.d("NavGraph", "Sign out button clicked")
                 authViewModel.signOut()
                 android.util.Log.d("NavGraph", "Navigating to SignIn")
                 nav.navigate(Routes.SignIn) {
-                    popUpTo(Routes.Home) { inclusive = true }
-                    launchSingleTop = true
+                  popUpTo(Routes.Home) { inclusive = true }
+                  launchSingleTop = true
                 }
-            },
-            onSettingsClick = { nav.navigate(Routes.Settings) }
-        )
-    }
+              },
+              onSettingsClick = { nav.navigate(Routes.Settings) })
+        }
 
-    // Home With Drawer
-    composable(Routes.HomeWithDrawer) {
-        HomeScreen(
-            onAction1Click = { /* ... */ },
-            onAction2Click = { /* ... */ },
-            onSendMessage = { /* ... */ },
-            speechHelper = speechHelper,
-            onSignOut = {
+        // Home With Drawer
+        composable(Routes.HomeWithDrawer) {
+          HomeScreen(
+              onAction1Click = { /* ... */},
+              onAction2Click = { /* ... */},
+              onSendMessage = { /* ... */},
+              speechHelper = speechHelper,
+              onSignOut = {
                 android.util.Log.d("NavGraph", "Sign out button clicked (HomeWithDrawer)")
                 authViewModel.signOut()
                 android.util.Log.d("NavGraph", "Navigating to SignIn (HomeWithDrawer)")
                 nav.navigate(Routes.SignIn) {
-                    popUpTo(Routes.Home) { inclusive = true }
-                    launchSingleTop = true
+                  popUpTo(Routes.Home) { inclusive = true }
+                  launchSingleTop = true
                 }
-            },
-            onSettingsClick = { nav.navigate(Routes.Settings) },
-            openDrawerOnStart = true
-        )
-    }
+              },
+              onSettingsClick = { nav.navigate(Routes.Settings) },
+              openDrawerOnStart = true)
+        }
 
-    // Settings
-    composable(Routes.Settings) {
-        SettingsPage(
-            onBackClick = {
+        // Settings
+        composable(Routes.Settings) {
+          SettingsPage(
+              onBackClick = {
                 nav.navigate(Routes.HomeWithDrawer) { popUpTo(Routes.Home) { inclusive = false } }
-            },
-            onSignOut = {
+              },
+              onSignOut = {
                 android.util.Log.d("NavGraph", "Sign out button clicked (Settings)")
                 authViewModel.signOut()
                 android.util.Log.d("NavGraph", "Navigating to SignIn (Settings)")
                 nav.navigate(Routes.SignIn) {
-                    popUpTo(Routes.Home) { inclusive = true }
-                    launchSingleTop = true
+                  popUpTo(Routes.Home) { inclusive = true }
+                  launchSingleTop = true
                 }
-            }
-        )
-    }
+              })
+        }
+      }
 }
