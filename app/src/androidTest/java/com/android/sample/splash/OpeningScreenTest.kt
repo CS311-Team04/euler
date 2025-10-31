@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.sample.authentification.AuthProvider
 import com.android.sample.authentification.AuthUiState
+import java.util.concurrent.atomic.AtomicBoolean
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -103,15 +104,15 @@ class OpeningScreenTest {
 
   @Test
   fun opening_screen_navigates_to_home_after_delay_when_signed_in() {
-    var homeCalled = false
-    var signInCalled = false
+    val homeCalled = AtomicBoolean(false)
+    val signInCalled = AtomicBoolean(false)
 
     composeRule.setContent {
       MaterialTheme {
         OpeningScreen(
             authState = AuthUiState.SignedIn,
-            onNavigateToSignIn = { signInCalled = true },
-            onNavigateToHome = { homeCalled = true })
+            onNavigateToSignIn = { signInCalled.set(true) },
+            onNavigateToHome = { homeCalled.set(true) })
       }
     }
 
@@ -120,31 +121,33 @@ class OpeningScreenTest {
         .onNodeWithContentDescription(OpeningScreenTestConstants.OPENING_SCREEN_CONTENT_DESCRIPTION)
         .assertIsDisplayed()
 
-    // Wait for Compose to be idle
+    // Wait for Compose to be idle to ensure LaunchedEffect starts
     composeRule.waitForIdle()
 
-    // Wait for navigation callback with timeout (up to 3 seconds)
+    // Wait for navigation callback with timeout (up to 4 seconds to account for delay)
     val startTime = System.currentTimeMillis()
-    while (!homeCalled && !signInCalled && (System.currentTimeMillis() - startTime) < 3000) {
-      Thread.sleep(50)
+    while (!homeCalled.get() &&
+        !signInCalled.get() &&
+        (System.currentTimeMillis() - startTime) < 4000) {
+      Thread.sleep(100)
     }
 
     // Verify navigation occurred
-    assertTrue("Should navigate to home when signed in", homeCalled)
-    assertFalse("Should not navigate to sign in when signed in", signInCalled)
+    assertTrue("Should navigate to home when signed in", homeCalled.get())
+    assertFalse("Should not navigate to sign in when signed in", signInCalled.get())
   }
 
   @Test
   fun opening_screen_navigates_to_signin_after_delay_when_idle() {
-    var homeCalled = false
-    var signInCalled = false
+    val homeCalled = AtomicBoolean(false)
+    val signInCalled = AtomicBoolean(false)
 
     composeRule.setContent {
       MaterialTheme {
         OpeningScreen(
             authState = AuthUiState.Idle,
-            onNavigateToSignIn = { signInCalled = true },
-            onNavigateToHome = { homeCalled = true })
+            onNavigateToSignIn = { signInCalled.set(true) },
+            onNavigateToHome = { homeCalled.set(true) })
       }
     }
 
@@ -153,31 +156,33 @@ class OpeningScreenTest {
         .onNodeWithContentDescription(OpeningScreenTestConstants.OPENING_SCREEN_CONTENT_DESCRIPTION)
         .assertIsDisplayed()
 
-    // Wait for Compose to be idle
+    // Wait for Compose to be idle to ensure LaunchedEffect starts
     composeRule.waitForIdle()
 
-    // Wait for navigation callback with timeout (up to 3 seconds)
+    // Wait for navigation callback with timeout (up to 4 seconds to account for delay)
     val startTime = System.currentTimeMillis()
-    while (!homeCalled && !signInCalled && (System.currentTimeMillis() - startTime) < 3000) {
-      Thread.sleep(50)
+    while (!homeCalled.get() &&
+        !signInCalled.get() &&
+        (System.currentTimeMillis() - startTime) < 4000) {
+      Thread.sleep(100)
     }
 
     // Verify navigation occurred
-    assertTrue("Should navigate to sign in when idle", signInCalled)
-    assertFalse("Should not navigate to home when idle", homeCalled)
+    assertTrue("Should navigate to sign in when idle", signInCalled.get())
+    assertFalse("Should not navigate to home when idle", homeCalled.get())
   }
 
   @Test
   fun opening_screen_navigates_to_signin_after_delay_when_loading() {
-    var homeCalled = false
-    var signInCalled = false
+    val homeCalled = AtomicBoolean(false)
+    val signInCalled = AtomicBoolean(false)
 
     composeRule.setContent {
       MaterialTheme {
         OpeningScreen(
             authState = AuthUiState.Loading(AuthProvider.MICROSOFT),
-            onNavigateToSignIn = { signInCalled = true },
-            onNavigateToHome = { homeCalled = true })
+            onNavigateToSignIn = { signInCalled.set(true) },
+            onNavigateToHome = { homeCalled.set(true) })
       }
     }
 
@@ -186,31 +191,33 @@ class OpeningScreenTest {
         .onNodeWithContentDescription(OpeningScreenTestConstants.OPENING_SCREEN_CONTENT_DESCRIPTION)
         .assertIsDisplayed()
 
-    // Wait for Compose to be idle
+    // Wait for Compose to be idle to ensure LaunchedEffect starts
     composeRule.waitForIdle()
 
-    // Wait for navigation callback with timeout (up to 3 seconds)
+    // Wait for navigation callback with timeout (up to 4 seconds to account for delay)
     val startTime = System.currentTimeMillis()
-    while (!homeCalled && !signInCalled && (System.currentTimeMillis() - startTime) < 3000) {
-      Thread.sleep(50)
+    while (!homeCalled.get() &&
+        !signInCalled.get() &&
+        (System.currentTimeMillis() - startTime) < 4000) {
+      Thread.sleep(100)
     }
 
     // Verify navigation occurred
-    assertTrue("Should navigate to sign in when loading", signInCalled)
-    assertFalse("Should not navigate to home when loading", homeCalled)
+    assertTrue("Should navigate to sign in when loading", signInCalled.get())
+    assertFalse("Should not navigate to home when loading", homeCalled.get())
   }
 
   @Test
   fun opening_screen_navigates_to_signin_after_delay_when_error() {
-    var homeCalled = false
-    var signInCalled = false
+    val homeCalled = AtomicBoolean(false)
+    val signInCalled = AtomicBoolean(false)
 
     composeRule.setContent {
       MaterialTheme {
         OpeningScreen(
             authState = AuthUiState.Error("Test error"),
-            onNavigateToSignIn = { signInCalled = true },
-            onNavigateToHome = { homeCalled = true })
+            onNavigateToSignIn = { signInCalled.set(true) },
+            onNavigateToHome = { homeCalled.set(true) })
       }
     }
 
@@ -219,17 +226,19 @@ class OpeningScreenTest {
         .onNodeWithContentDescription(OpeningScreenTestConstants.OPENING_SCREEN_CONTENT_DESCRIPTION)
         .assertIsDisplayed()
 
-    // Wait for Compose to be idle
+    // Wait for Compose to be idle to ensure LaunchedEffect starts
     composeRule.waitForIdle()
 
-    // Wait for navigation callback with timeout (up to 3 seconds)
+    // Wait for navigation callback with timeout (up to 4 seconds to account for delay)
     val startTime = System.currentTimeMillis()
-    while (!homeCalled && !signInCalled && (System.currentTimeMillis() - startTime) < 3000) {
-      Thread.sleep(50)
+    while (!homeCalled.get() &&
+        !signInCalled.get() &&
+        (System.currentTimeMillis() - startTime) < 4000) {
+      Thread.sleep(100)
     }
 
     // Verify navigation occurred
-    assertTrue("Should navigate to sign in when error", signInCalled)
-    assertFalse("Should not navigate to home when error", homeCalled)
+    assertTrue("Should navigate to sign in when error", signInCalled.get())
+    assertFalse("Should not navigate to home when error", homeCalled.get())
   }
 }
