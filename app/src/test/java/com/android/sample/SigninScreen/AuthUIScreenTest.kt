@@ -10,7 +10,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.waitForIdle
 import com.android.sample.authentification.AuthProvider
 import com.android.sample.authentification.AuthTags
 import com.android.sample.authentification.AuthUIScreen
