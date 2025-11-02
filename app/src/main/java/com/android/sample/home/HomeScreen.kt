@@ -33,6 +33,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.android.sample.Chat.ChatMessage
 import com.android.sample.R
 import kotlinx.coroutines.launch
 
@@ -246,29 +247,27 @@ fun HomeScreen(
                         modifier = Modifier.padding(horizontal = 16.dp))
                   }
             }) { padding ->
-              // Contenu central (placeholder visuel)
               Box(
                   modifier = Modifier.fillMaxSize().padding(padding).background(Color.Black),
                   contentAlignment = Alignment.Center) {
-                    // Ici tu pourras afficher un dashboard, une timeline, etc.
-                    LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                      if (ui.isSending) {
-                        item {
-                          ThinkingIndicator(
-                              modifier =
-                                  Modifier.fillMaxWidth()
-                                      .padding(vertical = 8.dp)
-                                      .testTag("home_thinking_indicator"))
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                          items(items = ui.messages, key = { it.id }) { item ->
+                            ChatMessage(message = item, modifier = Modifier.fillMaxWidth())
+                          }
+
+                          if (ui.isSending) {
+                            item {
+                              Spacer(Modifier.height(6.dp))
+                              ThinkingIndicator(
+                                  modifier =
+                                      Modifier.fillMaxWidth()
+                                          .padding(vertical = 8.dp)
+                                          .testTag("home_thinking_indicator"))
+                            }
+                          }
                         }
-                      }
-                      items(ui.recent) { item ->
-                        Text(
-                            text = item.title,
-                            color = Color.White,
-                            fontSize = 14.sp,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
-                      }
-                    }
                   }
             }
       }

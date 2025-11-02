@@ -3,6 +3,8 @@ package com.android.sample.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.sample.BuildConfig
+import com.android.sample.Chat.ChatType
+import com.android.sample.Chat.ChatUIModel
 import com.google.firebase.functions.FirebaseFunctions
 import java.util.UUID
 import kotlin.getValue
@@ -32,21 +34,7 @@ class HomeViewModel : ViewModel() {
                       SystemItem(id = "mail", name = "EPFL Mail", isConnected = false),
                       SystemItem(id = "drive", name = "EPFL Drive", isConnected = true),
                   ),
-              recent =
-                  listOf(
-                      ActionItem(
-                          id = UUID.randomUUID().toString(),
-                          title = "Posted a question on Ed Discussion",
-                          time = "2h ago"),
-                      ActionItem(
-                          id = UUID.randomUUID().toString(),
-                          title = "Synced notes with EPFL Drive",
-                          time = "Yesterday"),
-                      ActionItem(
-                          id = UUID.randomUUID().toString(),
-                          title = "Checked IS-Academia timetable",
-                          time = "2 days ago"),
-                  )))
+              messages = emptyList()))
   val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
   // private val endpoint = "http://10.0.2.2:5001/euler-e8edb/us-central1/answerWithRagHttp"
   // private val apiKey = "db8e16080302b511c256794b26a6e80089c80e1c15b7927193e754b7fd87fc4e"
@@ -77,27 +65,32 @@ class HomeViewModel : ViewModel() {
     val msg = current.messageDraft.trim()
     if (msg.isEmpty()) return
 
-    val userAction =
-        ActionItem(UUID.randomUUID().toString(), title = "You: \"$msg\"", time = "Just now")
+    val now = System.currentTimeMillis()
+    val userMsg =
+        ChatUIModel(
+            id = UUID.randomUUID().toString(), text = msg, timestamp = now, type = ChatType.USER)
 
-    // Start sending
     _uiState.value =
-        current.copy(
-            recent = listOf(userAction) + current.recent, isSending = true, messageDraft = "")
+        current.copy(messages = current.messages + userMsg, messageDraft = "", isSending = true)
 
     viewModelScope.launch {
       try {
         val answer = callAnswerWithRag(msg)
-        val botAction =
-            ActionItem(UUID.randomUUID().toString(), title = "EULER: $answer", time = "Just now")
-        _uiState.value = _uiState.value.copy(recent = listOf(botAction) + _uiState.value.recent)
+        val aiMsg =
+            ChatUIModel(
+                id = UUID.randomUUID().toString(),
+                text = answer,
+                timestamp = System.currentTimeMillis(),
+                type = ChatType.AI)
+        _uiState.value = _uiState.value.copy(messages = _uiState.value.messages + aiMsg)
       } catch (e: Exception) {
-        val errAction =
-            ActionItem(
-                UUID.randomUUID().toString(),
-                title = "Error: ${e.message ?: "request failed"}",
-                time = "Just now")
-        _uiState.value = _uiState.value.copy(recent = listOf(errAction) + _uiState.value.recent)
+        val errMsg =
+            ChatUIModel(
+                id = UUID.randomUUID().toString(),
+                text = "Error: ${e.message ?: "request failed"}",
+                timestamp = System.currentTimeMillis(),
+                type = ChatType.AI)
+        _uiState.value = _uiState.value.copy(messages = _uiState.value.messages + errMsg)
       } finally {
         // ALWAYS stop sending
         _uiState.value = _uiState.value.copy(isSending = false)
@@ -118,7 +111,7 @@ class HomeViewModel : ViewModel() {
   }
 
   fun clearChat() {
-    _uiState.value = _uiState.value.copy(recent = emptyList())
+    _uiState.value = _uiState.value.copy(messages = emptyList())
   }
 
   fun showDeleteConfirmation() {
