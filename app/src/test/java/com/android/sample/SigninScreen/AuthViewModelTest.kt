@@ -13,9 +13,18 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class AuthViewModelTest {
 
+  private fun createViewModel(): AuthViewModel {
+    // The ViewModel's property initializers catch IllegalStateException from Firebase
+    // and set auth/firestore to null, which results in Error state
+    // In unit tests, Firebase is not initialized, so this exception is expected
+    // The try-catch in the ViewModel should handle it gracefully
+    // If it doesn't, we'll see the actual error from the test failure
+    return AuthViewModel()
+  }
+
   @Test
   fun AuthViewModel_initial_state_is_Idle_or_Error() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     val initialState = viewModel.state.first()
     assertTrue(
         "Initial state should be Idle or Error (if Firebase not initialized)",
@@ -24,7 +33,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_onMicrosoftLoginClick_sets_Loading_state() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     // Wait for initial state
     viewModel.state.first()
 
@@ -39,7 +48,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_onMicrosoftLoginClick_does_not_change_if_already_loading() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     viewModel.onMicrosoftLoginClick()
@@ -53,7 +62,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_onSwitchEduLoginClick_starts_sign_in() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     viewModel.onSwitchEduLoginClick()
@@ -67,7 +76,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_onSwitchEduLoginClick_does_not_change_if_already_loading() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     viewModel.onMicrosoftLoginClick()
@@ -81,7 +90,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_onAuthenticationSuccess_sets_SignedIn_state() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     viewModel.onAuthenticationSuccess()
@@ -92,7 +101,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_onAuthenticationError_sets_Error_state() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     val errorMessage = "Test error message"
@@ -107,7 +116,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_onAuthenticationError_with_empty_message() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     viewModel.onAuthenticationError("")
@@ -121,7 +130,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_onAuthenticationError_with_long_message() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     val longMessage = "A".repeat(1000)
@@ -136,7 +145,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_signOut_sets_Idle_state() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     viewModel.signOut()
@@ -147,7 +156,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_signOut_works_from_SignedIn_state() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     viewModel.onAuthenticationSuccess()
@@ -162,7 +171,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_signOut_works_from_Error_state() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     viewModel.onAuthenticationError("Error")
@@ -177,7 +186,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_state_transitions_from_Idle_to_Loading() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     val initialState = viewModel.state.first()
 
     viewModel.onMicrosoftLoginClick()
@@ -188,7 +197,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_state_transitions_from_Loading_to_SignedIn() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     viewModel.onMicrosoftLoginClick()
@@ -202,7 +211,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_state_transitions_from_Loading_to_Error() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     viewModel.onMicrosoftLoginClick()
@@ -216,7 +225,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_state_transitions_from_Error_to_SignedIn() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     viewModel.onAuthenticationError("Error")
@@ -230,7 +239,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_SWITCH_EDU_loading_completes_to_SignedIn() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     viewModel.onSwitchEduLoginClick()
@@ -253,7 +262,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_multiple_error_messages() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     viewModel.onAuthenticationError("Error 1")
@@ -273,7 +282,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_can_retry_after_error() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     viewModel.onAuthenticationError("Error")
@@ -287,7 +296,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_can_retry_after_signout() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     viewModel.onAuthenticationSuccess()
@@ -305,13 +314,13 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_state_flow_is_not_null() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     assertNotNull(viewModel.state)
   }
 
   @Test
   fun AuthViewModel_state_flow_provides_current_value() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     val state = viewModel.state.first()
     assertNotNull(state)
     assertTrue(state is AuthUiState)
@@ -319,7 +328,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_can_handle_multiple_rapid_clicks() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     // Rapid clicks should only result in one loading state
@@ -336,7 +345,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_provider_separation_MICROSOFT_vs_SWITCH_EDU() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     viewModel.onMicrosoftLoginClick()
@@ -359,7 +368,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_error_message_preserves_unicode() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     val unicodeMessage = "Erreur: émoji 🚀"
@@ -374,7 +383,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_error_message_preserves_newlines() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     val multilineMessage = "Line 1\nLine 2\nLine 3"
@@ -389,7 +398,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_state_changes_are_reflected_in_flow() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     val states = mutableListOf<AuthUiState>()
 
     states.add(viewModel.state.first())
@@ -409,7 +418,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_SWITCH_EDU_provider_creates_correct_loading_state() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     viewModel.onSwitchEduLoginClick()
@@ -424,7 +433,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_MICROSOFT_provider_creates_correct_loading_state() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     viewModel.onMicrosoftLoginClick()
@@ -439,7 +448,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_signOut_from_Idle_stays_Idle() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     val initialState = viewModel.state.first()
 
     viewModel.signOut()
@@ -450,7 +459,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_complete_flow_idle_to_signedin() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     // Idle -> Loading -> SignedIn
@@ -465,7 +474,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_complete_flow_with_error() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     // Idle -> Loading -> Error -> Idle (via signOut)
@@ -484,7 +493,7 @@ class AuthViewModelTest {
 
   @Test
   fun AuthViewModel_error_can_be_cleared_by_success() = runTest {
-    val viewModel = AuthViewModel()
+    val viewModel = createViewModel()
     viewModel.state.first()
 
     viewModel.onAuthenticationError("Error")
