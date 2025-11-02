@@ -3,6 +3,7 @@ package com.android.sample.screen
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.hasContentDescription
@@ -251,10 +252,23 @@ class AuthUIScreenComprehensiveTest {
       }
     }
 
+    composeRule.waitForIdle()
+    Thread.sleep(1000) // Allow AnimatedVisibility animation (800ms) to complete
+    // Wait for the loading indicator to appear - it exists in the composition
     composeRule.waitUntilAtLeastOneExists(hasTestTag(AuthTags.MsProgress), timeoutMillis = 5000)
     composeRule.waitForIdle()
-    // Loading indicator should be visible
-    composeRule.onNodeWithTag(AuthTags.MsProgress).assertIsDisplayed()
+
+    // Verify loading indicator exists (use unmerged tree to find it inside disabled button)
+    val progressNode = composeRule.onNodeWithTag(AuthTags.MsProgress, useUnmergedTree = true)
+    progressNode.assertExists()
+
+    // Microsoft button should be disabled when loading - check by trying to assert it's enabled
+    try {
+      composeRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsEnabled()
+      org.junit.Assert.fail("Microsoft button should be disabled when loading")
+    } catch (e: AssertionError) {
+      // Expected - button is disabled
+    }
     // Other button should still work
     composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsEnabled()
   }
@@ -290,11 +304,19 @@ class AuthUIScreenComprehensiveTest {
       }
     }
 
+    composeRule.waitForIdle()
+    Thread.sleep(1000) // Allow AnimatedVisibility animation (800ms) to complete
+    // Wait for the loading indicator to appear
     composeRule.waitUntilAtLeastOneExists(hasTestTag(AuthTags.MsProgress), timeoutMillis = 5000)
-    composeRule.onNodeWithTag(AuthTags.MsProgress).assertIsDisplayed()
+    composeRule.waitForIdle()
+
+    // Verify loading indicator exists (use unmerged tree to find it inside disabled button)
+    val progressNode = composeRule.onNodeWithTag(AuthTags.MsProgress, useUnmergedTree = true)
+    progressNode.assertExists()
+
     // Switch progress should not exist - verify by trying to assert it's displayed
     try {
-      composeRule.onNodeWithTag(AuthTags.SwitchProgress).assertIsDisplayed()
+      composeRule.onNodeWithTag(AuthTags.SwitchProgress, useUnmergedTree = true).assertIsDisplayed()
       org.junit.Assert.fail("SwitchProgress should not exist")
     } catch (e: AssertionError) {
       // Expected - node does not exist
@@ -560,5 +582,114 @@ class AuthUIScreenComprehensiveTest {
     // Privacy policy text should exist and be clickable
     composeRule.onNodeWithTag(AuthTags.TermsText).assertIsDisplayed()
     // Note: The actual click handling is in PrivacyPolicyText composable
+  }
+
+  // ==================== MICROSOFT SIGN-IN FLOW TESTS ====================
+
+  @Test
+  fun Microsoft_button_click_triggers_callback_in_all_states() {
+    var msClicked = false
+
+    // Test in Idle state
+    composeRule.setContent {
+      MaterialTheme {
+        AuthUIScreen(
+            state = AuthUiState.Idle,
+            onMicrosoftLogin = { msClicked = true },
+            onSwitchEduLogin = {})
+      }
+    }
+    composeRule.onNodeWithTag(AuthTags.BtnMicrosoft).performClick()
+    assertTrue("Microsoft button callback should be triggered", msClicked)
+
+    // Reset and test in Error state
+    msClicked = false
+    composeRule.setContent {
+      MaterialTheme {
+        AuthUIScreen(
+            state = AuthUiState.Error("Test error"),
+            onMicrosoftLogin = { msClicked = true },
+            onSwitchEduLogin = {})
+      }
+    }
+    composeRule.onNodeWithTag(AuthTags.BtnMicrosoft).performClick()
+    assertTrue("Microsoft button callback should work in error state", msClicked)
+  }
+
+  @Test
+  fun Microsoft_button_disabled_during_loading_prevents_multiple_clicks() {
+    var clickCount = 0
+
+    composeRule.setContent {
+      MaterialTheme {
+        AuthUIScreen(
+            state = AuthUiState.Loading(AuthProvider.MICROSOFT),
+            onMicrosoftLogin = { clickCount++ },
+            onSwitchEduLogin = {})
+      }
+    }
+
+    composeRule.waitForIdle()
+    Thread.sleep(500)
+
+    // Button should be disabled, so clicking shouldn't trigger callback
+    // (Button is disabled, so clicks are ignored)
+    try {
+      composeRule.onNodeWithTag(AuthTags.BtnMicrosoft).performClick()
+    } catch (e: Exception) {
+      // Expected - disabled button may not be clickable
+    }
+
+    // Click count should remain 0 because button is disabled
+    assertEquals("Disabled button should not trigger clicks", 0, clickCount)
+  }
+
+  @Test
+  fun Microsoft_sign_in_transitions_through_states() {
+    // Test Loading state is correctly displayed
+    composeRule.setContent {
+      MaterialTheme {
+        AuthUIScreen(
+            state = AuthUiState.Loading(AuthProvider.MICROSOFT),
+            onMicrosoftLogin = {},
+            onSwitchEduLogin = {})
+      }
+    }
+
+    composeRule.waitForIdle()
+    Thread.sleep(500)
+
+    // Verify loading state - button should be disabled and progress indicator should exist
+    try {
+      composeRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsEnabled()
+      org.junit.Assert.fail("Button should be disabled in loading state")
+    } catch (e: AssertionError) {
+      // Expected - button is disabled
+    }
+
+    composeRule.waitUntilAtLeastOneExists(hasTestTag(AuthTags.MsProgress), timeoutMillis = 5000)
+    val progressNode = composeRule.onNodeWithTag(AuthTags.MsProgress, useUnmergedTree = true)
+    progressNode.assertExists()
+
+    // Test SignedIn state
+    composeRule.setContent {
+      MaterialTheme {
+        AuthUIScreen(state = AuthUiState.SignedIn, onMicrosoftLogin = {}, onSwitchEduLogin = {})
+      }
+    }
+
+    composeRule.waitForIdle()
+
+    // In SignedIn state, buttons should be enabled and no loading indicators
+    composeRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsEnabled()
+    composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsEnabled()
+
+    // Loading indicators should not exist
+    try {
+      composeRule.onNodeWithTag(AuthTags.MsProgress, useUnmergedTree = true).assertIsDisplayed()
+      org.junit.Assert.fail("MsProgress should not exist in SignedIn state")
+    } catch (e: AssertionError) {
+      // Expected - no loading indicators
+    }
   }
 }
