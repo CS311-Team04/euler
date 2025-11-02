@@ -24,8 +24,7 @@ class HomeScreenTestCov {
 
   private val testDispatcher = StandardTestDispatcher()
 
-  @get:Rule
-  val composeTestRule = createComposeRule()
+  @get:Rule val composeTestRule = createComposeRule()
 
   // ----------- BASIC VISIBILITY TESTS -----------
 
@@ -90,18 +89,19 @@ class HomeScreenTestCov {
   // ----------- STATE & ENABLEMENT -----------
 
   @Test
-  fun sending_disables_buttons_and_field() = runTest(testDispatcher) {
-    val vm = HomeViewModel()
-    composeTestRule.setContent { MaterialTheme { HomeScreen(viewModel = vm) } }
+  fun sending_disables_buttons_and_field() =
+      runTest(testDispatcher) {
+        val vm = HomeViewModel()
+        composeTestRule.setContent { MaterialTheme { HomeScreen(viewModel = vm) } }
 
-    vm.updateMessageDraft("Sending...")
-    vm.sendMessage()
-    composeTestRule.waitForIdle()
+        vm.updateMessageDraft("Sending...")
+        vm.sendMessage()
+        composeTestRule.waitForIdle()
 
-    composeTestRule.onNodeWithTag(HomeTags.MicBtn).assertExists()
-    composeTestRule.onNodeWithTag(HomeTags.MessageField).assertExists()
-    assertTrue(vm.uiState.value.isSending)
-  }
+        composeTestRule.onNodeWithTag(HomeTags.MicBtn).assertExists()
+        composeTestRule.onNodeWithTag(HomeTags.MessageField).assertExists()
+        assertTrue(vm.uiState.value.isSending)
+      }
 
   @Test
   fun send_button_triggers_onSendMessage_and_clears_draft() {
@@ -111,10 +111,12 @@ class HomeScreenTestCov {
 
     composeTestRule.setContent {
       MaterialTheme {
-        HomeScreen(viewModel = vm, onSendMessage = {
-          called = true
-          textSent = it
-        })
+        HomeScreen(
+            viewModel = vm,
+            onSendMessage = {
+              called = true
+              textSent = it
+            })
       }
     }
 
@@ -200,4 +202,3 @@ class HomeScreenTestCov {
     composeTestRule.onNodeWithTag(HomeTags.MicBtn).assertIsDisplayed()
   }
 }
-
