@@ -584,10 +584,9 @@ class AuthUIScreenComprehensiveTest {
   // ==================== MICROSOFT SIGN-IN FLOW TESTS ====================
 
   @Test
-  fun Microsoft_button_click_triggers_callback_in_all_states() {
+  fun Microsoft_button_click_triggers_callback_in_idle_state() {
     var msClicked = false
 
-    // Test in Idle state
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(
@@ -598,9 +597,12 @@ class AuthUIScreenComprehensiveTest {
     }
     composeRule.onNodeWithTag(AuthTags.BtnMicrosoft).performClick()
     assertTrue("Microsoft button callback should be triggered", msClicked)
+  }
 
-    // Reset and test in Error state
-    msClicked = false
+  @Test
+  fun Microsoft_button_click_triggers_callback_in_error_state() {
+    var msClicked = false
+
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(
@@ -642,7 +644,7 @@ class AuthUIScreenComprehensiveTest {
   }
 
   @Test
-  fun Microsoft_sign_in_transitions_through_states() {
+  fun Microsoft_loading_state_disables_button_and_shows_progress() {
     // Test Loading state is correctly displayed
     composeRule.setContent {
       MaterialTheme {
@@ -667,8 +669,10 @@ class AuthUIScreenComprehensiveTest {
     composeRule.waitUntilAtLeastOneExists(hasTestTag(AuthTags.MsProgress), timeoutMillis = 5000)
     // waitUntilAtLeastOneExists already confirmed the node exists
     composeRule.onNodeWithTag(AuthTags.MsProgress, useUnmergedTree = true)
+  }
 
-    // Test SignedIn state
+  @Test
+  fun Microsoft_signed_in_state_enables_buttons_and_hides_loading() {
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.SignedIn, onMicrosoftLogin = {}, onSwitchEduLogin = {})
