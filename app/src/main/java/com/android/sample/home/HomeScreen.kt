@@ -50,6 +50,20 @@ object HomeTags {
   const val TopRightMenu = "home_topright_menu"
 }
 
+/**
+ * Entry screen for the chat experience.
+ *
+ * Responsibilities:
+ * - Hosts the top app bar, navigation drawer, message input, and the chat message list.
+ * - Renders messages from [HomeViewModel.uiState] (see [HomeUiState.messages]).
+ * - Shows a global “thinking” indicator after the last user message when [HomeUiState.isSending] is
+ *   true.
+ *
+ * Key behaviors:
+ * - Drawer open/close state is synchronized with the ViewModel.
+ * - Send button animates between idle/sending/disabled states.
+ * - Chat list uses spacing and stable keys for smooth updates.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -67,7 +81,7 @@ fun HomeScreen(
   val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
   val scope = rememberCoroutineScope()
 
-  // Synchronise l'état ViewModel <-> composant Drawer
+  // Keep drawer UI and ViewModel in sync.
   LaunchedEffect(ui.isDrawerOpen) {
     if (ui.isDrawerOpen && !drawerState.isOpen) {
       drawerState.open()
@@ -91,8 +105,7 @@ fun HomeScreen(
             ui = ui,
             onToggleSystem = { id -> viewModel.toggleSystemConnection(id) },
             onSignOut = {
-              // TODO: brancher ton sign-out réel
-              // Ferme le drawer visuellement + sync VM
+              // Close drawer visually then propagate sign out.
               scope.launch { drawerState.close() }
               if (ui.isDrawerOpen) viewModel.toggleDrawer()
               onSignOut()
@@ -146,7 +159,7 @@ fun HomeScreen(
                               modifier = Modifier.size(24.dp))
                         }
 
-                    // Menu haut-droite (placeholder)
+                    // Simple overflow menu.
                     DropdownMenu(
                         expanded = ui.isTopRightOpen,
                         onDismissRequest = { viewModel.setTopRightOpen(false) },
@@ -167,7 +180,7 @@ fun HomeScreen(
               Column(
                   Modifier.fillMaxWidth().background(Color.Black).padding(bottom = 16.dp),
                   horizontalAlignment = Alignment.CenterHorizontally) {
-                    // Boutons d'action
+                    // Quick action buttons.
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -185,7 +198,7 @@ fun HomeScreen(
 
                     Spacer(Modifier.height(16.dp))
 
-                    // Champ de message branché au ViewModel
+                    // Message input bound to ViewModel state.
                     OutlinedTextField(
                         value = ui.messageDraft,
                         onValueChange = { viewModel.updateMessageDraft(it) },
@@ -247,6 +260,7 @@ fun HomeScreen(
                         modifier = Modifier.padding(horizontal = 16.dp))
                   }
             }) { padding ->
+              // Chat content: list of messages + thinking indicator at the end while sending.
               Box(
                   modifier = Modifier.fillMaxSize().padding(padding).background(Color.Black),
                   contentAlignment = Alignment.Center) {
@@ -257,6 +271,7 @@ fun HomeScreen(
                             ChatMessage(message = item, modifier = Modifier.fillMaxWidth())
                           }
 
+                          // Global thinking indicator shown AFTER the last user message.
                           if (ui.isSending) {
                             item {
                               Spacer(Modifier.height(6.dp))
@@ -272,7 +287,7 @@ fun HomeScreen(
             }
       }
 
-  // Delete Confirmation Modal
+  // Delete confirmation dialog layered over the screen.
   AnimatedVisibility(
       visible = ui.showDeleteConfirmation,
       enter = fadeIn(tween(200)),
@@ -287,6 +302,7 @@ fun HomeScreen(
       }
 }
 
+/** Compact, rounded action button used in the bottom actions row. */
 @Composable
 private fun ActionButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
   Button(
@@ -297,8 +313,6 @@ private fun ActionButton(label: String, modifier: Modifier = Modifier, onClick: 
         Text(label, color = Color.White, textAlign = TextAlign.Center)
       }
 }
-
-/* ----- Placeholders pour compo externes (drawer + panneau top-right) ----- */
 
 @Composable
 private fun TopRightPanelPlaceholder(onDismiss: () -> Unit, onDeleteClick: () -> Unit) {
@@ -311,6 +325,10 @@ private fun TopRightPanelPlaceholder(onDismiss: () -> Unit, onDeleteClick: () ->
       })
 }
 
+/**
+ * Modal shown to confirm clearing the chat history. Exposes two testTags: "home_delete_cancel" and
+ * "home_delete_confirm" on buttons.
+ */
 @Composable
 private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit) {
   Box(
@@ -367,6 +385,10 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
       }
 }
 
+/**
+ * Small inline indicator shown while awaiting an AI reply. Driven by HomeUiState.isSending and
+ * rendered after the last message in the list.
+ */
 @Composable
 private fun ThinkingIndicator(modifier: Modifier = Modifier) {
   var dots by remember { mutableStateOf(0) }
@@ -393,6 +415,11 @@ private fun ThinkingIndicator(modifier: Modifier = Modifier) {
       }
 }
 
+/**
+ * Animated circular send button used inside the text field.
+ * - Enlarges slightly when enabled, shows a spinner when sending.
+ * - Disabled when the draft is blank or a send is in progress.
+ */
 @Composable
 private fun BubbleSendButton(
     enabled: Boolean,

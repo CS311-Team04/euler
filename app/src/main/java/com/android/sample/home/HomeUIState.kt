@@ -3,8 +3,8 @@ package com.android.sample.home
 import com.android.sample.Chat.ChatUIModel
 
 /**
- * Photo immuable de tout ce que la HomeScreen doit afficher à un instant t. Un changement = on crée
- * une nouvelle copie via copy(...)
+ * Immutable snapshot of everything the HomeScreen needs to render at a given time. Any UI change
+ * produces a new instance via copy(...).
  */
 data class HomeUiState(
     val userName: String = "Student",
@@ -18,8 +18,11 @@ data class HomeUiState(
     val isSending: Boolean = false
 )
 
-/** Représente un système EPFL (IS-Academia, Moodle, Drive, etc.) et son état de connexion. */
+/** Represents an EPFL system (e.g., IS-Academia, Moodle, Drive) and its connection state. */
 data class SystemItem(val id: String, val name: String, val isConnected: Boolean)
 
-/** Représente une entrée dans la timeline des actions récentes. */
+/**
+ * Legacy timeline entry used before migrating to message-based chat. Kept temporarily for backward
+ * compatibility in tests or old screens.
+ */
 data class ActionItem(val id: String, val title: String, val time: String)

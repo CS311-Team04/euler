@@ -19,6 +19,26 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+/**
+ * Renders a single chat message as either:
+ * - a right-aligned grey "bubble" for user messages, or
+ * - a full-width, background-less paragraph for AI messages.
+ *
+ * This composable is presentation-only: it consumes a [ChatUIModel] that must already encode the
+ * message role (see [ChatType]) and the display text.
+ *
+ * ### Testing
+ * - User bubble node is tagged with `chat_user_bubble`
+ * - User text node is tagged with `chat_user_text`
+ * - AI text node is tagged with `chat_ai_text`
+ *
+ * @param message The UI model for the message (text + role).
+ * @param modifier Optional [Modifier] for the outer layout node of this message.
+ * @param userBubbleBg Background color for the user bubble.
+ * @param userBubbleText Text color for the user bubble content.
+ * @param aiText Text color for the AI paragraph.
+ * @param maxUserBubbleWidthFraction Maximum width fraction for the user bubble (0 < f ≤ 1).
+ */
 @Composable
 fun ChatMessage(
     message: ChatUIModel,
@@ -31,6 +51,7 @@ fun ChatMessage(
   val isUser = message.type == ChatType.USER
 
   if (isUser) {
+    // ---- USER: right-aligned grey bubble ----
     Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
       Box(modifier = Modifier.fillMaxWidth(maxUserBubbleWidthFraction)) {
         Surface(
@@ -53,6 +74,7 @@ fun ChatMessage(
       }
     }
   } else {
+    // ---- AI: plain paragraph, full content width ----
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
       Text(
           text = message.text,
