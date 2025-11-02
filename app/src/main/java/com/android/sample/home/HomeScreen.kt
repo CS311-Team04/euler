@@ -4,6 +4,11 @@ import androidx.compose.animation.*
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -14,7 +19,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Send
@@ -27,7 +31,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -185,41 +192,170 @@ fun HomeScreen(
                     Spacer(Modifier.height(16.dp))
 
                     // Champ de message branché au ViewModel
+                    val canSend = ui.messageDraft.isNotBlank() && !ui.isSending
+                    val isEmpty = ui.messageDraft.isBlank()
+                    
                     OutlinedTextField(
                         value = ui.messageDraft,
                         onValueChange = { viewModel.updateMessageDraft(it) },
-                        placeholder = { Text("Message EULER", color = Color.Gray) },
+                        placeholder = { Text("Ask Anything", color = Color.Gray) },
                         modifier =
                             Modifier.fillMaxWidth()
                                 .padding(horizontal = 16.dp)
                                 .height(60.dp)
                                 .testTag(HomeTags.MessageField),
                         enabled = !ui.isSending,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(
+                            onSend = {
+                                // Action visuelle uniquement - pas d'envoi réel
+                                // if (canSend) {
+                                //   onSendMessage(ui.messageDraft)
+                                //   viewModel.sendMessage()
+                                // }
+                            }
+                        ),
                         trailingIcon = {
-                          Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                          Row(horizontalArrangement = Arrangement.spacedBy(4.dp), 
+                               verticalAlignment = Alignment.CenterVertically,
+                               modifier = Modifier.height(40.dp)) {
+                            // Bouton Dictate (microphone) - toujours visible
                             IconButton(
                                 onClick = {
                                   speechHelper?.startListening { recognized ->
                                     viewModel.updateMessageDraft(recognized)
                                   }
                                 },
-                                enabled = speechHelper != null,
-                                modifier = Modifier.testTag(HomeTags.MicBtn)) {
-                                  Icon(
-                                      Icons.Default.Call,
-                                      contentDescription = "Speak",
-                                      tint = Color.Gray)
-                                }
-                            val canSend = ui.messageDraft.isNotBlank() && !ui.isSending
-                            BubbleSendButton(
-                                enabled = canSend,
-                                isSending = ui.isSending,
-                                onClick = {
-                                  if (canSend) {
-                                    onSendMessage(ui.messageDraft)
-                                    viewModel.sendMessage()
+                                enabled = speechHelper != null && !ui.isSending,
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .testTag(HomeTags.MicBtn)) {
+                                  // Icône microphone exacte (capsule allongée avec support en U inversé)
+                                  Canvas(modifier = Modifier.size(24.dp)) {
+                                      val centerX = size.width / 2
+                                      val centerY = size.height / 2
+                                      val strokeWidth = 2.dp.toPx()
+                                      
+                                      // Tête du micro (capsule allongée/ovale, ouverte en bas)
+                                      val micHeadWidth = size.width * 0.48f
+                                      val micHeadHeight = size.height * 0.52f
+                                      val radius = micHeadWidth / 2.8f
+                                      
+                                      // Dessine la capsule (ovale arrondi, plus large en haut)
+                                      drawOval(
+                                          color = Color.White,
+                                          topLeft = androidx.compose.ui.geometry.Offset(centerX - micHeadWidth/2, centerY - micHeadHeight/2),
+                                          size = androidx.compose.ui.geometry.Size(micHeadWidth, micHeadHeight),
+                                          style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth)
+                                      )
+                                      
+                                      // Support du micro (ligne verticale fine depuis le bas de la capsule)
+                                      val standY = centerY + micHeadHeight/2
+                                      val standHeight = size.height * 0.22f
+                                      drawLine(
+                                          color = Color.White,
+                                          start = androidx.compose.ui.geometry.Offset(centerX, standY),
+                                          end = androidx.compose.ui.geometry.Offset(centerX, standY + standHeight),
+                                          strokeWidth = strokeWidth,
+                                          cap = androidx.compose.ui.graphics.StrokeCap.Round
+                                      )
+                                      
+                                      // Base en forme de U inversé (crescent)
+                                      val baseWidth = micHeadWidth * 0.65f
+                                      val baseY = standY + standHeight
+                                      val baseHeight = 3.dp.toPx()
+                                      
+                                      // Ligne horizontale de base
+                                      drawLine(
+                                          color = Color.White,
+                                          start = androidx.compose.ui.geometry.Offset(centerX - baseWidth/2, baseY),
+                                          end = androidx.compose.ui.geometry.Offset(centerX + baseWidth/2, baseY),
+                                          strokeWidth = strokeWidth,
+                                          cap = androidx.compose.ui.graphics.StrokeCap.Round
+                                      )
+                                      
+                                      // Arcs pour les coins arrondis de la base
+                                      val arcRadius = 2.5.dp.toPx()
+                                      // Côté gauche
+                                      drawArc(
+                                          color = Color.White,
+                                          startAngle = 180f,
+                                          sweepAngle = 90f,
+                                          useCenter = false,
+                                          topLeft = androidx.compose.ui.geometry.Offset(centerX - baseWidth/2 - arcRadius, baseY - arcRadius),
+                                          size = androidx.compose.ui.geometry.Size(arcRadius * 2, arcRadius * 2),
+                                          style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth)
+                                      )
+                                      // Côté droit
+                                      drawArc(
+                                          color = Color.White,
+                                          startAngle = 270f,
+                                          sweepAngle = 90f,
+                                          useCenter = false,
+                                          topLeft = androidx.compose.ui.geometry.Offset(centerX + baseWidth/2 - arcRadius, baseY - arcRadius),
+                                          size = androidx.compose.ui.geometry.Size(arcRadius * 2, arcRadius * 2),
+                                          style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth)
+                                      )
                                   }
-                                })
+                                }
+                            
+                            // Bouton Voice Mode (barres de son) - visible uniquement quand le champ est vide
+                            AnimatedVisibility(
+                                visible = isEmpty,
+                                enter = fadeIn(animationSpec = tween(200)) + scaleIn(initialScale = 0.8f, animationSpec = tween(200)),
+                                exit = fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.8f, animationSpec = tween(200)),
+                                modifier = Modifier
+                            ) {
+                                IconButton(
+                                    onClick = {
+                                      // Voice mode - pas encore implémenté
+                                    },
+                                    enabled = !ui.isSending,
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .testTag("voice_mode_btn")) {
+                                      // Icône barres de son (equalizer)
+                                      Canvas(modifier = Modifier.size(24.dp)) {
+                                          val centerX = size.width / 2
+                                          val centerY = size.height / 2
+                                          val barWidth = 3.dp.toPx()
+                                          val spacing = 4.dp.toPx()
+                                          val maxHeight = size.height * 0.7f
+                                          
+                                          // 4 barres de hauteur variable
+                                          val barHeights = listOf(maxHeight * 0.5f, maxHeight, maxHeight * 0.8f, maxHeight * 0.6f)
+                                          
+                                          barHeights.forEachIndexed { index, height ->
+                                              val x = centerX - (barHeights.size - 1) * spacing / 2 + index * spacing
+                                              val y = centerY - height / 2
+                                              
+                                              drawRect(
+                                                  color = Color.White,
+                                                  topLeft = androidx.compose.ui.geometry.Offset(x - barWidth/2, y),
+                                                  size = androidx.compose.ui.geometry.Size(barWidth, height)
+                                              )
+                                          }
+                                      }
+                                    }
+                            }
+                            
+                            // Bouton Send - affiché uniquement quand il y a du texte
+                            AnimatedVisibility(
+                                visible = !isEmpty,
+                                enter = fadeIn(animationSpec = tween(200)) + scaleIn(initialScale = 0.8f, animationSpec = tween(200)),
+                                exit = fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.8f, animationSpec = tween(200)),
+                                modifier = Modifier
+                            ) {
+                                BubbleSendButton(
+                                    enabled = canSend,
+                                    isSending = ui.isSending,
+                                    onClick = {
+                                      if (canSend) {
+                                        onSendMessage(ui.messageDraft)
+                                        viewModel.sendMessage()
+                                      }
+                                    })
+                            }
                           }
                         },
                         shape = RoundedCornerShape(50),
