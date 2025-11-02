@@ -3,7 +3,6 @@ package com.android.sample.screen
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.hasContentDescription
@@ -258,9 +257,8 @@ class AuthUIScreenComprehensiveTest {
     composeRule.waitUntilAtLeastOneExists(hasTestTag(AuthTags.MsProgress), timeoutMillis = 5000)
     composeRule.waitForIdle()
 
-    // Verify loading indicator exists (use unmerged tree to find it inside disabled button)
-    val progressNode = composeRule.onNodeWithTag(AuthTags.MsProgress, useUnmergedTree = true)
-    progressNode.assertExists()
+    // waitUntilAtLeastOneExists already confirmed the node exists
+    composeRule.onNodeWithTag(AuthTags.MsProgress, useUnmergedTree = true)
 
     // Microsoft button should be disabled when loading - check by trying to assert it's enabled
     try {
@@ -306,13 +304,12 @@ class AuthUIScreenComprehensiveTest {
 
     composeRule.waitForIdle()
     Thread.sleep(1000) // Allow AnimatedVisibility animation (800ms) to complete
-    // Wait for the loading indicator to appear
+    // Wait for the loading indicator to appear - waitUntilAtLeastOneExists confirms it exists
     composeRule.waitUntilAtLeastOneExists(hasTestTag(AuthTags.MsProgress), timeoutMillis = 5000)
     composeRule.waitForIdle()
 
-    // Verify loading indicator exists (use unmerged tree to find it inside disabled button)
-    val progressNode = composeRule.onNodeWithTag(AuthTags.MsProgress, useUnmergedTree = true)
-    progressNode.assertExists()
+    // waitUntilAtLeastOneExists already confirmed the node exists
+    composeRule.onNodeWithTag(AuthTags.MsProgress, useUnmergedTree = true)
 
     // Switch progress should not exist - verify by trying to assert it's displayed
     try {
@@ -668,8 +665,8 @@ class AuthUIScreenComprehensiveTest {
     }
 
     composeRule.waitUntilAtLeastOneExists(hasTestTag(AuthTags.MsProgress), timeoutMillis = 5000)
-    val progressNode = composeRule.onNodeWithTag(AuthTags.MsProgress, useUnmergedTree = true)
-    progressNode.assertExists()
+    // waitUntilAtLeastOneExists already confirmed the node exists
+    composeRule.onNodeWithTag(AuthTags.MsProgress, useUnmergedTree = true)
 
     // Test SignedIn state
     composeRule.setContent {
