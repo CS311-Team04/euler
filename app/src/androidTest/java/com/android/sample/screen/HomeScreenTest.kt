@@ -88,7 +88,7 @@ class HomeScreenTest {
   fun displays_correct_placeholder_text() {
     composeRule.setContent { MaterialTheme { HomeScreen() } }
 
-    composeRule.onNodeWithText(TestConstants.PlaceholderTexts.MESSAGE_EULER).assertIsDisplayed()
+    composeRule.onNodeWithText("Ask Anything").assertIsDisplayed()
   }
 
   @Test
@@ -110,6 +110,9 @@ class HomeScreenTest {
         .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.MORE)
         .get(0)
         .assertIsDisplayed()
+    // Send button only appears when there's text
+    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test")
+    composeRule.waitForIdle()
     composeRule
         .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.SEND)
         .get(0)
@@ -240,7 +243,7 @@ class HomeScreenTest {
   fun message_field_placeholder_is_displayed() {
     composeRule.setContent { MaterialTheme { HomeScreen() } }
 
-    composeRule.onNodeWithText(TestConstants.PlaceholderTexts.MESSAGE_EULER).assertIsDisplayed()
+    composeRule.onNodeWithText("Ask Anything").assertIsDisplayed()
   }
 
   @Test
@@ -282,6 +285,9 @@ class HomeScreenTest {
         .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.MORE)
         .get(0)
         .assertIsDisplayed()
+    // Send button only appears when there's text
+    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test")
+    composeRule.waitForIdle()
     composeRule
         .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.SEND)
         .get(0)
@@ -559,10 +565,10 @@ class HomeScreenTest {
     // Attendre que l'UI soit complètement rendue
     composeRule.waitForIdle()
 
-    // Le bouton devrait exister même quand désactivé
-    // Attendre explicitement qu'il soit disponible (plus robuste pour le CI)
-    composeRule.waitUntilAtLeastOneExists(hasContentDescription("Send"), timeoutMillis = 5000)
-    composeRule.onAllNodesWithContentDescription("Send").get(0).assertIsDisplayed()
+    // Le bouton Send n'apparaît que quand il y a du texte
+    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test")
+    composeRule.waitForIdle()
+    composeRule.onNodeWithTag(HomeTags.SendBtn).assertIsDisplayed()
   }
 
   @Test
@@ -745,7 +751,7 @@ class HomeScreenTest {
   fun placeholder_text_in_message_field() {
     composeRule.setContent { MaterialTheme { HomeScreen() } }
 
-    composeRule.onNodeWithText("Message EULER").assertIsDisplayed()
+    composeRule.onNodeWithText("Ask Anything").assertIsDisplayed()
   }
 
   @Test
@@ -764,6 +770,9 @@ class HomeScreenTest {
 
     composeRule.onAllNodesWithContentDescription("Menu").get(0).assertIsDisplayed()
     composeRule.onAllNodesWithContentDescription("More").get(0).assertIsDisplayed()
+    // Send button only appears when there's text
+    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test")
+    composeRule.waitForIdle()
     composeRule.onAllNodesWithContentDescription("Send").get(0).assertIsDisplayed()
     composeRule.onAllNodesWithContentDescription("Euler").get(0).assertIsDisplayed()
   }
