@@ -18,8 +18,8 @@ class AuthViewModelTest {
     val viewModel = AuthViewModel()
     val initialState = viewModel.state.first()
     assertTrue(
-        initialState is AuthUiState.Idle || initialState is AuthUiState.Error,
-        "Initial state should be Idle or Error (if Firebase not initialized)")
+        "Initial state should be Idle or Error (if Firebase not initialized)",
+        initialState is AuthUiState.Idle || initialState is AuthUiState.Error)
   }
 
   @Test
@@ -48,7 +48,7 @@ class AuthViewModelTest {
 
     viewModel.onMicrosoftLoginClick()
     val state2 = viewModel.state.first()
-    assertEquals(state1, state2, "Should not change state if already loading")
+    assertEquals("Should not change state if already loading", state1, state2)
   }
 
   @Test
@@ -76,7 +76,7 @@ class AuthViewModelTest {
 
     viewModel.onSwitchEduLoginClick()
     val state2 = viewModel.state.first()
-    assertEquals(state1, state2, "Should not change state if already loading")
+    assertEquals("Should not change state if already loading", state1, state2)
   }
 
   @Test

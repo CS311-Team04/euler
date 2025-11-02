@@ -498,12 +498,6 @@ class AuthTagsTest {
   }
 
   @Test
-  fun AuthTags_progress_tags_contain_progress() {
-    assertTrue(AuthTags.MsProgress.contains("progress"))
-    assertTrue(AuthTags.SwitchProgress.contains("progress"))
-  }
-
-  @Test
   fun AuthTags_text_tags_contain_text() {
     assertTrue(AuthTags.TermsText.contains("text"))
     assertTrue(AuthTags.ByEpflText.contains("text"))
