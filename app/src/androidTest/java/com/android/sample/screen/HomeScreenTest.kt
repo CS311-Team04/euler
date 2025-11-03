@@ -80,7 +80,7 @@ class HomeScreenTest {
   fun displays_correct_action_button_texts() {
     composeRule.setContent { MaterialTheme { HomeScreen() } }
 
-    composeRule.onNodeWithText(TestConstants.ButtonTexts.FIND_CS220_EXAMS).assertIsDisplayed()
+    composeRule.onNodeWithText(TestConstants.ButtonTexts.WHAT_IS_EPFL).assertIsDisplayed()
     composeRule.onNodeWithText(TestConstants.ButtonTexts.CHECK_ED_DISCUSSION).assertIsDisplayed()
   }
 
@@ -247,7 +247,7 @@ class HomeScreenTest {
   fun action_buttons_display_correct_labels() {
     composeRule.setContent { MaterialTheme { HomeScreen() } }
 
-    composeRule.onNodeWithText(TestConstants.ButtonTexts.FIND_CS220_EXAMS).assertIsDisplayed()
+    composeRule.onNodeWithText(TestConstants.ButtonTexts.WHAT_IS_EPFL).assertIsDisplayed()
     composeRule.onNodeWithText(TestConstants.ButtonTexts.CHECK_ED_DISCUSSION).assertIsDisplayed()
   }
 
@@ -726,7 +726,7 @@ class HomeScreenTest {
   fun action_buttons_labels_are_displayed() {
     composeRule.setContent { MaterialTheme { HomeScreen() } }
 
-    composeRule.onNodeWithText("Find CS220 past exams").assertIsDisplayed()
+    composeRule.onNodeWithText("What is EPFL").assertIsDisplayed()
     composeRule.onNodeWithText("Check Ed Discussion").assertIsDisplayed()
   }
 
