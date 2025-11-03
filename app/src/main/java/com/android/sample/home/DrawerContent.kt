@@ -1,5 +1,6 @@
 package com.android.sample.home
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.Image
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -35,11 +35,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.res.painterResource
 import com.android.sample.R
 
 object DrawerTags {
@@ -76,7 +76,7 @@ fun DrawerContent(
           Image(
               painter = painterResource(id = R.drawable.euler_logo),
               contentDescription = "Euler Logo",
-              modifier = Modifier.height(30.dp).offset(x = 1.dp,y=5.dp),
+              modifier = Modifier.height(30.dp).offset(x = 1.dp, y = 5.dp),
               contentScale = ContentScale.Fit)
         }
 
@@ -120,7 +120,11 @@ fun DrawerContent(
               Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.Link, contentDescription = "Connectors", tint = Color(0xFFB0B0B0))
                 Spacer(Modifier.width(12.dp))
-                Text("Connectors", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Normal)
+                Text(
+                    "Connectors",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Normal)
                 Spacer(Modifier.weight(1f))
                 Icon(
                     Icons.Filled.KeyboardArrowRight,
@@ -152,7 +156,11 @@ fun DrawerContent(
                       .padding(vertical = 4.dp)
                       .testTag(DrawerTags.ViewAllRow)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                  Text("View all chats", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Normal)
+                  Text(
+                      "View all chats",
+                      color = Color.White,
+                      fontSize = 16.sp,
+                      fontWeight = FontWeight.Normal)
                   Spacer(Modifier.weight(1f))
                   Icon(
                       Icons.Filled.KeyboardArrowRight,
@@ -173,7 +181,11 @@ fun DrawerContent(
                 Icon(Icons.Filled.Person, contentDescription = null, tint = Color.White)
               }
           Spacer(Modifier.width(12.dp))
-          Text(ui.userName.lowercase(), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Normal)
+          Text(
+              ui.userName.lowercase(),
+              color = Color.White,
+              fontSize = 16.sp,
+              fontWeight = FontWeight.Normal)
           Spacer(Modifier.weight(1f))
           Icon(
               Icons.Filled.Settings,
