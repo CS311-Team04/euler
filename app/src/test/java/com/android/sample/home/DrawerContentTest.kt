@@ -23,37 +23,27 @@ class DrawerContentTest {
   fun renders_core_elements() {
     composeTestRule.setContent { MaterialTheme { DrawerContent() } }
     composeTestRule.onNodeWithTag(DrawerTags.Root).assertIsDisplayed()
-    composeTestRule.onNodeWithText("Settings").assertIsDisplayed()
-    composeTestRule.onNodeWithText("Log out").assertIsDisplayed()
+    composeTestRule.onNodeWithText("New chat").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Connectors").assertIsDisplayed()
   }
 
   @Test
-  fun settings_click_invokes_callback() {
+  fun connectors_click_invokes_settings_callback() {
     var clicked = false
     composeTestRule.setContent {
       MaterialTheme { DrawerContent(onSettingsClick = { clicked = true }) }
     }
-    composeTestRule.onNodeWithTag(DrawerTags.SettingsRow).performClick()
+    composeTestRule.onNodeWithTag(DrawerTags.ConnectorsRow).performClick()
     assertTrue(clicked)
   }
 
   @Test
-  fun signout_click_invokes_callback() {
+  fun user_settings_invokes_callback() {
     var clicked = false
     composeTestRule.setContent {
-      MaterialTheme { DrawerContent(onSignOut = { clicked = true }) }
+      MaterialTheme { DrawerContent(onSettingsClick = { clicked = true }) }
     }
-    composeTestRule.onNodeWithTag(DrawerTags.SignOutRow).performClick()
+    composeTestRule.onNodeWithTag(DrawerTags.UserSettings).performClick()
     assertTrue(clicked)
   }
-
-  @Test
-  fun close_button_invokes_callback() {
-    var closed = false
-    composeTestRule.setContent { MaterialTheme { DrawerContent(onClose = { closed = true }) } }
-    composeTestRule.onNodeWithTag(DrawerTags.CloseBtn).performClick()
-    assertTrue(closed)
-  }
 }
-
-

@@ -15,14 +15,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.Image
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -32,17 +32,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.painterResource
+import com.android.sample.R
 
 object DrawerTags {
   const val Root = "drawer_root"
-  const val CloseBtn = "drawer_close_btn"
-  const val SettingsRow = "drawer_settings_row"
-  const val SignOutRow = "drawer_signout_row"
+  const val NewChatRow = "drawer_newchat_row"
+  const val ConnectorsRow = "drawer_connectors_row"
+  const val RecentsSection = "drawer_recents"
+  const val ViewAllRow = "drawer_view_all"
+  const val UserSettings = "drawer_user_settings"
 }
 
 @Composable
@@ -65,101 +70,145 @@ fun DrawerContent(
               .background(Color(0xFF121212))
               .padding(horizontal = 20.dp, vertical = 16.dp)
               .testTag(DrawerTags.Root)) {
-        // Header
+        // Logo header
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-          Text(
-              text = "Menu",
-              color = Color.White,
-              fontSize = 18.sp,
-              fontWeight = FontWeight.SemiBold,
-              modifier = Modifier.weight(1f))
-          Icon(
-              imageVector = Icons.Filled.Close,
-              contentDescription = "Close",
-              tint = Color.White,
-              modifier = Modifier.size(24.dp).clickable { onClose() }.testTag(DrawerTags.CloseBtn))
+          Image(
+              painter = painterResource(id = R.drawable.euler_logo),
+              contentDescription = "Euler Logo",
+              modifier = Modifier.height(90.dp),
+              contentScale = ContentScale.Fit)
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+        Surface(color = Color(0x22FFFFFF), modifier = Modifier.fillMaxWidth().height(1.dp)) {}
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Profile card (embedded)
-        Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1B1B1B)),
-            shape = RoundedCornerShape(14.dp)) {
-              Row(
-                  verticalAlignment = Alignment.CenterVertically,
-                  modifier = Modifier.fillMaxWidth().padding(14.dp)) {
-                    Box(
-                        modifier =
-                            Modifier.size(48.dp).clip(CircleShape).background(Color(0xFFE53935)),
-                        contentAlignment = Alignment.Center) {
-                          Text("S", color = Color.White, fontWeight = FontWeight.Bold)
-                        }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                      Text("Student", color = Color.White, fontWeight = FontWeight.SemiBold)
-                      Text("EPFL • 15,000 students", color = Color.Gray, fontSize = 12.sp)
+        // New chat
+        Surface(
+            color = Color.Transparent,
+            modifier =
+                Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { /* TODO new chat */}
+                    .padding(vertical = 12.dp)
+                    .testTag(DrawerTags.NewChatRow)) {
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier.size(28.dp).clip(CircleShape).background(Color(0xFFE53935)),
+                    contentAlignment = Alignment.Center) {
+                      Icon(Icons.Filled.Add, contentDescription = "New chat", tint = Color.White)
                     }
-                  }
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    "New chat",
+                    color = Color(0xFFFF6E6E),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Normal)
+              }
             }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // Settings row
+        // Connectors row
         Surface(
+            color = Color.Transparent,
             modifier =
                 Modifier.fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .clickable { onSettingsClick() }
-                    .padding(horizontal = 12.dp, vertical = 14.dp)
-                    .testTag(DrawerTags.SettingsRow),
-            color = Color.Transparent) {
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Color.White)
-            Spacer(modifier = Modifier.width(12.dp))
-            Text("Settings", color = Color.White, fontSize = 16.sp)
-          }
-        }
+                    .padding(vertical = 12.dp)
+                    .testTag(DrawerTags.ConnectorsRow)) {
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Link, contentDescription = "Connectors", tint = Color(0xFFB0B0B0))
+                Spacer(Modifier.width(12.dp))
+                Text("Connectors", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Normal)
+                Spacer(Modifier.weight(1f))
+                Icon(
+                    Icons.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = Color(0xFFB0B0B0))
+              }
+            }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(
+            "RECENTS",
+            color = Color(0xFF8A8A8A),
+            fontSize = 12.sp,
+            modifier = Modifier.testTag(DrawerTags.RecentsSection))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        // Connected systems quick view (compact chips)
-        Text("Connected systems", color = Color.Gray, fontSize = 12.sp)
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          Chip(label = "Moodle", color = Color(0xFFE6B422)) { onToggleSystem("moodle") }
-          Chip(label = "IS-Academia", color = Color(0xFF5386E4)) { onToggleSystem("is-academia") }
+        Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+          RecentRow(title = "CS220 Final Exam retrieval")
+          RecentRow(title = "Linear Algebra help")
+          RecentRow(title = "Project deadline query")
+          RecentRow(title = "Course registration info")
+
+          Surface(
+              color = Color.Transparent,
+              modifier =
+                  Modifier.fillMaxWidth()
+                      .clip(RoundedCornerShape(8.dp))
+                      .clickable {}
+                      .padding(vertical = 4.dp)
+                      .testTag(DrawerTags.ViewAllRow)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                  Text("View all chats", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Normal)
+                  Spacer(Modifier.weight(1f))
+                  Icon(
+                      Icons.Filled.KeyboardArrowRight,
+                      contentDescription = null,
+                      tint = Color(0xFFB0B0B0))
+                }
+              }
         }
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Sign out row (red)
-        Surface(
-            modifier =
-                Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable { onSignOut() }
-                    .padding(horizontal = 12.dp, vertical = 14.dp)
-                    .testTag(DrawerTags.SignOutRow),
-            color = Color.Transparent) {
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.ExitToApp, contentDescription = "Log out", tint = Color(0xFFE53935))
-            Spacer(modifier = Modifier.width(12.dp))
-            Text("Log out", color = Color(0xFFE53935), fontSize = 16.sp, fontWeight = FontWeight.Medium)
-          }
+        Surface(color = Color(0x22FFFFFF), modifier = Modifier.fillMaxWidth().height(1.dp)) {}
+        Spacer(Modifier.height(12.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+          Box(
+              modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0xFF2A2A2A)),
+              contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.Person, contentDescription = null, tint = Color.White)
+              }
+          Spacer(Modifier.width(12.dp))
+          Text(ui.userName.lowercase(), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Normal)
+          Spacer(Modifier.weight(1f))
+          Icon(
+              Icons.Filled.Settings,
+              contentDescription = "Settings",
+              tint = Color.White,
+              modifier =
+                  Modifier.size(20.dp)
+                      .clickable { onSettingsClick() }
+                      .testTag(DrawerTags.UserSettings))
         }
+        Spacer(Modifier.height(12.dp))
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxWidth()) {
+              Text("Powered by Apertus", color = Color.Gray, fontSize = 12.sp)
+            }
       }
 }
 
 @Composable
-private fun Chip(label: String, color: Color, onClick: () -> Unit) {
-  Surface(
-      color = Color(0xFF1B1B1B), shape = RoundedCornerShape(20.dp), modifier = Modifier.clickable { onClick() }) {
-    Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-      Box(Modifier.size(10.dp).clip(CircleShape).background(color))
-      Spacer(Modifier.width(6.dp))
-      Text(label, color = Color.White, fontSize = 12.sp)
-    }
+private fun RecentRow(title: String) {
+  Row(verticalAlignment = Alignment.CenterVertically) {
+    Box(
+        modifier =
+            Modifier.size(24.dp).clip(RoundedCornerShape(6.dp)).background(Color(0xFF2A2A2A)),
+        contentAlignment = Alignment.Center) {
+          Icon(
+              imageVector = Icons.Outlined.ChatBubbleOutline,
+              contentDescription = null,
+              tint = Color(0xFF8A8A8A),
+              modifier = Modifier.size(16.dp))
+        }
+    Spacer(Modifier.width(12.dp))
+    Text(title, color = Color.White, fontSize = 16.sp)
   }
 }
 
