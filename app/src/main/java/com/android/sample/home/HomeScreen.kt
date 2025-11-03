@@ -14,8 +14,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.rounded.Send
@@ -46,6 +47,7 @@ object HomeTags {
   const val MessageField = "home_message_field"
   const val SendBtn = "home_send_btn"
   const val MicBtn = "home_mic_btn"
+  const val VoiceBtn = "home_voice_btn"
   const val Drawer = "home_drawer"
   const val TopRightMenu = "home_topright_menu"
 }
@@ -209,8 +211,10 @@ fun HomeScreen(
                                 .height(60.dp)
                                 .testTag(HomeTags.MessageField),
                         enabled = !ui.isSending,
+                        singleLine = true,
                         trailingIcon = {
                           Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            // Dictation button (mic icon) - always visible
                             IconButton(
                                 onClick = {
                                   speechHelper?.startListening { recognized ->
@@ -220,20 +224,45 @@ fun HomeScreen(
                                 enabled = speechHelper != null,
                                 modifier = Modifier.testTag(HomeTags.MicBtn)) {
                                   Icon(
-                                      Icons.Default.Call,
-                                      contentDescription = "Speak",
+                                      Icons.Default.Mic,
+                                      contentDescription = "Dictate",
                                       tint = Color.Gray)
                                 }
+
                             val canSend = ui.messageDraft.isNotBlank() && !ui.isSending
-                            BubbleSendButton(
-                                enabled = canSend,
-                                isSending = ui.isSending,
-                                onClick = {
-                                  if (canSend) {
-                                    onSendMessage(ui.messageDraft)
-                                    viewModel.sendMessage()
-                                  }
-                                })
+
+                            // Voice mode button (equalizer icon) - shown when there's no text
+                            AnimatedVisibility(
+                                visible = !canSend,
+                                enter = fadeIn() + scaleIn(),
+                                exit = fadeOut() + scaleOut()) {
+                                  IconButton(
+                                      onClick = {
+                                        // Voice mode clicked - nothing happens (to be implemented)
+                                      },
+                                      modifier = Modifier.testTag(HomeTags.VoiceBtn)) {
+                                        Icon(
+                                            Icons.Default.GraphicEq,
+                                            contentDescription = "Voice mode",
+                                            tint = Color.Gray)
+                                      }
+                                }
+
+                            // Send button - shown only when there's text
+                            AnimatedVisibility(
+                                visible = canSend,
+                                enter = fadeIn() + scaleIn(),
+                                exit = fadeOut() + scaleOut()) {
+                                  BubbleSendButton(
+                                      enabled = canSend,
+                                      isSending = ui.isSending,
+                                      onClick = {
+                                        if (canSend) {
+                                          onSendMessage(ui.messageDraft)
+                                          viewModel.sendMessage()
+                                        }
+                                      })
+                                }
                           }
                         },
                         shape = RoundedCornerShape(50),
