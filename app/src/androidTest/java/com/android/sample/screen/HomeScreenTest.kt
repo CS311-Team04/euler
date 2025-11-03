@@ -41,6 +41,14 @@ class HomeScreenTest {
     }
   }
 
+  // Helper function to check if a node with content description does not exist
+  private fun assertNodeWithContentDescriptionDoesNotExist(contentDescription: String) {
+    val nodes = composeRule.onAllNodesWithContentDescription(contentDescription)
+    assertTrue(
+        "Node with content description '$contentDescription' should not exist but was found",
+        nodes.fetchSemanticsNodes().isEmpty())
+  }
+
   // Helper function to wait for Send button to be available and click it
   // This is more robust for CI environments where timing can vary
   private fun waitAndClickSendButton() {
@@ -111,6 +119,9 @@ class HomeScreenTest {
         .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.MORE)
         .get(0)
         .assertIsDisplayed()
+    // Send button only appears when there's text
+    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test")
+    composeRule.waitForIdle()
     composeRule
         .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.SEND)
         .get(0)
@@ -283,6 +294,9 @@ class HomeScreenTest {
         .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.MORE)
         .get(0)
         .assertIsDisplayed()
+    // Send button only appears when there's text
+    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test")
+    composeRule.waitForIdle()
     composeRule
         .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.SEND)
         .get(0)
@@ -557,8 +571,13 @@ class HomeScreenTest {
     // Wait for the UI to be completely rendered
     composeRule.waitForIdle()
 
-    // The button should exist even when disabled
-    // Wait explicitly for it to be available (more robust for CI)
+    // The send button should NOT be visible when message is empty
+    // This is the new expected behavior - verify it doesn't exist
+    assertNodeWithContentDescriptionDoesNotExist("Send")
+
+    // Enter text to make send button appear
+    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test")
+    composeRule.waitForIdle()
     composeRule.waitUntilAtLeastOneExists(hasContentDescription("Send"), timeoutMillis = 5000)
     composeRule.onAllNodesWithContentDescription("Send").get(0).assertIsDisplayed()
   }
@@ -763,6 +782,9 @@ class HomeScreenTest {
 
     composeRule.onAllNodesWithContentDescription("Menu").get(0).assertIsDisplayed()
     composeRule.onAllNodesWithContentDescription("More").get(0).assertIsDisplayed()
+    // Send button only appears when there's text
+    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test")
+    composeRule.waitForIdle()
     composeRule.onAllNodesWithContentDescription("Send").get(0).assertIsDisplayed()
     composeRule.onAllNodesWithContentDescription("Euler").get(0).assertIsDisplayed()
   }
