@@ -435,20 +435,26 @@ class HomeViewModelTest {
   @Test
   fun toggleSystemConnection_multiple_times() = runTest {
     val viewModel = HomeViewModel()
+    
+    // Get initial state to ensure ViewModel is properly initialized
+    val initialState = viewModel.uiState.value
 
     viewModel.toggleSystemConnection("moodle")
-    val state1 = viewModel.uiState.first()
+    val state1 = viewModel.uiState.value
     val moodle1 = state1.systems.find { it.id == "moodle" }
+    assertNotNull(moodle1)
     assertFalse(moodle1!!.isConnected)
 
     viewModel.toggleSystemConnection("moodle")
-    val state2 = viewModel.uiState.first()
+    val state2 = viewModel.uiState.value
     val moodle2 = state2.systems.find { it.id == "moodle" }
+    assertNotNull(moodle2)
     assertTrue(moodle2!!.isConnected)
 
     viewModel.toggleSystemConnection("moodle")
-    val state3 = viewModel.uiState.first()
+    val state3 = viewModel.uiState.value
     val moodle3 = state3.systems.find { it.id == "moodle" }
+    assertNotNull(moodle3)
     assertFalse(moodle3!!.isConnected)
   }
 

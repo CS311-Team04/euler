@@ -168,11 +168,14 @@ class HomeScreenTestCov {
         val viewModel = HomeViewModel()
         viewModel.updateMessageDraft("Test query")
         viewModel.sendMessage()
-        advanceUntilIdle()
-        // User message should be added
+        // User message should be added immediately
         assertTrue(viewModel.uiState.value.recent.size > 0)
-        // isSending should still be true (network not complete yet)
+        // isSending should be true right after sendMessage is called
         assertTrue(viewModel.uiState.value.isSending)
+        // Advance time to allow the coroutine to complete (or fail)
+        advanceUntilIdle()
+        // After the finally block executes, isSending should be false
+        assertFalse(viewModel.uiState.value.isSending)
       }
 
   // ========== HomeScreen UI Tests - Core Components ==========
