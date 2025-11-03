@@ -4,3 +4,5 @@ node_modules/
 lib/index.js.map
 lib/index.js
 firebase-debug.log
+package-lock.json
+
