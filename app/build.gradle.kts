@@ -1,48 +1,11 @@
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsKotlinAndroid)
-    alias(libs.plugins.googleServices)
+    //alias(libs.plugins.googleServices) // Disabled for CI - google-services.json not available
+    //id("com.google.gms.google-services")
     id("jacoco")
     id("org.sonarqube")
     alias(libs.plugins.ktfmt)
-}
-
-// Create dummy google-services.json if missing (for CI compatibility)
-// This must happen before the Google Services plugin processes the file
-val googleServicesFile = file("${projectDir}/google-services.json")
-if (!googleServicesFile.exists()) {
-    logger.warn("google-services.json not found. Creating minimal dummy file for build...")
-    googleServicesFile.writeText("""
-{
-  "project_info": {
-    "project_number": "000000000000",
-    "project_id": "ci-dummy",
-    "storage_bucket": "ci-dummy.appspot.com"
-  },
-  "client": [
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
-        "android_client_info": {
-          "package_name": "com.android.sample"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "CI_DUMMY_KEY_DO_NOT_USE"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    }
-  ],
-  "configuration_version": "1"
-}
-    """.trimIndent())
 }
 
 android {
@@ -329,4 +292,3 @@ sonar {
         }
     }
 }
-
