@@ -110,11 +110,16 @@ class HomeScreenTest {
   @Test
   fun displays_icons_with_correct_content_descriptions() {
     composeRule.setContent { MaterialTheme { HomeScreen() } }
+    composeRule.waitForIdle()
 
+    composeRule.waitUntilAtLeastOneExists(
+        hasContentDescription(TestConstants.ContentDescriptions.MENU), timeoutMillis = 5000)
     composeRule
         .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.MENU)
         .get(0)
         .assertIsDisplayed()
+    composeRule.waitUntilAtLeastOneExists(
+        hasContentDescription(TestConstants.ContentDescriptions.MORE), timeoutMillis = 5000)
     composeRule
         .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.MORE)
         .get(0)
@@ -122,10 +127,14 @@ class HomeScreenTest {
     // Send button only appears when there's text
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test")
     composeRule.waitForIdle()
+    composeRule.waitUntilAtLeastOneExists(
+        hasContentDescription(TestConstants.ContentDescriptions.SEND), timeoutMillis = 5000)
     composeRule
         .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.SEND)
         .get(0)
         .assertIsDisplayed()
+    composeRule.waitUntilAtLeastOneExists(
+        hasContentDescription(TestConstants.ContentDescriptions.EULER), timeoutMillis = 5000)
     composeRule
         .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.EULER)
         .get(0)
@@ -285,11 +294,16 @@ class HomeScreenTest {
   @Test
   fun all_icons_have_content_descriptions() {
     composeRule.setContent { MaterialTheme { HomeScreen() } }
+    composeRule.waitForIdle()
 
+    composeRule.waitUntilAtLeastOneExists(
+        hasContentDescription(TestConstants.ContentDescriptions.MENU), timeoutMillis = 5000)
     composeRule
         .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.MENU)
         .get(0)
         .assertIsDisplayed()
+    composeRule.waitUntilAtLeastOneExists(
+        hasContentDescription(TestConstants.ContentDescriptions.MORE), timeoutMillis = 5000)
     composeRule
         .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.MORE)
         .get(0)
@@ -297,10 +311,14 @@ class HomeScreenTest {
     // Send button only appears when there's text
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test")
     composeRule.waitForIdle()
+    composeRule.waitUntilAtLeastOneExists(
+        hasContentDescription(TestConstants.ContentDescriptions.SEND), timeoutMillis = 5000)
     composeRule
         .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.SEND)
         .get(0)
         .assertIsDisplayed()
+    composeRule.waitUntilAtLeastOneExists(
+        hasContentDescription(TestConstants.ContentDescriptions.EULER), timeoutMillis = 5000)
     composeRule
         .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.EULER)
         .get(0)
@@ -779,13 +797,18 @@ class HomeScreenTest {
   @Test
   fun all_ui_elements_have_correct_content_descriptions() {
     composeRule.setContent { MaterialTheme { HomeScreen() } }
+    composeRule.waitForIdle()
 
+    composeRule.waitUntilAtLeastOneExists(hasContentDescription("Menu"), timeoutMillis = 5000)
     composeRule.onAllNodesWithContentDescription("Menu").get(0).assertIsDisplayed()
+    composeRule.waitUntilAtLeastOneExists(hasContentDescription("More"), timeoutMillis = 5000)
     composeRule.onAllNodesWithContentDescription("More").get(0).assertIsDisplayed()
     // Send button only appears when there's text
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test")
     composeRule.waitForIdle()
+    composeRule.waitUntilAtLeastOneExists(hasContentDescription("Send"), timeoutMillis = 5000)
     composeRule.onAllNodesWithContentDescription("Send").get(0).assertIsDisplayed()
+    composeRule.waitUntilAtLeastOneExists(hasContentDescription("Euler"), timeoutMillis = 5000)
     composeRule.onAllNodesWithContentDescription("Euler").get(0).assertIsDisplayed()
   }
 
