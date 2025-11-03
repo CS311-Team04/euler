@@ -53,8 +53,9 @@ fun SampleAppTheme(
   if (!view.isInEditMode) {
     SideEffect {
       val window = (view.context as Activity).window
-      window.statusBarColor = colorScheme.primary.toArgb()
-      WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = darkTheme
+      // Force a black status bar with light icons for consistent appearance
+      window.statusBarColor = androidx.compose.ui.graphics.Color.Black.toArgb()
+      WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
     }
   }
 

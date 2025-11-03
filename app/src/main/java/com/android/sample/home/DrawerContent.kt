@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -75,13 +76,11 @@ fun DrawerContent(
           Image(
               painter = painterResource(id = R.drawable.euler_logo),
               contentDescription = "Euler Logo",
-              modifier = Modifier.height(90.dp),
+              modifier = Modifier.height(30.dp).offset(x = 1.dp,y=5.dp),
               contentScale = ContentScale.Fit)
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-        Surface(color = Color(0x22FFFFFF), modifier = Modifier.fillMaxWidth().height(1.dp)) {}
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(35.dp))
 
         // New chat
         Surface(
@@ -205,10 +204,10 @@ private fun RecentRow(title: String) {
               imageVector = Icons.Outlined.ChatBubbleOutline,
               contentDescription = null,
               tint = Color(0xFF8A8A8A),
-              modifier = Modifier.size(16.dp))
+              modifier = Modifier.size(15.dp))
         }
     Spacer(Modifier.width(12.dp))
-    Text(title, color = Color.White, fontSize = 16.sp)
+    Text(title, color = Color.White, fontSize = 13.sp)
   }
 }
 
