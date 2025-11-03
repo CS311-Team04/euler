@@ -1,5 +1,7 @@
 package com.android.sample.home
 
+import com.android.sample.Chat.ChatType
+import com.android.sample.Chat.ChatUIModel
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -11,7 +13,7 @@ class HomeUIStateTest {
 
     assertEquals("Student", state.userName)
     assertTrue(state.systems.isEmpty())
-    assertTrue(state.recent.isEmpty())
+    assertTrue(state.messages.isEmpty())
     assertEquals("", state.messageDraft)
     assertFalse(state.isDrawerOpen)
     assertFalse(state.isTopRightOpen)
@@ -43,15 +45,19 @@ class HomeUIStateTest {
   @Test
   fun copy_updates_messageDraft_and_lists_without_affecting_flags() {
     val systems = listOf(SystemItem("isa", "IS-Academia", true))
-    val recent = listOf(ActionItem("1", "Test", "now"))
+    val messages =
+        listOf(
+            com.android.sample.Chat.ChatUIModel(
+                "1", "Test", System.currentTimeMillis(), com.android.sample.Chat.ChatType.USER))
     val base = HomeUiState()
 
     val updated =
-        base.copy(systems = systems, recent = recent, messageDraft = "Hello", isDrawerOpen = true)
+        base.copy(
+            systems = systems, messages = messages, messageDraft = "Hello", isDrawerOpen = true)
 
     assertEquals("Hello", updated.messageDraft)
     assertEquals(systems, updated.systems)
-    assertEquals(recent, updated.recent)
+    assertEquals(messages, updated.messages)
     assertTrue(updated.isDrawerOpen)
     assertFalse(updated.isTopRightOpen)
     assertFalse(updated.isLoading)
@@ -92,7 +98,7 @@ class HomeUIStateMoreTest {
 
     assertEquals("Student", state.userName)
     assertTrue(state.systems.isEmpty())
-    assertTrue(state.recent.isEmpty())
+    assertTrue(state.messages.isEmpty())
     assertEquals("", state.messageDraft)
     assertFalse(state.isDrawerOpen)
     assertFalse(state.isTopRightOpen)
@@ -126,18 +132,19 @@ class HomeUIStateMoreTest {
   }
 
   @Test
-  fun HomeUiState_with_recent_actions() {
-    val actions =
+  fun HomeUiState_with_messages() {
+    val now = System.currentTimeMillis()
+    val messages =
         listOf(
-            ActionItem("1", "Action 1", "1h ago"),
-            ActionItem("2", "Action 2", "2h ago"),
+            ChatUIModel("1", "Action 1", now, ChatType.USER),
+            ChatUIModel("2", "Action 2", now + 1000, ChatType.AI),
         )
 
-    val state = HomeUiState(recent = actions)
+    val state = HomeUiState(messages = messages)
 
-    assertEquals(2, state.recent.size)
-    assertEquals("Action 1", state.recent[0].title)
-    assertEquals("1h ago", state.recent[0].time)
+    assertEquals(2, state.messages.size)
+    assertEquals("Action 1", state.messages[0].text)
+    assertEquals(ChatType.USER, state.messages[0].type)
   }
 
   @Test
@@ -346,13 +353,13 @@ class HomeUIStateMoreTest {
   @Test
   fun HomeUiState_all_parameters_constructor() {
     val systems = listOf(SystemItem("id1", "System1", true))
-    val recent = listOf(ActionItem("id1", "Action1", "1h"))
+    val messages = listOf(ChatUIModel("id1", "Action1", System.currentTimeMillis(), ChatType.USER))
 
     val state =
         HomeUiState(
             userName = "User",
             systems = systems,
-            recent = recent,
+            messages = messages,
             messageDraft = "Draft",
             isDrawerOpen = true,
             isTopRightOpen = true,
@@ -361,7 +368,7 @@ class HomeUIStateMoreTest {
 
     assertEquals("User", state.userName)
     assertEquals(1, state.systems.size)
-    assertEquals(1, state.recent.size)
+    assertEquals(1, state.messages.size)
     assertEquals("Draft", state.messageDraft)
     assertTrue(state.isDrawerOpen)
     assertTrue(state.isTopRightOpen)
@@ -409,10 +416,11 @@ class HomeUIStateMoreTest {
   }
 
   @Test
-  fun HomeUiState_with_large_recent_list() {
-    val recent = List(100) { ActionItem("$it", "Action $it", "${it}h ago") }
-    val state = HomeUiState(recent = recent)
-    assertEquals(100, state.recent.size)
+  fun HomeUiState_with_large_messages_list() {
+    val now = System.currentTimeMillis()
+    val messages = List(100) { ChatUIModel("$it", "Action $it", now + it, ChatType.USER) }
+    val state = HomeUiState(messages = messages)
+    assertEquals(100, state.messages.size)
   }
 
   @Test
@@ -465,7 +473,7 @@ class HomeUIStateMoreTest {
     val (
         userName,
         systems,
-        recent,
+        messages,
         messageDraft,
         isDrawerOpen,
         isTopRightOpen,
@@ -475,7 +483,7 @@ class HomeUIStateMoreTest {
 
     assertEquals("TestUser", userName)
     assertTrue(systems.isEmpty())
-    assertTrue(recent.isEmpty())
+    assertTrue(messages.isEmpty())
     assertEquals("Draft", messageDraft)
     assertTrue(isDrawerOpen)
     assertFalse(isTopRightOpen)
@@ -573,18 +581,21 @@ class HomeUIStateMoreTest {
   }
 
   @Test
-  fun HomeUiState_with_multiple_systems_and_recent() {
+  fun HomeUiState_with_multiple_systems_and_messages() {
     val systems =
         listOf(
             SystemItem("1", "S1", true), SystemItem("2", "S2", false), SystemItem("3", "S3", true))
-    val recent =
+    val now = System.currentTimeMillis()
+    val messages =
         listOf(
-            ActionItem("1", "A1", "1h"), ActionItem("2", "A2", "2h"), ActionItem("3", "A3", "3h"))
+            ChatUIModel("1", "A1", now, ChatType.USER),
+            ChatUIModel("2", "A2", now + 1000, ChatType.AI),
+            ChatUIModel("3", "A3", now + 2000, ChatType.USER))
 
-    val state = HomeUiState(systems = systems, recent = recent)
+    val state = HomeUiState(systems = systems, messages = messages)
 
     assertEquals(3, state.systems.size)
-    assertEquals(3, state.recent.size)
+    assertEquals(3, state.messages.size)
   }
 
   @Test
@@ -613,7 +624,7 @@ class HomeUIStateMoreTest {
         HomeUiState(
             userName = "User",
             systems = listOf(SystemItem("1", "S", true)),
-            recent = listOf(ActionItem("1", "A", "1h")),
+            messages = listOf(ChatUIModel("1", "A", System.currentTimeMillis(), ChatType.USER)),
             messageDraft = "Draft",
             isDrawerOpen = true,
             isTopRightOpen = true,
