@@ -649,7 +649,7 @@ class HomeViewModelTest {
 
   @Test
   fun multiple_state_changes_in_sequence() =
-      runTest(testDispatcher) {
+      runTest(UnconfinedTestDispatcher()) {
         val viewModel = HomeViewModel()
 
         viewModel.toggleDrawer()
