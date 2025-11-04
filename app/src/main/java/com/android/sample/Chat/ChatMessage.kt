@@ -1,0 +1,87 @@
+package com.android.sample.Chat
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+/**
+ * Renders a single chat message as either:
+ * - a right-aligned grey "bubble" for user messages, or
+ * - a full-width, background-less paragraph for AI messages.
+ *
+ * This composable is presentation-only: it consumes a [ChatUIModel] that must already encode the
+ * message role (see [ChatType]) and the display text.
+ *
+ * ### Testing
+ * - User bubble node is tagged with `chat_user_bubble`
+ * - User text node is tagged with `chat_user_text`
+ * - AI text node is tagged with `chat_ai_text`
+ *
+ * @param message The UI model for the message (text + role).
+ * @param modifier Optional [Modifier] for the outer layout node of this message.
+ * @param userBubbleBg Background color for the user bubble.
+ * @param userBubbleText Text color for the user bubble content.
+ * @param aiText Text color for the AI paragraph.
+ * @param maxUserBubbleWidthFraction Maximum width fraction for the user bubble (0 < f ≤ 1).
+ */
+@Composable
+fun ChatMessage(
+    message: ChatUIModel,
+    modifier: Modifier = Modifier,
+    userBubbleBg: Color = Color(0xFF2B2B2B),
+    userBubbleText: Color = Color(0xFFFFFFFF),
+    aiText: Color = Color(0xFFEDEDED),
+    maxUserBubbleWidthFraction: Float = 0.78f,
+) {
+  val isUser = message.type == ChatType.USER
+
+  if (isUser) {
+    // ---- USER: right-aligned grey bubble ----
+    Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+      Box(modifier = Modifier.fillMaxWidth(maxUserBubbleWidthFraction)) {
+        Surface(
+            color = userBubbleBg,
+            shape = RoundedCornerShape(18.dp),
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp,
+            modifier = Modifier.testTag("chat_user_bubble")) {
+              Text(
+                  text = message.text,
+                  color = userBubbleText,
+                  style = MaterialTheme.typography.bodyMedium,
+                  lineHeight = 18.sp,
+                  textAlign = TextAlign.Start,
+                  modifier =
+                      Modifier.fillMaxWidth()
+                          .padding(horizontal = 14.dp, vertical = 10.dp)
+                          .testTag("chat_user_text"))
+            }
+      }
+    }
+  } else {
+    // ---- AI: plain paragraph, full content width ----
+    Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
+      Text(
+          text = message.text,
+          color = aiText,
+          style = MaterialTheme.typography.bodyMedium,
+          lineHeight = 20.sp,
+          modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+    }
+  }
+}

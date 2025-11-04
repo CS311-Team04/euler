@@ -1,22 +1,24 @@
 package com.android.sample.navigation
 
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.android.sample.VoiceChat.VoiceScreen
 import com.android.sample.auth.MicrosoftAuth
 import com.android.sample.authentification.AuthUIScreen
 import com.android.sample.authentification.AuthUiState
 import com.android.sample.home.HomeScreen
 import com.android.sample.settings.SettingsPage
 import com.android.sample.sign_in.AuthViewModel
-import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.splash.OpeningScreen
 
 object Routes {
@@ -25,14 +27,11 @@ object Routes {
   const val Home = "home"
   const val HomeWithDrawer = "home_with_drawer"
   const val Settings = "settings"
+  const val VoiceChat = "voice_chat"
 }
 
 @Composable
-fun AppNav(
-    startOnSignedIn: Boolean = false,
-    activity: android.app.Activity,
-    speechHelper: SpeechToTextHelper
-) {
+fun AppNav(startOnSignedIn: Boolean = false, activity: android.app.Activity) {
   val nav = rememberNavController()
   val authViewModel = remember { AuthViewModel() }
   val authState by authViewModel.state.collectAsState()
@@ -112,7 +111,6 @@ fun AppNav(
               onAction1Click = { /* ... */},
               onAction2Click = { /* ... */},
               onSendMessage = { /* ... */},
-              speechHelper = speechHelper,
               onSignOut = {
                 android.util.Log.d("NavGraph", "Sign out button clicked")
                 authViewModel.signOut()
@@ -122,7 +120,8 @@ fun AppNav(
                   launchSingleTop = true
                 }
               },
-              onSettingsClick = { nav.navigate(Routes.Settings) })
+              onSettingsClick = { nav.navigate(Routes.Settings) },
+              onVoiceChatClick = { nav.navigate(Routes.VoiceChat) })
         }
 
         // Home With Drawer
@@ -131,7 +130,6 @@ fun AppNav(
               onAction1Click = { /* ... */},
               onAction2Click = { /* ... */},
               onSendMessage = { /* ... */},
-              speechHelper = speechHelper,
               onSignOut = {
                 android.util.Log.d("NavGraph", "Sign out button clicked (HomeWithDrawer)")
                 authViewModel.signOut()
@@ -142,6 +140,7 @@ fun AppNav(
                 }
               },
               onSettingsClick = { nav.navigate(Routes.Settings) },
+              onVoiceChatClick = { nav.navigate(Routes.VoiceChat) },
               openDrawerOnStart = true)
         }
 
@@ -160,6 +159,11 @@ fun AppNav(
                   launchSingleTop = true
                 }
               })
+        }
+
+        // Voice Chat Screen
+        composable(Routes.VoiceChat) {
+          VoiceScreen(onClose = { nav.popBackStack() }, modifier = Modifier.fillMaxSize())
         }
       }
 }

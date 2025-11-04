@@ -19,8 +19,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.tooling.preview.PreviewParameter
-import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -176,7 +174,7 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
               }
             },
         preset = VisualPreset.Bloom, // Visualiseur Bloom
-        color = Color(0xFC0000),
+        color = Color(0x961A03),
         petals = 4,
         size = 1500.dp,
         modifier = Modifier.align(Alignment.Center).offset(y = -10.dp))
@@ -290,79 +288,8 @@ private class ManagedLevelSource(private val delegate: LevelSource) : LevelSourc
   }
 }
 
-// Preview Provider pour différents niveaux audio
-private class VoiceLevelProvider : PreviewParameterProvider<Float> {
-  override val values: Sequence<Float>
-    get() = sequenceOf(0f, 0.3f, 0.6f, 0.9f)
-}
-
-@Preview(
-    name = "VoiceScreen - Silent",
-    showBackground = true,
-    backgroundColor = 0xFF000000,
-    showSystemUi = true)
+@Preview(showBackground = true, backgroundColor = 0x0)
 @Composable
-private fun VoiceScreenPreviewSilent() {
-  VoiceScreenPreview(level = 0f)
-}
-
-@Preview(
-    name = "VoiceScreen - Active",
-    showBackground = true,
-    backgroundColor = 0xFF000000,
-    showSystemUi = true)
-@Composable
-private fun VoiceScreenPreviewActive() {
-  VoiceScreenPreview(level = 0.7f)
-}
-
-@Preview(
-    name = "VoiceScreen - Multiple Levels", showBackground = true, backgroundColor = 0xFF000000)
-@Composable
-private fun VoiceScreenPreviewMultiple(@PreviewParameter(VoiceLevelProvider::class) level: Float) {
-  VoiceScreenPreview(level = level)
-}
-
-@Composable
-private fun VoiceScreenPreview(level: Float) {
-  val mockSource = remember { MockLevelSource(level) }
-
-  Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-    // Visualiseur au centre avec mock source
-    VoiceVisualizer(
-        levelSource = mockSource,
-        preset = VisualPreset.Bloom,
-        color = Color(0xFC0000),
-        petals = 4,
-        size = 1500.dp,
-        modifier = Modifier.align(Alignment.Center).offset(y = -10.dp))
-
-    // Boutons bas
-    Column(
-        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
-        horizontalAlignment = Alignment.CenterHorizontally) {
-          Row(
-              horizontalArrangement = Arrangement.spacedBy(50.dp),
-              verticalAlignment = Alignment.CenterVertically) {
-                RoundIconButton(
-                    onClick = {},
-                    iconVector = Icons.Filled.Mic,
-                    size = 100.dp,
-                    background = Color(0x0),
-                    iconTint = Color.White)
-                RoundIconButton(
-                    onClick = {},
-                    iconVector = Icons.Default.Close,
-                    size = 100.dp,
-                    background = Color(0x0),
-                    iconTint = Color.White)
-              }
-          Spacer(Modifier.height(14.dp))
-          Text(
-              text = "Powered by APERTUS Swiss LLM",
-              color = Color(0xFF9A9A9A),
-              fontSize = 12.sp,
-              modifier = Modifier.alpha(0.9f))
-        }
-  }
+private fun VoiceChatScreenPreview() {
+  MaterialTheme { VoiceScreen(onClose = {}) }
 }

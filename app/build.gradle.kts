@@ -153,8 +153,8 @@ dependencies {
     implementation(libs.compose.ui.graphics)
     // Material Design 3
     implementation(libs.compose.material3)
-    // Material Icons Extended (pour Mic, etc.)
-    implementation("androidx.compose.material:material-icons-extended")
+    // Material Icons Extended for additional icons (Language, DarkMode, Extension, etc.)
+    implementation(libs.material.icons.extended)
     // Integration with activities
     implementation(libs.compose.activity)
     // Integration with ViewModels
