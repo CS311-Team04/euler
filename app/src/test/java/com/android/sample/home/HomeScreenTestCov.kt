@@ -127,25 +127,26 @@ class HomeScreenTestCov {
         viewModel.updateMessageDraft("First send")
         val initialCount = viewModel.uiState.value.messages.size
         viewModel.sendMessage()
-        
+
         // After first send, user message is added synchronously
         val afterFirstSend = viewModel.uiState.value
         assertEquals(initialCount + 1, afterFirstSend.messages.size)
-        
+
         // If isSending is still true, second send should be blocked
         // Store message count while potentially still sending
         val messagesAfterFirst = afterFirstSend.messages.size
         viewModel.updateMessageDraft("Second send")
         viewModel.sendMessage() // May or may not work depending on isSending state
-        
+
         // Wait for any pending operations
         advanceUntilIdle()
-        
+
         // Either the second message was blocked (same count) or allowed (count increased)
         // Both scenarios are valid depending on timing, so we just verify no crash
         val finalCount = viewModel.uiState.value.messages.size
-        assertTrue("Message count should be at least $messagesAfterFirst", 
-                   finalCount >= messagesAfterFirst)
+        assertTrue(
+            "Message count should be at least $messagesAfterFirst",
+            finalCount >= messagesAfterFirst)
       }
 
   @Test
