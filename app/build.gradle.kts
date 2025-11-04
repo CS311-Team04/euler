@@ -114,6 +114,7 @@ android {
         res.setSrcDirs(emptyList<File>())
         resources.setSrcDirs(emptyList<File>())
     }
+    buildToolsVersion = "34.0.0"
 }
 
 // When a library is used both by robolectric and connected tests, use this function
