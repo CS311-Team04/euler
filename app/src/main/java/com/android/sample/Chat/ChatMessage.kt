@@ -2,7 +2,6 @@ package com.android.sample.Chat
 
 import android.annotation.SuppressLint
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -53,50 +51,44 @@ fun ChatMessage(
     aiText: Color = Color(0xFFEDEDED),
     maxUserBubbleWidthFraction: Float = 0.78f
 ) {
-    val isUser = message.type == ChatType.USER
+  val isUser = message.type == ChatType.USER
 
-    if (isUser) {
-        // RIGHT-ALIGNED row; bubble wraps content (no fillMaxWidth on bubble or text)
-        Row(
-            modifier = modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
-        ) {
-            BoxWithConstraints {
-                val maxBubbleWidth = maxWidth * maxUserBubbleWidthFraction
+  if (isUser) {
+    // RIGHT-ALIGNED row; bubble wraps content (no fillMaxWidth on bubble or text)
+    Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+      BoxWithConstraints {
+        val maxBubbleWidth = maxWidth * maxUserBubbleWidthFraction
 
-                Surface(
-                    color = userBubbleBg,
-                    shape = RoundedCornerShape(18.dp),
-                    tonalElevation = 0.dp,
-                    shadowElevation = 0.dp,
-                    modifier = Modifier
-                        .widthIn(max = maxBubbleWidth)   // cap width
-                        .testTag("chat_user_bubble")
-                ) {
-                    Text(
-                        text = message.text,
-                        color = userBubbleText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        lineHeight = 18.sp,
-                        textAlign = TextAlign.Start,
-                        // IMPORTANT: no fillMaxWidth here → wrap content
-                        modifier = Modifier
-                            .padding(horizontal = 14.dp, vertical = 10.dp)
-                            .testTag("chat_user_text")
-                    )
-                }
+        Surface(
+            color = userBubbleBg,
+            shape = RoundedCornerShape(18.dp),
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp,
+            modifier =
+                Modifier.widthIn(max = maxBubbleWidth) // cap width
+                    .testTag("chat_user_bubble")) {
+              Text(
+                  text = message.text,
+                  color = userBubbleText,
+                  style = MaterialTheme.typography.bodyMedium,
+                  lineHeight = 18.sp,
+                  textAlign = TextAlign.Start,
+                  // IMPORTANT: no fillMaxWidth here → wrap content
+                  modifier =
+                      Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                          .testTag("chat_user_text"))
             }
-        }
-    } else {
-        // AI: full-width plain text
-        Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
-            Text(
-                text = message.text,
-                color = aiText,
-                style = MaterialTheme.typography.bodyMedium,
-                lineHeight = 20.sp,
-                modifier = Modifier.fillMaxWidth().testTag("chat_ai_text")
-            )
-        }
+      }
     }
+  } else {
+    // AI: full-width plain text
+    Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
+      Text(
+          text = message.text,
+          color = aiText,
+          style = MaterialTheme.typography.bodyMedium,
+          lineHeight = 20.sp,
+          modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+    }
+  }
 }
