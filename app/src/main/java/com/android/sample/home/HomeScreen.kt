@@ -245,7 +245,7 @@ fun HomeScreen(
 
                     Spacer(Modifier.height(16.dp))
 
-                    // Champ de message branché au ViewModel
+                    // Message input bound to ViewModel state.
                     OutlinedTextField(
                         value = ui.messageDraft,
                         onValueChange = { viewModel.updateMessageDraft(it) },
