@@ -11,6 +11,7 @@ INDEX_URL = os.getenv("INDEX_URL")
 INDEX_KEY = os.getenv("INDEX_KEY")
 if not INDEX_URL or not INDEX_KEY:
     raise SystemExit("[error] Missing INDEX_URL or INDEX_KEY in .env")
+ensure_nltk()
 
 # ---------- NLTK ----------
 def ensure_nltk():
@@ -78,7 +79,7 @@ def index_batches(chunks: List[Dict[str, Any]], batch=64, pause=0.05):
             INDEX_URL,
             headers={"x-api-key": INDEX_KEY, "Content-Type": "application/json"},
             data=json.dumps(payload).encode("utf-8"),
-            timeout=500,
+            timeout=200,
         )
         if not r.ok:
             raise RuntimeError(f"index batch {i//batch}: HTTP {r.status_code} {r.text[:1000]}")
@@ -140,7 +141,6 @@ def build_chunks_from_record(rec: Dict[str, Any], max_chars=1500, overlap_sents=
 
 # ---------- file indexing ----------
 def index_json_file(path: Path, max_chars=1500, overlap_sents=2):
-    ensure_nltk()
     records = list(load_json_records(path))
     if not records:
         print(f"{path} -> 0 records (skipped)")
