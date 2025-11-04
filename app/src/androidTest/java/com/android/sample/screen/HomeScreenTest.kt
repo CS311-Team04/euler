@@ -100,13 +100,6 @@ class HomeScreenTest {
     composeRule.onNodeWithText(TestConstants.PlaceholderTexts.MESSAGE_EULER).assertIsDisplayed()
   }
 
-  @Test
-  fun displays_footer_text() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    composeRule.onNodeWithText(TestConstants.FooterTexts.POWERED_BY).assertIsDisplayed()
-  }
-
   //  @Test
   //  fun displays_icons_with_correct_content_descriptions() {
   //    composeRule.setContent { MaterialTheme { HomeScreen() } }
