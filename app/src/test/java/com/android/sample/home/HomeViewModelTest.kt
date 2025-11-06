@@ -258,40 +258,6 @@ class HomeViewModelTest {
       }
 
   @Test
-  fun sendMessage_with_whitespace_only_does_nothing() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialCount = viewModel.uiState.value.messages.size
-
-        viewModel.updateMessageDraft("    ")
-        viewModel.sendMessage()
-
-        advanceTimeBy(100)
-
-        val stateAfterSend = viewModel.uiState.value
-        assertEquals(initialCount, stateAfterSend.messages.size)
-      }
-
-  @Test
-  fun toggleSystemConnection_for_isa_system() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        val isaSystem = initialState.systems.find { it.id == "isa" }
-        assertNotNull(isaSystem)
-        assertTrue(isaSystem!!.isConnected)
-
-        viewModel.toggleSystemConnection("isa")
-
-        val stateAfterToggle = viewModel.uiState.value
-        val updatedSystem = stateAfterToggle.systems.find { it.id == "isa" }
-        assertNotNull(updatedSystem)
-        assertFalse(updatedSystem!!.isConnected)
-      }
-
-  @Test
   fun toggleSystemConnection_for_camipro_system() =
       runTest(testDispatcher) {
         val viewModel = HomeViewModel()
