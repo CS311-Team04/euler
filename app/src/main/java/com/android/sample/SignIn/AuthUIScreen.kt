@@ -236,22 +236,7 @@ private fun MicrosoftEntraButton(
                   horizontalArrangement = Arrangement.Center) {
                     // Microsoft logo
                     Image(
-                        painter = painterResource(id = 
-                            
-                            
-                            
-                            
-                            
-                            
-                            
-                            
-                            
-                            
-                            
-                            
-                            
-                            
-                            .microsoft_logo),
+                        painter = painterResource(id = R.drawable.microsoft_logo),
                         contentDescription = "Microsoft Logo",
                         modifier = Modifier.size(24.dp))
 
