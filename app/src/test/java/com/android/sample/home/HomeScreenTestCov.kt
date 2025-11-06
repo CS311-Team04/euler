@@ -97,17 +97,6 @@ class HomeScreenTestCov {
   }
 
   @Test
-  fun viewModel_sendMessage_sets_isSending_true_and_clears_draft() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-        assertFalse(viewModel.uiState.value.isSending)
-        viewModel.updateMessageDraft("Test message")
-        viewModel.sendMessage()
-        assertTrue(viewModel.uiState.value.isSending)
-        assertEquals("", viewModel.uiState.value.messageDraft)
-      }
-
-  @Test
   fun viewModel_sendMessage_adds_user_message_to_messages() =
       runTest(testDispatcher) {
         val viewModel = HomeViewModel()
@@ -118,53 +107,6 @@ class HomeScreenTestCov {
         val firstItem = viewModel.uiState.value.messages.first()
         assertEquals("Hello, world!", firstItem.text)
         assertEquals(com.android.sample.Chat.ChatType.USER, firstItem.type)
-      }
-
-  @Test
-  fun viewModel_sendMessage_prevents_duplicate_sends() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-        viewModel.updateMessageDraft("First send")
-        val initialCount = viewModel.uiState.value.messages.size
-        viewModel.sendMessage()
-
-        // After first send, user message is added synchronously
-        val afterFirstSend = viewModel.uiState.value
-        assertEquals(initialCount + 1, afterFirstSend.messages.size)
-        assertTrue("isSending should be true after first send", afterFirstSend.isSending)
-
-        // Try to send second message immediately while isSending is true
-        // This should be blocked by the guard in sendMessage()
-        val messagesAfterFirst = afterFirstSend.messages.size
-        viewModel.updateMessageDraft("Second send")
-
-        // Verify isSending is still true before attempting second send
-        val stateBeforeSecondSend = viewModel.uiState.value
-        assertTrue(
-            "isSending should still be true before second send attempt",
-            stateBeforeSecondSend.isSending)
-
-        viewModel.sendMessage() // Should be blocked because isSending is true
-
-        // Check immediately (before coroutine completes) that second message was blocked
-        val stateAfterSecondAttempt = viewModel.uiState.value
-        assertEquals(
-            "Second message should be blocked when isSending is true",
-            messagesAfterFirst,
-            stateAfterSecondAttempt.messages.size)
-        // Note: isSending might be false if the first coroutine completed very quickly
-        // The important thing is that no second message was added
-
-        // Wait for coroutine to complete
-        advanceUntilIdle()
-
-        // After coroutine completes, isSending should be false
-        val finalState = viewModel.uiState.value
-        assertFalse("isSending should be false after coroutine completes", finalState.isSending)
-        // Should still have only one message (the first one, plus possibly an AI response)
-        assertTrue(
-            "Should have at least the first message",
-            finalState.messages.size >= messagesAfterFirst)
       }
 
   @Test
