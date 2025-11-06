@@ -6,10 +6,6 @@ plugins {
     alias(libs.plugins.ktfmt)
 }
 
-if (System.getenv("CI").isNullOrEmpty() && file("google-services.json").exists()) {
-    apply(plugin = libs.plugins.googleServices.get().pluginId)
-}
-
 android {
     namespace = "com.android.sample"
     compileSdk = 34
