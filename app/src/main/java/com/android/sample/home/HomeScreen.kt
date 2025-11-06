@@ -2,6 +2,7 @@ package com.android.sample.home
 
 import androidx.compose.animation.*
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -39,6 +40,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.android.sample.Chat.ChatMessage
 import com.android.sample.Chat.ChatType
 import com.android.sample.R
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 object HomeTags {
@@ -340,25 +342,47 @@ fun HomeScreen(
               Box(
                   modifier = Modifier.fillMaxSize().padding(padding).background(Color.Black),
                   contentAlignment = Alignment.Center) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize().padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                          items(items = ui.messages, key = { it.id }) { item ->
-                            ChatMessage(message = item, modifier = Modifier.fillMaxWidth())
-                          }
+                    if (ui.messages.isEmpty() && !ui.isSending) {
+                      // Show animated intro title when list is empty
+                      AnimatedIntroTitle(
+                          modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp))
+                    } else {
+                      val listState = rememberLazyListState()
 
-                          // Global thinking indicator shown AFTER the last user message.
-                          if (ui.isSending) {
-                            item {
-                              Spacer(Modifier.height(6.dp))
-                              ThinkingIndicator(
-                                  modifier =
-                                      Modifier.fillMaxWidth()
-                                          .padding(vertical = 8.dp)
-                                          .testTag("home_thinking_indicator"))
+                      // Auto-scroll to bottom when messages change or sending state changes
+                      LaunchedEffect(ui.messages.size, ui.isSending) {
+                        val lastIndex =
+                            if (ui.messages.isEmpty()) {
+                              0
+                            } else {
+                              // Scroll to last message index, or one more if showing thinking
+                              // indicator
+                              ui.messages.size - 1 + if (ui.isSending) 1 else 0
+                            }
+                        listState.animateScrollToItem(lastIndex)
+                      }
+
+                      LazyColumn(
+                          state = listState,
+                          modifier = Modifier.fillMaxSize().padding(16.dp),
+                          verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            items(items = ui.messages, key = { it.id }) { item ->
+                              ChatMessage(message = item, modifier = Modifier.fillMaxWidth())
+                            }
+
+                            // Global thinking indicator shown AFTER the last user message.
+                            if (ui.isSending) {
+                              item {
+                                Spacer(Modifier.height(6.dp))
+                                ThinkingIndicator(
+                                    modifier =
+                                        Modifier.fillMaxWidth()
+                                            .padding(vertical = 8.dp)
+                                            .testTag("home_thinking_indicator"))
+                              }
                             }
                           }
-                        }
+                    }
                   }
             }
       }
@@ -573,6 +597,72 @@ private fun BubbleSendButton(
           }
         }
   }
+}
+
+/**
+ * Animated intro title with rotating suggestions. Shows "Ask Euler Anything" in bold red, with
+ * suggestions that fade in/out every 3 seconds.
+ */
+@Composable
+internal fun AnimatedIntroTitle(modifier: Modifier = Modifier) {
+  val suggestions = remember {
+    listOf(
+        "Find CS220 past exams",
+        "Check my Moodle assignments",
+        "What's on Ed Discussion?",
+        "Show my IS-Academia schedule",
+        "Search EPFL Drive files")
+  }
+
+  var currentIndex by remember { mutableStateOf(0) }
+
+  // Rotate suggestions every 3 seconds
+  LaunchedEffect(Unit) {
+    while (true) {
+      delay(3000)
+      currentIndex = (currentIndex + 1) % suggestions.size
+    }
+  }
+
+  Column(
+      modifier = modifier,
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.Center) {
+        // Title: "Ask Euler Anything" in deep burgundy/plum
+        Text(
+            text = "Ask Euler Anything",
+            color = Color(0xFF8B0000), // Deep burgundy red
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(bottom = 16.dp))
+
+        // Rotating suggestion text with crossfade animation
+        Box(modifier = Modifier.height(32.dp), contentAlignment = Alignment.Center) {
+          AnimatedContent(
+              targetState = currentIndex,
+              transitionSpec = {
+                // Crossfade with vertical slide: old slides down, new slides in from above
+                (fadeIn(animationSpec = tween(300, easing = FastOutSlowInEasing)) +
+                    slideInVertically(
+                        animationSpec = tween(300, easing = FastOutSlowInEasing),
+                        initialOffsetY = { -it / 4 } // Slide in from above
+                        )) togetherWith
+                    (fadeOut(animationSpec = tween(300, easing = FastOutSlowInEasing)) +
+                        slideOutVertically(
+                            animationSpec = tween(300, easing = FastOutSlowInEasing),
+                            targetOffsetY = { it / 4 } // Slide out downward
+                            ))
+              },
+              label = "suggestion-transition") { index ->
+                Text(
+                    text = suggestions[index],
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center)
+              }
+        }
+      }
 }
 
 @Preview(showBackground = true, backgroundColor = 0x000000)
