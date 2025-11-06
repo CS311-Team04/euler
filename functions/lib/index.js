@@ -95,21 +95,15 @@ async function apertusChatFnCore({ messages, model, temperature, }) {
     logger.info("apertusChat success", { length: reply.length });
     return { reply };
 }
-async function qdrantEnsureCollection(dimension) {
+// collection is already created with hybrid schema; only verify existence
+async function qdrantEnsureCollection(_) {
     const base = process.env.QDRANT_URL;
     const key = process.env.QDRANT_API_KEY;
     const coll = process.env.QDRANT_COLLECTION;
     const res = await fetch(`${base}/collections/${coll}`, { headers: { "api-key": key } });
-    if (res.ok)
-        return;
-    const createRes = await fetch(`${base}/collections/${coll}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", "api-key": key },
-        body: JSON.stringify({ vectors: { size: dimension, distance: "Cosine" } }),
-    });
-    if (!createRes.ok) {
-        const t = await createRes.text().catch(() => "");
-        throw new Error(`Qdrant create collection failed: ${createRes.status} ${t}`);
+    if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        throw new Error(`Qdrant collection "${coll}" not found or not accessible: ${res.status} ${t}`);
     }
 }
 async function qdrantUpsert(points) {
@@ -123,18 +117,87 @@ async function qdrantUpsert(points) {
         throw new Error(`Qdrant upsert failed: ${res.status} ${t}`);
     }
 }
-async function qdrantSearch(vector, topK = 5) {
+// retrieval knobs
+const MAX_CANDIDATES = 24; // wider pool for better recall
+const MAX_DOCS = 3; // distinct sources to include
+const MAX_PER_DOC = 2; // chunks per source
+const CONTEXT_BUDGET = 1600; // total chars across all chunks
+const SNIPPET_LIMIT = 600; // per-chunk truncate
+// --- RRF fusion helper ---
+function rrfFuse(dense, sparse, k = 60) {
+    const map = new Map();
+    const add = (arr) => {
+        arr.forEach((it) => {
+            const key = String(it.id);
+            const inc = 1.0 / (k + it._rank + 1);
+            const cur = map.get(key);
+            if (cur)
+                cur.score += inc;
+            else
+                map.set(key, { item: it, score: inc });
+        });
+    };
+    add(dense);
+    add(sparse);
+    return [...map.values()]
+        .sort((a, b) => b.score - a.score)
+        .map(v => ({ ...v.item, score: v.score }));
+}
+// --- dense-only search for NAMED vector schema ---
+async function qdrantSearchDenseNamed(denseVec, topK = 24, filter) {
+    const body = {
+        vector: { name: "dense", vector: denseVec, params: { hnsw_ef: 48 } },
+        limit: topK,
+        with_payload: true,
+        with_vector: false,
+    };
+    if (filter)
+        body.filter = filter;
     const r = await fetch(`${process.env.QDRANT_URL}/collections/${process.env.QDRANT_COLLECTION}/points/search`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "api-key": process.env.QDRANT_API_KEY },
-        body: JSON.stringify({ vector, limit: topK, with_payload: true }),
+        body: JSON.stringify(body),
     });
-    if (!r.ok) {
-        const t = await r.text().catch(() => "");
-        throw new Error(`Qdrant search failed: ${r.status} ${t}`);
-    }
+    if (!r.ok)
+        throw new Error(`dense search failed: ${r.status} ${await r.text()}`);
     const j = await r.json();
-    return (j.result ?? []);
+    // annotate rank so RRF is stable
+    return (j.result ?? []).map((h, i) => ({ ...h, _rank: i }));
+}
+// --- sparse-only search using query text (needs sparse_vectors in collection) ---
+async function qdrantSearchSparseText(queryText, topK = 24, filter) {
+    const body = {
+        sparse: { name: "sparse", text: queryText },
+        limit: topK,
+        with_payload: true,
+        with_vector: false,
+    };
+    if (filter)
+        body.filter = filter;
+    const r = await fetch(`${process.env.QDRANT_URL}/collections/${process.env.QDRANT_COLLECTION}/points/search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "api-key": process.env.QDRANT_API_KEY },
+        body: JSON.stringify(body),
+    });
+    if (!r.ok)
+        throw new Error(`sparse search failed: ${r.status} ${await r.text()}`);
+    const j = await r.json();
+    return (j.result ?? []).map((h, i) => ({ ...h, _rank: i }));
+}
+// --- hybrid with safe fallback (NO /points/query) ---
+async function qdrantSearchHybrid(denseVec, queryText, topK = 24, filter) {
+    // run dense always
+    const dense = await qdrantSearchDenseNamed(denseVec, topK, filter);
+    // try sparse; if it fails (older Qdrant or missing sparse_vectors), fall back to dense-only
+    let sparse = [];
+    try {
+        sparse = await qdrantSearchSparseText(queryText, topK, filter);
+    }
+    catch {
+        return dense; // dense-only fallback
+    }
+    const fused = rrfFuse(dense, sparse, 60);
+    return fused.slice(0, topK);
 }
 /* =========================================================
  *            EMBEDDINGS UTIL
@@ -189,13 +252,22 @@ async function embedInBatches(allTexts, batchSize = 16, pauseMs = 150) {
 async function indexChunksCore({ chunks }) {
     if (!chunks?.length)
         return { count: 0, dim: 0 };
-    const texts = chunks.map((c) => c.text);
+    const texts = chunks.map((c) => {
+        const parts = [];
+        if (c.title)
+            parts.push(`Title: ${c.title}`);
+        const section = c.payload?.section ?? c.payload?.SECTION ?? c.payload?.Section;
+        if (section)
+            parts.push(`Section: ${section}`);
+        parts.push(c.text);
+        return parts.join("\n\n");
+    });
     const vectors = await embedInBatches(texts, 16, 150);
     const dim = vectors[0].length;
     await qdrantEnsureCollection(dim);
     const points = vectors.map((v, i) => ({
         id: normalizePointId(chunks[i].id),
-        vector: v,
+        vector: { dense: v }, // named dense vector
         payload: {
             original_id: chunks[i].id,
             text: chunks[i].text,
@@ -210,24 +282,57 @@ async function indexChunksCore({ chunks }) {
 }
 async function answerWithRagCore({ question, topK, model }) {
     const [queryVec] = await embedInBatches([question], 1, 0);
-    const hits = await qdrantSearch(queryVec, topK ?? 5);
-    const context = hits
-        .map((h) => `• ${h.payload?.title ? `[${h.payload.title}] ` : ""}${h.payload?.text ?? ""}`)
-        .join("\n\n");
+    // server-side hybrid search
+    const raw = await qdrantSearchHybrid(queryVec, question, Math.max(topK ?? 0, MAX_CANDIDATES));
+    // group by source (url first, fallback title)
+    const groups = new Map();
+    for (const h of raw) {
+        const key = (h.payload?.url || h.payload?.title || String(h.id)).toString();
+        if (!groups.has(key))
+            groups.set(key, []);
+        const arr = groups.get(key);
+        if (arr.length < MAX_PER_DOC)
+            arr.push(h);
+    }
+    // assemble diversified context under a strict budget
+    const orderedGroups = Array.from(groups.values())
+        .sort((a, b) => (b[0].score ?? 0) - (a[0].score ?? 0))
+        .slice(0, MAX_DOCS);
+    let budget = CONTEXT_BUDGET;
+    const chosen = [];
+    for (const g of orderedGroups) {
+        for (const h of g) {
+            const title = h.payload?.title;
+            const url = h.payload?.url;
+            const txt = String(h.payload?.text ?? "").slice(0, SNIPPET_LIMIT);
+            const snippet = txt;
+            if (snippet.length + 50 > budget)
+                continue;
+            chosen.push({ title, url, text: snippet, score: h.score ?? 0 });
+            budget -= (snippet.length + 50);
+        }
+    }
+    // numbered context
+    const context = chosen.map((c, i) => {
+        const head = c.title ? `[${i + 1}] ${c.title}` : `[${i + 1}]`;
+        const src = c.url ? `\nSource: ${c.url}` : "";
+        return `${head}\n${c.text}${src}`;
+    }).join("\n\n");
     const prompt = [
-        "Tu es un assistant concis. Réponds uniquement en t'appuyant sur le contexte fourni et tu t'appelles euler.",
+        "Tu es un assistant concis. Utilise le contexte fourni (plusieurs extraits) et cite les indices [1], [2], etc.",
         context ? `\nContexte:\n${context}\n` : "\n(Contexte vide)\n",
         `Question: ${question}`,
-        "\nSi l'information n'est pas dans le contexte, dis que tu ne sais pas.",
+        "Si l'information n'est pas dans le contexte, dis que tu ne sais pas.",
     ].join("\n");
     const chat = await chatClient.chat.completions.create({
         model: model ?? process.env.APERTUS_MODEL_ID,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.2,
+        max_tokens: 400,
     });
     return {
         reply: chat.choices?.[0]?.message?.content ?? "",
-        sources: hits.map((h) => ({ id: h.id, score: h.score, payload: h.payload })),
+        sources: chosen.map((c, i) => ({ idx: i + 1, title: c.title, url: c.url, score: c.score })),
     };
 }
 /* =========================================================

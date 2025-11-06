@@ -21,7 +21,7 @@ object TestConstants {
   object ButtonTexts {
     const val MICROSOFT_LOGIN = "Continue with Microsoft Entra ID"
     const val SWITCH_LOGIN = "Continue as a guest"
-    const val FIND_CS220_EXAMS = "Find CS220 past exams"
+    const val WHAT_IS_EPFL = "What is EPFL"
     const val CHECK_ED_DISCUSSION = "Check Ed Discussion"
   }
 

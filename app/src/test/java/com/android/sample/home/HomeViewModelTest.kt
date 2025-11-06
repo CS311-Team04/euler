@@ -867,21 +867,20 @@ class HomeViewModelTest {
       }
 
   @Test
-  fun hideDeleteConfirmation_does_not_affect_other_flags() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+  fun hideDeleteConfirmation_does_not_affect_other_flags() {
+    val viewModel = HomeViewModel()
 
-        viewModel.showDeleteConfirmation()
-        val before = viewModel.uiState.value
+    viewModel.showDeleteConfirmation()
+    val before = viewModel.uiState.value
 
-        viewModel.hideDeleteConfirmation()
-        val after = viewModel.uiState.value
+    viewModel.hideDeleteConfirmation()
+    val after = viewModel.uiState.value
 
-        assertEquals(before.isDrawerOpen, after.isDrawerOpen)
-        assertEquals(before.isTopRightOpen, after.isTopRightOpen)
-        assertEquals(before.isLoading, after.isLoading)
-        assertNotEquals(before.showDeleteConfirmation, after.showDeleteConfirmation)
-      }
+    assertEquals(before.isDrawerOpen, after.isDrawerOpen)
+    assertEquals(before.isTopRightOpen, after.isTopRightOpen)
+    assertEquals(before.isLoading, after.isLoading)
+    assertNotEquals(before.showDeleteConfirmation, after.showDeleteConfirmation)
+  }
 
   @Test
   fun setLoading_to_true_and_then_false() =
