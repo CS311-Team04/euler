@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.robolectric.annotation.Config
@@ -39,7 +40,7 @@ class VoiceVisualizerTest {
   fun voiceVisualizer_withDefaultPreset_displays() {
     val testSource = TestLevelSource(flowOf(0.4f))
     composeTestRule.setContent {
-      VoiceVisualizer(levelSource = testSource, size = androidx.compose.ui.unit.dp(100))
+      VoiceVisualizer(levelSource = testSource, size = 100.dp)
     }
     composeTestRule.onRoot().assertIsDisplayed()
   }
