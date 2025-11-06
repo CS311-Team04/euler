@@ -101,7 +101,7 @@ fun AuthUIScreen(
                       val screenHeight = LocalConfiguration.current.screenHeightDp.dp
                       val titleUpOffset = (25).dp
                       Text(
-                          text = "Ask anything, do everything",
+                          text = "Ask anything,\ndo everything",
                           style =
                               MaterialTheme.typography.headlineLarge.copy(
                                   fontFamily = FontFamily.Serif,
