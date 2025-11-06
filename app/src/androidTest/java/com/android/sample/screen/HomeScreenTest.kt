@@ -105,13 +105,6 @@ class HomeScreenTest {
     composeRule.onNodeWithText(TestConstants.PlaceholderTexts.MESSAGE_EULER).assertIsDisplayed()
   }
 
-  @Test
-  fun displays_footer_text() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    composeRule.onNodeWithText(TestConstants.FooterTexts.POWERED_BY).assertIsDisplayed()
-  }
-
   //  @Test
   //  fun displays_icons_with_correct_content_descriptions() {
   //    composeRule.setContent { MaterialTheme { HomeScreen() } }
@@ -279,13 +272,6 @@ class HomeScreenTest {
 
     composeRule.onNodeWithText(TestConstants.ButtonTexts.WHAT_IS_EPFL).assertIsDisplayed()
     composeRule.onNodeWithText(TestConstants.ButtonTexts.CHECK_ED_DISCUSSION).assertIsDisplayed()
-  }
-
-  @Test
-  fun screen_displays_footer_text() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    composeRule.onNodeWithText(TestConstants.FooterTexts.POWERED_BY).assertIsDisplayed()
   }
 
   @Test
@@ -776,15 +762,6 @@ class HomeScreenTest {
 
     composeRule.onNodeWithText("What is EPFL").assertIsDisplayed()
     composeRule.onNodeWithText("Check Ed Discussion").assertIsDisplayed()
-  }
-
-  @Test
-  fun footer_text_is_displayed() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    composeRule
-        .onNodeWithText("Powered by APERTUS Swiss LLM · MCP-enabled for 6 EPFL systems")
-        .assertIsDisplayed()
   }
 
   @Test

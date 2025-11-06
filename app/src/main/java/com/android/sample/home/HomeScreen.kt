@@ -13,6 +13,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -153,7 +154,7 @@ fun HomeScreen(
                     Image(
                         painter = painterResource(R.drawable.euler_logo),
                         contentDescription = "Euler",
-                        modifier = Modifier.height(100.dp),
+                        modifier = Modifier.height(25.dp),
                         contentScale = ContentScale.Fit)
                   },
                   actions = {
@@ -331,7 +332,7 @@ fun HomeScreen(
 
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = "Powered by APERTUS Swiss LLM · MCP-enabled for 6 EPFL systems",
+                        text = "Powered by APERTUS",
                         color = Color.Gray,
                         fontSize = 11.sp,
                         textAlign = TextAlign.Center,
