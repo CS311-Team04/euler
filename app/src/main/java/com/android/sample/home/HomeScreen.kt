@@ -7,10 +7,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -35,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.android.sample.Chat.ChatMessage
+import com.android.sample.Chat.ChatType
 import com.android.sample.R
 import kotlinx.coroutines.launch
 
@@ -83,7 +86,7 @@ fun HomeScreen(
   val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
   val scope = rememberCoroutineScope()
 
-  // Keep drawer UI and ViewModel in sync.
+  // Synchronize ViewModel state <-> Drawer component
   LaunchedEffect(ui.isDrawerOpen) {
     if (ui.isDrawerOpen && !drawerState.isOpen) {
       drawerState.open()
@@ -107,7 +110,8 @@ fun HomeScreen(
             ui = ui,
             onToggleSystem = { id -> viewModel.toggleSystemConnection(id) },
             onSignOut = {
-              // Close drawer visually then propagate sign out.
+              // TODO: connect your actual sign-out
+              // Close drawer visually + sync VM
               scope.launch { drawerState.close() }
               if (ui.isDrawerOpen) viewModel.toggleDrawer()
               onSignOut()
@@ -161,7 +165,7 @@ fun HomeScreen(
                               modifier = Modifier.size(24.dp))
                         }
 
-                    // Simple overflow menu.
+                    // Top-right menu (placeholder)
                     DropdownMenu(
                         expanded = ui.isTopRightOpen,
                         onDismissRequest = { viewModel.setTopRightOpen(false) },
@@ -182,20 +186,63 @@ fun HomeScreen(
               Column(
                   Modifier.fillMaxWidth().background(Color.Black).padding(bottom = 16.dp),
                   horizontalAlignment = Alignment.CenterHorizontally) {
-                    // Quick action buttons.
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.padding(horizontal = 16.dp)) {
-                          ActionButton(
-                              label = "Find CS220 past exams",
+                    // Horizontal scrollable row of suggestion chips
+                    val suggestions =
+                        listOf(
+                            "What is EPFL",
+                            "Check Ed Discussion",
+                            "Show my schedule",
+                            "Find library resources",
+                            "Check grades on IS-Academia",
+                            "Search Moodle courses",
+                            "What's due this week?",
+                            "Help me study for CS220")
+
+                    val scrollState = rememberScrollState()
+
+                    // Check if AI has already responded (at least one AI message exists)
+                    val hasAiResponded = ui.messages.any { it.type == ChatType.AI }
+
+                    // Animate visibility of suggestions - hide after first AI response
+                    AnimatedVisibility(
+                        visible = !hasAiResponded,
+                        enter = fadeIn(tween(300)) + slideInVertically(initialOffsetY = { 20 }),
+                        exit = fadeOut(tween(300)) + slideOutVertically(targetOffsetY = { -20 })) {
+                          Row(
                               modifier =
-                                  Modifier.weight(1f).height(50.dp).testTag(HomeTags.Action1Btn),
-                              onClick = onAction1Click)
-                          ActionButton(
-                              label = "Check Ed Discussion",
-                              modifier =
-                                  Modifier.weight(1f).height(50.dp).testTag(HomeTags.Action2Btn),
-                              onClick = onAction2Click)
+                                  Modifier.fillMaxWidth()
+                                      .horizontalScroll(scrollState)
+                                      .padding(horizontal = 16.dp),
+                              horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                suggestions.forEachIndexed { index, suggestion ->
+                                  val testTag =
+                                      when (index) {
+                                        0 -> HomeTags.Action1Btn
+                                        1 -> HomeTags.Action2Btn
+                                        else -> null
+                                      }
+
+                                  SuggestionChip(
+                                      text = suggestion,
+                                      modifier =
+                                          if (testTag != null) {
+                                            Modifier.testTag(testTag)
+                                          } else {
+                                            Modifier
+                                          },
+                                      onClick = {
+                                        // Call callbacks to maintain compatibility with tests
+                                        when (index) {
+                                          0 -> onAction1Click()
+                                          1 -> onAction2Click()
+                                        }
+                                        // Update draft and send message
+                                        viewModel.updateMessageDraft(suggestion)
+                                        onSendMessage(suggestion)
+                                        viewModel.sendMessage()
+                                      })
+                                }
+                              }
                         }
 
                     Spacer(Modifier.height(16.dp))
@@ -328,15 +375,21 @@ fun HomeScreen(
 
 /** Compact, rounded action button used in the bottom actions row. */
 @Composable
-private fun ActionButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-  Button(
+private fun SuggestionChip(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+  Surface(
       onClick = onClick,
-      shape = RoundedCornerShape(50),
-      colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E1E1E)),
-      modifier = modifier) {
-        Text(label, color = Color.White, textAlign = TextAlign.Center)
+      shape = RoundedCornerShape(50.dp),
+      color = Color(0xFF1E1E1E),
+      modifier = modifier.height(50.dp)) {
+        Box(
+            modifier = Modifier.fillMaxHeight().padding(horizontal = 20.dp, vertical = 12.dp),
+            contentAlignment = Alignment.Center) {
+              Text(text = text, color = Color.White, fontSize = 14.sp)
+            }
       }
 }
+
+/* ----- Placeholders for external components (drawer + top-right panel) ----- */
 
 @Composable
 private fun TopRightPanelPlaceholder(onDismiss: () -> Unit, onDeleteClick: () -> Unit) {
