@@ -1,8 +1,6 @@
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsKotlinAndroid)
-    //alias(libs.plugins.googleServices) //  Disabled for CI - google-services.json not available
-    //id("com.google.gms.google-services")
     id("jacoco")
     id("org.sonarqube")
     alias(libs.plugins.ktfmt)
