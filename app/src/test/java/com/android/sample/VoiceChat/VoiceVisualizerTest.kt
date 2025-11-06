@@ -39,9 +39,7 @@ class VoiceVisualizerTest {
   @Test
   fun voiceVisualizer_withDefaultPreset_displays() {
     val testSource = TestLevelSource(flowOf(0.4f))
-    composeTestRule.setContent {
-      VoiceVisualizer(levelSource = testSource, size = 100.dp)
-    }
+    composeTestRule.setContent { VoiceVisualizer(levelSource = testSource, size = 100.dp) }
     composeTestRule.onRoot().assertIsDisplayed()
   }
 
