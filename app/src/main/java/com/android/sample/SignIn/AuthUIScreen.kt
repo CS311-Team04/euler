@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -40,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
@@ -87,38 +89,34 @@ fun AuthUIScreen(
                 slideInVertically(
                     initialOffsetY = { it / 8 },
                     animationSpec = tween(800, easing = FastOutSlowInEasing))) {
-          Column(
-              modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp).testTag(AuthTags.Card),
-              horizontalAlignment = Alignment.CenterHorizontally,
-              verticalArrangement = Arrangement.SpaceBetween) {
-                // header (both logos)
-                Column(modifier = Modifier.fillMaxWidth()) {
-                  Spacer(modifier = Modifier.height(16.dp))
-                  LogosRow()
-                }
+          Box(
+              modifier =
+                  Modifier.fillMaxSize().padding(horizontal = 24.dp).testTag(AuthTags.Card)) {
 
-                // Spacer to move title down
-                Spacer(modifier = Modifier.weight(0.45f))
-
-                // Title only
-                Text(
-                    text = "Ask anything, do everything",
-                    style =
-                        MaterialTheme.typography.headlineLarge.copy(
-                            fontFamily = FontFamily.Serif,
-                            fontWeight = FontWeight.Normal,
-                            fontSize = 32.sp,
-                            color = Color.White),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().testTag(AuthTags.Title))
-
-                // Large spacer to push buttons section 40% down
-                Spacer(modifier = Modifier.weight(0.75f))
-
-                // Main content: Subtitle, buttons, and footer
+                // Central content pinned to true center
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.align(Alignment.Center).fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally) {
+                      // Title split on two lines
+                      val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+                      val titleUpOffset = (25).dp
+                      Text(
+                          text = "Ask anything,\ndo everything",
+                          style =
+                              MaterialTheme.typography.headlineLarge.copy(
+                                  fontFamily = FontFamily.Serif,
+                                  fontWeight = FontWeight.Normal,
+                                  fontSize = 40.sp,
+                                  lineHeight = 44.sp,
+                                  color = Color.White),
+                          textAlign = TextAlign.Center,
+                          modifier =
+                              Modifier.fillMaxWidth()
+                                  .offset(y = -titleUpOffset)
+                                  .testTag(AuthTags.Title))
+
+                      Spacer(modifier = Modifier.height(12.dp))
+
                       // Subtitle
                       Text(
                           text = "Welcome to EULER",
@@ -127,11 +125,11 @@ fun AuthUIScreen(
                                   fontFamily = FontFamily.SansSerif,
                                   fontWeight = FontWeight.Normal,
                                   fontSize = 16.sp,
-                                  color = Color.White),
+                                  color = Color(0xFF9CA3AF)),
                           textAlign = TextAlign.Center,
                           modifier = Modifier.fillMaxWidth().testTag(AuthTags.Subtitle))
 
-                      Spacer(modifier = Modifier.height(32.dp))
+                      Spacer(modifier = Modifier.height(40.dp))
 
                       // Buttons section
                       val isMicrosoftLoading =
@@ -146,12 +144,12 @@ fun AuthUIScreen(
                           onClick = onMicrosoftLogin,
                           modifier = Modifier.testTag(AuthTags.BtnMicrosoft))
 
-                      Spacer(modifier = Modifier.height(20.dp))
+                      Spacer(modifier = Modifier.height(16.dp))
 
                       // OR separator
                       OrSeparator()
 
-                      Spacer(modifier = Modifier.height(20.dp))
+                      Spacer(modifier = Modifier.height(16.dp))
 
                       // Guest button
                       GuestButton(
@@ -159,29 +157,22 @@ fun AuthUIScreen(
                           isLoading = isGuestLoading,
                           onClick = onSwitchEduLogin,
                           modifier = Modifier.testTag(AuthTags.BtnSwitchEdu))
+
+                      // Space below buttons; show terms just below the guest button
+                      Spacer(modifier = Modifier.height(12.dp))
+                      PrivacyPolicyText(modifier = Modifier.testTag(AuthTags.TermsText))
                     }
 
-                // Large spacer to push footer all the way to bottom
-                Spacer(modifier = Modifier.weight(0.9f))
-
-                // Footer section: Pinned to bottom
+                // Footer pinned to bottom-center: BY EPFL only
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally) {
-                      // Privacy Policy text
-                      PrivacyPolicyText(modifier = Modifier.testTag(AuthTags.TermsText))
-
-                      Spacer(modifier = Modifier.height(12.dp))
-
-                      // BY EPFL text
                       Text(
                           text = "BY EPFL",
                           style =
                               MaterialTheme.typography.bodySmall.copy(
                                   fontSize = 12.sp, color = Color(0xFF9CA3AF)),
                           modifier = Modifier.testTag(AuthTags.ByEpflText))
-
-                      Spacer(modifier = Modifier.height(24.dp))
                     }
               }
         }
@@ -197,21 +188,22 @@ private fun LogosRow() {
         Image(
             painter = painterResource(id = R.drawable.epfl_logo),
             contentDescription = "EPFL Logo",
-            modifier = Modifier.size(48.dp).testTag(AuthTags.LogoEpfl),
+            modifier = Modifier.size(48.dp).testTag(AuthTags.LogoEpfl).offset(y = 2.dp),
             contentScale = ContentScale.Fit)
 
+        Spacer(modifier = Modifier.width(12.dp))
         Box(
             modifier =
-                Modifier.width(0.5.dp)
-                    .height(16.dp)
-                    .padding(horizontal = 6.dp)
-                    .background(Color(0xFFC63F3F))
+                Modifier.width(1.dp)
+                    .height(14.dp)
+                    .background(Color(0xFF9CA3AF))
                     .testTag(AuthTags.LogoPoint))
+        Spacer(modifier = Modifier.width(12.dp))
 
         Image(
             painter = painterResource(id = R.drawable.euler_logo),
             contentDescription = "Euler Logo",
-            modifier = Modifier.size(80.dp).testTag(AuthTags.LogoEuler),
+            modifier = Modifier.size(32.dp).testTag(AuthTags.LogoEuler),
             contentScale = ContentScale.Fit)
       }
 }
@@ -239,7 +231,7 @@ private fun MicrosoftEntraButton(
             interactionSource = interaction,
             modifier = Modifier.fillMaxWidth()) {
               Row(
-                  modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                  modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
                   verticalAlignment = Alignment.CenterVertically,
                   horizontalArrangement = Arrangement.Center) {
                     // Microsoft logo
@@ -255,7 +247,9 @@ private fun MicrosoftEntraButton(
                         color = Color.Black,
                         style =
                             MaterialTheme.typography.bodyLarge.copy(
-                                fontFamily = FontFamily.SansSerif, fontSize = 16.sp))
+                                fontFamily = FontFamily.SansSerif,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold))
 
                     if (isLoading) {
                       Spacer(modifier = Modifier.width(12.dp))
@@ -303,7 +297,7 @@ private fun GuestButton(
       animateFloatAsState(
           targetValue = if (pressed) 0.98f else 1.0f, animationSpec = tween(120), label = "scale2")
 
-  val epflRed = Color(0xFFC63F3F)
+  val epflRed = Color(0xFFFF0000)
 
   Surface(
       color = epflRed,
@@ -315,7 +309,7 @@ private fun GuestButton(
             interactionSource = interaction,
             modifier = Modifier.fillMaxWidth()) {
               Row(
-                  modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                  modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
                   verticalAlignment = Alignment.CenterVertically,
                   horizontalArrangement = Arrangement.Center) {
                     Text(
@@ -323,7 +317,9 @@ private fun GuestButton(
                         color = Color.White,
                         style =
                             MaterialTheme.typography.bodyLarge.copy(
-                                fontFamily = FontFamily.SansSerif, fontSize = 16.sp))
+                                fontFamily = FontFamily.SansSerif,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold))
 
                     if (isLoading) {
                       Spacer(modifier = Modifier.width(12.dp))
@@ -350,17 +346,19 @@ private fun PrivacyPolicyText(modifier: Modifier = Modifier) {
     withStyle(
         style =
             SpanStyle(
-                color = Color(0xFF9CA3AF), fontFamily = FontFamily.SansSerif, fontSize = 14.sp)) {
+                color = Color(0xFF9CA3AF), fontFamily = FontFamily.SansSerif, fontSize = 11.sp)) {
           append("By continuing, you acknowledge EPFL's ")
         }
     pushStringAnnotation(
-        tag = "privacy_policy", annotation = "https://www.epfl.ch/about/overview/privacy/")
+        tag = "privacy_policy",
+        annotation =
+            "https://www.epfl.ch/about/overview/regulations-and-guidelines/epfl-privacy-policy/")
     withStyle(
         style =
             SpanStyle(
                 color = Color(0xFF9CA3AF),
                 fontFamily = FontFamily.SansSerif,
-                fontSize = 14.sp,
+                fontSize = 11.sp,
                 textDecoration = TextDecoration.Underline)) {
           append("Privacy Policy")
         }

@@ -49,64 +49,7 @@ class AuthUIScreenTest {
     composeTestRule.onNodeWithTag(AuthTags.Card).assertIsDisplayed()
   }
 
-  // ==================== LOGOS TESTS ====================
-
-  @Test
-  fun AuthUIScreen_renders_logos_row() {
-    composeTestRule.setContent {
-      MaterialTheme {
-        AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
-      }
-    }
-    composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag(AuthTags.LogosRow).assertIsDisplayed()
-  }
-
-  @Test
-  fun AuthUIScreen_renders_EPFL_logo() {
-    composeTestRule.setContent {
-      MaterialTheme {
-        AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
-      }
-    }
-    composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag(AuthTags.LogoEpfl).assertIsDisplayed()
-  }
-
-  @Test
-  fun AuthUIScreen_renders_logo_separator() {
-    composeTestRule.setContent {
-      MaterialTheme {
-        AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
-      }
-    }
-    composeTestRule.waitForIdle()
-    // Logo separator is a very small Box (0.5dp width), use unmerged tree to find it
-    composeTestRule.onNodeWithTag(AuthTags.LogoPoint, useUnmergedTree = true)
-  }
-
-  @Test
-  fun AuthUIScreen_renders_Euler_logo() {
-    composeTestRule.setContent {
-      MaterialTheme {
-        AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
-      }
-    }
-    composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag(AuthTags.LogoEuler).assertIsDisplayed()
-  }
-
-  @Test
-  fun AuthUIScreen_logos_have_content_descriptions() {
-    composeTestRule.setContent {
-      MaterialTheme {
-        AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
-      }
-    }
-    composeTestRule.waitForIdle()
-    composeTestRule.onNode(hasContentDescription("EPFL Logo")).assertIsDisplayed()
-    composeTestRule.onNode(hasContentDescription("Euler Logo")).assertIsDisplayed()
-  }
+  // (Removed) Logos tests no longer applicable: the top-left logos were removed from the UI.
 
   // ==================== TITLE AND SUBTITLE TESTS ====================
 
@@ -119,7 +62,7 @@ class AuthUIScreenTest {
     }
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.Title).assertIsDisplayed()
-    composeTestRule.onNodeWithText("Ask anything, do everything").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Ask anything,\ndo everything").assertIsDisplayed()
   }
 
   @Test
@@ -696,11 +639,7 @@ class AuthUIScreenTest {
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.Root).assertIsDisplayed()
     composeTestRule.onNodeWithTag(AuthTags.Card).assertIsDisplayed()
-    composeTestRule.onNodeWithTag(AuthTags.LogosRow).assertIsDisplayed()
-    composeTestRule.onNodeWithTag(AuthTags.LogoEpfl).assertIsDisplayed()
-    // Logo separator is a very small Box (0.5dp width), use unmerged tree to find it
-    composeTestRule.onNodeWithTag(AuthTags.LogoPoint, useUnmergedTree = true)
-    composeTestRule.onNodeWithTag(AuthTags.LogoEuler).assertIsDisplayed()
+    // Top-left logos were removed; corresponding test tags are no longer asserted here.
     composeTestRule.onNodeWithTag(AuthTags.Title).assertIsDisplayed()
     composeTestRule.onNodeWithTag(AuthTags.Subtitle).assertIsDisplayed()
     composeTestRule.onNodeWithTag(AuthTags.OrSeparator).assertIsDisplayed()
