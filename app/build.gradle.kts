@@ -4,6 +4,14 @@ plugins {
     id("jacoco")
     id("org.sonarqube")
     alias(libs.plugins.ktfmt)
+    alias(libs.plugins.googleServices) apply false
+}
+
+// Apply Google Services only locally when the JSON is present (not on CI)
+val isCi = !System.getenv("CI").isNullOrEmpty()
+val hasGoogleServicesJson = file("google-services.json").exists()
+if (!isCi && hasGoogleServicesJson) {
+    apply(plugin = libs.plugins.googleServices.get().pluginId)
 }
 
 android {
