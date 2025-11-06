@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -98,7 +99,7 @@ fun AuthUIScreen(
                 }
 
                 // Spacer to move title down
-                Spacer(modifier = Modifier.weight(0.45f))
+                Spacer(modifier = Modifier.weight(0.55f))
 
                 // Title only
                 Text(
@@ -211,7 +212,8 @@ private fun LogosRow() {
         Image(
             painter = painterResource(id = R.drawable.euler_logo),
             contentDescription = "Euler Logo",
-            modifier = Modifier.size(80.dp).testTag(AuthTags.LogoEuler),
+            modifier =
+                Modifier.size(40.dp).testTag(AuthTags.LogoEuler).offset(x = 12.dp, y = -3.dp),
             contentScale = ContentScale.Fit)
       }
 }
