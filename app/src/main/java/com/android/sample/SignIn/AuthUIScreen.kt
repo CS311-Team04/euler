@@ -382,6 +382,6 @@ private fun PrivacyPolicyText(modifier: Modifier = Modifier) {
 
   Text(
       text = annotatedText,
-      modifier = modifier.clickable { /* Handle privacy policy click */},
+      modifier = modifier.clickable { /* Handle privacy policy link */},
       style = MaterialTheme.typography.bodySmall)
 }
