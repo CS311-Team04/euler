@@ -21,10 +21,7 @@ class VoiceVisualizerTest {
     val testSource = TestLevelSource(flowOf(0.5f))
     composeTestRule.setContent {
       VoiceVisualizer(
-          levelSource = testSource,
-          preset = VisualPreset.Bloom,
-          petals = 10,
-          size = 100.dp)
+          levelSource = testSource, preset = VisualPreset.Bloom, petals = 10, size = 100.dp)
     }
     composeTestRule.onRoot().assertIsDisplayed()
   }
@@ -33,10 +30,7 @@ class VoiceVisualizerTest {
   fun voiceVisualizer_withRipplePreset_displays() {
     val testSource = TestLevelSource(flowOf(0.3f))
     composeTestRule.setContent {
-      VoiceVisualizer(
-          levelSource = testSource,
-          preset = VisualPreset.Ripple,
-          size = 100.dp)
+      VoiceVisualizer(levelSource = testSource, preset = VisualPreset.Ripple, size = 100.dp)
     }
     composeTestRule.onRoot().assertIsDisplayed()
   }
@@ -54,10 +48,7 @@ class VoiceVisualizerTest {
   fun voiceVisualizer_withZeroLevel_displays() {
     val testSource = TestLevelSource(flowOf(0f))
     composeTestRule.setContent {
-      VoiceVisualizer(
-          levelSource = testSource,
-          preset = VisualPreset.Bloom,
-          size = 100.dp)
+      VoiceVisualizer(levelSource = testSource, preset = VisualPreset.Bloom, size = 100.dp)
     }
     composeTestRule.onRoot().assertIsDisplayed()
   }
@@ -66,10 +57,7 @@ class VoiceVisualizerTest {
   fun voiceVisualizer_withMaxLevel_displays() {
     val testSource = TestLevelSource(flowOf(1f))
     composeTestRule.setContent {
-      VoiceVisualizer(
-          levelSource = testSource,
-          preset = VisualPreset.Bloom,
-          size = 100.dp)
+      VoiceVisualizer(levelSource = testSource, preset = VisualPreset.Bloom, size = 100.dp)
     }
     composeTestRule.onRoot().assertIsDisplayed()
   }
@@ -78,10 +66,7 @@ class VoiceVisualizerTest {
   fun voiceVisualizer_withCustomColor_displays() {
     val testSource = TestLevelSource(flowOf(0.5f))
     composeTestRule.setContent {
-      VoiceVisualizer(
-          levelSource = testSource,
-          color = Color.Blue,
-          size = 100.dp)
+      VoiceVisualizer(levelSource = testSource, color = Color.Blue, size = 100.dp)
     }
     composeTestRule.onRoot().assertIsDisplayed()
   }
@@ -91,10 +76,7 @@ class VoiceVisualizerTest {
     val testSource = TestLevelSource(flowOf(0.5f))
     composeTestRule.setContent {
       VoiceVisualizer(
-          levelSource = testSource,
-          preset = VisualPreset.Bloom,
-          petals = 5,
-          size = 100.dp)
+          levelSource = testSource, preset = VisualPreset.Bloom, petals = 5, size = 100.dp)
     }
     composeTestRule.onRoot().assertIsDisplayed()
   }
@@ -102,11 +84,7 @@ class VoiceVisualizerTest {
   @Test
   fun voiceVisualizer_withCustomSize_displays() {
     val testSource = TestLevelSource(flowOf(0.5f))
-    composeTestRule.setContent {
-      VoiceVisualizer(
-          levelSource = testSource,
-          size = 200.dp)
-    }
+    composeTestRule.setContent { VoiceVisualizer(levelSource = testSource, size = 200.dp) }
     composeTestRule.onRoot().assertIsDisplayed()
   }
 
@@ -131,4 +109,3 @@ private class TestLevelSource(private val flow: Flow<Float>) : LevelSource {
 
   override fun stop() {}
 }
-

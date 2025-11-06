@@ -23,9 +23,7 @@ class VoiceScreenTest {
 
   @Test
   fun voiceScreen_withModifier_displays() {
-    composeTestRule.setContent {
-      VoiceScreen(onClose = {}, modifier = Modifier.size(100.dp))
-    }
+    composeTestRule.setContent { VoiceScreen(onClose = {}, modifier = Modifier.size(100.dp)) }
     composeTestRule.onRoot().assertIsDisplayed()
   }
 
@@ -37,4 +35,3 @@ class VoiceScreenTest {
     assertTrue(true)
   }
 }
-

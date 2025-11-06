@@ -17,18 +17,13 @@ class VoiceChatSheetTest {
   @Test
   fun voiceOverlay_displays() {
     var dismissCalled = false
-    composeTestRule.setContent {
-      VoiceOverlay(onDismiss = { dismissCalled = true })
-    }
+    composeTestRule.setContent { VoiceOverlay(onDismiss = { dismissCalled = true }) }
     composeTestRule.onRoot().assertIsDisplayed()
   }
 
   @Test
   fun voiceOverlay_withModifier_displays() {
-    composeTestRule.setContent {
-      VoiceOverlay(onDismiss = {}, modifier = Modifier.size(100.dp))
-    }
+    composeTestRule.setContent { VoiceOverlay(onDismiss = {}, modifier = Modifier.size(100.dp)) }
     composeTestRule.onRoot().assertIsDisplayed()
   }
 }
-

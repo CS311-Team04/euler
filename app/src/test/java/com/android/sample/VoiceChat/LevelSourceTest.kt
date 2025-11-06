@@ -147,4 +147,3 @@ private class ManagedLevelSource(private val delegate: LevelSource) : LevelSourc
     // Ne pas arrêter, car c'est géré ailleurs
   }
 }
-

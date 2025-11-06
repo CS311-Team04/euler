@@ -85,9 +85,7 @@ class LevelSmootherTest {
   fun step_multipleSteps_convergesToTarget() {
     smoother.reset()
     var current = 0f
-    repeat(100) {
-      current = smoother.step(1f)
-    }
+    repeat(100) { current = smoother.step(1f) }
     assertTrue(current > 0.9f)
   }
 
@@ -118,9 +116,7 @@ class LevelSmootherTest {
     assertEquals(0f, zeroResult, 0.001f)
 
     smoother.reset()
-    repeat(100) {
-      smoother.step(1f)
-    }
+    repeat(100) { smoother.step(1f) }
     val oneResult = smoother.step(1f)
     assertTrue(oneResult > 0.9f)
   }
@@ -140,17 +136,13 @@ class LevelSmootherTest {
   fun step_rapidChanges_smoothsCorrectly() {
     smoother.reset()
     var result = 0f
-    repeat(10) {
-      result = smoother.step(if (it % 2 == 0) 1f else 0f)
-    }
+    repeat(10) { result = smoother.step(if (it % 2 == 0) 1f else 0f) }
     assertTrue(result >= 0f && result <= 1f)
   }
 
   @Test
   fun reset_afterMultipleSteps_resetsCorrectly() {
-    repeat(50) {
-      smoother.step(0.7f)
-    }
+    repeat(50) { smoother.step(0.7f) }
     smoother.reset()
     val afterReset = smoother.step(0f)
     assertEquals(0f, afterReset, 0.001f)
@@ -163,11 +155,8 @@ class LevelSmootherTest {
     assertEquals(0f, result1, 0.001f)
 
     smoother.reset()
-    repeat(200) {
-      smoother.step(1f)
-    }
+    repeat(200) { smoother.step(1f) }
     val result2 = smoother.step(1f)
     assertTrue(result2 > 0.95f)
   }
 }
-

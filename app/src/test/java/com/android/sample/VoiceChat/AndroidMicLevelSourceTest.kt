@@ -102,4 +102,3 @@ class AndroidMicLevelSourceTest {
     assertNotNull(source2.levels)
   }
 }
-
