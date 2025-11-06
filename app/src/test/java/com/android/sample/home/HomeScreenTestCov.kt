@@ -131,22 +131,32 @@ class HomeScreenTestCov {
         // After first send, user message is added synchronously
         val afterFirstSend = viewModel.uiState.value
         assertEquals(initialCount + 1, afterFirstSend.messages.size)
+        assertTrue("isSending should be true after first send", afterFirstSend.isSending)
 
-        // If isSending is still true, second send should be blocked
-        // Store message count while potentially still sending
+        // Try to send second message immediately while isSending is true
+        // This should be blocked by the guard in sendMessage()
         val messagesAfterFirst = afterFirstSend.messages.size
         viewModel.updateMessageDraft("Second send")
-        viewModel.sendMessage() // May or may not work depending on isSending state
+        viewModel.sendMessage() // Should be blocked because isSending is true
 
-        // Wait for any pending operations
+        // Check immediately (before coroutine completes) that second message was blocked
+        val stateAfterSecondAttempt = viewModel.uiState.value
+        assertEquals(
+            "Second message should be blocked when isSending is true",
+            messagesAfterFirst,
+            stateAfterSecondAttempt.messages.size)
+        assertTrue("isSending should still be true", stateAfterSecondAttempt.isSending)
+
+        // Wait for coroutine to complete
         advanceUntilIdle()
 
-        // Either the second message was blocked (same count) or allowed (count increased)
-        // Both scenarios are valid depending on timing, so we just verify no crash
-        val finalCount = viewModel.uiState.value.messages.size
+        // After coroutine completes, isSending should be false
+        val finalState = viewModel.uiState.value
+        assertFalse("isSending should be false after coroutine completes", finalState.isSending)
+        // Should still have only one message (the first one, plus possibly an AI response)
         assertTrue(
-            "Message count should be at least $messagesAfterFirst",
-            finalCount >= messagesAfterFirst)
+            "Should have at least the first message",
+            finalState.messages.size >= messagesAfterFirst)
       }
 
   @Test
