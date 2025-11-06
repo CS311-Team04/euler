@@ -17,11 +17,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -273,7 +273,7 @@ fun HomeScreen(
                                 enabled = speechHelper != null,
                                 modifier = Modifier.testTag(HomeTags.MicBtn)) {
                                   Icon(
-                                      Icons.Default.Star,
+                                      Icons.Default.Mic,
                                       contentDescription = "Dictate",
                                       tint = Color.Gray)
                                 }
@@ -291,7 +291,7 @@ fun HomeScreen(
                                       },
                                       modifier = Modifier.testTag(HomeTags.VoiceBtn)) {
                                         Icon(
-                                            Icons.Default.Refresh,
+                                            Icons.Default.GraphicEq,
                                             contentDescription = "Voice mode",
                                             tint = Color.Gray)
                                       }
