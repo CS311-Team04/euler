@@ -9,8 +9,11 @@ import androidx.compose.ui.unit.dp
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class VoiceChatSheetTest {
 
@@ -18,8 +21,7 @@ class VoiceChatSheetTest {
 
   @Test
   fun voiceOverlay_displays() {
-    var dismissCalled = false
-    composeTestRule.setContent { VoiceOverlay(onDismiss = { dismissCalled = true }) }
+    composeTestRule.setContent { VoiceOverlay(onDismiss = {}) }
     composeTestRule.onRoot().assertIsDisplayed()
   }
 

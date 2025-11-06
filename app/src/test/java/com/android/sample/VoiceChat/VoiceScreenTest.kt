@@ -9,8 +9,11 @@ import androidx.compose.ui.unit.dp
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class VoiceScreenTest {
 
@@ -18,8 +21,7 @@ class VoiceScreenTest {
 
   @Test
   fun voiceScreen_displays() {
-    var closeCalled = false
-    composeTestRule.setContent { VoiceScreen(onClose = { closeCalled = true }) }
+    composeTestRule.setContent { VoiceScreen(onClose = {}) }
     composeTestRule.onRoot().assertIsDisplayed()
   }
 
