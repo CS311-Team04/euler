@@ -192,4 +192,77 @@ class NavGraphLogicTest {
     assertEquals(
         "Should use whitespace message", "   ", getErrorMessage(errorWhitespace, "Default"))
   }
+
+  @Test
+  fun routes_object_contains_all_constants() {
+    assertNotNull("Opening route should be defined", Routes.Opening)
+    assertNotNull("SignIn route should be defined", Routes.SignIn)
+    assertNotNull("Home route should be defined", Routes.Home)
+    assertNotNull("HomeWithDrawer route should be defined", Routes.HomeWithDrawer)
+    assertNotNull("Settings route should be defined", Routes.Settings)
+    assertNotNull("VoiceChat route should be defined", Routes.VoiceChat)
+  }
+
+  @Test
+  fun routes_have_correct_values_and_are_unique() {
+    assertEquals("opening", Routes.Opening)
+    assertEquals("signin", Routes.SignIn)
+    assertEquals("home", Routes.Home)
+    assertEquals("home_with_drawer", Routes.HomeWithDrawer)
+    assertEquals("settings", Routes.Settings)
+    assertEquals("voice_chat", Routes.VoiceChat)
+
+    val allRoutes =
+        setOf(
+            Routes.Opening,
+            Routes.SignIn,
+            Routes.Home,
+            Routes.HomeWithDrawer,
+            Routes.Settings,
+            Routes.VoiceChat)
+    assertEquals("All routes should be unique", 6, allRoutes.size)
+  }
+
+  @Test
+  fun routes_follow_naming_convention() {
+    val routes =
+        listOf(
+            Routes.Opening,
+            Routes.SignIn,
+            Routes.Home,
+            Routes.HomeWithDrawer,
+            Routes.Settings,
+            Routes.VoiceChat)
+    routes.forEach { route ->
+      assertTrue("Route should be lowercase: $route", route == route.lowercase())
+      assertFalse("Route should not contain spaces: $route", route.contains(" "))
+    }
+  }
+
+  @Test
+  fun navigation_edge_cases_include_empty_destination() {
+    assertFalse(
+        "SignedIn with empty destination should not navigate",
+        shouldNavigateToHomeFromSignIn(AuthUiState.SignedIn, ""))
+  }
+
+  @Test
+  fun state_checking_functions_are_mutually_exclusive() {
+    val states =
+        listOf(
+            AuthUiState.Idle,
+            AuthUiState.Loading(AuthProvider.MICROSOFT),
+            AuthUiState.Loading(AuthProvider.SWITCH_EDU),
+            AuthUiState.SignedIn,
+            AuthUiState.Error("Test"))
+    for (state in states) {
+      val flags =
+          listOf(
+              isIdleState(state),
+              isLoadingState(state),
+              isSignedInState(state),
+              isErrorState(state))
+      assertEquals("Exactly one state predicate should be true for $state", 1, flags.count { it })
+    }
+  }
 }
