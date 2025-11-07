@@ -3,9 +3,12 @@ package com.android.sample.VoiceChat
 import android.Manifest
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -45,5 +48,55 @@ class VoiceScreenInteractionTest {
 
     composeTestRule.setContent { VoiceScreen(onClose = {}) }
     composeTestRule.onRoot().assertIsDisplayed()
+  }
+
+  @Test
+  fun levelIndicator_shows_when_mic_activated() {
+    val app = org.robolectric.RuntimeEnvironment.getApplication()
+    Shadows.shadowOf(app).grantPermissions(Manifest.permission.RECORD_AUDIO)
+
+    composeTestRule.setContent { VoiceScreen(onClose = {}) }
+
+    // Initially no indicator
+    assertTrue(
+        composeTestRule
+            .onAllNodes(hasText("Level:", substring = true))
+            .fetchSemanticsNodes()
+            .isEmpty())
+
+    // Click mic button
+    val clickables = composeTestRule.onAllNodes(hasClickAction())
+    if (clickables.fetchSemanticsNodes().isNotEmpty()) {
+      clickables[0].performClick()
+    }
+
+    // Indicator appears
+    composeTestRule.onNodeWithText("Level:", substring = true).assertIsDisplayed()
+  }
+
+  @Test
+  fun mic_auto_deactivates_after_silence() {
+    val app = org.robolectric.RuntimeEnvironment.getApplication()
+    Shadows.shadowOf(app).grantPermissions(Manifest.permission.RECORD_AUDIO)
+
+    composeTestRule.setContent { VoiceScreen(onClose = {}) }
+
+    // Activate mic
+    val clickables = composeTestRule.onAllNodes(hasClickAction())
+    if (clickables.fetchSemanticsNodes().isNotEmpty()) {
+      clickables[0].performClick()
+    }
+    composeTestRule.onNodeWithText("Level:", substring = true).assertIsDisplayed()
+
+    // Wait > 2.5s to trigger auto-off
+    Thread.sleep(3000)
+    composeTestRule.waitForIdle()
+
+    // Indicator should disappear
+    assertTrue(
+        composeTestRule
+            .onAllNodes(hasText("Level:", substring = true))
+            .fetchSemanticsNodes()
+            .isEmpty())
   }
 }
