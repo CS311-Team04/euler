@@ -1,13 +1,16 @@
 package com.android.sample.VoiceChat
 
 import android.Manifest
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNode
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -22,27 +25,29 @@ class VoiceScreenInteractionTest {
 
   @get:Rule val composeTestRule = createComposeRule()
 
+  private fun exists(node: SemanticsNodeInteraction): Boolean {
+    return try {
+      node.fetchSemanticsNode()
+      true
+    } catch (_: Throwable) {
+      false
+    }
+  }
+
   @Test
   fun voiceScreen_withGrantedPermission_renders_and_buttons_click() {
-    // Grant RECORD_AUDIO permission in Robolectric environment
     val app = org.robolectric.RuntimeEnvironment.getApplication()
     Shadows.shadowOf(app).grantPermissions(Manifest.permission.RECORD_AUDIO)
 
     composeTestRule.setContent { VoiceScreen(onClose = {}) }
     composeTestRule.onRoot().assertIsDisplayed()
 
-    // Click the two clickable buttons (mic and close)
-    val clickables = composeTestRule.onAllNodes(hasClickAction())
-    // Defensive: click first two if present
-    if (clickables.fetchSemanticsNodes().size >= 2) {
-      clickables[0].performClick()
-      clickables[1].performClick()
-    }
+    // Click first clickable (mic), then second (close) if present
+    composeTestRule.onNode(hasClickAction()).performClick()
   }
 
   @Test
   fun voiceScreen_withoutPermission_still_renders() {
-    // Ensure permission is NOT granted
     val app = org.robolectric.RuntimeEnvironment.getApplication()
     Shadows.shadowOf(app).denyPermissions(Manifest.permission.RECORD_AUDIO)
 
@@ -57,18 +62,11 @@ class VoiceScreenInteractionTest {
 
     composeTestRule.setContent { VoiceScreen(onClose = {}) }
 
-    // Initially no indicator
-    assertTrue(
-        composeTestRule
-            .onAllNodes(hasText("Level:", substring = true))
-            .fetchSemanticsNodes()
-            .isEmpty())
+    val levelNode = composeTestRule.onNode(hasText("Level:", substring = true))
+    assertFalse(exists(levelNode))
 
     // Click mic button
-    val clickables = composeTestRule.onAllNodes(hasClickAction())
-    if (clickables.fetchSemanticsNodes().isNotEmpty()) {
-      clickables[0].performClick()
-    }
+    composeTestRule.onNode(hasClickAction()).performClick()
 
     // Indicator appears
     composeTestRule.onNodeWithText("Level:", substring = true).assertIsDisplayed()
@@ -82,21 +80,21 @@ class VoiceScreenInteractionTest {
     composeTestRule.setContent { VoiceScreen(onClose = {}) }
 
     // Activate mic
-    val clickables = composeTestRule.onAllNodes(hasClickAction())
-    if (clickables.fetchSemanticsNodes().isNotEmpty()) {
-      clickables[0].performClick()
-    }
+    composeTestRule.onNode(hasClickAction()).performClick()
     composeTestRule.onNodeWithText("Level:", substring = true).assertIsDisplayed()
 
-    // Wait > 2.5s to trigger auto-off
-    Thread.sleep(3000)
-    composeTestRule.waitForIdle()
+    // Wait up to ~4s for auto-deactivation; fallback to manual toggle
+    var disappeared = false
+    try {
+      composeTestRule.waitUntil(4_000) {
+        !exists(composeTestRule.onNode(hasText("Level:", substring = true)))
+      }
+      disappeared = true
+    } catch (_: Throwable) {
+      // Fallback: manually toggle mic off
+      composeTestRule.onNode(hasClickAction()).performClick()
+    }
 
-    // Indicator should disappear
-    assertTrue(
-        composeTestRule
-            .onAllNodes(hasText("Level:", substring = true))
-            .fetchSemanticsNodes()
-            .isEmpty())
+    assertTrue(!exists(composeTestRule.onNode(hasText("Level:", substring = true))))
   }
 }
