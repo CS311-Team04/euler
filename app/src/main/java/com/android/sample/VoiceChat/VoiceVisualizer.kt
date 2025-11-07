@@ -2,17 +2,22 @@ package com.android.sample.VoiceChat
 
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlin.math.*
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.min
+import kotlin.math.sin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -100,51 +105,31 @@ private fun AgslBloom(
 
   Canvas(modifier.size(size)) {
     val canvasSize = this.size
-    val center = androidx.compose.ui.geometry.Offset(canvasSize.width / 2f, canvasSize.height / 2f)
-    val minSize = minOf(canvasSize.width, canvasSize.height)
+    val center = Offset(canvasSize.width / 2f, canvasSize.height / 2f)
+    val minSize = min(canvasSize.width, canvasSize.height)
 
-    // Continuous animation with more proportional reaction
-    val breathing = sin(t * 2.0f) * 0.015f
-    val clamped = level.coerceIn(0f, 1f)
-    val oneMinusClamped = (1.0 - clamped.toDouble())
-    val easeLevel =
-        1.0f - (oneMinusClamped * oneMinusClamped * oneMinusClamped).toFloat() // pow(x, 3)
+    val params = calculateBloomParameters(level, t, petals, minSize)
 
-    // Base size of the entire bloom grows with audio level
-    val baseScale = 1.0f + easeLevel * 1.0f // Shape can grow up to ~2x base size
-    val base = minSize * 0.16f * baseScale
-
-    // Petal amplitude for animation (kept consistent to preserve shape)
-    val amp = 0.12f + 0.45f * sin(t * 2) * cos(2 * t) * 2
-
-    // Background circle behind the bloom
     drawCircle(
-        color = color.copy(alpha = 0.01f + easeLevel * 0.05f),
-        radius = base * (1f + breathing) * 0.9f * 10, // Grows with base
+        color = color.copy(alpha = 0.01f + params.easeLevel * 0.05f),
+        radius = params.base * (1f + params.breathing) * 0.9f * 10,
         center = center)
 
-    // Petals path - proportional reaction
     val path = Path()
-    val steps = petals * 50
-    val phase = t * 1.5f
-
-    for (i in 0..steps) {
-      val angle = (i.toFloat() / steps) * 2f * PI.toFloat()
-      val edge = base * (1f + amp * sin(petals.toFloat() * angle + phase) / 5)
-      val x = center.x + edge * cos(angle) * 1.2f
-      val y = center.y + edge * sin(angle) * 1.2f
-
-      if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+    params.pathPoints.forEachIndexed { index, offset ->
+      if (index == 0) {
+        path.moveTo(offset.x, offset.y)
+      } else {
+        path.lineTo(offset.x, offset.y)
+      }
     }
     path.close()
 
-    // Alpha more visible proportionally to the level
-    drawPath(path, color.copy(alpha = 0.75f + easeLevel * 0.3f), style = Fill)
+    drawPath(path, color.copy(alpha = 0.75f + params.easeLevel * 0.3f), style = Fill)
 
-    // Core - proportional to base size (grows with the whole shape)
     drawCircle(
-        color = Color.Black.copy(alpha = 0.25f + easeLevel * 0.15f),
-        radius = base * 0.2f,
+        color = Color.Black.copy(alpha = 0.25f + params.easeLevel * 0.15f),
+        radius = params.base * 0.2f,
         center = center)
   }
 }
@@ -172,30 +157,14 @@ private fun AgslRipple(level: Float, color: Color, size: Dp, modifier: Modifier 
 
   Canvas(modifier.size(size)) {
     val canvasSize = this.size
-    val center = androidx.compose.ui.geometry.Offset(canvasSize.width / 2f, canvasSize.height / 2f)
-    val minSize = minOf(canvasSize.width, canvasSize.height)
+    val center = Offset(canvasSize.width / 2f, canvasSize.height / 2f)
+    val minSize = min(canvasSize.width, canvasSize.height)
 
-    // More proportional reaction: smaller base, larger amplitude
-    val baseRadius = minSize * 0.08f
-    val maxRadius = minSize * 0.45f
-    val radius = baseRadius + (maxRadius - baseRadius) * level.coerceIn(0f, 1f)
+    val params = calculateRippleParameters(level, t, minSize)
 
-    val waveTime = t * 1.7f
-
-    // Ripple rings - more visible with voice
-    for (i in 0..3) {
-      val ringRadius = radius + i * minSize * 0.06f
-      val wave = 0.5f + 0.5f * sin(18f * (ringRadius / minSize) - waveTime)
-      val alpha = (0.6f - i * 0.15f).coerceIn(0f, 1f)
-
-      // Alpha becomes more visible when voice level increases
-      val baseAlpha = 0.35f + 0.3f * level.coerceIn(0f, 1f)
-      val finalAlpha = alpha * (baseAlpha + 0.45f * wave)
-
-      drawCircle(
-          color = color.copy(alpha = finalAlpha.coerceIn(0f, 1f)),
-          radius = ringRadius,
-          center = center)
+    params.radii.forEachIndexed { index, ringRadius ->
+      val alpha = params.alphas[index]
+      drawCircle(color = color.copy(alpha = alpha), radius = ringRadius, center = center)
     }
   }
 }
@@ -221,4 +190,67 @@ private fun LegacyPulse(level: Float, color: Color, size: Dp, modifier: Modifier
     drawCircle(color.copy(alpha = 0.8f + level * 0.15f), r, c)
     drawCircle(Color.Black.copy(alpha = 0.22f + level * 0.1f), r * 0.22f, c)
   }
+}
+
+@VisibleForTesting
+internal data class BloomParameters(
+    val breathing: Float,
+    val easeLevel: Float,
+    val base: Float,
+    val pathPoints: List<Offset>
+)
+
+@VisibleForTesting
+internal fun calculateBloomParameters(
+    level: Float,
+    t: Float,
+    petals: Int,
+    minSize: Float
+): BloomParameters {
+  val breathing = sin(t * 2.0f) * 0.015f
+  val clamped = level.coerceIn(0f, 1f)
+  val oneMinusClamped = (1.0 - clamped.toDouble())
+  val easeLevel =
+      1.0f - (oneMinusClamped * oneMinusClamped * oneMinusClamped).toFloat() // pow(x, 3)
+  val baseScale = 1.0f + easeLevel * 1.0f
+  val base = minSize * 0.16f * baseScale
+  val amp = 0.12f + 0.45f * sin(t * 2) * cos(2 * t) * 2
+  val steps = petals * 50
+  val phase = t * 1.5f
+  val points =
+      (0..steps).map { index ->
+        val angle = (index.toFloat() / steps) * 2f * PI.toFloat()
+        val edge = base * (1f + amp * sin(petals.toFloat() * angle + phase) / 5)
+        val x = (minSize / 2f) + edge * cos(angle) * 1.2f
+        val y = (minSize / 2f) + edge * sin(angle) * 1.2f
+        Offset(x, y)
+      }
+  return BloomParameters(
+      breathing = breathing, easeLevel = easeLevel, base = base, pathPoints = points)
+}
+
+@VisibleForTesting
+internal data class RippleParameters(val radii: List<Float>, val alphas: List<Float>)
+
+@VisibleForTesting
+internal fun calculateRippleParameters(level: Float, t: Float, minSize: Float): RippleParameters {
+  val baseRadius = minSize * 0.08f
+  val maxRadius = minSize * 0.45f
+  val radius = baseRadius + (maxRadius - baseRadius) * level.coerceIn(0f, 1f)
+  val waveTime = t * 1.7f
+  val baseAlpha = 0.35f + 0.3f * level.coerceIn(0f, 1f)
+
+  val radii = mutableListOf<Float>()
+  val alphas = mutableListOf<Float>()
+
+  for (i in 0..3) {
+    val ringRadius = radius + i * minSize * 0.06f
+    val wave = 0.5f + 0.5f * sin(18f * (ringRadius / minSize) - waveTime)
+    val alpha = (0.6f - i * 0.15f).coerceIn(0f, 1f)
+    val finalAlpha = (alpha * (baseAlpha + 0.45f * wave)).coerceIn(0f, 1f)
+    radii += ringRadius
+    alphas += finalAlpha
+  }
+
+  return RippleParameters(radii = radii, alphas = alphas)
 }

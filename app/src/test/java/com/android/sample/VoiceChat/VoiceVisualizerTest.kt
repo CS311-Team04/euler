@@ -3,6 +3,7 @@ package com.android.sample.VoiceChat
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -229,6 +230,29 @@ class VoiceVisualizerTest {
     assertEquals(1, source.stopCount)
     assertTrue("expected emissions recorded", source.emittedValues.isNotEmpty())
     assertTrue("values should be clamped", source.emittedValues.all { it in 0f..1f })
+  }
+
+  @Test
+  fun bloomParameters_result_scalesWithLevel() {
+    val low = calculateBloomParameters(level = 0.2f, t = 0.1f, petals = 4, minSize = 200f)
+    val high = calculateBloomParameters(level = 0.8f, t = 0.1f, petals = 4, minSize = 200f)
+
+    assertTrue(high.base > low.base)
+    assertEquals(low.pathPoints.size, high.pathPoints.size)
+    assertTrue(low.pathPoints.all { it.x.isFinite() && it.y.isFinite() })
+    assertNotEquals(Offset.Zero, low.pathPoints.first())
+  }
+
+  @Test
+  fun rippleParameters_produces_expected_rings() {
+    val paramsLow = calculateRippleParameters(0.1f, t = 0.2f, minSize = 250f)
+    val paramsHigh = calculateRippleParameters(0.9f, t = 0.2f, minSize = 250f)
+
+    assertEquals(4, paramsLow.radii.size)
+    assertEquals(4, paramsLow.alphas.size)
+    assertTrue(paramsLow.alphas.all { it in 0f..1f })
+    assertTrue(paramsHigh.alphas.all { it in 0f..1f })
+    assertTrue(paramsHigh.radii.first() > paramsLow.radii.first())
   }
 }
 
