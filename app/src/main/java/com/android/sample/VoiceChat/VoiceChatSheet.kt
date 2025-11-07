@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
-/** VoiceOverlay - Utilisé dans HomeScreen pour afficher VoiceScreen */
+/** Voice overlay entry point used from HomeScreen to render the voice UI. */
 @Composable
 fun VoiceOverlay(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
   VoiceScreen(onClose = onDismiss, modifier = modifier)

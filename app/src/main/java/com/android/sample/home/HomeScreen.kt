@@ -83,7 +83,8 @@ fun HomeScreen(
     onSignOut: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onVoiceChatClick: () -> Unit = {},
-    openDrawerOnStart: Boolean = false
+    openDrawerOnStart: Boolean = false,
+    speechHelper: com.android.sample.speech.SpeechToTextHelper? = null
 ) {
   val ui by viewModel.uiState.collectAsState()
   val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -267,8 +268,11 @@ fun HomeScreen(
                             // Voice chat button - opens voice visualizer
                             IconButton(
                                 onClick = {
-                                  // Voice chat functionality - handled elsewhere
+                                  speechHelper?.startListening { recognized ->
+                                    viewModel.updateMessageDraft(recognized)
+                                  }
                                 },
+                                enabled = speechHelper != null,
                                 modifier = Modifier.testTag(HomeTags.MicBtn)) {
                                   Icon(
                                       Icons.Default.Mic,

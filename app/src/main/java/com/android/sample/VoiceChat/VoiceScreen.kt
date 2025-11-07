@@ -29,6 +29,10 @@ import kotlinx.coroutines.delay as coroutinesDelay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
+/**
+ * Full-screen voice UI: requests microphone permission, manages mic lifecycle, monitors audio
+ * levels and renders the visualizer. Provides close action.
+ */
 @Composable
 fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
   val context = androidx.compose.ui.platform.LocalContext.current
@@ -59,79 +63,79 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
     }
   }
 
-  // État pour contrôler si le microphone est actif
+  // State to control whether the microphone is active
   var isMicActive by remember { mutableStateOf(false) }
   val mic = remember { AndroidMicLevelSource() }
   val mockSource = remember { MockLevelSource(0f) }
 
-  // Détection d'inactivité vocale pour désactiver automatiquement
+  // Voice inactivity detection to automatically disable mic after silence
   var lastVoiceTime by remember { mutableStateOf(System.currentTimeMillis()) }
-  val silenceThreshold = 0.05f // Seuil pour considérer qu'il y a du silence
-  val silenceDuration = 2500L // 2.5 secondes de silence avant désactivation
+  val silenceThreshold = 0.05f // Threshold to consider silence
+  val silenceDuration = 2500L // 2.5 seconds of silence before auto deactivation
 
-  // Surveillance du niveau audio pour détecter l'inactivité
+  // Monitor current audio level to track inactivity
   var currentLevel by remember { mutableStateOf(0f) }
 
-  // Contrôle du microphone (start/stop)
+  // Microphone control (start/stop)
   LaunchedEffect(isMicActive, hasMic) {
     if (isMicActive && hasMic) {
       try {
-        android.util.Log.d("VoiceScreen", "Démarrage du microphone...")
+        android.util.Log.d("VoiceScreen", "Starting microphone...")
         mic.start()
         lastVoiceTime = System.currentTimeMillis()
-        // Petit délai pour laisser le micro s'initialiser
+        // Small delay to let the mic initialize
         coroutinesDelay(100)
-        android.util.Log.d("VoiceScreen", "Microphone démarré avec succès")
+        android.util.Log.d("VoiceScreen", "Microphone started successfully")
       } catch (e: Exception) {
-        android.util.Log.e("VoiceScreen", "Erreur démarrage micro", e)
+        android.util.Log.e("VoiceScreen", "Microphone start error", e)
         e.printStackTrace()
         isMicActive = false
       }
     } else {
       try {
-        android.util.Log.d("VoiceScreen", "Arrêt du microphone...")
+        android.util.Log.d("VoiceScreen", "Stopping microphone...")
         mic.stop()
-        android.util.Log.d("VoiceScreen", "Microphone arrêté")
+        android.util.Log.d("VoiceScreen", "Microphone stopped")
       } catch (e: Exception) {
-        android.util.Log.e("VoiceScreen", "Erreur arrêt micro", e)
+        android.util.Log.e("VoiceScreen", "Microphone stop error", e)
       }
       currentLevel = 0f
     }
   }
 
-  // Nettoyage quand on quitte l'écran
+  // Cleanup when leaving the screen
   DisposableEffect(Unit) {
     onDispose {
       if (isMicActive) {
         mic.stop()
-        android.util.Log.d("VoiceScreen", "Microphone arrêté lors de la fermeture")
+        android.util.Log.d("VoiceScreen", "Microphone stopped on dispose")
       }
     }
   }
 
-  // Collecter les niveaux audio quand le micro est actif + détection de silence
+  // Collect audio levels when mic is active + silence detection
   LaunchedEffect(isMicActive, hasMic) {
     if (isMicActive && hasMic) {
       try {
-        android.util.Log.d("VoiceScreen", "Début collecte des niveaux audio")
+        android.util.Log.d("VoiceScreen", "Begin collecting audio levels")
         var frameCount = 0
         mic.levels.collect { level ->
           currentLevel = level
           frameCount++
 
-          // Log périodique pour débugger
-          if (frameCount % 30 == 0) { // Toutes les ~0.5 secondes
+          // Periodic logs for debugging
+          if (frameCount % 30 == 0) { // ~ every 0.5s
             android.util.Log.d(
                 "VoiceScreen",
-                "Niveau audio: ${String.format("%.3f", level)} (seuil silence: $silenceThreshold)")
+                "Audio level: ${String.format("%.3f", level)} (silence threshold: $silenceThreshold)")
           }
 
-          // Si le niveau est au-dessus du seuil, on considère qu'il y a de la voix
+          // If level is above the threshold, consider it as voice activity
           if (level > silenceThreshold) {
             lastVoiceTime = System.currentTimeMillis()
-            if (frameCount % 10 == 0) { // Log moins souvent quand on détecte la voix
+            if (frameCount % 10 == 0) { // Log less often when voice is detected
               android.util.Log.d(
-                  "VoiceScreen", "Voix détectée! Niveau: ${String.format("%.3f", level)}")
+                  "VoiceScreen", "Voice detected! Level: ${String.format("%.3f", level)}")
             }
           }
         }
@@ -144,16 +148,15 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
     }
   }
 
-  // Vérifier périodiquement si on doit désactiver après silence
+  // Periodically check whether to disable mic after continuous silence
   LaunchedEffect(isMicActive) {
     if (isMicActive && hasMic) {
       while (isMicActive) {
-        coroutinesDelay(500) // Vérifier toutes les 500ms
+        coroutinesDelay(500) // Check every 500ms
         val timeSinceLastVoice = System.currentTimeMillis() - lastVoiceTime
         if (timeSinceLastVoice > silenceDuration && currentLevel <= silenceThreshold) {
           android.util.Log.d(
-              "VoiceScreen",
-              "Silence détecté (${timeSinceLastVoice}ms), désactivation automatique du micro")
+              "VoiceScreen", "Silence detected (${timeSinceLastVoice}ms), auto deactivating mic")
           isMicActive = false
           break
         }
@@ -163,9 +166,8 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
 
   Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
 
-    // Visualiseur au centre - utilise le vrai micro si actif, sinon mock silencieux
-    // On utilise ManagedLevelSource pour empêcher VoiceVisualizer de démarrer/arrêter
-    // automatiquement
+    // Visualizer in the center - uses real mic if active, otherwise silent mock
+    // ManagedLevelSource prevents VoiceVisualizer from auto start/stop
     VoiceVisualizer(
         levelSource =
             remember(isMicActive, hasMic) {
@@ -175,13 +177,13 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
                 mockSource
               }
             },
-        preset = VisualPreset.Bloom, // Visualiseur Bloom
+        preset = VisualPreset.Bloom, // Bloom visualizer
         color = Color(0xFC0000),
         petals = 4,
         size = 1500.dp,
         modifier = Modifier.align(Alignment.Center).offset(y = -10.dp))
 
-    // Boutons bas
+    // Bottom buttons
     Column(
         modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally) {
@@ -194,7 +196,7 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
                         isMicActive = !isMicActive
                         android.util.Log.d(
                             "VoiceScreen",
-                            "Microphone ${if (isMicActive) "activé" else "désactivé"}")
+                            "Microphone ${if (isMicActive) "enabled" else "disabled"}")
                         if (isMicActive) {
                           lastVoiceTime = System.currentTimeMillis()
                         }
@@ -203,7 +205,7 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
                     iconVector = Icons.Filled.Mic,
                     size = 100.dp,
                     background =
-                        if (isMicActive) Color(0x33FF0000) else Color(0x0), // Indicateur visuel
+                        if (isMicActive) Color(0x33FF0000) else Color(0x0), // Visual indicator
                     iconTint = if (isMicActive) Color(0xFFFF0000) else Color.White)
                 RoundIconButton(
                     onClick = onClose,
@@ -214,11 +216,11 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
               }
           Spacer(Modifier.height(14.dp))
 
-          // Indicateur de niveau audio pour débugger
+          // Simple debug level indicator while mic active
           if (isMicActive && hasMic) {
             Text(
                 text =
-                    "Niveau: ${String.format("%.2f", currentLevel)} ${if (currentLevel > silenceThreshold) "✓ Voix" else "Silence"}",
+                    "Level: ${String.format("%.2f", currentLevel)} ${if (currentLevel > silenceThreshold) "✓ Voice" else "Silence"}",
                 color =
                     if (currentLevel > silenceThreshold) Color(0xFF2CD510) else Color(0xFF9A9A9A),
                 fontSize = 11.sp,
@@ -235,6 +237,7 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
   }
 }
 
+/** Circular icon button used in the voice UI for mic/close actions. */
 @Composable
 private fun RoundIconButton(
     onClick: () -> Unit,
@@ -259,7 +262,7 @@ private fun RoundIconButton(
       }
 }
 
-// Mock LevelSource pour les previews
+// Mock LevelSource for previews
 private class MockLevelSource(private val level: Float) : LevelSource {
   override val levels = flow {
     while (true) {
@@ -268,29 +271,30 @@ private class MockLevelSource(private val level: Float) : LevelSource {
     }
   }
 
+  /** No-op in preview. */
   override fun start() {}
 
+  /** No-op in preview. */
   override fun stop() {}
 }
 
-// Wrapper pour empêcher VoiceVisualizer de démarrer automatiquement le micro
-// Mais on passe quand même le flux pour que VoiceVisualizer puisse collecter les niveaux
+// Wrapper that prevents VoiceVisualizer from starting/stopping the mic automatically
+// but still forwards the flow so VoiceVisualizer can collect levels
 private class ManagedLevelSource(private val delegate: LevelSource) : LevelSource {
   override val levels: Flow<Float> = delegate.levels
 
+  /** Intentionally does nothing; lifecycle is managed by VoiceScreen. */
   override fun start() {
-    // Ne pas démarrer, car c'est géré dans VoiceScreen
-    // Le micro est déjà démarré dans VoiceScreen
-    android.util.Log.d("ManagedLevelSource", "start() appelé mais ignoré (géré par VoiceScreen)")
+    android.util.Log.d("ManagedLevelSource", "start() called but ignored (managed by VoiceScreen)")
   }
 
+  /** Intentionally does nothing; lifecycle is managed by VoiceScreen. */
   override fun stop() {
-    // Ne pas arrêter, car c'est géré dans VoiceScreen
-    android.util.Log.d("ManagedLevelSource", "stop() appelé mais ignoré (géré par VoiceScreen)")
+    android.util.Log.d("ManagedLevelSource", "stop() called but ignored (managed by VoiceScreen)")
   }
 }
 
-// Preview Provider pour différents niveaux audio
+/** Preview provider for different fixed audio levels. */
 private class VoiceLevelProvider : PreviewParameterProvider<Float> {
   override val values: Sequence<Float>
     get() = sequenceOf(0f, 0.3f, 0.6f, 0.9f)
@@ -323,12 +327,13 @@ private fun VoiceScreenPreviewMultiple(@PreviewParameter(VoiceLevelProvider::cla
   VoiceScreenPreview(level = level)
 }
 
+/** Preview content used by the previews above. */
 @Composable
 private fun VoiceScreenPreview(level: Float) {
   val mockSource = remember { MockLevelSource(level) }
 
   Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-    // Visualiseur au centre avec mock source
+    // Visualizer centered with mock source
     VoiceVisualizer(
         levelSource = mockSource,
         preset = VisualPreset.Bloom,
@@ -337,7 +342,7 @@ private fun VoiceScreenPreview(level: Float) {
         size = 1500.dp,
         modifier = Modifier.align(Alignment.Center).offset(y = -10.dp))
 
-    // Boutons bas
+    // Bottom buttons
     Column(
         modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally) {

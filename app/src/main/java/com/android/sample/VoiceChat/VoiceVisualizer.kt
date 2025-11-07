@@ -16,25 +16,30 @@ import kotlin.math.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
+/** Visual presets for the voice visualizer. */
 enum class VisualPreset {
   Bloom,
   Ripple
 }
 
+/**
+ * Composable visualizer that renders audio-driven visuals using a [LevelSource]. It smooths levels
+ * for fluid animation and supports different visual [preset]s.
+ */
 @Composable
 fun VoiceVisualizer(
     levelSource: LevelSource,
     modifier: Modifier = Modifier,
     preset: VisualPreset = VisualPreset.Bloom,
     color: Color = Color(0xFFB61919),
-    petals: Int = 10, // pour Bloom
+    petals: Int = 10, // for Bloom preset
     size: Dp = 360.dp
 ) {
   val smoother = remember { LevelSmoother() }
   var rawLevel by remember { mutableStateOf(0f) }
   var level by remember { mutableStateOf(0f) }
 
-  // Collecter les niveaux bruts
+  // Collect raw levels
   LaunchedEffect(levelSource) {
     levelSource.start()
     try {
@@ -44,11 +49,11 @@ fun VoiceVisualizer(
     }
   }
 
-  // Smoothing continu avec animation frame pour fluidité maximale (~60fps)
+  // Continuous smoothing with frame-based animation for maximum fluidity (~60fps)
   LaunchedEffect(Unit) {
     while (isActive) {
-      delay(8) // ~60fps (16ms par frame)
-      // Smoothing à chaque frame pour une animation ultra fluide
+      delay(8) // ~60fps
+      // Smooth each frame for ultra-smooth animation
       level = smoother.step(rawLevel)
     }
   }
@@ -59,11 +64,12 @@ fun VoiceVisualizer(
       VisualPreset.Ripple -> AgslRipple(level, color, size, modifier)
     }
   } else {
-    // fallback < 33
+    // Fallback for < API 33
     LegacyPulse(level, color, size, modifier)
   }
 }
 
+/** Bloom-style visualization (API 33+) drawn with Canvas (simplified placeholder for AGSL). */
 @RequiresApi(33)
 @Composable
 private fun AgslBloom(
@@ -73,21 +79,21 @@ private fun AgslBloom(
     size: Dp,
     modifier: Modifier = Modifier
 ) {
-  // Version simplifiée sans shader pour l'instant - dessin Canvas direct
+  // Simplified version without shader for now - direct Canvas drawing
   var t by remember { mutableStateOf(0f) }
   var frameCount by remember { mutableStateOf(0L) }
 
-  // Animation continue pour 60fps+ fluide
+  // Continuous animation targeting ~60fps
   LaunchedEffect(Unit) {
     val startTime = System.currentTimeMillis()
     while (isActive) {
-      delay(10) // ~60fps (16ms par frame)
-      t = ((System.currentTimeMillis() - startTime) / 1000f) // Temps en secondes
-      frameCount++ // Force la recomposition à chaque frame pour animation fluide
+      delay(10) // ~60fps
+      t = ((System.currentTimeMillis() - startTime) / 1000f) // Time in seconds
+      frameCount++ // Force recomposition each frame for smooth animation
     }
   }
 
-  // Utiliser frameCount pour forcer la recomposition à chaque frame
+  // Use frameCount to force recomposition each frame
   val r = remember { frameCount }
 
   Canvas(modifier.size(size)) {
@@ -95,27 +101,27 @@ private fun AgslBloom(
     val center = androidx.compose.ui.geometry.Offset(canvasSize.width / 2f, canvasSize.height / 2f)
     val minSize = minOf(canvasSize.width, canvasSize.height)
 
-    // Animation continue avec réaction plus proportionnelle
+    // Continuous animation with more proportional reaction
     val breathing = sin(t * 2.0f) * 0.015f
     val clamped = level.coerceIn(0f, 1f)
     val oneMinusClamped = (1.0 - clamped.toDouble())
     val easeLevel =
         1.0f - (oneMinusClamped * oneMinusClamped * oneMinusClamped).toFloat() // pow(x, 3)
 
-    // La taille de base de TOUTE la forme du bloom grossit avec le niveau audio
-    val baseScale = 1.0f + easeLevel * 1.0f // La forme peut grossir jusqu'à 2x sa taille de base
+    // Base size of the entire bloom grows with audio level
+    val baseScale = 1.0f + easeLevel * 1.0f // Shape can grow up to ~2x base size
     val base = minSize * 0.16f * baseScale
 
-    // Amplitude des pétales pour l'animation (reste constante pour garder la forme)
+    // Petal amplitude for animation (kept consistent to preserve shape)
     val amp = 0.12f + 0.45f * sin(t * 2) * cos(2 * t) * 2
 
-    // Cercle derriere le bloom
+    // Background circle behind the bloom
     drawCircle(
         color = color.copy(alpha = 0.01f + easeLevel * 0.05f),
-        radius = base * (1f + breathing) * 0.9f * 10, // Grossit avec base
+        radius = base * (1f + breathing) * 0.9f * 10, // Grows with base
         center = center)
 
-    // Petals avec path - réaction proportionnelle
+    // Petals path - proportional reaction
     val path = Path()
     val steps = petals * 50
     val phase = t * 1.5f
@@ -130,35 +136,36 @@ private fun AgslBloom(
     }
     path.close()
 
-    // Alpha plus visible proportionnellement au niveau
-    drawPath(path, color.copy(alpha = 0.75f + easeLevel * 0.3f), style = Fill) // Augmenté
+    // Alpha more visible proportionally to the level
+    drawPath(path, color.copy(alpha = 0.75f + easeLevel * 0.3f), style = Fill)
 
-    // Core - reste proportionnel à la taille de base (grossit avec toute la forme)
+    // Core - proportional to base size (grows with the whole shape)
     drawCircle(
         color = Color.Black.copy(alpha = 0.25f + easeLevel * 0.15f),
-        radius = base * 0.2f, // Proportionnel à base, donc grossit avec toute la forme
+        radius = base * 0.2f,
         center = center)
   }
 }
 
+/** Ripple-style visualization (API 33+) drawn with Canvas (simplified placeholder for AGSL). */
 @RequiresApi(33)
 @Composable
 private fun AgslRipple(level: Float, color: Color, size: Dp, modifier: Modifier = Modifier) {
-  // Version simplifiée sans shader pour l'instant
+  // Simplified version without shader for now
   var t by remember { mutableStateOf(0f) }
   var frameCount by remember { mutableStateOf(0L) }
 
-  // Animation continue pour 60fps+ fluide
+  // Continuous animation targeting ~60fps
   LaunchedEffect(Unit) {
     val startTime = System.currentTimeMillis()
     while (isActive) {
-      delay(16) // ~60fps (16ms par frame)
-      t = ((System.currentTimeMillis() - startTime) / 1000f) // Temps en secondes
-      frameCount++ // Force la recomposition à chaque frame
+      delay(16) // ~60fps
+      t = ((System.currentTimeMillis() - startTime) / 1000f) // Time in seconds
+      frameCount++ // Force recomposition each frame
     }
   }
 
-  // Utiliser frameCount pour forcer la recomposition à chaque frame
+  // Use frameCount to force recomposition each frame
   val r1 = remember { frameCount }
 
   Canvas(modifier.size(size)) {
@@ -166,21 +173,21 @@ private fun AgslRipple(level: Float, color: Color, size: Dp, modifier: Modifier 
     val center = androidx.compose.ui.geometry.Offset(canvasSize.width / 2f, canvasSize.height / 2f)
     val minSize = minOf(canvasSize.width, canvasSize.height)
 
-    // Réaction plus proportionnelle : base plus petite, amplitude plus grande
+    // More proportional reaction: smaller base, larger amplitude
     val baseRadius = minSize * 0.08f
-    val maxRadius = minSize * 0.45f // Augmenté de 0.43f (0.08 + 0.35)
+    val maxRadius = minSize * 0.45f
     val radius = baseRadius + (maxRadius - baseRadius) * level.coerceIn(0f, 1f)
 
     val waveTime = t * 1.7f
 
-    // Ripple rings - plus visibles avec la voix
+    // Ripple rings - more visible with voice
     for (i in 0..3) {
-      val ringRadius = radius + i * minSize * 0.06f // Légèrement augmenté
+      val ringRadius = radius + i * minSize * 0.06f
       val wave = 0.5f + 0.5f * sin(18f * (ringRadius / minSize) - waveTime)
       val alpha = (0.6f - i * 0.15f).coerceIn(0f, 1f)
 
-      // Alpha plus visible quand il y a de la voix
-      val baseAlpha = 0.35f + 0.3f * level.coerceIn(0f, 1f) // Augmenté pour plus de visibilité
+      // Alpha becomes more visible when voice level increases
+      val baseAlpha = 0.35f + 0.3f * level.coerceIn(0f, 1f)
       val finalAlpha = alpha * (baseAlpha + 0.45f * wave)
 
       drawCircle(
@@ -191,6 +198,7 @@ private fun AgslRipple(level: Float, color: Color, size: Dp, modifier: Modifier 
   }
 }
 
+/** Fallback pulse visualization for devices below API 33. */
 @Composable
 private fun LegacyPulse(level: Float, color: Color, size: Dp, modifier: Modifier = Modifier) {
   val px = with(LocalDensity.current) { size.toPx() }
@@ -200,14 +208,14 @@ private fun LegacyPulse(level: Float, color: Color, size: Dp, modifier: Modifier
     val c = androidx.compose.ui.geometry.Offset(canvasSize.width / 2f, canvasSize.height / 2f)
     val minSize = minOf(canvasSize.width, canvasSize.height)
 
-    // Réaction plus proportionnelle : base plus petite, amplitude plus grande
+    // More proportional reaction: smaller base, larger amplitude
     val baseRadius = minSize * 0.25f
     val maxRadius = minSize * 0.42f
     val r = baseRadius + (maxRadius - baseRadius) * level.coerceIn(0f, 1f)
 
-    // Glow plus visible avec la voix
+    // Slight glow becomes more visible with voice
     drawCircle(color.copy(alpha = 0.12f + level * 0.2f), r * 1.8f, c)
-    // Cercle principal plus visible
+    // Main circle
     drawCircle(color.copy(alpha = 0.8f + level * 0.15f), r, c)
     drawCircle(Color.Black.copy(alpha = 0.22f + level * 0.1f), r * 0.22f, c)
   }

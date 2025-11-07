@@ -1,12 +1,12 @@
 package com.android.sample.navigation
 
+import android.app.Activity
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -19,6 +19,7 @@ import com.android.sample.authentification.AuthUiState
 import com.android.sample.home.HomeScreen
 import com.android.sample.settings.SettingsPage
 import com.android.sample.sign_in.AuthViewModel
+import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.splash.OpeningScreen
 
 object Routes {
@@ -31,7 +32,7 @@ object Routes {
 }
 
 @Composable
-fun AppNav(startOnSignedIn: Boolean = false, activity: android.app.Activity) {
+fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: SpeechToTextHelper) {
   val nav = rememberNavController()
   val authViewModel = remember { AuthViewModel() }
   val authState by authViewModel.state.collectAsState()
@@ -111,6 +112,7 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: android.app.Activity) {
               onAction1Click = { /* ... */},
               onAction2Click = { /* ... */},
               onSendMessage = { /* ... */},
+              speechHelper = speechHelper,
               onSignOut = {
                 android.util.Log.d("NavGraph", "Sign out button clicked")
                 authViewModel.signOut()
@@ -130,6 +132,7 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: android.app.Activity) {
               onAction1Click = { /* ... */},
               onAction2Click = { /* ... */},
               onSendMessage = { /* ... */},
+              speechHelper = speechHelper,
               onSignOut = {
                 android.util.Log.d("NavGraph", "Sign out button clicked (HomeWithDrawer)")
                 authViewModel.signOut()
