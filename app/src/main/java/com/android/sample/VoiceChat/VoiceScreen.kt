@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
@@ -203,6 +204,7 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
                       }
                     },
                     iconVector = Icons.Filled.Mic,
+                    contentDescription = "Toggle microphone",
                     size = 100.dp,
                     background =
                         if (isMicActive) Color(0x33FF0000) else Color(0x0), // Visual indicator
@@ -210,6 +212,7 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
                 RoundIconButton(
                     onClick = onClose,
                     iconVector = Icons.Default.Close,
+                    contentDescription = "Close voice screen",
                     size = 100.dp,
                     background = Color(0x0),
                     iconTint = Color.White)
@@ -224,7 +227,7 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
                 color =
                     if (currentLevel > silenceThreshold) Color(0xFF2CD510) else Color(0xFF9A9A9A),
                 fontSize = 11.sp,
-                modifier = Modifier.alpha(0.8f))
+                modifier = Modifier.alpha(0.8f).testTag("levelIndicator"))
             Spacer(Modifier.height(8.dp))
           }
 
@@ -242,6 +245,7 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
 private fun RoundIconButton(
     onClick: () -> Unit,
     iconVector: ImageVector,
+    contentDescription: String,
     size: Dp,
     background: Color,
     iconTint: Color
@@ -255,7 +259,7 @@ private fun RoundIconButton(
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
           Icon(
               imageVector = iconVector,
-              contentDescription = null,
+              contentDescription = contentDescription,
               tint = iconTint,
               modifier = Modifier.size(size * 0.5f))
         }
@@ -352,12 +356,14 @@ private fun VoiceScreenPreview(level: Float) {
                 RoundIconButton(
                     onClick = {},
                     iconVector = Icons.Filled.Mic,
+                    contentDescription = "Toggle microphone",
                     size = 100.dp,
                     background = Color(0x0),
                     iconTint = Color.White)
                 RoundIconButton(
                     onClick = {},
                     iconVector = Icons.Default.Close,
+                    contentDescription = "Close voice screen",
                     size = 100.dp,
                     background = Color(0x0),
                     iconTint = Color.White)
