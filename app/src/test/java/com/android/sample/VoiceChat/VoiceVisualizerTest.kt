@@ -9,8 +9,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.*
 import org.junit.Rule
@@ -96,6 +94,36 @@ class VoiceVisualizerTest {
   }
 
   @Test
+  fun voiceVisualizer_updatesSmoothedLevel_onSamples() {
+    val source = RecordingLevelSource(initial = 0f)
+    val observed = mutableListOf<Float>()
+    composeTestRule.mainClock.autoAdvance = false
+
+    try {
+      composeTestRule.setContent {
+        VoiceVisualizer(levelSource = source, size = 160.dp, onLevelUpdate = { observed.add(it) })
+      }
+      composeTestRule.waitForIdle()
+
+      repeat(5) { composeTestRule.mainClock.advanceTimeByFrame() }
+
+      composeTestRule.runOnIdle { source.push(1f) }
+      repeat(25) { composeTestRule.mainClock.advanceTimeByFrame() }
+
+      composeTestRule.runOnIdle { source.push(0f) }
+      repeat(25) { composeTestRule.mainClock.advanceTimeByFrame() }
+
+      composeTestRule.waitForIdle()
+    } finally {
+      composeTestRule.mainClock.autoAdvance = true
+    }
+
+    assertTrue("expected samples to be recorded", observed.isNotEmpty())
+    assertTrue("expected peak level above 0.6", (observed.maxOrNull() ?: 0f) > 0.6f)
+    assertTrue("expected trough level below 0.4", (observed.minOrNull() ?: 1f) < 0.4f)
+  }
+
+  @Test
   fun voiceVisualizer_lifecycle_startsAndStopsLevelSource() {
     val source = RecordingLevelSource()
     lateinit var showVisualizer: MutableState<Boolean>
@@ -166,27 +194,4 @@ private class TestLevelSource(private val flow: Flow<Float>) : LevelSource {
   override fun start() {}
 
   override fun stop() {}
-}
-
-private class RecordingLevelSource(initial: Float = 0f) : LevelSource {
-  private val levelsFlow = MutableSharedFlow<Float>(replay = 1)
-  override val levels = levelsFlow.asSharedFlow()
-
-  var startCount = 0
-    private set
-
-  var stopCount = 0
-    private set
-
-  init {
-    levelsFlow.tryEmit(initial)
-  }
-
-  override fun start() {
-    startCount++
-  }
-
-  override fun stop() {
-    stopCount++
-  }
 }

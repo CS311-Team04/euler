@@ -33,7 +33,8 @@ fun VoiceVisualizer(
     preset: VisualPreset = VisualPreset.Bloom,
     color: Color = Color(0xFFB61919),
     petals: Int = 10, // for Bloom preset
-    size: Dp = 360.dp
+    size: Dp = 360.dp,
+    onLevelUpdate: (Float) -> Unit = {}
 ) {
   val smoother = remember { LevelSmoother() }
   var rawLevel by remember { mutableStateOf(0f) }
@@ -55,6 +56,7 @@ fun VoiceVisualizer(
       delay(8) // ~60fps
       // Smooth each frame for ultra-smooth animation
       level = smoother.step(rawLevel)
+      onLevelUpdate(level)
     }
   }
 

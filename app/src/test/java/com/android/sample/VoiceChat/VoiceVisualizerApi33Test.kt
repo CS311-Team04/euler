@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -41,6 +42,39 @@ class VoiceVisualizerApi33Test {
           levelSource = source, preset = VisualPreset.Ripple, color = Color.Cyan, size = 160.dp)
     }
     composeRule.onRoot().assertIsDisplayed()
+  }
+
+  @Test
+  fun voiceVisualizer_api33_ripple_reactsToLevels() {
+    val source = RecordingLevelSource(initial = 0f)
+    val observed = mutableListOf<Float>()
+    composeRule.mainClock.autoAdvance = false
+
+    try {
+      composeRule.setContent {
+        VoiceVisualizer(
+            levelSource = source,
+            preset = VisualPreset.Ripple,
+            color = Color.Magenta,
+            size = 180.dp,
+            onLevelUpdate = { observed.add(it) })
+      }
+      composeRule.waitForIdle()
+
+      repeat(5) { composeRule.mainClock.advanceTimeByFrame() }
+
+      composeRule.runOnIdle { source.push(0.85f) }
+      repeat(25) { composeRule.mainClock.advanceTimeByFrame() }
+
+      composeRule.runOnIdle { source.push(0.1f) }
+      repeat(25) { composeRule.mainClock.advanceTimeByFrame() }
+
+      composeRule.waitForIdle()
+    } finally {
+      composeRule.mainClock.autoAdvance = true
+    }
+
+    assertTrue("expected ripple to react to level input", observed.any { it > 0.5f })
   }
 }
 
