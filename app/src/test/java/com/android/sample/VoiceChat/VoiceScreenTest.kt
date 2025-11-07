@@ -38,4 +38,16 @@ class VoiceScreenTest {
     // If we get here without exception, the test passes
     assertTrue(true)
   }
+
+  @Test
+  fun voiceOverlay_displays() {
+    composeTestRule.setContent { VoiceOverlay(onDismiss = {}) }
+    composeTestRule.onRoot().assertIsDisplayed()
+  }
+
+  @Test
+  fun voiceOverlay_withModifier_displays() {
+    composeTestRule.setContent { VoiceOverlay(onDismiss = {}, modifier = Modifier.size(100.dp)) }
+    composeTestRule.onRoot().assertIsDisplayed()
+  }
 }

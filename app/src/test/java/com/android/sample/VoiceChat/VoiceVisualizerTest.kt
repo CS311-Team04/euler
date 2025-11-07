@@ -3,6 +3,7 @@ package com.android.sample.VoiceChat
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
@@ -80,6 +81,76 @@ class VoiceVisualizerTest {
 
     assertTrue("expected multiple updates", observed.size >= 20)
     assertTrue("values stay within bounds", observed.all { it in 0f..1f })
+  }
+
+  @Test
+  @Config(sdk = [33])
+  fun voiceVisualizer_ripple_reactsToLevels_onApi33() {
+    val source = RecordingLevelSource(initial = 0f)
+    val observed = mutableListOf<Float>()
+    composeTestRule.mainClock.autoAdvance = false
+
+    try {
+      composeTestRule.setContent {
+        VoiceVisualizer(
+            levelSource = source,
+            preset = VisualPreset.Ripple,
+            color = Color.Magenta,
+            size = 180.dp,
+            onLevelUpdate = { observed.add(it) })
+      }
+      composeTestRule.waitForIdle()
+
+      repeat(5) { composeTestRule.mainClock.advanceTimeByFrame() }
+
+      composeTestRule.runOnIdle { source.push(0.85f) }
+      repeat(25) { composeTestRule.mainClock.advanceTimeByFrame() }
+
+      composeTestRule.runOnIdle { source.push(0.1f) }
+      repeat(25) { composeTestRule.mainClock.advanceTimeByFrame() }
+
+      composeTestRule.waitForIdle()
+    } finally {
+      composeTestRule.mainClock.autoAdvance = true
+    }
+
+    assertTrue("expected ripple to react to level input", observed.any { it > 0.5f })
+  }
+
+  @Test
+  @Config(sdk = [33])
+  fun voiceVisualizer_bloom_reactsToLevels_onApi33() {
+    val source = RecordingLevelSource(initial = 0f)
+    val observed = mutableListOf<Float>()
+    composeTestRule.mainClock.autoAdvance = false
+
+    try {
+      composeTestRule.setContent {
+        VoiceVisualizer(
+            levelSource = source,
+            preset = VisualPreset.Bloom,
+            color = Color.Green,
+            petals = 6,
+            size = 200.dp,
+            onLevelUpdate = { observed.add(it) })
+      }
+      composeTestRule.waitForIdle()
+
+      repeat(5) { composeTestRule.mainClock.advanceTimeByFrame() }
+
+      composeTestRule.runOnIdle { source.push(0.9f) }
+      repeat(25) { composeTestRule.mainClock.advanceTimeByFrame() }
+
+      composeTestRule.runOnIdle { source.push(0.2f) }
+      repeat(25) { composeTestRule.mainClock.advanceTimeByFrame() }
+
+      composeTestRule.waitForIdle()
+    } finally {
+      composeTestRule.mainClock.autoAdvance = true
+    }
+
+    assertTrue("expected bloom to react to level input", observed.any { it > 0.55f })
+    assertTrue("expected bloom to decay", observed.any { it < 0.35f })
   }
 
   @Test
