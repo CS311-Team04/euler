@@ -16,12 +16,19 @@ class RecordingLevelSource(initial: Float = 0f) : LevelSource {
   var stopCount = 0
     private set
 
+  private val _emittedValues = mutableListOf<Float>()
+  val emittedValues: List<Float>
+    get() = _emittedValues
+
   init {
     levelsFlow.tryEmit(initial)
+    _emittedValues += initial.coerceIn(0f, 1f)
   }
 
   fun push(value: Float) {
-    levelsFlow.tryEmit(value.coerceIn(0f, 1f))
+    val clamped = value.coerceIn(0f, 1f)
+    levelsFlow.tryEmit(clamped)
+    _emittedValues += clamped
   }
 
   override fun start() {

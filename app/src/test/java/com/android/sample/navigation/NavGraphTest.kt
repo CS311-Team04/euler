@@ -14,6 +14,7 @@ class NavGraphTest {
     assertNotNull("Home route should be defined", Routes.Home)
     assertNotNull("HomeWithDrawer route should be defined", Routes.HomeWithDrawer)
     assertNotNull("Settings route should be defined", Routes.Settings)
+    assertNotNull("VoiceChat route should be defined", Routes.VoiceChat)
   }
 
   @Test
@@ -24,20 +25,33 @@ class NavGraphTest {
     assertEquals("Home route should match", "home", Routes.Home)
     assertEquals("HomeWithDrawer route should match", "home_with_drawer", Routes.HomeWithDrawer)
     assertEquals("Settings route should match", "settings", Routes.Settings)
+    assertEquals("VoiceChat route should match", "voice_chat", Routes.VoiceChat)
   }
 
   @Test
   fun all_routes_are_unique() {
     val routes =
-        setOf(Routes.Opening, Routes.SignIn, Routes.Home, Routes.HomeWithDrawer, Routes.Settings)
-    assertEquals("All routes should be unique", 5, routes.size)
+        setOf(
+            Routes.Opening,
+            Routes.SignIn,
+            Routes.Home,
+            Routes.HomeWithDrawer,
+            Routes.Settings,
+            Routes.VoiceChat)
+    assertEquals("All routes should be unique", 6, routes.size)
   }
 
   @Test
   fun routes_follow_naming_convention() {
     // All routes should be lowercase with underscores
     val routes =
-        listOf(Routes.Opening, Routes.SignIn, Routes.Home, Routes.HomeWithDrawer, Routes.Settings)
+        listOf(
+            Routes.Opening,
+            Routes.SignIn,
+            Routes.Home,
+            Routes.HomeWithDrawer,
+            Routes.Settings,
+            Routes.VoiceChat)
 
     for (route in routes) {
       assertTrue("Route should be lowercase: $route", route == route.lowercase())

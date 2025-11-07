@@ -185,6 +185,21 @@ class VoiceVisualizerTest {
     val values = VisualPreset.values()
     assertEquals(2, values.size)
   }
+
+  @Test
+  fun recordingLevelSource_clampsValuesAndTracksLifecycle() {
+    val source = RecordingLevelSource(initial = 0.5f)
+
+    source.start()
+    source.push(2f)
+    source.push(-1f)
+    source.stop()
+
+    assertEquals(1, source.startCount)
+    assertEquals(1, source.stopCount)
+    assertTrue("expected emissions recorded", source.emittedValues.isNotEmpty())
+    assertTrue("values should be clamped", source.emittedValues.all { it in 0f..1f })
+  }
 }
 
 // Helper class for testing

@@ -159,7 +159,7 @@ class NavGraphLogicTest {
             AuthUiState.SignedIn,
             AuthUiState.Error("Test error"))
 
-    val destinations = listOf(Routes.Opening, Routes.SignIn, Routes.Home, null)
+    val destinations = listOf(Routes.Opening, Routes.SignIn, Routes.Home, Routes.VoiceChat, null)
 
     for (state in states) {
       for (destination in destinations) {

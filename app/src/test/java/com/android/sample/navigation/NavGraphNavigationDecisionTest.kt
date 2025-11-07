@@ -33,6 +33,7 @@ class NavGraphNavigationDecisionTest {
             Routes.Home,
             Routes.HomeWithDrawer,
             Routes.Settings,
+            Routes.VoiceChat,
             null)
 
     for (destination in allDestinations) {
@@ -116,7 +117,13 @@ class NavGraphNavigationDecisionTest {
   fun all_routes_values_used_in_navigation() {
     // Verify all route constants are used in navigation logic
     val routes =
-        listOf(Routes.Opening, Routes.SignIn, Routes.Home, Routes.HomeWithDrawer, Routes.Settings)
+        listOf(
+            Routes.Opening,
+            Routes.SignIn,
+            Routes.Home,
+            Routes.HomeWithDrawer,
+            Routes.Settings,
+            Routes.VoiceChat)
 
     // Test that Routes.SignIn is used correctly in navigation decision
     val signedInState = AuthUiState.SignedIn

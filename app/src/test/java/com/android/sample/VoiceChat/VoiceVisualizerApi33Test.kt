@@ -76,6 +76,41 @@ class VoiceVisualizerApi33Test {
 
     assertTrue("expected ripple to react to level input", observed.any { it > 0.5f })
   }
+
+  @Test
+  fun voiceVisualizer_api33_bloom_reactsToLevels() {
+    val source = RecordingLevelSource(initial = 0f)
+    val observed = mutableListOf<Float>()
+    composeRule.mainClock.autoAdvance = false
+
+    try {
+      composeRule.setContent {
+        VoiceVisualizer(
+            levelSource = source,
+            preset = VisualPreset.Bloom,
+            color = Color.Green,
+            petals = 6,
+            size = 200.dp,
+            onLevelUpdate = { observed.add(it) })
+      }
+      composeRule.waitForIdle()
+
+      repeat(5) { composeRule.mainClock.advanceTimeByFrame() }
+
+      composeRule.runOnIdle { source.push(0.9f) }
+      repeat(25) { composeRule.mainClock.advanceTimeByFrame() }
+
+      composeRule.runOnIdle { source.push(0.2f) }
+      repeat(25) { composeRule.mainClock.advanceTimeByFrame() }
+
+      composeRule.waitForIdle()
+    } finally {
+      composeRule.mainClock.autoAdvance = true
+    }
+
+    assertTrue("expected bloom to react to level input", observed.any { it > 0.55f })
+    assertTrue("expected bloom to decay", observed.any { it < 0.35f })
+  }
 }
 
 private class Api33TestLevelSource(private val flow: Flow<Float>) : LevelSource {
