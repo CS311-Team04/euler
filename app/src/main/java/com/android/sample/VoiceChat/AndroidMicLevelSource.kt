@@ -38,6 +38,7 @@ interface Recorder {
 interface RecorderProvider {
   fun minBufferSize(sampleRate: Int): Int
 
+  @RequiresPermission(Manifest.permission.RECORD_AUDIO)
   fun create(sampleRate: Int, bufferSize: Int): Recorder
 }
 
@@ -48,6 +49,7 @@ private class DefaultRecorderProvider : RecorderProvider {
         .coerceAtLeast(AndroidMicLevelSource.MIN_AUDIO_BUFFER_SIZE)
   }
 
+  @RequiresPermission(Manifest.permission.RECORD_AUDIO)
   override fun create(sampleRate: Int, bufferSize: Int): Recorder {
     val ar =
         AudioRecord(
@@ -100,7 +102,13 @@ class AndroidMicLevelSource(
     val min = recorderProvider.minBufferSize(sampleRate)
 
     try {
-      recorder = recorderProvider.create(sampleRate, min)
+      try {
+        recorder = recorderProvider.create(sampleRate, min)
+      } catch (se: SecurityException) {
+        android.util.Log.e(TAG, "SecurityException creating AudioRecord (missing permission)", se)
+        recorder = null
+        return
+      }
 
       if (recorder?.state != Recorder.STATE_INITIALIZED) {
         android.util.Log.e(
@@ -112,7 +120,16 @@ class AndroidMicLevelSource(
 
       android.util.Log.d(TAG, "AudioRecord initialized successfully")
 
-      recorder?.startRecording()
+      try {
+        recorder?.startRecording()
+      } catch (se: SecurityException) {
+        android.util.Log.e(TAG, "SecurityException starting AudioRecord", se)
+        try {
+          recorder?.release()
+        } catch (_: Throwable) {}
+        recorder = null
+        return
+      }
 
       val recordingState = recorder?.recordingState
       android.util.Log.d(
