@@ -1,11 +1,16 @@
 package com.android.sample.VoiceChat
 
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.*
 import org.junit.Rule
@@ -91,6 +96,57 @@ class VoiceVisualizerTest {
   }
 
   @Test
+  fun voiceVisualizer_lifecycle_startsAndStopsLevelSource() {
+    val source = RecordingLevelSource()
+    lateinit var showVisualizer: MutableState<Boolean>
+
+    composeTestRule.setContent {
+      showVisualizer = remember { mutableStateOf(true) }
+      if (showVisualizer.value) {
+        VoiceVisualizer(levelSource = source, size = 120.dp)
+      }
+    }
+    composeTestRule.waitForIdle()
+
+    assertEquals(1, source.startCount)
+    assertEquals(0, source.stopCount)
+
+    composeTestRule.runOnIdle { showVisualizer.value = false }
+    composeTestRule.waitUntil(timeoutMillis = 2_000) { source.stopCount == 1 }
+
+    assertEquals(1, source.startCount)
+    assertEquals(1, source.stopCount)
+  }
+
+  @Test
+  fun voiceVisualizer_replacingSource_stopsPreviousAndStartsNewOne() {
+    val first = RecordingLevelSource()
+    val second = RecordingLevelSource()
+    lateinit var levelSourceState: MutableState<LevelSource>
+    lateinit var showVisualizer: MutableState<Boolean>
+
+    composeTestRule.setContent {
+      showVisualizer = remember { mutableStateOf(true) }
+      levelSourceState = remember { mutableStateOf<LevelSource>(first) }
+      if (showVisualizer.value) {
+        VoiceVisualizer(levelSource = levelSourceState.value, size = 140.dp)
+      }
+    }
+
+    composeTestRule.waitForIdle()
+    assertEquals(1, first.startCount)
+    assertEquals(0, first.stopCount)
+
+    composeTestRule.runOnIdle { levelSourceState.value = second }
+    composeTestRule.waitUntil(timeoutMillis = 2_000) { first.stopCount == 1 }
+    assertEquals(1, second.startCount)
+    assertEquals(0, second.stopCount)
+
+    composeTestRule.runOnIdle { showVisualizer.value = false }
+    composeTestRule.waitUntil(timeoutMillis = 2_000) { second.stopCount == 1 }
+  }
+
+  @Test
   fun visualPreset_enumValues_areCorrect() {
     assertEquals(VisualPreset.Bloom, VisualPreset.valueOf("Bloom"))
     assertEquals(VisualPreset.Ripple, VisualPreset.valueOf("Ripple"))
@@ -110,4 +166,27 @@ private class TestLevelSource(private val flow: Flow<Float>) : LevelSource {
   override fun start() {}
 
   override fun stop() {}
+}
+
+private class RecordingLevelSource(initial: Float = 0f) : LevelSource {
+  private val levelsFlow = MutableSharedFlow<Float>(replay = 1)
+  override val levels = levelsFlow.asSharedFlow()
+
+  var startCount = 0
+    private set
+
+  var stopCount = 0
+    private set
+
+  init {
+    levelsFlow.tryEmit(initial)
+  }
+
+  override fun start() {
+    startCount++
+  }
+
+  override fun stop() {
+    stopCount++
+  }
 }
