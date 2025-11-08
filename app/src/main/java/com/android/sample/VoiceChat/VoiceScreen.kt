@@ -31,6 +31,8 @@ import kotlinx.coroutines.delay as coroutinesDelay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
+private const val TAG = "VoiceScreen"
+
 /**
  * Full-screen voice UI: requests microphone permission, manages mic lifecycle, monitors audio
  * levels and renders the visualizer. Provides close action.
@@ -48,20 +50,11 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
   val launcher =
       rememberLauncherForActivityResult(
           contract = ActivityResultContracts.RequestPermission(),
-          onResult = { granted ->
-            hasMic = granted
-            android.util.Log.d("VoiceScreen", "Permission RECORD_AUDIO: $granted")
-            if (!granted) {
-              android.util.Log.w("VoiceScreen", "Microphone permission was denied by user")
-            }
-          })
+          onResult = { granted -> hasMic = handlePermissionResult(granted) })
 
   LaunchedEffect(Unit) {
-    if (!alreadyGranted) {
-      android.util.Log.d("VoiceScreen", "Requesting RECORD_AUDIO permission...")
+    if (logInitialPermissionState(alreadyGranted)) {
       launcher.launch(Manifest.permission.RECORD_AUDIO)
-    } else {
-      android.util.Log.d("VoiceScreen", "RECORD_AUDIO permission already granted")
     }
   }
 
@@ -150,20 +143,18 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
   }
 
   // Periodically check whether to disable mic after continuous silence
-  LaunchedEffect(isMicActive) {
-    if (isMicActive && hasMic) {
-      while (isMicActive) {
-        coroutinesDelay(500) // Check every 500ms
-        val now = System.currentTimeMillis()
-        if (shouldDeactivateMic(
-            now, lastVoiceTime, currentLevel, silenceThreshold, silenceDuration)) {
-          android.util.Log.d(
-              "VoiceScreen", "Silence detected (${now - lastVoiceTime}ms), auto deactivating mic")
-          isMicActive = false
-          break
-        }
-      }
-    }
+  LaunchedEffect(isMicActive, hasMic) {
+    monitorSilence(
+        isMicActiveProvider = { isMicActive },
+        hasMicProvider = { hasMic },
+        delayMs = { millis -> coroutinesDelay(millis) },
+        timeProvider = { System.currentTimeMillis() },
+        lastVoiceTimeProvider = { lastVoiceTime },
+        currentLevelProvider = { currentLevel },
+        silenceThreshold = silenceThreshold,
+        silenceDuration = silenceDuration,
+        onDeactivate = { isMicActive = false },
+        logger = { message -> android.util.Log.d(TAG, message) })
   }
 
   Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
@@ -197,8 +188,7 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
                       if (hasMic) {
                         isMicActive = !isMicActive
                         android.util.Log.d(
-                            "VoiceScreen",
-                            "Microphone ${if (isMicActive) "enabled" else "disabled"}")
+                            TAG, "Microphone ${if (isMicActive) "enabled" else "disabled"}")
                         if (isMicActive) {
                           lastVoiceTime = System.currentTimeMillis()
                         }
@@ -290,6 +280,60 @@ internal fun shouldDeactivateMic(
 }
 
 @VisibleForTesting internal fun resetLevelAfterError(): Float = 0f
+
+@VisibleForTesting
+internal fun handlePermissionResult(
+    granted: Boolean,
+    debugLog: (String) -> Unit = { message -> android.util.Log.d(TAG, message) },
+    warnLog: (String) -> Unit = { message -> android.util.Log.w(TAG, message) }
+): Boolean {
+  debugLog("Permission RECORD_AUDIO: $granted")
+  if (!granted) {
+    warnLog("Microphone permission was denied by user")
+  }
+  return granted
+}
+
+@VisibleForTesting
+internal fun logInitialPermissionState(
+    alreadyGranted: Boolean,
+    debugLog: (String) -> Unit = { message -> android.util.Log.d(TAG, message) }
+): Boolean {
+  return if (!alreadyGranted) {
+    debugLog("Requesting RECORD_AUDIO permission...")
+    true
+  } else {
+    debugLog("RECORD_AUDIO permission already granted")
+    false
+  }
+}
+
+@VisibleForTesting
+internal suspend fun monitorSilence(
+    isMicActiveProvider: () -> Boolean,
+    hasMicProvider: () -> Boolean,
+    delayMs: suspend (Long) -> Unit,
+    timeProvider: () -> Long,
+    lastVoiceTimeProvider: () -> Long,
+    currentLevelProvider: () -> Float,
+    silenceThreshold: Float,
+    silenceDuration: Long,
+    onDeactivate: () -> Unit,
+    logger: (String) -> Unit = {}
+) {
+  if (!isMicActiveProvider() || !hasMicProvider()) return
+  while (isMicActiveProvider()) {
+    delayMs(500)
+    val now = timeProvider()
+    val lastVoice = lastVoiceTimeProvider()
+    val level = currentLevelProvider()
+    if (shouldDeactivateMic(now, lastVoice, level, silenceThreshold, silenceDuration)) {
+      logger("Silence detected (${now - lastVoice}ms), auto deactivating mic")
+      onDeactivate()
+      break
+    }
+  }
+}
 
 // Mock LevelSource for previews
 private class MockLevelSource(private val level: Float) : LevelSource {
