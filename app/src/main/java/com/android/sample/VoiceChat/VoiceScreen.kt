@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -132,17 +133,16 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
           }
 
           // If level is above the threshold, consider it as voice activity
-          if (level > silenceThreshold) {
-            lastVoiceTime = System.currentTimeMillis()
-            if (frameCount % 10 == 0) { // Log less often when voice is detected
-              android.util.Log.d(
-                  "VoiceScreen", "Voice detected! Level: ${String.format("%.3f", level)}")
-            }
+          val now = System.currentTimeMillis()
+          lastVoiceTime = updateLastVoiceTimestamp(level, silenceThreshold, now, lastVoiceTime)
+          if (level > silenceThreshold && frameCount % 10 == 0) {
+            android.util.Log.d(
+                "VoiceScreen", "Voice detected! Level: ${String.format("%.3f", level)}")
           }
         }
       } catch (e: Exception) {
         android.util.Log.e("VoiceScreen", "Error collecting audio levels", e)
-        currentLevel = 0f
+        currentLevel = resetLevelAfterError()
       }
     } else {
       currentLevel = 0f
@@ -154,10 +154,11 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
     if (isMicActive && hasMic) {
       while (isMicActive) {
         coroutinesDelay(500) // Check every 500ms
-        val timeSinceLastVoice = System.currentTimeMillis() - lastVoiceTime
-        if (timeSinceLastVoice > silenceDuration && currentLevel <= silenceThreshold) {
+        val now = System.currentTimeMillis()
+        if (shouldDeactivateMic(
+            now, lastVoiceTime, currentLevel, silenceThreshold, silenceDuration)) {
           android.util.Log.d(
-              "VoiceScreen", "Silence detected (${timeSinceLastVoice}ms), auto deactivating mic")
+              "VoiceScreen", "Silence detected (${now - lastVoiceTime}ms), auto deactivating mic")
           isMicActive = false
           break
         }
@@ -265,6 +266,30 @@ private fun RoundIconButton(
         }
       }
 }
+
+@VisibleForTesting
+internal fun updateLastVoiceTimestamp(
+    level: Float,
+    silenceThreshold: Float,
+    currentTime: Long,
+    lastVoiceTime: Long
+): Long {
+  return if (level > silenceThreshold) currentTime else lastVoiceTime
+}
+
+@VisibleForTesting
+internal fun shouldDeactivateMic(
+    currentTime: Long,
+    lastVoiceTime: Long,
+    currentLevel: Float,
+    silenceThreshold: Float,
+    silenceDuration: Long
+): Boolean {
+  val timeSinceLastVoice = currentTime - lastVoiceTime
+  return timeSinceLastVoice > silenceDuration && currentLevel <= silenceThreshold
+}
+
+@VisibleForTesting internal fun resetLevelAfterError(): Float = 0f
 
 // Mock LevelSource for previews
 private class MockLevelSource(private val level: Float) : LevelSource {
