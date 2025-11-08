@@ -1,10 +1,12 @@
 package com.android.sample.VoiceChat
 
+import android.graphics.PathMeasure
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
@@ -263,6 +265,16 @@ class VoiceVisualizerTest {
   fun bloomParameters_respectPetalCount() {
     val params = calculateBloomParameters(level = 0.6f, t = 0.3f, petals = 6, minSize = 160f)
     assertTrue(params.pathPoints.size >= 6 * 40)
+  }
+
+  @Test
+  fun buildBloomPath_closesShape() {
+    val params = calculateBloomParameters(level = 0.5f, t = 0.2f, petals = 5, minSize = 220f)
+    val path = buildBloomPath(params.pathPoints)
+    val measure = PathMeasure(path.asAndroidPath(), false)
+    assertTrue(measure.length > 0)
+    val forcedClosed = PathMeasure(path.asAndroidPath(), true)
+    assertEquals(forcedClosed.length, measure.length, 1e-3f)
   }
 
   @Test

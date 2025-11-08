@@ -115,15 +115,7 @@ private fun AgslBloom(
         radius = params.base * (1f + params.breathing) * 0.9f * 10,
         center = center)
 
-    val path = Path()
-    params.pathPoints.forEachIndexed { index, offset ->
-      if (index == 0) {
-        path.moveTo(offset.x, offset.y)
-      } else {
-        path.lineTo(offset.x, offset.y)
-      }
-    }
-    path.close()
+    val path = buildBloomPath(params.pathPoints)
 
     drawPath(path, color.copy(alpha = 0.75f + params.easeLevel * 0.3f), style = Fill)
 
@@ -199,6 +191,22 @@ internal data class BloomParameters(
     val base: Float,
     val pathPoints: List<Offset>
 )
+
+@VisibleForTesting
+internal fun buildBloomPath(points: List<Offset>): Path {
+  val path = Path()
+  points.forEachIndexed { index, offset ->
+    if (index == 0) {
+      path.moveTo(offset.x, offset.y)
+    } else {
+      path.lineTo(offset.x, offset.y)
+    }
+  }
+  if (points.isNotEmpty()) {
+    path.close()
+  }
+  return path
+}
 
 @VisibleForTesting
 internal fun calculateBloomParameters(
