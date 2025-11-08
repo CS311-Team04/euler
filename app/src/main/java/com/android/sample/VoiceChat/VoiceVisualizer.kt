@@ -153,10 +153,9 @@ private fun AgslRipple(level: Float, color: Color, size: Dp, modifier: Modifier 
     val minSize = min(canvasSize.width, canvasSize.height)
 
     val params = calculateRippleParameters(level, t, minSize)
-
-    params.radii.forEachIndexed { index, ringRadius ->
-      val alpha = params.alphas[index]
-      drawCircle(color = color.copy(alpha = alpha), radius = ringRadius, center = center)
+    val circles = createRippleCircles(params)
+    circles.forEach { circle ->
+      drawCircle(color = color.copy(alpha = circle.alpha), radius = circle.radius, center = center)
     }
   }
 }
@@ -172,15 +171,13 @@ private fun LegacyPulse(level: Float, color: Color, size: Dp, modifier: Modifier
     val minSize = minOf(canvasSize.width, canvasSize.height)
 
     // More proportional reaction: smaller base, larger amplitude
-    val baseRadius = minSize * 0.25f
-    val maxRadius = minSize * 0.42f
-    val r = baseRadius + (maxRadius - baseRadius) * level.coerceIn(0f, 1f)
+    val metrics = calculateLegacyPulseMetrics(level, minSize)
 
     // Slight glow becomes more visible with voice
-    drawCircle(color.copy(alpha = 0.12f + level * 0.2f), r * 1.8f, c)
+    drawCircle(color.copy(alpha = 0.12f + level * 0.2f), metrics.radius * 1.8f, c)
     // Main circle
-    drawCircle(color.copy(alpha = 0.8f + level * 0.15f), r, c)
-    drawCircle(Color.Black.copy(alpha = 0.22f + level * 0.1f), r * 0.22f, c)
+    drawCircle(color.copy(alpha = 0.8f + level * 0.15f), metrics.radius, c)
+    drawCircle(Color.Black.copy(alpha = 0.22f + level * 0.1f), metrics.radius * 0.22f, c)
   }
 }
 
@@ -206,6 +203,31 @@ internal fun buildBloomPath(points: List<Offset>): Path {
     path.close()
   }
   return path
+}
+
+@VisibleForTesting internal data class RippleCircle(val radius: Float, val alpha: Float)
+
+@VisibleForTesting
+internal fun createRippleCircles(params: RippleParameters): List<RippleCircle> {
+  return params.radii.mapIndexed { index, radius ->
+    RippleCircle(radius = radius, alpha = params.alphas[index])
+  }
+}
+
+@VisibleForTesting
+internal data class LegacyPulseMetrics(
+    val baseRadius: Float,
+    val maxRadius: Float,
+    val radius: Float
+)
+
+@VisibleForTesting
+internal fun calculateLegacyPulseMetrics(level: Float, minSize: Float): LegacyPulseMetrics {
+  val baseRadius = minSize * 0.25f
+  val maxRadius = minSize * 0.42f
+  val clampedLevel = level.coerceIn(0f, 1f)
+  val r = baseRadius + (maxRadius - baseRadius) * clampedLevel
+  return LegacyPulseMetrics(baseRadius = baseRadius, maxRadius = maxRadius, radius = r)
 }
 
 @VisibleForTesting

@@ -278,6 +278,27 @@ class VoiceVisualizerTest {
   }
 
   @Test
+  fun createRippleCircles_pairsRadiusAndAlpha() {
+    val params = calculateRippleParameters(level = 0.6f, t = 0.4f, minSize = 210f)
+    val circles = createRippleCircles(params)
+    assertEquals(params.radii.size, circles.size)
+    circles.forEachIndexed { index, circle ->
+      assertEquals(params.radii[index], circle.radius, 1e-4f)
+      assertEquals(params.alphas[index], circle.alpha, 1e-4f)
+    }
+  }
+
+  @Test
+  fun legacyPulseMetrics_scalesWithLevel() {
+    val low = calculateLegacyPulseMetrics(level = 0.1f, minSize = 300f)
+    val high = calculateLegacyPulseMetrics(level = 0.9f, minSize = 300f)
+    assertEquals(low.baseRadius, high.baseRadius, 1e-4f)
+    assertEquals(low.maxRadius, high.maxRadius, 1e-4f)
+    assertTrue("radius should increase with level", high.radius > low.radius)
+    assertTrue("radius stays within bounds", high.radius in low.baseRadius..high.maxRadius)
+  }
+
+  @Test
   fun rippleParameters_waveInfluenceAlpha() {
     val t1 = calculateRippleParameters(0.5f, t = 0.0f, minSize = 200f)
     val t2 = calculateRippleParameters(0.5f, t = 0.5f, minSize = 200f)
