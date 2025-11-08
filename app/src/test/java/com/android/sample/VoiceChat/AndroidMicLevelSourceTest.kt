@@ -94,6 +94,34 @@ class AndroidMicLevelSourceTest {
   }
 
   @Test
+  fun start_handlesSecurityExceptionWhenStarting() = runBlocking {
+    val recorder = StartSecurityExceptionRecorder()
+    val provider = FakeRecorderProvider(recorderFactory = { recorder })
+    val source = AndroidMicLevelSource(recorderProvider = provider)
+
+    source.start()
+
+    assertEquals(1, recorder.startAttempts.get())
+    assertEquals(1, recorder.releaseCount.get())
+
+    source.stop()
+  }
+
+  @Test
+  fun start_handlesUnexpectedExceptionAndReleases() = runBlocking {
+    val recorder = ThrowingStateRecorder()
+    val provider = FakeRecorderProvider(recorderFactory = { recorder })
+    val source = AndroidMicLevelSource(recorderProvider = provider)
+
+    source.start()
+
+    assertEquals(1, recorder.releaseCount.get())
+    assertEquals(0, recorder.startCount.get())
+
+    source.stop()
+  }
+
+  @Test
   fun readLoop_emitsAndStopsOnZero() = runBlocking {
     val provider = FakeRecorderProvider(recorderFactory = { LoopRecorder() })
     val source = AndroidMicLevelSource(recorderProvider = provider)
@@ -259,6 +287,53 @@ class AndroidMicLevelSourceTest {
 
     override fun release() {
       releaseCount++
+    }
+  }
+
+  private class StartSecurityExceptionRecorder : Recorder {
+    val startAttempts = AtomicInteger(0)
+    val releaseCount = AtomicInteger(0)
+
+    override val state: Int
+      get() = Recorder.STATE_INITIALIZED
+
+    override val recordingState: Int
+      get() = Recorder.RECORDSTATE_RECORDING
+
+    override fun startRecording() {
+      startAttempts.incrementAndGet()
+      throw SecurityException("denied")
+    }
+
+    override fun read(buffer: ShortArray, offset: Int, size: Int): Int = 0
+
+    override fun stop() {}
+
+    override fun release() {
+      releaseCount.incrementAndGet()
+    }
+  }
+
+  private class ThrowingStateRecorder : Recorder {
+    val releaseCount = AtomicInteger(0)
+    val startCount = AtomicInteger(0)
+
+    override val state: Int
+      get() = throw IllegalStateException("boom")
+
+    override val recordingState: Int
+      get() = Recorder.RECORDSTATE_RECORDING
+
+    override fun startRecording() {
+      startCount.incrementAndGet()
+    }
+
+    override fun read(buffer: ShortArray, offset: Int, size: Int): Int = 0
+
+    override fun stop() {}
+
+    override fun release() {
+      releaseCount.incrementAndGet()
     }
   }
 }
