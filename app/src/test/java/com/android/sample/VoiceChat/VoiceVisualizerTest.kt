@@ -316,9 +316,10 @@ class VoiceVisualizerTest {
     assertTrue(instructions.pathAlpha > 0f)
     assertTrue(instructions.innerCircleAlpha > 0f)
     assertTrue(instructions.outerCircleRadius > instructions.innerCircleRadius)
-    assertEquals(params.base * 0.2f, instructions.innerCircleRadius, 1e-4f)
+    assertEquals(params.base * 0.25f, instructions.innerCircleRadius, 1e-4f)
     val measure = PathMeasure(instructions.path.asAndroidPath(), false)
     assertTrue(measure.length > 0)
+    assertNotEquals(Offset.Zero, instructions.pathCenter)
   }
 
   @Test

@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 import kotlinx.coroutines.delay
@@ -38,7 +39,7 @@ fun VoiceVisualizer(
     preset: VisualPreset = VisualPreset.Bloom,
     color: Color = Color(0xFFB61919),
     petals: Int = 10, // for Bloom preset
-    size: Dp = 360.dp,
+    size: Dp = 500.dp,
     onLevelUpdate: (Float) -> Unit = {}
 ) {
   val smoother = remember { LevelSmoother() }
@@ -58,7 +59,7 @@ fun VoiceVisualizer(
   // Continuous smoothing with frame-based animation for maximum fluidity (~60fps)
   LaunchedEffect(Unit) {
     while (isActive) {
-      delay(8) // ~60fps
+      delay(16) // ~60fps
       // Smooth each frame for ultra-smooth animation
       level = smoother.step(rawLevel)
       onLevelUpdate(level)
@@ -94,14 +95,11 @@ private fun AgslBloom(
   LaunchedEffect(Unit) {
     val startTime = System.currentTimeMillis()
     while (isActive) {
-      delay(10) // ~60fps
+      delay(16) // ~60fps
       t = ((System.currentTimeMillis() - startTime) / 1000f) // Time in seconds
       frameCount++ // Force recomposition each frame for smooth animation
     }
   }
-
-  // Use frameCount to force recomposition each frame
-  val r = remember { frameCount }
 
   Canvas(modifier.size(size)) {
     val metrics = calculateCanvasMetrics(this.size)
@@ -109,17 +107,12 @@ private fun AgslBloom(
     val params = calculateBloomParameters(level, t, petals, metrics.minSize)
     val instructions = createBloomDrawInstructions(params)
 
-    drawCircle(
-        color = color.copy(alpha = instructions.outerCircleAlpha),
-        radius = instructions.outerCircleRadius,
-        center = metrics.center)
-
     drawPath(instructions.path, color.copy(alpha = instructions.pathAlpha), style = Fill)
 
     drawCircle(
-        color = Color.Black.copy(alpha = instructions.innerCircleAlpha),
+        color = Color(0xFFF44336),
         radius = instructions.innerCircleRadius,
-        center = metrics.center)
+        center = instructions.pathCenter)
   }
 }
 
@@ -140,9 +133,6 @@ private fun AgslRipple(level: Float, color: Color, size: Dp, modifier: Modifier 
       frameCount++ // Force recomposition each frame
     }
   }
-
-  // Use frameCount to force recomposition each frame
-  val r1 = remember { frameCount }
 
   Canvas(modifier.size(size)) {
     val metrics = calculateCanvasMetrics(this.size)
@@ -215,24 +205,29 @@ internal data class BloomDrawInstructions(
     val path: Path,
     val pathAlpha: Float,
     val innerCircleAlpha: Float,
-    val innerCircleRadius: Float
+    val innerCircleRadius: Float,
+    val pathCenter: Offset
 )
 
 @VisibleForTesting
 internal fun createBloomDrawInstructions(params: BloomParameters): BloomDrawInstructions {
-  val outerAlpha = 0.01f + params.easeLevel * 0.05f
+  val outerAlpha = max(0.35f, 0.25f + params.easeLevel * 0.05f)
   val outerRadius = params.base * (1f + params.breathing) * 0.9f * 10
   val path = buildBloomPath(params.pathPoints)
+  val avgX = params.pathPoints.sumOf { it.x.toDouble() } / params.pathPoints.size
+  val avgY = params.pathPoints.sumOf { it.y.toDouble() } / params.pathPoints.size
+  val pathCenter = Offset(avgX.toFloat(), avgY.toFloat())
   val pathAlpha = 0.75f + params.easeLevel * 0.3f
-  val innerAlpha = 0.25f + params.easeLevel * 0.15f
-  val innerRadius = params.base * 0.2f
+  val innerAlpha = 0.95f
+  val innerRadius = params.base * 0.25f
   return BloomDrawInstructions(
       outerCircleAlpha = outerAlpha,
       outerCircleRadius = outerRadius,
       path = path,
       pathAlpha = pathAlpha,
       innerCircleAlpha = innerAlpha,
-      innerCircleRadius = innerRadius)
+      innerCircleRadius = innerRadius,
+      pathCenter = pathCenter)
 }
 
 @VisibleForTesting internal data class RippleCircle(val radius: Float, val alpha: Float)

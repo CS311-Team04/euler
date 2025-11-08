@@ -2,6 +2,7 @@ package com.android.sample.VoiceChat
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.VisibleForTesting
@@ -19,7 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
@@ -39,7 +40,7 @@ private const val TAG = "VoiceScreen"
  */
 @Composable
 fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
-  val context = androidx.compose.ui.platform.LocalContext.current
+  val context = LocalContext.current
   val alreadyGranted =
       ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
           PackageManager.PERMISSION_GRANTED
@@ -75,24 +76,24 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
   LaunchedEffect(isMicActive, hasMic) {
     if (isMicActive && hasMic) {
       try {
-        android.util.Log.d("VoiceScreen", "Starting microphone...")
+        Log.d("VoiceScreen", "Starting microphone...")
         mic.start()
         lastVoiceTime = System.currentTimeMillis()
         // Small delay to let the mic initialize
         coroutinesDelay(100)
-        android.util.Log.d("VoiceScreen", "Microphone started successfully")
+        Log.d("VoiceScreen", "Microphone started successfully")
       } catch (e: Exception) {
-        android.util.Log.e("VoiceScreen", "Microphone start error", e)
+        Log.e("VoiceScreen", "Microphone start error", e)
         e.printStackTrace()
         isMicActive = false
       }
     } else {
       try {
-        android.util.Log.d("VoiceScreen", "Stopping microphone...")
+        Log.d("VoiceScreen", "Stopping microphone...")
         mic.stop()
-        android.util.Log.d("VoiceScreen", "Microphone stopped")
+        Log.d("VoiceScreen", "Microphone stopped")
       } catch (e: Exception) {
-        android.util.Log.e("VoiceScreen", "Microphone stop error", e)
+        Log.e("VoiceScreen", "Microphone stop error", e)
       }
       currentLevel = 0f
     }
@@ -103,7 +104,7 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
     onDispose {
       if (isMicActive) {
         mic.stop()
-        android.util.Log.d("VoiceScreen", "Microphone stopped on dispose")
+        Log.d("VoiceScreen", "Microphone stopped on dispose")
       }
     }
   }
@@ -112,7 +113,7 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
   LaunchedEffect(isMicActive, hasMic) {
     if (isMicActive && hasMic) {
       try {
-        android.util.Log.d("VoiceScreen", "Begin collecting audio levels")
+        Log.d("VoiceScreen", "Begin collecting audio levels")
         var frameCount = 0
         mic.levels.collect { level ->
           currentLevel = level
@@ -120,7 +121,7 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
 
           // Periodic logs for debugging
           if (frameCount % 30 == 0) { // ~ every 0.5s
-            android.util.Log.d(
+            Log.d(
                 "VoiceScreen",
                 "Audio level: ${String.format("%.3f", level)} (silence threshold: $silenceThreshold)")
           }
@@ -129,12 +130,11 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
           val now = System.currentTimeMillis()
           lastVoiceTime = updateLastVoiceTimestamp(level, silenceThreshold, now, lastVoiceTime)
           if (level > silenceThreshold && frameCount % 10 == 0) {
-            android.util.Log.d(
-                "VoiceScreen", "Voice detected! Level: ${String.format("%.3f", level)}")
+            Log.d("VoiceScreen", "Voice detected! Level: ${String.format("%.3f", level)}")
           }
         }
       } catch (e: Exception) {
-        android.util.Log.e("VoiceScreen", "Error collecting audio levels", e)
+        Log.e("VoiceScreen", "Error collecting audio levels", e)
         currentLevel = resetLevelAfterError()
       }
     } else {
@@ -154,7 +154,7 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
         silenceThreshold = silenceThreshold,
         silenceDuration = silenceDuration,
         onDeactivate = { isMicActive = false },
-        logger = { message -> android.util.Log.d(TAG, message) })
+        logger = { message -> Log.d(TAG, message) })
   }
 
   Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
@@ -173,8 +173,8 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
         preset = VisualPreset.Bloom, // Bloom visualizer
         color = Color(0xFC0000),
         petals = 4,
-        size = 1500.dp,
-        modifier = Modifier.align(Alignment.Center).offset(y = -10.dp))
+        size = 1400.dp,
+        modifier = Modifier.align(Alignment.Center).offset(y = 180.dp))
 
     // Bottom buttons
     Column(
@@ -187,8 +187,7 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
                     onClick = {
                       if (hasMic) {
                         isMicActive = !isMicActive
-                        android.util.Log.d(
-                            TAG, "Microphone ${if (isMicActive) "enabled" else "disabled"}")
+                        Log.d(TAG, "Microphone ${if (isMicActive) "enabled" else "disabled"}")
                         if (isMicActive) {
                           lastVoiceTime = System.currentTimeMillis()
                         }
@@ -209,18 +208,6 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
                     iconTint = Color.White)
               }
           Spacer(Modifier.height(14.dp))
-
-          // Simple debug level indicator while mic active
-          if (isMicActive && hasMic) {
-            Text(
-                text =
-                    "Level: ${String.format("%.2f", currentLevel)} ${if (currentLevel > silenceThreshold) "✓ Voice" else "Silence"}",
-                color =
-                    if (currentLevel > silenceThreshold) Color(0xFF2CD510) else Color(0xFF9A9A9A),
-                fontSize = 11.sp,
-                modifier = Modifier.alpha(0.8f).testTag("levelIndicator"))
-            Spacer(Modifier.height(8.dp))
-          }
 
           Text(
               text = "Powered by APERTUS Swiss LLM",
@@ -284,8 +271,8 @@ internal fun shouldDeactivateMic(
 @VisibleForTesting
 internal fun handlePermissionResult(
     granted: Boolean,
-    debugLog: (String) -> Unit = { message -> android.util.Log.d(TAG, message) },
-    warnLog: (String) -> Unit = { message -> android.util.Log.w(TAG, message) }
+    debugLog: (String) -> Unit = { message -> Log.d(TAG, message) },
+    warnLog: (String) -> Unit = { message -> Log.w(TAG, message) }
 ): Boolean {
   debugLog("Permission RECORD_AUDIO: $granted")
   if (!granted) {
@@ -297,7 +284,7 @@ internal fun handlePermissionResult(
 @VisibleForTesting
 internal fun logInitialPermissionState(
     alreadyGranted: Boolean,
-    debugLog: (String) -> Unit = { message -> android.util.Log.d(TAG, message) }
+    debugLog: (String) -> Unit = { message -> Log.d(TAG, message) }
 ): Boolean {
   return if (!alreadyGranted) {
     debugLog("Requesting RECORD_AUDIO permission...")
@@ -340,7 +327,7 @@ private class MockLevelSource(private val level: Float) : LevelSource {
   override val levels = flow {
     while (true) {
       emit(level.coerceIn(0f, 1f))
-      kotlinx.coroutines.delay(16)
+      coroutinesDelay(16)
     }
   }
 
@@ -358,12 +345,12 @@ private class ManagedLevelSource(private val delegate: LevelSource) : LevelSourc
 
   /** Intentionally does nothing; lifecycle is managed by VoiceScreen. */
   override fun start() {
-    android.util.Log.d("ManagedLevelSource", "start() called but ignored (managed by VoiceScreen)")
+    Log.d("ManagedLevelSource", "start() called but ignored (managed by VoiceScreen)")
   }
 
   /** Intentionally does nothing; lifecycle is managed by VoiceScreen. */
   override fun stop() {
-    android.util.Log.d("ManagedLevelSource", "stop() called but ignored (managed by VoiceScreen)")
+    Log.d("ManagedLevelSource", "stop() called but ignored (managed by VoiceScreen)")
   }
 }
 
@@ -404,46 +391,5 @@ private fun VoiceScreenPreviewMultiple(@PreviewParameter(VoiceLevelProvider::cla
 @Composable
 @VisibleForTesting
 internal fun VoiceScreenPreviewContent(level: Float) {
-  val mockSource = remember { MockLevelSource(level) }
-
-  Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-    // Visualizer centered with mock source
-    VoiceVisualizer(
-        levelSource = mockSource,
-        preset = VisualPreset.Bloom,
-        color = Color(0xFC0000),
-        petals = 4,
-        size = 1500.dp,
-        modifier = Modifier.align(Alignment.Center).offset(y = -10.dp))
-
-    // Bottom buttons
-    Column(
-        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
-        horizontalAlignment = Alignment.CenterHorizontally) {
-          Row(
-              horizontalArrangement = Arrangement.spacedBy(50.dp),
-              verticalAlignment = Alignment.CenterVertically) {
-                RoundIconButton(
-                    onClick = {},
-                    iconVector = Icons.Filled.Mic,
-                    contentDescription = "Toggle microphone",
-                    size = 100.dp,
-                    background = Color(0x0),
-                    iconTint = Color.White)
-                RoundIconButton(
-                    onClick = {},
-                    iconVector = Icons.Default.Close,
-                    contentDescription = "Close voice screen",
-                    size = 100.dp,
-                    background = Color(0x0),
-                    iconTint = Color.White)
-              }
-          Spacer(Modifier.height(14.dp))
-          Text(
-              text = "Powered by APERTUS Swiss LLM",
-              color = Color(0xFF9A9A9A),
-              fontSize = 12.sp,
-              modifier = Modifier.alpha(0.9f))
-        }
-  }
+  MaterialTheme { VoiceScreen(onClose = {}, modifier = Modifier.fillMaxSize()) }
 }
