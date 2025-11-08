@@ -1,7 +1,11 @@
 package com.android.sample.home
 
+import com.android.sample.Chat.ChatType
+import com.android.sample.Chat.ChatUIModel
 import com.android.sample.util.MainDispatcherRule
+import java.util.UUID
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
@@ -15,14 +19,25 @@ class HomeViewModelTest {
   private val testDispatcher
     get() = mainDispatcherRule.dispatcher
 
+  private fun HomeViewModel.replaceMessages(vararg texts: String) {
+    val field = HomeViewModel::class.java.getDeclaredField("_uiState")
+    field.isAccessible = true
+    @Suppress("UNCHECKED_CAST") val stateFlow = field.get(this) as MutableStateFlow<HomeUiState>
+    val current = stateFlow.value
+    val messages =
+        texts.map { text ->
+          ChatUIModel(
+              id = UUID.randomUUID().toString(), text = text, timestamp = 0L, type = ChatType.USER)
+        }
+    stateFlow.value = current.copy(messages = messages)
+  }
+
   @Test
   fun clearChat_empties_messages() =
       runTest(testDispatcher) {
         val viewModel = HomeViewModel()
 
-        // Add some messages first - message is added synchronously before coroutine
-        viewModel.updateMessageDraft("Test message")
-        viewModel.sendMessage()
+        viewModel.replaceMessages("Test message")
 
         // Initial state should have messages now (user message added synchronously)
         val initialState = viewModel.uiState.value
@@ -194,9 +209,7 @@ class HomeViewModelTest {
       runTest(testDispatcher) {
         val viewModel = HomeViewModel()
 
-        // Add some messages first - message is added synchronously before coroutine
-        viewModel.updateMessageDraft("Test message")
-        viewModel.sendMessage()
+        viewModel.replaceMessages("Test message")
 
         val initialState = viewModel.uiState.value
         assertTrue(initialState.messages.isNotEmpty())
@@ -1008,9 +1021,7 @@ class HomeViewModelTest {
       runTest(testDispatcher) {
         val viewModel = HomeViewModel()
 
-        // Add some messages first - message is added synchronously before coroutine
-        viewModel.updateMessageDraft("Test message")
-        viewModel.sendMessage()
+        viewModel.replaceMessages("Test message")
 
         val initialState = viewModel.uiState.value
         assertTrue(initialState.messages.isNotEmpty())
