@@ -138,4 +138,36 @@ class VoiceScreenLogicTest {
 
     assertFalse(active)
   }
+
+  @Test
+  fun evaluateAudioLevel_detectsVoiceAndLogs() {
+    val previousTime = 1_000L
+    val result =
+        evaluateAudioLevel(
+            level = 0.6f,
+            silenceThreshold = 0.2f,
+            frameCount = 30,
+            currentTime = 5_000L,
+            lastVoiceTime = previousTime)
+
+    assertTrue(result.shouldLogLevel)
+    assertTrue(result.voiceDetected)
+    assertEquals(5_000L, result.updatedLastVoiceTime)
+  }
+
+  @Test
+  fun evaluateAudioLevel_silenceDoesNotUpdateTimestamp() {
+    val previousTime = 2_000L
+    val result =
+        evaluateAudioLevel(
+            level = 0.01f,
+            silenceThreshold = 0.2f,
+            frameCount = 7,
+            currentTime = 6_000L,
+            lastVoiceTime = previousTime)
+
+    assertFalse(result.shouldLogLevel)
+    assertFalse(result.voiceDetected)
+    assertEquals(previousTime, result.updatedLastVoiceTime)
+  }
 }

@@ -119,18 +119,24 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
           currentLevel = level
           frameCount++
 
-          // Periodic logs for debugging
-          if (frameCount % 30 == 0) { // ~ every 0.5s
+          val evaluation =
+              evaluateAudioLevel(
+                  level = level,
+                  silenceThreshold = silenceThreshold,
+                  frameCount = frameCount,
+                  currentTime = System.currentTimeMillis(),
+                  lastVoiceTime = lastVoiceTime)
+
+          lastVoiceTime = evaluation.updatedLastVoiceTime
+
+          if (evaluation.shouldLogLevel) {
             Log.d(
-                "VoiceScreen",
+                TAG,
                 "Audio level: ${String.format("%.3f", level)} (silence threshold: $silenceThreshold)")
           }
 
-          // If level is above the threshold, consider it as voice activity
-          val now = System.currentTimeMillis()
-          lastVoiceTime = updateLastVoiceTimestamp(level, silenceThreshold, now, lastVoiceTime)
-          if (level > silenceThreshold && frameCount % 10 == 0) {
-            Log.d("VoiceScreen", "Voice detected! Level: ${String.format("%.3f", level)}")
+          if (evaluation.voiceDetected) {
+            Log.d(TAG, "Voice detected! Level: ${String.format("%.3f", level)}")
           }
         }
       } catch (e: Exception) {
@@ -267,6 +273,31 @@ internal fun shouldDeactivateMic(
 }
 
 @VisibleForTesting internal fun resetLevelAfterError(): Float = 0f
+
+@VisibleForTesting
+internal data class AudioLevelEvaluation(
+    val updatedLastVoiceTime: Long,
+    val shouldLogLevel: Boolean,
+    val voiceDetected: Boolean
+)
+
+@VisibleForTesting
+internal fun evaluateAudioLevel(
+    level: Float,
+    silenceThreshold: Float,
+    frameCount: Int,
+    currentTime: Long,
+    lastVoiceTime: Long
+): AudioLevelEvaluation {
+  val updatedLastVoice =
+      updateLastVoiceTimestamp(level, silenceThreshold, currentTime, lastVoiceTime)
+  val shouldLogLevel = frameCount % 30 == 0
+  val voiceDetected = level > silenceThreshold && frameCount % 10 == 0
+  return AudioLevelEvaluation(
+      updatedLastVoiceTime = updatedLastVoice,
+      shouldLogLevel = shouldLogLevel,
+      voiceDetected = voiceDetected)
+}
 
 @VisibleForTesting
 internal fun handlePermissionResult(
