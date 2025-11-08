@@ -2,7 +2,8 @@ package com.android.sample.home
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -15,7 +16,8 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
 
-  private val testDispatcher = UnconfinedTestDispatcher()
+  private val testDispatcher = StandardTestDispatcher()
+  private val testScope = TestScope(testDispatcher)
 
   @Before
   fun setup() {
@@ -99,7 +101,7 @@ class HomeViewModelTest {
         viewModel.sendMessage()
 
         // Advance time
-        advanceTimeBy(100)
+        testScope.advanceTimeBy(100)
 
         // Verify nothing changed
         val stateAfterSend = viewModel.uiState.value
@@ -267,7 +269,7 @@ class HomeViewModelTest {
         viewModel.updateMessageDraft("    ")
         viewModel.sendMessage()
 
-        advanceTimeBy(100)
+        testScope.advanceTimeBy(100)
 
         val stateAfterSend = viewModel.uiState.value
         assertEquals(initialCount, stateAfterSend.messages.size)
@@ -649,7 +651,7 @@ class HomeViewModelTest {
 
   @Test
   fun multiple_state_changes_in_sequence() =
-      runTest(UnconfinedTestDispatcher()) {
+      runTest(testDispatcher) {
         val viewModel = HomeViewModel()
 
         viewModel.toggleDrawer()
