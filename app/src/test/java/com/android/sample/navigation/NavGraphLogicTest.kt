@@ -276,23 +276,36 @@ class NavGraphLogicTest {
   }
 
   @Test
-  fun resolveAuthEffect_returns_start_signin_when_loadingMicrosoft() {
-    val effect = resolveAuthEffect(AuthUiState.Loading(AuthProvider.MICROSOFT), Routes.SignIn)
-    assertEquals(AuthEffect.StartMicrosoftSignIn, effect)
+  fun resolveAuthCommand_returns_start_signin_when_loadingMicrosoft() {
+    val command = resolveAuthCommand(AuthUiState.Loading(AuthProvider.MICROSOFT), Routes.SignIn)
+    assertEquals(AuthCommand.StartMicrosoftSignIn, command)
   }
 
   @Test
-  fun resolveAuthEffect_returns_navigate_home_when_signedInOnSignIn() {
-    val effect = resolveAuthEffect(AuthUiState.SignedIn, Routes.SignIn)
-    assertEquals(AuthEffect.NavigateHome, effect)
+  fun resolveAuthCommand_returns_navigate_home_when_signedInOnSignIn() {
+    val command = resolveAuthCommand(AuthUiState.SignedIn, Routes.SignIn)
+    assertEquals(AuthCommand.NavigateHome, command)
   }
 
   @Test
-  fun resolveAuthEffect_returns_none_for_other_states() {
-    val effectIdle = resolveAuthEffect(AuthUiState.Idle, Routes.SignIn)
-    val effectError = resolveAuthEffect(AuthUiState.Error("oops"), Routes.Home)
-    assertEquals(AuthEffect.None, effectIdle)
-    assertEquals(AuthEffect.None, effectError)
+  fun resolveAuthCommand_returns_none_for_other_states() {
+    val commandIdle = resolveAuthCommand(AuthUiState.Idle, Routes.SignIn)
+    val commandError = resolveAuthCommand(AuthUiState.Error("oops"), Routes.Home)
+    assertEquals(AuthCommand.None, commandIdle)
+    assertEquals(AuthCommand.None, commandError)
+  }
+
+  @Test
+  fun executeAuthCommand_dispatches_to_correct_action() {
+    var signInCalled = 0
+    var navigateCalled = 0
+
+    executeAuthCommand(AuthCommand.StartMicrosoftSignIn, { signInCalled++ }, { navigateCalled++ })
+    executeAuthCommand(AuthCommand.NavigateHome, { signInCalled++ }, { navigateCalled++ })
+    executeAuthCommand(AuthCommand.None, { signInCalled++ }, { navigateCalled++ })
+
+    assertEquals(1, signInCalled)
+    assertEquals(1, navigateCalled)
   }
 
   @Test

@@ -241,6 +241,8 @@ class VoiceVisualizerTest {
     assertEquals(low.pathPoints.size, high.pathPoints.size)
     assertTrue(low.pathPoints.all { it.x.isFinite() && it.y.isFinite() })
     assertNotEquals(Offset.Zero, low.pathPoints.first())
+    assertEquals(low.pathPoints.first().x, low.pathPoints.last().x, 1e-2f)
+    assertEquals(low.pathPoints.first().y, low.pathPoints.last().y, 1e-2f)
   }
 
   @Test
@@ -253,6 +255,22 @@ class VoiceVisualizerTest {
     assertTrue(paramsLow.alphas.all { it in 0f..1f })
     assertTrue(paramsHigh.alphas.all { it in 0f..1f })
     assertTrue(paramsHigh.radii.first() > paramsLow.radii.first())
+    assertTrue(paramsHigh.radii.zipWithNext().all { (a, b) -> b >= a })
+    assertTrue(paramsLow.alphas.zipWithNext().all { (a, b) -> a >= b })
+  }
+
+  @Test
+  fun bloomParameters_respectPetalCount() {
+    val params = calculateBloomParameters(level = 0.6f, t = 0.3f, petals = 6, minSize = 160f)
+    assertTrue(params.pathPoints.size >= 6 * 40)
+  }
+
+  @Test
+  fun rippleParameters_waveInfluenceAlpha() {
+    val t1 = calculateRippleParameters(0.5f, t = 0.0f, minSize = 200f)
+    val t2 = calculateRippleParameters(0.5f, t = 0.5f, minSize = 200f)
+    assertNotEquals(t1.alphas, t2.alphas)
+    assertTrue(t1.alphas.zip(t2.alphas).any { (a, b) -> a != b })
   }
 }
 

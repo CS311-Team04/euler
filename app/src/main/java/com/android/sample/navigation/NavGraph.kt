@@ -45,8 +45,10 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
   // Handle Microsoft authentication when loading
   LaunchedEffect(authState) {
     val currentState = authState
-    when (resolveAuthEffect(currentState, currentDestination)) {
-      AuthEffect.StartMicrosoftSignIn ->
+    val command = resolveAuthCommand(currentState, currentDestination)
+    executeAuthCommand(
+        command,
+        startMicrosoftSignIn = {
           MicrosoftAuth.signIn(
               activity = activity,
               onSuccess = { authViewModel.onAuthenticationSuccess() },
@@ -56,16 +58,14 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
                         currentState, exception.message ?: "Authentication failed")
                 authViewModel.onAuthenticationError(errorMessage)
               })
-      AuthEffect.NavigateHome ->
+        },
+        navigateHome = {
           nav.navigate(Routes.Home) {
             popUpTo(Routes.SignIn) { inclusive = true }
             launchSingleTop = true
             restoreState = true
           }
-      AuthEffect.None -> {
-        // No navigation required for the current state (idle/error)
-      }
-    }
+        })
   }
 
   NavHost(
@@ -162,18 +162,33 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
       }
 }
 
-internal enum class AuthEffect {
-  StartMicrosoftSignIn,
-  NavigateHome,
-  None
+internal sealed class AuthCommand {
+  object StartMicrosoftSignIn : AuthCommand()
+
+  object NavigateHome : AuthCommand()
+
+  object None : AuthCommand()
 }
 
 @VisibleForTesting
-internal fun resolveAuthEffect(authState: AuthUiState, currentDestination: String?): AuthEffect {
+internal fun resolveAuthCommand(authState: AuthUiState, currentDestination: String?): AuthCommand {
   return when {
-    shouldTriggerMicrosoftAuth(authState) -> AuthEffect.StartMicrosoftSignIn
-    shouldNavigateToHomeFromSignIn(authState, currentDestination) -> AuthEffect.NavigateHome
-    else -> AuthEffect.None
+    shouldTriggerMicrosoftAuth(authState) -> AuthCommand.StartMicrosoftSignIn
+    shouldNavigateToHomeFromSignIn(authState, currentDestination) -> AuthCommand.NavigateHome
+    else -> AuthCommand.None
+  }
+}
+
+@VisibleForTesting
+internal fun executeAuthCommand(
+    command: AuthCommand,
+    startMicrosoftSignIn: () -> Unit,
+    navigateHome: () -> Unit
+) {
+  when (command) {
+    AuthCommand.StartMicrosoftSignIn -> startMicrosoftSignIn()
+    AuthCommand.NavigateHome -> navigateHome()
+    AuthCommand.None -> {}
   }
 }
 
