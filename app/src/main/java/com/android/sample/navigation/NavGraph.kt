@@ -1,6 +1,7 @@
 package com.android.sample.navigation
 
 import android.app.Activity
+import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,35 +45,25 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
   // Handle Microsoft authentication when loading
   LaunchedEffect(authState) {
     val currentState = authState
-    when {
-      shouldTriggerMicrosoftAuth(currentState) -> {
-        // Handle Microsoft authentication using Firebase Auth
-        MicrosoftAuth.signIn(
-            activity = activity,
-            onSuccess = { authViewModel.onAuthenticationSuccess() },
-            onError = { exception ->
-              val errorMessage =
-                  if (currentState is AuthUiState.Error) {
-                    getErrorMessage(currentState, exception.message ?: "Authentication failed")
-                  } else {
-                    exception.message ?: "Authentication failed"
-                  }
-              authViewModel.onAuthenticationError(errorMessage)
-            })
-      }
-      shouldNavigateToHomeFromSignIn(currentState, currentDestination) -> {
-        // Only navigate to Home from SignIn screen, not from Opening screen
-        nav.navigate(Routes.Home) {
-          popUpTo(Routes.SignIn) { inclusive = true }
-          launchSingleTop = true
-          restoreState = true
-        }
-      }
-      isErrorState(currentState) -> {
-        // Handle error state - could show snackbar or toast
-      }
-      else -> {
-        /* Idle state - no navigation */
+    when (resolveAuthEffect(currentState, currentDestination)) {
+      AuthEffect.StartMicrosoftSignIn ->
+          MicrosoftAuth.signIn(
+              activity = activity,
+              onSuccess = { authViewModel.onAuthenticationSuccess() },
+              onError = { exception ->
+                val errorMessage =
+                    buildAuthenticationErrorMessage(
+                        currentState, exception.message ?: "Authentication failed")
+                authViewModel.onAuthenticationError(errorMessage)
+              })
+      AuthEffect.NavigateHome ->
+          nav.navigate(Routes.Home) {
+            popUpTo(Routes.SignIn) { inclusive = true }
+            launchSingleTop = true
+            restoreState = true
+          }
+      AuthEffect.None -> {
+        // No navigation required for the current state (idle/error)
       }
     }
   }
@@ -169,4 +160,24 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
           VoiceScreen(onClose = { nav.popBackStack() }, modifier = Modifier.fillMaxSize())
         }
       }
+}
+
+internal enum class AuthEffect {
+  StartMicrosoftSignIn,
+  NavigateHome,
+  None
+}
+
+@VisibleForTesting
+internal fun resolveAuthEffect(authState: AuthUiState, currentDestination: String?): AuthEffect {
+  return when {
+    shouldTriggerMicrosoftAuth(authState) -> AuthEffect.StartMicrosoftSignIn
+    shouldNavigateToHomeFromSignIn(authState, currentDestination) -> AuthEffect.NavigateHome
+    else -> AuthEffect.None
+  }
+}
+
+@VisibleForTesting
+internal fun buildAuthenticationErrorMessage(authState: AuthUiState, fallback: String): String {
+  return if (authState is AuthUiState.Error) getErrorMessage(authState, fallback) else fallback
 }

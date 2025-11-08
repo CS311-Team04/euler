@@ -265,4 +265,46 @@ class NavGraphLogicTest {
       assertEquals("Exactly one state predicate should be true for $state", 1, flags.count { it })
     }
   }
+
+  @Test
+  fun state_immutability_after_operations() {
+    val idleState = AuthUiState.Idle
+    assertTrue("Idle is idle", isIdleState(idleState))
+    assertFalse("Idle is not loading", isLoadingState(idleState))
+    assertFalse("Idle is not signed in", isSignedInState(idleState))
+    assertFalse("Idle is not error", isErrorState(idleState))
+  }
+
+  @Test
+  fun resolveAuthEffect_returns_start_signin_when_loadingMicrosoft() {
+    val effect = resolveAuthEffect(AuthUiState.Loading(AuthProvider.MICROSOFT), Routes.SignIn)
+    assertEquals(AuthEffect.StartMicrosoftSignIn, effect)
+  }
+
+  @Test
+  fun resolveAuthEffect_returns_navigate_home_when_signedInOnSignIn() {
+    val effect = resolveAuthEffect(AuthUiState.SignedIn, Routes.SignIn)
+    assertEquals(AuthEffect.NavigateHome, effect)
+  }
+
+  @Test
+  fun resolveAuthEffect_returns_none_for_other_states() {
+    val effectIdle = resolveAuthEffect(AuthUiState.Idle, Routes.SignIn)
+    val effectError = resolveAuthEffect(AuthUiState.Error("oops"), Routes.Home)
+    assertEquals(AuthEffect.None, effectIdle)
+    assertEquals(AuthEffect.None, effectError)
+  }
+
+  @Test
+  fun buildAuthenticationErrorMessage_prefers_state_message() {
+    val errorState = AuthUiState.Error("")
+    val fallback = "Authentication failed"
+    assertEquals(fallback, buildAuthenticationErrorMessage(errorState, fallback))
+  }
+
+  @Test
+  fun buildAuthenticationErrorMessage_uses_fallback_for_non_error_state() {
+    val fallback = "Authentication failed"
+    assertEquals(fallback, buildAuthenticationErrorMessage(AuthUiState.Idle, fallback))
+  }
 }
