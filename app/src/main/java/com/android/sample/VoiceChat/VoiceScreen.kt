@@ -336,7 +336,7 @@ private class VoiceLevelProvider : PreviewParameterProvider<Float> {
     showSystemUi = true)
 @Composable
 private fun VoiceScreenPreviewSilent() {
-  VoiceScreenPreview(level = 0f)
+  VoiceScreenPreviewContent(level = 0f)
 }
 
 @Preview(
@@ -346,19 +346,20 @@ private fun VoiceScreenPreviewSilent() {
     showSystemUi = true)
 @Composable
 private fun VoiceScreenPreviewActive() {
-  VoiceScreenPreview(level = 0.7f)
+  VoiceScreenPreviewContent(level = 0.7f)
 }
 
 @Preview(
     name = "VoiceScreen - Multiple Levels", showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 private fun VoiceScreenPreviewMultiple(@PreviewParameter(VoiceLevelProvider::class) level: Float) {
-  VoiceScreenPreview(level = level)
+  VoiceScreenPreviewContent(level = level)
 }
 
 /** Preview content used by the previews above. */
 @Composable
-private fun VoiceScreenPreview(level: Float) {
+@VisibleForTesting
+internal fun VoiceScreenPreviewContent(level: Float) {
   val mockSource = remember { MockLevelSource(level) }
 
   Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {

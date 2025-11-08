@@ -50,4 +50,10 @@ class VoiceScreenTest {
     composeTestRule.setContent { VoiceOverlay(onDismiss = {}, modifier = Modifier.size(100.dp)) }
     composeTestRule.onRoot().assertIsDisplayed()
   }
+
+  @Test
+  fun voiceScreenPreviewContent_renders() {
+    composeTestRule.setContent { VoiceScreenPreviewContent(level = 0.4f) }
+    composeTestRule.onRoot().assertIsDisplayed()
+  }
 }
