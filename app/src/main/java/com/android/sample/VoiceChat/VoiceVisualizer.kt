@@ -8,10 +8,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
@@ -104,25 +104,22 @@ private fun AgslBloom(
   val r = remember { frameCount }
 
   Canvas(modifier.size(size)) {
-    val canvasSize = this.size
-    val center = Offset(canvasSize.width / 2f, canvasSize.height / 2f)
-    val minSize = min(canvasSize.width, canvasSize.height)
+    val metrics = calculateCanvasMetrics(this.size)
 
-    val params = calculateBloomParameters(level, t, petals, minSize)
-
-    drawCircle(
-        color = color.copy(alpha = 0.01f + params.easeLevel * 0.05f),
-        radius = params.base * (1f + params.breathing) * 0.9f * 10,
-        center = center)
-
-    val path = buildBloomPath(params.pathPoints)
-
-    drawPath(path, color.copy(alpha = 0.75f + params.easeLevel * 0.3f), style = Fill)
+    val params = calculateBloomParameters(level, t, petals, metrics.minSize)
+    val instructions = createBloomDrawInstructions(params)
 
     drawCircle(
-        color = Color.Black.copy(alpha = 0.25f + params.easeLevel * 0.15f),
-        radius = params.base * 0.2f,
-        center = center)
+        color = color.copy(alpha = instructions.outerCircleAlpha),
+        radius = instructions.outerCircleRadius,
+        center = metrics.center)
+
+    drawPath(instructions.path, color.copy(alpha = instructions.pathAlpha), style = Fill)
+
+    drawCircle(
+        color = Color.Black.copy(alpha = instructions.innerCircleAlpha),
+        radius = instructions.innerCircleRadius,
+        center = metrics.center)
   }
 }
 
@@ -148,14 +145,13 @@ private fun AgslRipple(level: Float, color: Color, size: Dp, modifier: Modifier 
   val r1 = remember { frameCount }
 
   Canvas(modifier.size(size)) {
-    val canvasSize = this.size
-    val center = Offset(canvasSize.width / 2f, canvasSize.height / 2f)
-    val minSize = min(canvasSize.width, canvasSize.height)
+    val metrics = calculateCanvasMetrics(this.size)
 
-    val params = calculateRippleParameters(level, t, minSize)
+    val params = calculateRippleParameters(level, t, metrics.minSize)
     val circles = createRippleCircles(params)
     circles.forEach { circle ->
-      drawCircle(color = color.copy(alpha = circle.alpha), radius = circle.radius, center = center)
+      drawCircle(
+          color = color.copy(alpha = circle.alpha), radius = circle.radius, center = metrics.center)
     }
   }
 }
@@ -163,21 +159,18 @@ private fun AgslRipple(level: Float, color: Color, size: Dp, modifier: Modifier 
 /** Fallback pulse visualization for devices below API 33. */
 @Composable
 private fun LegacyPulse(level: Float, color: Color, size: Dp, modifier: Modifier = Modifier) {
-  val px = with(LocalDensity.current) { size.toPx() }
-
   Canvas(modifier.size(size)) {
-    val canvasSize = this.size
-    val c = androidx.compose.ui.geometry.Offset(canvasSize.width / 2f, canvasSize.height / 2f)
-    val minSize = minOf(canvasSize.width, canvasSize.height)
+    val metrics = calculateCanvasMetrics(this.size)
 
     // More proportional reaction: smaller base, larger amplitude
-    val metrics = calculateLegacyPulseMetrics(level, minSize)
+    val pulseMetrics = calculateLegacyPulseMetrics(level, metrics.minSize)
 
     // Slight glow becomes more visible with voice
-    drawCircle(color.copy(alpha = 0.12f + level * 0.2f), metrics.radius * 1.8f, c)
+    drawCircle(color.copy(alpha = 0.12f + level * 0.2f), pulseMetrics.radius * 1.8f, metrics.center)
     // Main circle
-    drawCircle(color.copy(alpha = 0.8f + level * 0.15f), metrics.radius, c)
-    drawCircle(Color.Black.copy(alpha = 0.22f + level * 0.1f), metrics.radius * 0.22f, c)
+    drawCircle(color.copy(alpha = 0.8f + level * 0.15f), pulseMetrics.radius, metrics.center)
+    drawCircle(
+        Color.Black.copy(alpha = 0.22f + level * 0.1f), pulseMetrics.radius * 0.22f, metrics.center)
   }
 }
 
@@ -203,6 +196,43 @@ internal fun buildBloomPath(points: List<Offset>): Path {
     path.close()
   }
   return path
+}
+
+@VisibleForTesting
+internal data class CanvasMetrics(val size: Size, val center: Offset, val minSize: Float)
+
+@VisibleForTesting
+internal fun calculateCanvasMetrics(size: Size): CanvasMetrics {
+  val center = Offset(size.width / 2f, size.height / 2f)
+  val minSize = min(size.width, size.height)
+  return CanvasMetrics(size = size, center = center, minSize = minSize)
+}
+
+@VisibleForTesting
+internal data class BloomDrawInstructions(
+    val outerCircleAlpha: Float,
+    val outerCircleRadius: Float,
+    val path: Path,
+    val pathAlpha: Float,
+    val innerCircleAlpha: Float,
+    val innerCircleRadius: Float
+)
+
+@VisibleForTesting
+internal fun createBloomDrawInstructions(params: BloomParameters): BloomDrawInstructions {
+  val outerAlpha = 0.01f + params.easeLevel * 0.05f
+  val outerRadius = params.base * (1f + params.breathing) * 0.9f * 10
+  val path = buildBloomPath(params.pathPoints)
+  val pathAlpha = 0.75f + params.easeLevel * 0.3f
+  val innerAlpha = 0.25f + params.easeLevel * 0.15f
+  val innerRadius = params.base * 0.2f
+  return BloomDrawInstructions(
+      outerCircleAlpha = outerAlpha,
+      outerCircleRadius = outerRadius,
+      path = path,
+      pathAlpha = pathAlpha,
+      innerCircleAlpha = innerAlpha,
+      innerCircleRadius = innerRadius)
 }
 
 @VisibleForTesting internal data class RippleCircle(val radius: Float, val alpha: Float)

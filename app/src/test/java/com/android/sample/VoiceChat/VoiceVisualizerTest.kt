@@ -299,6 +299,29 @@ class VoiceVisualizerTest {
   }
 
   @Test
+  fun calculateCanvasMetrics_returnsCenterAndMinSize() {
+    val size = androidx.compose.ui.geometry.Size(width = 200f, height = 120f)
+    val metrics = calculateCanvasMetrics(size)
+    assertEquals(size, metrics.size)
+    assertEquals(100f, metrics.center.x, 1e-4f)
+    assertEquals(60f, metrics.center.y, 1e-4f)
+    assertEquals(120f, metrics.minSize, 1e-4f)
+  }
+
+  @Test
+  fun createBloomDrawInstructions_scalesWithParameters() {
+    val params = calculateBloomParameters(level = 0.7f, t = 0.5f, petals = 4, minSize = 180f)
+    val instructions = createBloomDrawInstructions(params)
+    assertTrue(instructions.outerCircleAlpha > 0f)
+    assertTrue(instructions.pathAlpha > 0f)
+    assertTrue(instructions.innerCircleAlpha > 0f)
+    assertTrue(instructions.outerCircleRadius > instructions.innerCircleRadius)
+    assertEquals(params.base * 0.2f, instructions.innerCircleRadius, 1e-4f)
+    val measure = PathMeasure(instructions.path.asAndroidPath(), false)
+    assertTrue(measure.length > 0)
+  }
+
+  @Test
   fun rippleParameters_waveInfluenceAlpha() {
     val t1 = calculateRippleParameters(0.5f, t = 0.0f, minSize = 200f)
     val t2 = calculateRippleParameters(0.5f, t = 0.5f, minSize = 200f)
