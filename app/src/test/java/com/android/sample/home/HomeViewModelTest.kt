@@ -1,34 +1,19 @@
 package com.android.sample.home
 
-import kotlinx.coroutines.Dispatchers
+import com.android.sample.util.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
-import org.junit.After
 import org.junit.Assert.*
-import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
 
-  private val testDispatcher = StandardTestDispatcher()
-  private val testScope = TestScope(testDispatcher)
-
-  @Before
-  fun setup() {
-    // Configure Main dispatcher BEFORE any ViewModel creation
-    Dispatchers.setMain(testDispatcher)
-  }
-
-  @After
-  fun tearDown() {
-    Dispatchers.resetMain()
-  }
+  @get:Rule val mainDispatcherRule = MainDispatcherRule()
+  private val testDispatcher
+    get() = mainDispatcherRule.dispatcher
 
   @Test
   fun clearChat_empties_messages() =
@@ -101,7 +86,7 @@ class HomeViewModelTest {
         viewModel.sendMessage()
 
         // Advance time
-        testScope.advanceTimeBy(100)
+        testDispatcher.scheduler.advanceTimeBy(100)
 
         // Verify nothing changed
         val stateAfterSend = viewModel.uiState.value
@@ -269,7 +254,7 @@ class HomeViewModelTest {
         viewModel.updateMessageDraft("    ")
         viewModel.sendMessage()
 
-        testScope.advanceTimeBy(100)
+        testDispatcher.scheduler.advanceTimeBy(100)
 
         val stateAfterSend = viewModel.uiState.value
         assertEquals(initialCount, stateAfterSend.messages.size)
