@@ -115,6 +115,11 @@ open class ElevenLabsPlayback(
       }
     } ?: throw IOException("ElevenLabs response body empty")
 
+    if (!cacheFile.exists() || cacheFile.length() == 0L) {
+      cacheFile.delete()
+      throw IOException("ElevenLabs response body empty")
+    }
+
     return cacheFile
   }
 

@@ -218,6 +218,78 @@ class ElevenLabsPlaybackTest {
   }
 
   @Test
+  fun getOrDownloadAudio_httpErrorThrows() {
+    val scope = CoroutineScope(Dispatchers.Unconfined)
+    val server = MockWebServer()
+    server.enqueue(MockResponse().setResponseCode(500))
+    server.start()
+
+    val baseUrl = server.url("/v1").toString().trimEnd('/')
+    val playback =
+        object :
+            ElevenLabsPlayback(
+                context = context,
+                apiKeyProvider = { "key" },
+                voiceIdProvider = { "voice" },
+                baseUrl = baseUrl,
+                httpClient = OkHttpClient(),
+                coroutineScope = scope) {
+          suspend fun download(text: String, id: String): File = getOrDownloadAudio(text, id)
+        }
+
+    try {
+      val exception =
+          kotlin
+              .runCatching {
+                kotlinx.coroutines.runBlocking { playback.download("Bonjour", "err") }
+              }
+              .exceptionOrNull()
+      assertTrue(exception is IOException)
+      assertEquals(1, server.requestCount)
+    } finally {
+      playback.shutdown()
+      scope.cancel()
+      server.shutdown()
+    }
+  }
+
+  @Test
+  fun getOrDownloadAudio_emptyBodyThrows() {
+    val scope = CoroutineScope(Dispatchers.Unconfined)
+    val server = MockWebServer()
+    server.enqueue(MockResponse().setResponseCode(200).setHeader("Content-Type", "audio/mpeg"))
+    server.start()
+
+    val baseUrl = server.url("/v1").toString().trimEnd('/')
+    val playback =
+        object :
+            ElevenLabsPlayback(
+                context = context,
+                apiKeyProvider = { "key" },
+                voiceIdProvider = { "voice" },
+                baseUrl = baseUrl,
+                httpClient = OkHttpClient(),
+                coroutineScope = scope) {
+          suspend fun download(text: String, id: String): File = getOrDownloadAudio(text, id)
+        }
+
+    try {
+      val exception =
+          kotlin
+              .runCatching {
+                kotlinx.coroutines.runBlocking { playback.download("Bonjour", "empty") }
+              }
+              .exceptionOrNull()
+      assertTrue(exception is IOException)
+      assertEquals(1, server.requestCount)
+    } finally {
+      playback.shutdown()
+      scope.cancel()
+      server.shutdown()
+    }
+  }
+
+  @Test
   fun speak_missing_voiceId_reports_error() {
     val scope = CoroutineScope(Dispatchers.Unconfined)
     val errorLatch = CountDownLatch(1)

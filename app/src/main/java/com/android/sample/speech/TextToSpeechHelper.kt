@@ -31,8 +31,13 @@ interface SpeechPlayback {
  * - Expose a simple [speak] method with callbacks for start/done/error events
  * - Allow clients to stop playback or release resources when no longer needed
  */
-class TextToSpeechHelper(context: Context, private val preferredLocale: Locale = Locale.FRENCH) :
-    SpeechPlayback {
+class TextToSpeechHelper(
+    context: Context,
+    private val preferredLocale: Locale = Locale.FRENCH,
+    private val engineFactory: (Context, (Int) -> Unit) -> TextToSpeechEngine = { ctx, listener ->
+      AndroidTextToSpeechEngine(ctx, listener)
+    }
+) : SpeechPlayback {
 
   private val appContext = context.applicationContext
   private val mainHandler = Handler(Looper.getMainLooper())
@@ -54,37 +59,12 @@ class TextToSpeechHelper(context: Context, private val preferredLocale: Locale =
 
   @Volatile private var isReady: Boolean = false
 
-  private lateinit var textToSpeech: TextToSpeech
+  private val engine: TextToSpeechEngine
 
   init {
-    textToSpeech =
-        TextToSpeech(appContext) { status ->
-          isReady =
-              if (status == TextToSpeech.SUCCESS) {
-                selectLanguage()
-              } else {
-                false
-              }
+    engine = engineFactory(appContext) { status -> handleInitialization(status) }
 
-          synchronized(pendingQueue) {
-            if (isReady) {
-              // Replay queued requests now that initialization succeeded.
-              val requests = pendingQueue.toList()
-              pendingQueue.clear()
-              requests.forEach { speakInternal(it) }
-            } else {
-              // Notify queued callbacks that TTS is unavailable.
-              val failure =
-                  IllegalStateException("TextToSpeech engine is not available on this device")
-              pendingQueue.forEach { pending ->
-                dispatchOnMain { pending.callbacks.onError(failure) }
-              }
-              pendingQueue.clear()
-            }
-          }
-        }
-
-    textToSpeech.setOnUtteranceProgressListener(
+    engine.setProgressListener(
         object : UtteranceProgressListener() {
           override fun onStart(utteranceId: String) {
             callbacks[utteranceId]?.let { cb -> dispatchOnMain { cb.onStart() } }
@@ -144,20 +124,19 @@ class TextToSpeechHelper(context: Context, private val preferredLocale: Locale =
   /** Stops any ongoing playback immediately. */
   override fun stop() {
     callbacks.clear()
-    textToSpeech.stop()
+    engine.stop()
   }
 
   /** Releases the underlying TTS engine. Call when you no longer need speech output. */
   override fun shutdown() {
     callbacks.clear()
-    textToSpeech.stop()
-    textToSpeech.shutdown()
+    engine.stop()
+    engine.shutdown()
   }
 
   private fun speakInternal(request: PendingSpeech) {
     callbacks[request.utteranceId] = request.callbacks
-    val result =
-        textToSpeech.speak(request.text, TextToSpeech.QUEUE_FLUSH, null, request.utteranceId)
+    val result = engine.speak(request.text, TextToSpeech.QUEUE_FLUSH, null, request.utteranceId)
     if (result != TextToSpeech.SUCCESS) {
       callbacks.remove(request.utteranceId)
       val failure = IllegalStateException("Failed to enqueue text-to-speech (code=$result)")
@@ -182,11 +161,71 @@ class TextToSpeechHelper(context: Context, private val preferredLocale: Locale =
     }
 
     for (locale in candidates) {
-      val result = textToSpeech.setLanguage(locale)
+      val result = engine.setLanguage(locale)
       if (result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED) {
         return true
       }
     }
     return false
+  }
+
+  private fun handleInitialization(status: Int) {
+    isReady =
+        if (status == TextToSpeech.SUCCESS) {
+          selectLanguage()
+        } else {
+          false
+        }
+
+    synchronized(pendingQueue) {
+      if (isReady) {
+        val requests = pendingQueue.toList()
+        pendingQueue.clear()
+        requests.forEach { speakInternal(it) }
+      } else {
+        val failure = IllegalStateException("TextToSpeech engine is not available on this device")
+        pendingQueue.forEach { pending -> dispatchOnMain { pending.callbacks.onError(failure) } }
+        pendingQueue.clear()
+      }
+    }
+  }
+}
+
+interface TextToSpeechEngine {
+  fun setLanguage(locale: Locale): Int
+
+  fun speak(text: String, queueMode: Int, params: android.os.Bundle?, utteranceId: String): Int
+
+  fun stop()
+
+  fun shutdown()
+
+  fun setProgressListener(listener: UtteranceProgressListener)
+}
+
+private class AndroidTextToSpeechEngine(context: Context, initListener: (Int) -> Unit) :
+    TextToSpeechEngine {
+
+  private val engine = TextToSpeech(context) { status -> initListener(status) }
+
+  override fun setLanguage(locale: Locale): Int = engine.setLanguage(locale)
+
+  override fun speak(
+      text: String,
+      queueMode: Int,
+      params: android.os.Bundle?,
+      utteranceId: String
+  ): Int = engine.speak(text, queueMode, params, utteranceId)
+
+  override fun stop() {
+    engine.stop()
+  }
+
+  override fun shutdown() {
+    engine.shutdown()
+  }
+
+  override fun setProgressListener(listener: UtteranceProgressListener) {
+    engine.setOnUtteranceProgressListener(listener)
   }
 }
