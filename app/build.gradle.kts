@@ -190,6 +190,7 @@ dependencies {
     implementation("com.github.spotbugs:spotbugs-annotations:4.8.3")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 
 }
 

@@ -30,6 +30,7 @@ open class ElevenLabsPlayback(
     private val apiKeyProvider: () -> String,
     private val voiceIdProvider: () -> String,
     private val modelId: String = "eleven_multilingual_v2",
+    private val baseUrl: String = DEFAULT_BASE_URL,
     private val httpClient: OkHttpClient = OkHttpClient(),
     private val coroutineScope: CoroutineScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -96,7 +97,7 @@ open class ElevenLabsPlayback(
 
     val request =
         Request.Builder()
-            .url("https://api.elevenlabs.io/v1/text-to-speech/$voiceId")
+            .url("$baseUrl/text-to-speech/$voiceId")
             .header("xi-api-key", apiKey)
             .header("Accept", "audio/mpeg")
             .post(payload.toRequestBody("application/json".toMediaType()))
@@ -168,5 +169,9 @@ open class ElevenLabsPlayback(
     mediaPlayer?.reset()
     mediaPlayer?.release()
     mediaPlayer = null
+  }
+
+  companion object {
+    private const val DEFAULT_BASE_URL = "https://api.elevenlabs.io/v1"
   }
 }
