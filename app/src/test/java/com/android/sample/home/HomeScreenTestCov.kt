@@ -3,6 +3,7 @@ package com.android.sample.home
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -10,8 +11,10 @@ import androidx.compose.ui.test.performTextInput
 import com.android.sample.Chat.ChatMessage
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
+import com.android.sample.speech.SpeechPlayback
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -34,6 +37,60 @@ class HomeScreenTestCov {
   @get:Rule val composeTestRule = createComposeRule()
 
   private val testDispatcher = UnconfinedTestDispatcher()
+
+  private class FakeSpeechPlayback : SpeechPlayback {
+    var lastSpokenText: String? = null
+    var lastUtteranceId: String? = null
+    var stopCount: Int = 0
+    private val startCallbacks = mutableListOf<() -> Unit>()
+    private val doneCallbacks = mutableListOf<() -> Unit>()
+    private val errorCallbacks = mutableListOf<(Throwable?) -> Unit>()
+
+    override fun speak(
+        text: String,
+        utteranceId: String,
+        onStart: () -> Unit,
+        onDone: () -> Unit,
+        onError: (Throwable?) -> Unit
+    ) {
+      lastSpokenText = text
+      lastUtteranceId = utteranceId
+      startCallbacks += onStart
+      doneCallbacks += onDone
+      errorCallbacks += onError
+    }
+
+    override fun stop() {
+      stopCount++
+      startCallbacks.clear()
+      doneCallbacks.clear()
+      errorCallbacks.clear()
+    }
+
+    override fun shutdown() {
+      stop()
+    }
+
+    fun triggerStart() {
+      val callbacks = startCallbacks.toList()
+      startCallbacks.clear()
+      callbacks.forEach { it.invoke() }
+    }
+
+    fun triggerDone() {
+      val callbacks = doneCallbacks.toList()
+      doneCallbacks.clear()
+      callbacks.forEach { it.invoke() }
+    }
+
+    fun triggerError(t: Throwable? = null) {
+      val callbacks = errorCallbacks.toList()
+      errorCallbacks.clear()
+      callbacks.forEach { it.invoke(t) }
+    }
+
+    fun hasPendingStartCallback(): Boolean = startCallbacks.isNotEmpty()
+  }
 
   @Before
   fun setup() {
@@ -506,6 +563,38 @@ class HomeScreenTestCov {
   }
 
   @Test
+  fun chatMessage_shows_voice_button_when_helper_available() {
+    val aiMessage =
+        ChatUIModel(
+            id = "test-ai-voice",
+            text = "Voice playback enabled",
+            timestamp = System.currentTimeMillis(),
+            type = ChatType.AI)
+    val fakePlayback = FakeSpeechPlayback()
+
+    composeTestRule.setContent {
+      MaterialTheme {
+        ChatMessage(
+            message = aiMessage,
+            onSpeakClick = { chatMessage ->
+              fakePlayback.speak(
+                  text = chatMessage.text,
+                  utteranceId = chatMessage.id,
+                  onStart = {},
+                  onDone = {},
+                  onError = {})
+            })
+      }
+    }
+
+    composeTestRule.onNodeWithTag("chat_ai_voice_btn_${aiMessage.id}").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("chat_ai_voice_btn_${aiMessage.id}").performClick()
+    fakePlayback.triggerStart()
+    fakePlayback.triggerDone()
+    assertEquals("Voice playback enabled", fakePlayback.lastSpokenText)
+  }
+
+  @Test
   fun chatMessage_displays_ai_message_with_different_text() {
     // Test with a different AI message to ensure the Column and Text render correctly
     val aiMessage =
@@ -522,6 +611,126 @@ class HomeScreenTestCov {
     // This covers the Column(horizontalAlignment = Alignment.Start) and Text composables
     composeTestRule.onNodeWithTag("chat_ai_text").assertIsDisplayed()
     composeTestRule.onNodeWithText("Another AI response with different content").assertIsDisplayed()
+  }
+
+  @Test
+  fun homeScreen_voice_button_shows_loading_then_stop_then_idle() {
+    val viewModel = HomeViewModel()
+    val aiMessage =
+        ChatUIModel(
+            id = "voice-ai-1",
+            text = "Lecture via ElevenLabs",
+            timestamp = System.currentTimeMillis(),
+            type = ChatType.AI)
+    viewModel.setUiStateForTest(HomeUiState(messages = listOf(aiMessage)))
+    val playback = FakeSpeechPlayback()
+
+    composeTestRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = viewModel, textToSpeechHelper = playback) }
+    }
+    composeTestRule.waitForIdle()
+
+    composeTestRule.onNodeWithTag("chat_ai_voice_btn_${aiMessage.id}").performClick()
+    composeTestRule.waitForIdle()
+    assertEquals(aiMessage.id, playback.lastUtteranceId)
+    assertTrue(playback.hasPendingStartCallback())
+
+    playback.triggerStart()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithContentDescription("Arrêter la lecture").assertIsDisplayed()
+
+    playback.triggerDone()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithContentDescription("Lire le message").assertIsDisplayed()
+  }
+
+  @Test
+  fun homeScreen_voice_button_second_click_stops_playback() {
+    val viewModel = HomeViewModel()
+    val aiMessage =
+        ChatUIModel(
+            id = "voice-ai-2",
+            text = "Cliquer pour arrêter",
+            timestamp = System.currentTimeMillis(),
+            type = ChatType.AI)
+    viewModel.setUiStateForTest(HomeUiState(messages = listOf(aiMessage)))
+    val playback = FakeSpeechPlayback()
+
+    composeTestRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = viewModel, textToSpeechHelper = playback) }
+    }
+    composeTestRule.waitForIdle()
+
+    val buttonTag = "chat_ai_voice_btn_${aiMessage.id}"
+    composeTestRule.onNodeWithTag(buttonTag).performClick()
+    playback.triggerStart()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithContentDescription("Arrêter la lecture").assertIsDisplayed()
+
+    composeTestRule.onNodeWithContentDescription("Arrêter la lecture").performClick()
+    composeTestRule.waitForIdle()
+    assertEquals(1, playback.stopCount)
+    composeTestRule.onNodeWithContentDescription("Lire le message").assertIsDisplayed()
+  }
+
+  @Test
+  fun homeScreen_voice_button_error_resets_state() {
+    val viewModel = HomeViewModel()
+    val aiMessage =
+        ChatUIModel(
+            id = "voice-ai-error",
+            text = "Erreur de lecture",
+            timestamp = System.currentTimeMillis(),
+            type = ChatType.AI)
+    viewModel.setUiStateForTest(HomeUiState(messages = listOf(aiMessage)))
+    val playback = FakeSpeechPlayback()
+
+    composeTestRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = viewModel, textToSpeechHelper = playback) }
+    }
+    composeTestRule.waitForIdle()
+
+    composeTestRule.onNodeWithTag("chat_ai_voice_btn_${aiMessage.id}").performClick()
+    composeTestRule.waitForIdle()
+    assertTrue(playback.hasPendingStartCallback())
+    playback.triggerError(RuntimeException("network"))
+    composeTestRule.waitForIdle()
+
+    composeTestRule.onNodeWithContentDescription("Lire le message").assertIsDisplayed()
+  }
+
+  @Test
+  fun chatMessage_speaking_state_shows_stop_icon() {
+    val aiMessage =
+        ChatUIModel(
+            id = "speaking-ai",
+            text = "Audio en cours",
+            timestamp = System.currentTimeMillis(),
+            type = ChatType.AI)
+
+    composeTestRule.setContent {
+      MaterialTheme { ChatMessage(message = aiMessage, isSpeaking = true, onSpeakClick = {}) }
+    }
+    composeTestRule.waitForIdle()
+
+    composeTestRule.onNodeWithContentDescription("Arrêter la lecture").assertIsDisplayed()
+  }
+
+  @Test
+  fun chatMessage_idle_state_shows_volume_icon() {
+    val aiMessage =
+        ChatUIModel(
+            id = "idle-ai",
+            text = "Audio disponible",
+            timestamp = System.currentTimeMillis(),
+            type = ChatType.AI)
+
+    composeTestRule.setContent {
+      MaterialTheme { ChatMessage(message = aiMessage, onSpeakClick = {}) }
+    }
+    composeTestRule.waitForIdle()
+
+    composeTestRule.onNodeWithContentDescription("Lire le message").assertIsDisplayed()
   }
 
   // ========== Tests for Suggestion Chips ==========
@@ -1068,4 +1277,11 @@ class HomeScreenTestCov {
     // Verify that suggestions are visible when hasAiResponded is false
     composeTestRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed()
   }
+}
+
+private fun HomeViewModel.setUiStateForTest(state: HomeUiState) {
+  val field = HomeViewModel::class.java.getDeclaredField("_uiState")
+  field.isAccessible = true
+  val flow = field.get(this) as MutableStateFlow<HomeUiState>
+  flow.value = state
 }

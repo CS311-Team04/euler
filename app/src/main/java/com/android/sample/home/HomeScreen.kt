@@ -41,6 +41,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.android.sample.Chat.ChatMessage
 import com.android.sample.Chat.ChatType
 import com.android.sample.R
+import com.android.sample.speech.SpeechPlayback
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -83,11 +84,24 @@ fun HomeScreen(
     onSignOut: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     openDrawerOnStart: Boolean = false,
-    speechHelper: com.android.sample.speech.SpeechToTextHelper? = null
+    speechHelper: com.android.sample.speech.SpeechToTextHelper? = null,
+    textToSpeechHelper: SpeechPlayback? = null
 ) {
   val ui by viewModel.uiState.collectAsState()
   val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
   val scope = rememberCoroutineScope()
+  val ttsHelper = textToSpeechHelper
+
+  var speakingMessageId by remember { mutableStateOf<String?>(null) }
+  var loadingMessageId by remember { mutableStateOf<String?>(null) }
+
+  DisposableEffect(ttsHelper) {
+    onDispose {
+      ttsHelper?.stop()
+      speakingMessageId = null
+      loadingMessageId = null
+    }
+  }
 
   // Synchronize ViewModel state <-> Drawer component
   LaunchedEffect(ui.isDrawerOpen) {
@@ -368,7 +382,47 @@ fun HomeScreen(
                           modifier = Modifier.fillMaxSize().padding(16.dp),
                           verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             items(items = ui.messages, key = { it.id }) { item ->
-                              ChatMessage(message = item, modifier = Modifier.fillMaxWidth())
+                              val isSpeaking = speakingMessageId == item.id
+                              val isLoading = loadingMessageId == item.id
+                              ChatMessage(
+                                  message = item,
+                                  modifier = Modifier.fillMaxWidth(),
+                                  isSpeaking = isSpeaking,
+                                  isLoadingSpeech = isLoading,
+                                  onSpeakClick =
+                                      if (item.type == ChatType.AI && ttsHelper != null) {
+                                        { message ->
+                                          if (speakingMessageId == message.id) {
+                                            ttsHelper.stop()
+                                            speakingMessageId = null
+                                            loadingMessageId = null
+                                          } else {
+                                            loadingMessageId = message.id
+                                            ttsHelper.speak(
+                                                text = message.text,
+                                                utteranceId = message.id,
+                                                onStart = {
+                                                  loadingMessageId = null
+                                                  speakingMessageId = message.id
+                                                },
+                                                onDone = {
+                                                  if (speakingMessageId == message.id) {
+                                                    speakingMessageId = null
+                                                  }
+                                                },
+                                                onError = {
+                                                  if (speakingMessageId == message.id) {
+                                                    speakingMessageId = null
+                                                  }
+                                                  if (loadingMessageId == message.id) {
+                                                    loadingMessageId = null
+                                                  }
+                                                })
+                                          }
+                                        }
+                                      } else {
+                                        null
+                                      })
                             }
 
                             // Global thinking indicator shown AFTER the last user message.
