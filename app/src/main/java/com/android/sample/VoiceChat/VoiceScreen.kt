@@ -75,26 +75,23 @@ fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
   // Microphone control (start/stop)
   LaunchedEffect(isMicActive, hasMic) {
     if (isMicActive && hasMic) {
-      try {
-        Log.d("VoiceScreen", "Starting microphone...")
-        mic.start()
-        lastVoiceTime = System.currentTimeMillis()
-        // Small delay to let the mic initialize
-        coroutinesDelay(100)
-        Log.d("VoiceScreen", "Microphone started successfully")
-      } catch (e: Exception) {
-        Log.e("VoiceScreen", "Microphone start error", e)
-        e.printStackTrace()
+      val startResult =
+          startMicrophoneSafely(
+              startAction = { mic.start() },
+              delayMs = { millis -> coroutinesDelay(millis) },
+              currentTime = { System.currentTimeMillis() },
+              log = { message -> Log.d(TAG, message) },
+              errorLog = { message, throwable -> Log.e(TAG, message, throwable) })
+      if (startResult.success) {
+        lastVoiceTime = startResult.lastVoiceTime ?: System.currentTimeMillis()
+      } else {
         isMicActive = false
       }
     } else {
-      try {
-        Log.d("VoiceScreen", "Stopping microphone...")
-        mic.stop()
-        Log.d("VoiceScreen", "Microphone stopped")
-      } catch (e: Exception) {
-        Log.e("VoiceScreen", "Microphone stop error", e)
-      }
+      stopMicrophoneSafely(
+          stopAction = { mic.stop() },
+          log = { message -> Log.d(TAG, message) },
+          errorLog = { message, throwable -> Log.e(TAG, message, throwable) })
       currentLevel = 0f
     }
   }
@@ -297,6 +294,46 @@ internal fun evaluateAudioLevel(
       updatedLastVoiceTime = updatedLastVoice,
       shouldLogLevel = shouldLogLevel,
       voiceDetected = voiceDetected)
+}
+
+@VisibleForTesting
+data class MicrophoneStartResult(val success: Boolean, val lastVoiceTime: Long? = null)
+
+@VisibleForTesting
+suspend fun startMicrophoneSafely(
+    startAction: () -> Unit,
+    delayMs: suspend (Long) -> Unit,
+    currentTime: () -> Long,
+    log: (String) -> Unit,
+    errorLog: (String, Throwable) -> Unit,
+    delayDurationMs: Long = 100L
+): MicrophoneStartResult {
+  return try {
+    log("Starting microphone...")
+    startAction()
+    val now = currentTime()
+    delayMs(delayDurationMs)
+    log("Microphone started successfully")
+    MicrophoneStartResult(success = true, lastVoiceTime = now)
+  } catch (e: Throwable) {
+    errorLog("Microphone start error", e)
+    MicrophoneStartResult(success = false)
+  }
+}
+
+@VisibleForTesting
+fun stopMicrophoneSafely(
+    stopAction: () -> Unit,
+    log: (String) -> Unit,
+    errorLog: (String, Throwable) -> Unit
+) {
+  try {
+    log("Stopping microphone...")
+    stopAction()
+    log("Microphone stopped")
+  } catch (e: Throwable) {
+    errorLog("Microphone stop error", e)
+  }
 }
 
 @VisibleForTesting
