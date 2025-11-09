@@ -13,9 +13,11 @@ import kotlinx.coroutines.cancel
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -27,6 +29,18 @@ import org.robolectric.annotation.Config
 class ElevenLabsPlaybackTest {
 
   private val context: Application = RuntimeEnvironment.getApplication()
+  private val cacheRoot
+    get() = File(context.cacheDir, "elevenlabs_audio")
+
+  @Before
+  fun setUp() {
+    cacheRoot.deleteRecursively()
+  }
+
+  @After
+  fun tearDown() {
+    cacheRoot.deleteRecursively()
+  }
 
   @Test
   fun speak_success_invokes_callbacks() {
