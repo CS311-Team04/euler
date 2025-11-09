@@ -223,6 +223,22 @@ class VoiceScreenTest {
     assertEquals(previousTime, result.updatedLastVoiceTime)
   }
 
+  @Test
+  fun evaluateAudioLevel_logsWithoutVoiceDetection() {
+    val previousTime = 4_000L
+    val result =
+        evaluateAudioLevel(
+            level = 0.15f,
+            silenceThreshold = 0.2f,
+            frameCount = 60,
+            currentTime = 8_000L,
+            lastVoiceTime = previousTime)
+
+    assertTrue(result.shouldLogLevel)
+    assertFalse(result.voiceDetected)
+    assertEquals(previousTime, result.updatedLastVoiceTime)
+  }
+
   @OptIn(ExperimentalCoroutinesApi::class)
   @Test
   fun startMicrophoneSafely_success() = runTest {
@@ -284,5 +300,43 @@ class VoiceScreenTest {
         errorLog = { message, _ -> events += message })
 
     assertEquals(listOf("Stopping microphone...", "Microphone stop error"), events)
+  }
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  @Test
+  fun monitorSilence_returnsImmediatelyWhenMicInactive() = runTest {
+    var loggerCalled = false
+    monitorSilence(
+        isMicActiveProvider = { false },
+        hasMicProvider = { true },
+        delayMs = { fail("Should not delay when mic is inactive") },
+        timeProvider = { 0L },
+        lastVoiceTimeProvider = { 0L },
+        currentLevelProvider = { 0f },
+        silenceThreshold = 0.05f,
+        silenceDuration = 2_500L,
+        onDeactivate = { fail("Should not deactivate when inactive") },
+        logger = { loggerCalled = true })
+
+    assertFalse(loggerCalled)
+  }
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  @Test
+  fun monitorSilence_returnsImmediatelyWhenMicUnavailable() = runTest {
+    var loggerCalled = false
+    monitorSilence(
+        isMicActiveProvider = { true },
+        hasMicProvider = { false },
+        delayMs = { fail("Should not delay when mic unavailable") },
+        timeProvider = { 0L },
+        lastVoiceTimeProvider = { 0L },
+        currentLevelProvider = { 0f },
+        silenceThreshold = 0.05f,
+        silenceDuration = 2_500L,
+        onDeactivate = { fail("Should not deactivate when mic unavailable") },
+        logger = { loggerCalled = true })
+
+    assertFalse(loggerCalled)
   }
 }
