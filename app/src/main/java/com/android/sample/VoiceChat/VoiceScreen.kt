@@ -39,35 +39,53 @@ private const val TAG = "VoiceScreen"
  * levels and renders the visualizer. Provides close action.
  */
 @Composable
-fun VoiceScreen(onClose: () -> Unit, modifier: Modifier = Modifier) {
+fun VoiceScreen(
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+    levelSourceFactory: () -> LevelSource = { AndroidMicLevelSource() },
+    initialHasMicOverride: Boolean? = null,
+    permissionRequester: ((String) -> Unit)? = null,
+    silenceThresholdOverride: Float? = null,
+    silenceDurationOverride: Long? = null
+) {
   val context = LocalContext.current
   val alreadyGranted =
-      ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-          PackageManager.PERMISSION_GRANTED
+      initialHasMicOverride
+          ?: (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+              PackageManager.PERMISSION_GRANTED)
 
   var hasMic by remember { mutableStateOf(alreadyGranted) }
 
   // Runtime permission
   val launcher =
-      rememberLauncherForActivityResult(
-          contract = ActivityResultContracts.RequestPermission(),
-          onResult = { granted -> hasMic = handlePermissionResult(granted) })
+      if (permissionRequester == null) {
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission(),
+            onResult = { granted -> hasMic = handlePermissionResult(granted) })
+      } else {
+        null
+      }
+
+  val requestPermission =
+      remember(permissionRequester, launcher) {
+        permissionRequester ?: { permission: String -> launcher?.launch(permission) }
+      }
 
   LaunchedEffect(Unit) {
     if (logInitialPermissionState(alreadyGranted)) {
-      launcher.launch(Manifest.permission.RECORD_AUDIO)
+      requestPermission(Manifest.permission.RECORD_AUDIO)
     }
   }
 
   // State to control whether the microphone is active
   var isMicActive by remember { mutableStateOf(false) }
-  val mic = remember { AndroidMicLevelSource() }
+  val mic = remember(levelSourceFactory) { levelSourceFactory() }
   val mockSource = remember { MockLevelSource(0f) }
 
   // Voice inactivity detection to automatically disable mic after silence
   var lastVoiceTime by remember { mutableStateOf(System.currentTimeMillis()) }
-  val silenceThreshold = 0.05f // Threshold to consider silence
-  val silenceDuration = 2500L // 2.5 seconds of silence before auto deactivation
+  val silenceThreshold = silenceThresholdOverride ?: 0.05f // Threshold to consider silence
+  val silenceDuration = silenceDurationOverride ?: 2500L // 2.5 seconds of silence before auto...
 
   // Monitor current audio level to track inactivity
   var currentLevel by remember { mutableStateOf(0f) }

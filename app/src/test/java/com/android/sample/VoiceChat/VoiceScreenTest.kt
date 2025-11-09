@@ -1,14 +1,22 @@
 package com.android.sample.VoiceChat
 
+import android.Manifest
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
+import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -57,6 +65,91 @@ class VoiceScreenTest {
   fun voiceScreenPreviewContent_renders() {
     composeTestRule.setContent { VoiceScreenPreviewContent(level = 0.4f) }
     composeTestRule.onRoot().assertIsDisplayed()
+  }
+
+  @Test
+  fun voiceScreen_toggleControlsInjectedMic() {
+    val fakeSource = FakeMicLevelSource()
+    composeTestRule.setContent {
+      VoiceScreen(
+          onClose = {},
+          levelSourceFactory = { fakeSource },
+          initialHasMicOverride = true,
+          silenceThresholdOverride = 0.2f,
+          silenceDurationOverride = 100L)
+    }
+
+    composeTestRule.onNodeWithContentDescription("Toggle microphone").performClick()
+
+    composeTestRule.runOnIdle {
+      fakeSource.push(0.7f)
+      fakeSource.push(0.0f)
+    }
+
+    composeTestRule.waitUntilTrue(timeoutMillis = 2_000) { fakeSource.stopCount.get() > 0 }
+
+    composeTestRule.runOnIdle {
+      assertEquals(1, fakeSource.startCount.get())
+      assertTrue(fakeSource.stopCount.get() >= 1)
+    }
+  }
+
+  @Test
+  fun voiceScreen_requestsPermissionWhenNotGranted() {
+    val requested = mutableListOf<String>()
+    composeTestRule.setContent {
+      VoiceScreen(
+          onClose = {},
+          levelSourceFactory = { FakeMicLevelSource() },
+          initialHasMicOverride = false,
+          permissionRequester = { requested += it })
+    }
+
+    composeTestRule.waitForIdle()
+    assertEquals(listOf(Manifest.permission.RECORD_AUDIO), requested)
+  }
+
+  @Test
+  fun voiceScreen_toggleWithThrowingMic_revertsState() {
+    val throwingSource = ThrowingMicLevelSource()
+    composeTestRule.setContent {
+      VoiceScreen(
+          onClose = {}, levelSourceFactory = { throwingSource }, initialHasMicOverride = true)
+    }
+
+    composeTestRule.onNodeWithContentDescription("Toggle microphone").performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.runOnIdle { assertTrue(throwingSource.startAttempts.get() >= 1) }
+    composeTestRule.onNodeWithContentDescription("Toggle microphone").performClick()
+    composeTestRule.waitForIdle()
+
+    composeTestRule.runOnIdle {
+      assertTrue(throwingSource.startAttempts.get() >= 2)
+      assertTrue(throwingSource.stopCount.get() >= 1)
+    }
+  }
+
+  @Test
+  fun voiceScreen_disposeStopsMic() {
+    val fakeSource = FakeMicLevelSource()
+    val showScreen = mutableStateOf(true)
+
+    composeTestRule.setContent {
+      if (showScreen.value) {
+        VoiceScreen(
+            onClose = {},
+            levelSourceFactory = { fakeSource },
+            initialHasMicOverride = true,
+            silenceDurationOverride = Long.MAX_VALUE)
+      }
+    }
+
+    composeTestRule.onNodeWithContentDescription("Toggle microphone").performClick()
+    composeTestRule.runOnIdle { fakeSource.push(0.6f) }
+    composeTestRule.runOnIdle { showScreen.value = false }
+    composeTestRule.waitForIdle()
+
+    composeTestRule.runOnIdle { assertTrue(fakeSource.stopCount.get() >= 1) }
   }
 
   @Test
@@ -338,5 +431,55 @@ class VoiceScreenTest {
         logger = { loggerCalled = true })
 
     assertFalse(loggerCalled)
+  }
+}
+
+private class FakeMicLevelSource : LevelSource {
+  private val flow = MutableSharedFlow<Float>(replay = 1)
+  val startCount = AtomicInteger(0)
+  val stopCount = AtomicInteger(0)
+
+  init {
+    flow.tryEmit(0f)
+  }
+
+  override val levels = flow
+
+  override fun start() {
+    startCount.incrementAndGet()
+  }
+
+  override fun stop() {
+    stopCount.incrementAndGet()
+  }
+
+  fun push(value: Float) {
+    flow.tryEmit(value)
+  }
+}
+
+private class ThrowingMicLevelSource : LevelSource {
+  val startAttempts = AtomicInteger(0)
+  val stopCount = AtomicInteger(0)
+
+  override val levels = MutableSharedFlow<Float>(replay = 1)
+
+  override fun start() {
+    startAttempts.incrementAndGet()
+    throw IllegalStateException("boom")
+  }
+
+  override fun stop() {
+    stopCount.incrementAndGet()
+  }
+}
+
+private fun ComposeTestRule.waitUntilTrue(timeoutMillis: Long, condition: () -> Boolean) {
+  val deadline = System.currentTimeMillis() + timeoutMillis
+  while (!condition()) {
+    if (System.currentTimeMillis() > deadline) {
+      fail("Condition not met within $timeoutMillis ms")
+    }
+    this.waitForIdle()
   }
 }
