@@ -34,6 +34,15 @@ class VoiceVisualizerTest {
   }
 
   @Test
+  fun voiceVisualizer_pre33_ripplePresetFallsBack() {
+    val testSource = TestLevelSource(flowOf(0.2f))
+    composeTestRule.setContent {
+      VoiceVisualizer(levelSource = testSource, preset = VisualPreset.Ripple, size = 96.dp)
+    }
+    composeTestRule.onRoot().assertIsDisplayed()
+  }
+
+  @Test
   fun voiceVisualizer_updatesSmoothedLevel_onSamples() {
     val source = RecordingLevelSource(initial = 0f)
     val observed = mutableListOf<Float>()
@@ -328,6 +337,30 @@ class VoiceVisualizerTest {
     val t2 = calculateRippleParameters(0.5f, t = 0.5f, minSize = 200f)
     assertNotEquals(t1.alphas, t2.alphas)
     assertTrue(t1.alphas.zip(t2.alphas).any { (a, b) -> a != b })
+  }
+
+  @Test
+  fun rippleParameters_clampsValues() {
+    val params = calculateRippleParameters(level = 1.5f, t = 3.2f, minSize = 220f)
+    val expectedFirstRadius = 220f * 0.45f
+    assertEquals(expectedFirstRadius, params.radii.first(), 1e-4f)
+    assertTrue(params.radii.zipWithNext().all { (a, b) -> b > a })
+    assertTrue(params.alphas.all { it in 0f..1f })
+    assertTrue(params.alphas.last() >= 0f)
+  }
+
+  @Test
+  fun legacyPulseMetrics_clampsNegativeLevel() {
+    val metrics = calculateLegacyPulseMetrics(level = -0.5f, minSize = 360f)
+    assertEquals(metrics.baseRadius, metrics.radius, 1e-4f)
+  }
+
+  @Test
+  fun bloomParameters_bounds() {
+    val params = calculateBloomParameters(level = 1.4f, t = 1.1f, petals = 6, minSize = 210f)
+    assertTrue(params.easeLevel in 0f..1f)
+    assertEquals(6 * 50 + 1, params.pathPoints.size)
+    assertTrue(params.pathPoints.all { it.x.isFinite() && it.y.isFinite() })
   }
 }
 
