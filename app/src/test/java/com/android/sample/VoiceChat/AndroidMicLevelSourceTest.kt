@@ -148,6 +148,50 @@ class AndroidMicLevelSourceTest {
     assertEquals(1, recorder.releaseCount)
   }
 
+  @Test
+  fun readLoop_logsAtIntervalAndStopsWhenRecorderStops() = runBlocking {
+    val recorder = LoggingRecorder()
+    val source =
+        AndroidMicLevelSource(
+            recorderProvider = FakeRecorderProvider(recorderFactory = { recorder }))
+
+    source.start()
+
+    // Wait for the recorder to report that the periodic logging interval has been reached
+    withTimeout(2_000) {
+      while (recorder.loggedInterval.get() < AndroidMicLevelSource.LOG_INTERVAL_FRAMES) {
+        delay(10)
+      }
+    }
+
+    // Wait until the recorder flips to non-recording state which should end the loop
+    withTimeout(1_000) { recorder.loopFinished.first { it } }
+
+    source.stop()
+
+    assertTrue(recorder.loggedInterval.get() >= AndroidMicLevelSource.LOG_INTERVAL_FRAMES)
+  }
+
+  @Test
+  fun start_whenAlreadyStarted_doesNotRecreateRecorder() {
+    val createCount = AtomicInteger(0)
+    val source =
+        AndroidMicLevelSource(
+            recorderProvider =
+                FakeRecorderProvider(
+                    recorderFactory = {
+                      createCount.incrementAndGet()
+                      NoopRecordingRecorder()
+                    },
+                    minBuffer = 16))
+
+    source.start()
+    source.start() // Should be ignored
+    source.stop()
+
+    assertEquals(1, createCount.get())
+  }
+
   private class FakeRecorderProvider(
       private val recorderFactory: () -> Recorder,
       private val minBuffer: Int = 8
@@ -335,5 +379,62 @@ class AndroidMicLevelSourceTest {
     override fun release() {
       releaseCount.incrementAndGet()
     }
+  }
+
+  private class LoggingRecorder : Recorder {
+    private val reads = AtomicInteger(0)
+    private val loopFinishedFlow = MutableSharedFlow<Boolean>(replay = 1)
+    private var recordingStateValue = Recorder.RECORDSTATE_RECORDING
+
+    val loggedInterval: AtomicInteger = AtomicInteger(0)
+    val loopFinished: MutableSharedFlow<Boolean>
+      get() = loopFinishedFlow
+
+    override val state: Int
+      get() = Recorder.STATE_INITIALIZED
+
+    override val recordingState: Int
+      get() = recordingStateValue
+
+    override fun startRecording() {}
+
+    override fun read(buffer: ShortArray, offset: Int, size: Int): Int {
+      val count = reads.incrementAndGet()
+      val n = kotlin.math.min(size, 64)
+      for (i in 0 until n) {
+        buffer[offset + i] = 1200.toShort()
+      }
+      if (count % AndroidMicLevelSource.LOG_INTERVAL_FRAMES == 0) {
+        loggedInterval.set(count)
+      }
+      if (count > AndroidMicLevelSource.LOG_INTERVAL_FRAMES) {
+        recordingStateValue = 0
+        loopFinishedFlow.tryEmit(true)
+        return 0
+      }
+      return n
+    }
+
+    override fun stop() {
+      recordingStateValue = 0
+    }
+
+    override fun release() {}
+  }
+
+  private class NoopRecordingRecorder : Recorder {
+    override val state: Int
+      get() = Recorder.STATE_INITIALIZED
+
+    override val recordingState: Int
+      get() = Recorder.RECORDSTATE_RECORDING
+
+    override fun startRecording() {}
+
+    override fun read(buffer: ShortArray, offset: Int, size: Int): Int = 0
+
+    override fun stop() {}
+
+    override fun release() {}
   }
 }
