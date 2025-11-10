@@ -1,19 +1,23 @@
 package com.android.sample.navigation
 
+import android.annotation.SuppressLint
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navigation
 import com.android.sample.auth.MicrosoftAuth
 import com.android.sample.authentification.AuthUIScreen
 import com.android.sample.authentification.AuthUiState
 import com.android.sample.home.HomeScreen
+import com.android.sample.home.HomeViewModel
 import com.android.sample.settings.SettingsPage
 import com.android.sample.sign_in.AuthViewModel
 import com.android.sample.speech.SpeechToTextHelper
@@ -27,6 +31,7 @@ object Routes {
   const val Settings = "settings"
 }
 
+@SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
 fun AppNav(
     startOnSignedIn: Boolean = false,
@@ -65,11 +70,11 @@ fun AppNav(
         nav.navigate(Routes.Home) {
           popUpTo(Routes.SignIn) { inclusive = true }
           launchSingleTop = true
-          restoreState = true
+          restoreState = false
         }
       }
       isErrorState(currentState) -> {
-        // Handle error state - could show snackbar or toast
+        // Handle error state
       }
       else -> {
         /* Idle state - no navigation */
@@ -80,7 +85,7 @@ fun AppNav(
   NavHost(
       navController = nav,
       startDestination = if (startOnSignedIn) Routes.Home else Routes.Opening) {
-        // Opening Screen (nouvelle logique)
+        // Opening Screen (new flow)
         composable(Routes.Opening) {
           OpeningScreen(
               authState = authState,
@@ -105,61 +110,70 @@ fun AppNav(
               onMicrosoftLogin = { authViewModel.onMicrosoftLoginClick() },
               onSwitchEduLogin = { authViewModel.onSwitchEduLoginClick() })
         }
+        navigation(startDestination = Routes.Home, route = "home_root") {
+          // Home Screen
+          composable(Routes.Home) {
+            val parentEntry = remember { nav.getBackStackEntry("home_root") }
+            val vm: HomeViewModel = viewModel(parentEntry)
+            HomeScreen(
+                viewModel = vm,
+                onAction1Click = { /* ... */},
+                onAction2Click = { /* ... */},
+                onSendMessage = { /* ... */},
+                speechHelper = speechHelper,
+                onSignOut = {
+                  android.util.Log.d("NavGraph", "Sign out button clicked")
+                  authViewModel.signOut()
+                  android.util.Log.d("NavGraph", "Navigating to SignIn")
+                  nav.navigate(Routes.SignIn) {
+                    popUpTo(Routes.Home) { inclusive = true }
+                    launchSingleTop = true
+                    restoreState = false
+                  }
+                },
+                onSettingsClick = { nav.navigate(Routes.Settings) },
+                forceNewChatOnFirstOpen = false)
+          }
 
-        // Home Screen
-        composable(Routes.Home) {
-          HomeScreen(
-              onAction1Click = { /* ... */},
-              onAction2Click = { /* ... */},
-              onSendMessage = { /* ... */},
-              speechHelper = speechHelper,
-              onSignOut = {
-                android.util.Log.d("NavGraph", "Sign out button clicked")
-                authViewModel.signOut()
-                android.util.Log.d("NavGraph", "Navigating to SignIn")
-                nav.navigate(Routes.SignIn) {
-                  popUpTo(Routes.Home) { inclusive = true }
-                  launchSingleTop = true
-                }
-              },
-              onSettingsClick = { nav.navigate(Routes.Settings) })
-        }
+          // Home With Drawer
+          composable(Routes.HomeWithDrawer) {
+            val parentEntry = remember { nav.getBackStackEntry("home_root") }
+            val vm: HomeViewModel = viewModel(parentEntry)
+            HomeScreen(
+                viewModel = vm,
+                onAction1Click = { /* ... */},
+                onAction2Click = { /* ... */},
+                onSendMessage = { /* ... */},
+                speechHelper = speechHelper,
+                onSignOut = {
+                  android.util.Log.d("NavGraph", "Sign out button clicked (HomeWithDrawer)")
+                  authViewModel.signOut()
+                  android.util.Log.d("NavGraph", "Navigating to SignIn (HomeWithDrawer)")
+                  nav.navigate(Routes.SignIn) {
+                    popUpTo(Routes.Home) { inclusive = true }
+                    launchSingleTop = true
+                    restoreState = false
+                  }
+                },
+                onSettingsClick = { nav.navigate(Routes.Settings) },
+                openDrawerOnStart = true)
+          }
 
-        // Home With Drawer
-        composable(Routes.HomeWithDrawer) {
-          HomeScreen(
-              onAction1Click = { /* ... */},
-              onAction2Click = { /* ... */},
-              onSendMessage = { /* ... */},
-              speechHelper = speechHelper,
-              onSignOut = {
-                android.util.Log.d("NavGraph", "Sign out button clicked (HomeWithDrawer)")
-                authViewModel.signOut()
-                android.util.Log.d("NavGraph", "Navigating to SignIn (HomeWithDrawer)")
-                nav.navigate(Routes.SignIn) {
-                  popUpTo(Routes.Home) { inclusive = true }
-                  launchSingleTop = true
-                }
-              },
-              onSettingsClick = { nav.navigate(Routes.Settings) },
-              openDrawerOnStart = true)
-        }
-
-        // Settings
-        composable(Routes.Settings) {
-          SettingsPage(
-              onBackClick = {
-                nav.navigate(Routes.HomeWithDrawer) { popUpTo(Routes.Home) { inclusive = false } }
-              },
-              onSignOut = {
-                android.util.Log.d("NavGraph", "Sign out button clicked (Settings)")
-                authViewModel.signOut()
-                android.util.Log.d("NavGraph", "Navigating to SignIn (Settings)")
-                nav.navigate(Routes.SignIn) {
-                  popUpTo(Routes.Home) { inclusive = true }
-                  launchSingleTop = true
-                }
-              })
+          // Settings
+          composable(Routes.Settings) {
+            SettingsPage(
+                onBackClick = { nav.popBackStack() },
+                onSignOut = {
+                  android.util.Log.d("NavGraph", "Sign out button clicked (Settings)")
+                  authViewModel.signOut()
+                  android.util.Log.d("NavGraph", "Navigating to SignIn (Settings)")
+                  nav.navigate(Routes.SignIn) {
+                    popUpTo(Routes.Home) { inclusive = true }
+                    launchSingleTop = true
+                    restoreState = false
+                  }
+                })
+          }
         }
       }
 }

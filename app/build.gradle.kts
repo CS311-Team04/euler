@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsKotlinAndroid)
-    //alias(libs.plugins.googleServices) //  Disabled for CI - google-services.json not available
+    alias(libs.plugins.googleServices) //  Disabled for CI - google-services.json not available
     //id("com.google.gms.google-services")
     id("jacoco")
     id("org.sonarqube")
@@ -84,8 +84,8 @@ android {
         }
     }
 
-    // Correctif JaCoCo : exclure les libs du SDK et BouncyCastle
-    // pour éviter les erreurs d'instrumentation pendant les tests
+    // JaCoCo fix: exclude SDK and BouncyCastle libraries
+    // to avoid instrumentation errors during tests
     tasks.withType<Test> {
         configure<JacocoTaskExtension> {
             isIncludeNoLocationClasses = true
@@ -181,7 +181,7 @@ dependencies {
 
     implementation("com.microsoft.identity.client:msal:6.0.1")
 
-    // --- Dépendances de sécurité manquantes requises par MSAL ---
+    // --- Additional security dependencies required by MSAL ---
     implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
     implementation("com.google.crypto.tink:tink-android:1.12.0")
