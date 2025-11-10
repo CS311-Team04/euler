@@ -195,8 +195,8 @@ dependencies {
     implementation("com.google.code.findbugs:jsr305:3.0.2")
     implementation("com.github.spotbugs:spotbugs-annotations:4.8.3")
 
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    implementation(libs.okhttp)
+    testImplementation(libs.okhttp.mockwebserver)
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.compose.ui:ui-tooling-preview")
 

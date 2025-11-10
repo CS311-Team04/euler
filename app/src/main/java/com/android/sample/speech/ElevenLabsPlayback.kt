@@ -116,7 +116,11 @@ open class ElevenLabsPlayback(
     } ?: throw IOException("ElevenLabs response body empty")
 
     if (!cacheFile.exists() || cacheFile.length() == 0L) {
-      cacheFile.delete()
+      val deleted = cacheFile.delete()
+      if (!deleted && cacheFile.exists()) {
+        throw IOException(
+            "ElevenLabs response body empty and failed to delete cache file ${cacheFile.absolutePath}")
+      }
       throw IOException("ElevenLabs response body empty")
     }
 
