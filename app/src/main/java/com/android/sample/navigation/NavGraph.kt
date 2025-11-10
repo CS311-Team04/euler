@@ -34,7 +34,12 @@ object Routes {
 }
 
 @Composable
-fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: SpeechToTextHelper, textToSpeechHelper: SpeechPlayback ) {
+fun AppNav(
+    startOnSignedIn: Boolean = false,
+    activity: Activity,
+    speechHelper: SpeechToTextHelper,
+    textToSpeechHelper: SpeechPlayback
+) {
   val nav = rememberNavController()
   val authViewModel = remember { AuthViewModel() }
   val authState by authViewModel.state.collectAsState()
