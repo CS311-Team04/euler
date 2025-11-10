@@ -203,7 +203,7 @@ interface TextToSpeechEngine {
   fun setProgressListener(listener: UtteranceProgressListener)
 }
 
-private class AndroidTextToSpeechEngine(context: Context, initListener: (Int) -> Unit) :
+internal class AndroidTextToSpeechEngine(context: Context, initListener: (Int) -> Unit) :
     TextToSpeechEngine {
 
   private val engine = TextToSpeech(context) { status -> initListener(status) }

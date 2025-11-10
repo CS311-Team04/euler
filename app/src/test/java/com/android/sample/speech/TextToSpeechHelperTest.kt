@@ -83,6 +83,59 @@ class TextToSpeechHelperTest {
   }
 
   @Test
+  fun speak_engineErrorCode_invokesCallback() {
+    val engine = FakeEngine()
+    engine.languageResults += TextToSpeech.LANG_AVAILABLE
+    val helper =
+        TextToSpeechHelper(context) { _, init ->
+          engine.initListener = init
+          engine
+        }
+    engine.triggerInit(TextToSpeech.SUCCESS)
+
+    var error: Throwable? = null
+    helper.speak(
+        text = "Bonjour",
+        utteranceId = "utt-error-code",
+        onStart = { engine.triggerStart("utt-error-code") },
+        onDone = {},
+        onError = { error = it })
+
+    engine.triggerError("utt-error-code", 7)
+    Shadows.shadowOf(Looper.getMainLooper()).idle()
+
+    assertTrue(error is IllegalStateException)
+    assertTrue(error?.message?.contains("7") == true)
+  }
+
+  @Test
+  fun initialization_success_but_no_supported_language_notifiesError() {
+    val engine = FakeEngine()
+    engine.languageResults += TextToSpeech.LANG_NOT_SUPPORTED
+    engine.languageResults += TextToSpeech.LANG_MISSING_DATA
+    engine.languageResults += TextToSpeech.LANG_MISSING_DATA
+    val helper =
+        TextToSpeechHelper(context, Locale("es", "ES")) { _, init ->
+          engine.initListener = init
+          engine
+        }
+
+    var error: Throwable? = null
+    helper.speak(
+        text = "Bonjour",
+        utteranceId = "utt-nosupport",
+        onStart = {},
+        onDone = {},
+        onError = { error = it })
+
+    engine.triggerInit(TextToSpeech.SUCCESS)
+    Shadows.shadowOf(Looper.getMainLooper()).idle()
+
+    assertTrue(error is IllegalStateException)
+    assertTrue(engine.speakCalls.isEmpty())
+  }
+
+  @Test
   fun stop_clears_callbacks_and_stops_engine() {
     val engine = FakeEngine()
     engine.languageResults += TextToSpeech.LANG_AVAILABLE
