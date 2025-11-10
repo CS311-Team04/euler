@@ -83,6 +83,7 @@ fun HomeScreen(
     onSendMessage: (String) -> Unit = {},
     onSignOut: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onVoiceChatClick: () -> Unit = {},
     openDrawerOnStart: Boolean = false,
     speechHelper: com.android.sample.speech.SpeechToTextHelper? = null,
     textToSpeechHelper: SpeechPlayback? = null
@@ -277,8 +278,8 @@ fun HomeScreen(
                         enabled = !ui.isSending,
                         singleLine = true,
                         trailingIcon = {
-                          Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            // Dictation button (mic icon) - always visible
+                          Row(horizontalArrangement = Arrangement.spacedBy(0.2.dp)) {
+                            // Voice chat button - opens voice visualizer
                             IconButton(
                                 onClick = {
                                   speechHelper?.startListening { recognized ->
@@ -301,9 +302,7 @@ fun HomeScreen(
                                 enter = fadeIn() + scaleIn(),
                                 exit = fadeOut() + scaleOut()) {
                                   IconButton(
-                                      onClick = {
-                                        // Voice mode clicked - nothing happens (to be implemented)
-                                      },
+                                      onClick = { onVoiceChatClick() },
                                       modifier = Modifier.testTag(HomeTags.VoiceBtn)) {
                                         Icon(
                                             Icons.Default.GraphicEq,

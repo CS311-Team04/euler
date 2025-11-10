@@ -1,11 +1,17 @@
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsKotlinAndroid)
-    // alias(libs.plugins.googleServices) //  Disabled for CI - google-services.json not available
-    //id("com.google.gms.google-services")
     id("jacoco")
     id("org.sonarqube")
     alias(libs.plugins.ktfmt)
+    alias(libs.plugins.googleServices) apply false
+}
+
+// Apply Google Services only locally when the JSON is present (not on CI)
+val isCi = !System.getenv("CI").isNullOrEmpty()
+val hasGoogleServicesJson = file("google-services.json").exists()
+if (!isCi && hasGoogleServicesJson) {
+    apply(plugin = libs.plugins.googleServices.get().pluginId)
 }
 
 android {
@@ -191,6 +197,8 @@ dependencies {
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    debugImplementation("androidx.compose.ui:ui-tooling")
+    implementation("androidx.compose.ui:ui-tooling-preview")
 
 }
 
