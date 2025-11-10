@@ -1,5 +1,8 @@
 package com.android.sample.VoiceChat
 
+import com.android.sample.VoiceChat.UI.AndroidMicLevelSource
+import com.android.sample.VoiceChat.UI.Recorder
+import com.android.sample.VoiceChat.UI.RecorderProvider
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -57,7 +60,8 @@ class AndroidMicLevelSourceTest {
   fun start_handlesNotInitializedRecorder() = runBlocking {
     val source =
         AndroidMicLevelSource(
-            recorderProvider = FakeRecorderProvider(recorderFactory = { NotInitializedRecorder() }))
+            recorderProvider = FakeRecorderProvider(recorderFactory = { NotInitializedRecorder() })
+        )
 
     source.start()
     source.stop()
@@ -68,7 +72,8 @@ class AndroidMicLevelSourceTest {
   fun start_handlesNotRecordingState() = runBlocking {
     val source =
         AndroidMicLevelSource(
-            recorderProvider = FakeRecorderProvider(recorderFactory = { NotRecordingRecorder() }))
+            recorderProvider = FakeRecorderProvider(recorderFactory = { NotRecordingRecorder() })
+        )
 
     source.start()
     source.stop()
@@ -81,11 +86,11 @@ class AndroidMicLevelSourceTest {
         AndroidMicLevelSource(
             recorderProvider =
                 object : RecorderProvider {
-                  override fun minBufferSize(sampleRate: Int): Int = 128
+                    override fun minBufferSize(sampleRate: Int): Int = 128
 
-                  override fun create(sampleRate: Int, bufferSize: Int): Recorder {
-                    throw SecurityException("permission missing")
-                  }
+                    override fun create(sampleRate: Int, bufferSize: Int): Recorder {
+                        throw SecurityException("permission missing")
+                    }
                 })
 
     source.start()
@@ -138,7 +143,8 @@ class AndroidMicLevelSourceTest {
     val recorder = NegativeReadRecorder()
     val source =
         AndroidMicLevelSource(
-            recorderProvider = FakeRecorderProvider(recorderFactory = { recorder }))
+            recorderProvider = FakeRecorderProvider(recorderFactory = { recorder })
+        )
 
     source.start()
     withTimeout(1_000) { recorder.loopFinished.first { it } }
@@ -153,7 +159,8 @@ class AndroidMicLevelSourceTest {
     val recorder = LoggingRecorder()
     val source =
         AndroidMicLevelSource(
-            recorderProvider = FakeRecorderProvider(recorderFactory = { recorder }))
+            recorderProvider = FakeRecorderProvider(recorderFactory = { recorder })
+        )
 
     source.start()
 
@@ -180,10 +187,12 @@ class AndroidMicLevelSourceTest {
             recorderProvider =
                 FakeRecorderProvider(
                     recorderFactory = {
-                      createCount.incrementAndGet()
-                      NoopRecordingRecorder()
+                        createCount.incrementAndGet()
+                        NoopRecordingRecorder()
                     },
-                    minBuffer = 16))
+                    minBuffer = 16
+                )
+        )
 
     source.start()
     source.start() // Should be ignored

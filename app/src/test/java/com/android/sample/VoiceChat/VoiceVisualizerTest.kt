@@ -11,6 +11,16 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
+import com.android.sample.VoiceChat.UI.LevelSource
+import com.android.sample.VoiceChat.UI.VisualPreset
+import com.android.sample.VoiceChat.UI.VoiceVisualizer
+import com.android.sample.VoiceChat.UI.buildBloomPath
+import com.android.sample.VoiceChat.UI.calculateBloomParameters
+import com.android.sample.VoiceChat.UI.calculateCanvasMetrics
+import com.android.sample.VoiceChat.UI.calculateLegacyPulseMetrics
+import com.android.sample.VoiceChat.UI.calculateRippleParameters
+import com.android.sample.VoiceChat.UI.createBloomDrawInstructions
+import com.android.sample.VoiceChat.UI.createRippleCircles
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.*
@@ -37,7 +47,7 @@ class VoiceVisualizerTest {
   fun voiceVisualizer_pre33_ripplePresetFallsBack() {
     val testSource = TestLevelSource(flowOf(0.2f))
     composeTestRule.setContent {
-      VoiceVisualizer(levelSource = testSource, preset = VisualPreset.Ripple, size = 96.dp)
+        VoiceVisualizer(levelSource = testSource, preset = VisualPreset.Ripple, size = 96.dp)
     }
     composeTestRule.onRoot().assertIsDisplayed()
   }
@@ -50,7 +60,7 @@ class VoiceVisualizerTest {
 
     try {
       composeTestRule.setContent {
-        VoiceVisualizer(levelSource = source, size = 160.dp, onLevelUpdate = { observed.add(it) })
+          VoiceVisualizer(levelSource = source, size = 160.dp, onLevelUpdate = { observed.add(it) })
       }
       composeTestRule.waitForIdle()
 
@@ -80,7 +90,7 @@ class VoiceVisualizerTest {
 
     try {
       composeTestRule.setContent {
-        VoiceVisualizer(levelSource = source, size = 120.dp, onLevelUpdate = { observed.add(it) })
+          VoiceVisualizer(levelSource = source, size = 120.dp, onLevelUpdate = { observed.add(it) })
       }
       composeTestRule.waitForIdle()
 
@@ -104,12 +114,12 @@ class VoiceVisualizerTest {
 
     try {
       composeTestRule.setContent {
-        VoiceVisualizer(
-            levelSource = source,
-            preset = VisualPreset.Ripple,
-            color = Color.Magenta,
-            size = 180.dp,
-            onLevelUpdate = { observed.add(it) })
+          VoiceVisualizer(
+              levelSource = source,
+              preset = VisualPreset.Ripple,
+              color = Color.Magenta,
+              size = 180.dp,
+              onLevelUpdate = { observed.add(it) })
       }
       composeTestRule.waitForIdle()
 
@@ -138,13 +148,13 @@ class VoiceVisualizerTest {
 
     try {
       composeTestRule.setContent {
-        VoiceVisualizer(
-            levelSource = source,
-            preset = VisualPreset.Bloom,
-            color = Color.Green,
-            petals = 6,
-            size = 200.dp,
-            onLevelUpdate = { observed.add(it) })
+          VoiceVisualizer(
+              levelSource = source,
+              preset = VisualPreset.Bloom,
+              color = Color.Green,
+              petals = 6,
+              size = 200.dp,
+              onLevelUpdate = { observed.add(it) })
       }
       composeTestRule.waitForIdle()
 
@@ -173,7 +183,7 @@ class VoiceVisualizerTest {
     composeTestRule.setContent {
       showVisualizer = remember { mutableStateOf(true) }
       if (showVisualizer.value) {
-        VoiceVisualizer(levelSource = source, size = 120.dp)
+          VoiceVisualizer(levelSource = source, size = 120.dp)
       }
     }
     composeTestRule.waitForIdle()
@@ -199,7 +209,7 @@ class VoiceVisualizerTest {
       showVisualizer = remember { mutableStateOf(true) }
       levelSourceState = remember { mutableStateOf<LevelSource>(first) }
       if (showVisualizer.value) {
-        VoiceVisualizer(levelSource = levelSourceState.value, size = 140.dp)
+          VoiceVisualizer(levelSource = levelSourceState.value, size = 140.dp)
       }
     }
 

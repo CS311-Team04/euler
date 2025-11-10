@@ -1,18 +1,21 @@
-package com.android.sample.VoiceChat
+package com.android.sample.VoiceChat.UI
 
 import android.Manifest
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.util.Log
 import androidx.annotation.RequiresPermission
 import kotlin.math.sqrt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 /** Wrapper interface around AudioRecord to enable deterministic testing. */
 interface Recorder {
@@ -87,7 +90,7 @@ class AndroidMicLevelSource(
 ) : LevelSource {
 
   private var recorder: Recorder? = null
-  private var job: kotlinx.coroutines.Job? = null
+  private var job: Job? = null
   private val _levels = MutableSharedFlow<Float>(replay = 1)
   override val levels: Flow<Float> = _levels
 
@@ -105,25 +108,25 @@ class AndroidMicLevelSource(
       try {
         recorder = recorderProvider.create(sampleRate, min)
       } catch (se: SecurityException) {
-        android.util.Log.e(TAG, "SecurityException creating AudioRecord (missing permission)", se)
+        Log.e(TAG, "SecurityException creating AudioRecord (missing permission)", se)
         recorder = null
         return
       }
 
       if (recorder?.state != Recorder.STATE_INITIALIZED) {
-        android.util.Log.e(
+        Log.e(
             TAG, "Error: AudioRecord is not initialized correctly, state: ${recorder?.state}")
         recorder?.release()
         recorder = null
         return
       }
 
-      android.util.Log.d(TAG, "AudioRecord initialized successfully")
+      Log.d(TAG, "AudioRecord initialized successfully")
 
       try {
         recorder?.startRecording()
       } catch (se: SecurityException) {
-        android.util.Log.e(TAG, "SecurityException starting AudioRecord", se)
+        Log.e(TAG, "SecurityException starting AudioRecord", se)
         try {
           recorder?.release()
         } catch (_: Throwable) {}
@@ -132,12 +135,12 @@ class AndroidMicLevelSource(
       }
 
       val recordingState = recorder?.recordingState
-      android.util.Log.d(
+      Log.d(
           TAG,
           "AudioRecord started, state: $recordingState (RECORDSTATE_RECORDING=${Recorder.RECORDSTATE_RECORDING})")
 
       if (recordingState != Recorder.RECORDSTATE_RECORDING) {
-        android.util.Log.e(
+        Log.e(
             TAG,
             "Error: AudioRecord is not in RECORDING state after startRecording(), state: $recordingState")
         try {
@@ -148,7 +151,7 @@ class AndroidMicLevelSource(
         return
       }
     } catch (e: Exception) {
-      android.util.Log.e(TAG, "Exception while initializing AudioRecord", e)
+      Log.e(TAG, "Exception while initializing AudioRecord", e)
       try {
         recorder?.release()
       } catch (_: Throwable) {}
@@ -168,7 +171,7 @@ class AndroidMicLevelSource(
               for (i in 0 until n) {
                 val v = buf[i].toInt()
                 s += v * v
-                maxVal = maxOf(maxVal, kotlin.math.abs(v))
+                maxVal = maxOf(maxVal, abs(v))
               }
               val rms = sqrt(s / n)
 
@@ -183,16 +186,16 @@ class AndroidMicLevelSource(
               // Periodic debug log
               frameCount++
               if (frameCount % LOG_INTERVAL_FRAMES == 0) {
-                android.util.Log.d(
+                Log.d(
                     TAG,
                     "RMS: ${String.format("%.2f", rms)}, Max: $maxVal, Normalized: ${String.format("%.3f", norm)}, Amplified: ${String.format("%.3f", amplified)}")
               }
             } else if (n < 0) {
-              android.util.Log.w(TAG, "Audio read error: $n")
+              Log.w(TAG, "Audio read error: $n")
             }
             delay(FRAME_DELAY_MS)
           }
-          android.util.Log.d(
+          Log.d(
               TAG,
               "Read loop finished (isActive=$isActive, recordingState=${recorder?.recordingState})")
         }

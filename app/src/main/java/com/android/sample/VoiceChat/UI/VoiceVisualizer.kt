@@ -1,4 +1,4 @@
-package com.android.sample.VoiceChat
+package com.android.sample.VoiceChat.UI
 
 import android.os.Build
 import androidx.annotation.RequiresApi

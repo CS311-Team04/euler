@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsKotlinAndroid)
@@ -13,6 +15,24 @@ val hasGoogleServicesJson = file("google-services.json").exists()
 if (!isCi && hasGoogleServicesJson) {
     apply(plugin = libs.plugins.googleServices.get().pluginId)
 }
+
+val elevenLabsProperties = Properties().apply {
+    val file = rootProject.file("elevenlabs.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
+}
+
+fun resolveElevenLabsSecret(envVar: String, propertyKey: String): String {
+    val envValue = System.getenv(envVar)?.trim().orEmpty()
+    if (envValue.isNotEmpty()) return envValue
+    return elevenLabsProperties.getProperty(propertyKey, "").trim()
+}
+
+fun quoteBuildConfig(value: String): String = "\"${value.replace("\"", "\\\"")}\""
+
+val elevenLabsApiKey = resolveElevenLabsSecret("ELEVENLABS_API_KEY", "elevenlabs.apiKey")
+val elevenLabsVoiceId = resolveElevenLabsSecret("ELEVENLABS_VOICE_ID", "elevenlabs.voiceId")
 
 android {
     namespace = "com.android.sample"
@@ -32,6 +52,8 @@ android {
         buildConfigField ("String", "FUNCTIONS_HOST", "\"10.0.2.2\"")
         buildConfigField ("int",    "FUNCTIONS_PORT", "5002")
         buildConfigField ("boolean","USE_FUNCTIONS_EMULATOR", "true")
+        buildConfigField("String", "ELEVENLABS_API_KEY", quoteBuildConfig(elevenLabsApiKey))
+        buildConfigField("String", "ELEVENLABS_VOICE_ID", quoteBuildConfig(elevenLabsVoiceId))
     }
 
     buildTypes {
@@ -197,6 +219,9 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.compose.ui:ui-tooling-preview")
+
+    // Networking/WebSocket for ElevenLabs integrations
+    implementation(libs.okhttp)
 
 }
 

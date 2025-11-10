@@ -30,6 +30,7 @@ mockito = "5.7.0"
 mockk = "1.13.8"
 securityCrypto = "1.1.0-alpha06"
 msal = "4.3.0"
+okhttp = "4.12.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -105,6 +106,7 @@ mockk-agent = { group = "io.mockk", name = "mockk-agent", version.ref = "mockk" 
 security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 
 msal = { group = "com.microsoft.identity.client", name = "msal", version.ref = "msal" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
