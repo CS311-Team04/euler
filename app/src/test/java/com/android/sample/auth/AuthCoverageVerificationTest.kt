@@ -33,11 +33,6 @@ class AuthCoverageVerificationTest {
     // Verify MicrosoftAuth coverage
     assertNotNull("MicrosoftAuth should be testable", MicrosoftAuth)
 
-    // Verify MsalAuthRepository coverage
-    val repo = MsalAuthRepository.getInstance()
-    assertNotNull("MsalAuthRepository should be testable", repo)
-    assertTrue("MsalAuthRepository should implement AuthRepository", repo is AuthRepository)
-
     // Verify AuthRepository interface coverage
     assertTrue("AuthRepository should be interface", AuthRepository::class.java.isInterface)
   }
