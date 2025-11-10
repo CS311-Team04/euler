@@ -18,7 +18,8 @@ import androidx.core.content.ContextCompat
 import java.util.Locale
 
 /**
- * Helper class to encapsulate Android speech-to-text using [SpeechRecognizer] directly (no Google UI).
+ * Helper class to encapsulate Android speech-to-text using [SpeechRecognizer] directly (no Google
+ * UI).
  *
  * Responsibilities:
  * - Request RECORD_AUDIO permission on demand.
@@ -104,8 +105,8 @@ class SpeechToTextHelper(private val context: Context, caller: ActivityResultCal
   }
 
   /**
-   * Instantiates the platform speech recognizer only once and registers our listener.
-   * Returns `false` if the device does not support recognition.
+   * Instantiates the platform speech recognizer only once and registers our listener. Returns
+   * `false` if the device does not support recognition.
    */
   private fun ensureSpeechRecognizer(): Boolean {
     if (speechRecognizer != null) return true
@@ -121,8 +122,8 @@ class SpeechToTextHelper(private val context: Context, caller: ActivityResultCal
   }
 
   /**
-   * Prepares and fires a recognition session (no UI). We request partial results and
-   * rely on our listener to stream updates back to the UI layer.
+   * Prepares and fires a recognition session (no UI). We request partial results and rely on our
+   * listener to stream updates back to the UI layer.
    */
   private fun startInternalListening() {
     if (!ensureSpeechRecognizer()) {
@@ -184,8 +185,8 @@ class SpeechToTextHelper(private val context: Context, caller: ActivityResultCal
       }
 
   /**
-   * Emits the final transcription. If none is provided we surface a soft error so the
-   * caller can prompt the user to retry.
+   * Emits the final transcription. If none is provided we surface a soft error so the caller can
+   * prompt the user to retry.
    */
   private fun deliverFinalResult(results: Bundle?) {
     val bestMatch = extractBestMatch(results)
@@ -198,10 +199,9 @@ class SpeechToTextHelper(private val context: Context, caller: ActivityResultCal
   }
 
   private fun extractBestMatch(bundle: Bundle?): String? =
-      bundle
-          ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-          ?.firstOrNull()
-          ?.takeIf { it.isNotBlank() }
+      bundle?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.takeIf {
+        it.isNotBlank()
+      }
 
   private fun errorMessageForCode(error: Int): String =
       when (error) {
@@ -229,4 +229,3 @@ class SpeechToTextHelper(private val context: Context, caller: ActivityResultCal
     private const val MAX_RMS_DB = 10f
   }
 }
-

@@ -12,13 +12,11 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import com.android.sample.VoiceChat.Backend.ElevenLabs_LiveTTSClient.SessionState as LiveSessionState
+import com.android.sample.VoiceChat.Backend.VoiceChatViewModel
 import com.android.sample.VoiceChat.UI.LevelSource
 import com.android.sample.VoiceChat.UI.VoiceOverlay
 import com.android.sample.VoiceChat.UI.VoiceScreen
-import com.android.sample.VoiceChat.Backend.ElevenLabs_LiveTTSClient.SessionState as LiveSessionState
-import com.android.sample.VoiceChat.Backend.VoiceChatViewModel
-import com.android.sample.VoiceChat.FakeAudioPlayer
-import com.android.sample.VoiceChat.FakeLiveTtsClient
 import com.android.sample.VoiceChat.UI.VoiceScreenPreviewContent
 import com.android.sample.VoiceChat.UI.evaluateAudioLevel
 import com.android.sample.VoiceChat.UI.handlePermissionResult
@@ -90,13 +88,12 @@ class VoiceScreenTest {
   fun voiceScreen_toggleControlsInjectedMic() {
     val fakeSource = FakeMicLevelSource()
     composeTestRule.setContent {
-        VoiceScreen(
-            onClose = {},
-            levelSourceFactory = { fakeSource },
-            initialHasMicOverride = true,
-            silenceThresholdOverride = 0.2f,
-            silenceDurationOverride = 100L
-        )
+      VoiceScreen(
+          onClose = {},
+          levelSourceFactory = { fakeSource },
+          initialHasMicOverride = true,
+          silenceThresholdOverride = 0.2f,
+          silenceDurationOverride = 100L)
     }
 
     composeTestRule.onNodeWithContentDescription("Toggle microphone").performClick()
@@ -118,11 +115,11 @@ class VoiceScreenTest {
   fun voiceScreen_requestsPermissionWhenNotGranted() {
     val requested = mutableListOf<String>()
     composeTestRule.setContent {
-        VoiceScreen(
-            onClose = {},
-            levelSourceFactory = { FakeMicLevelSource() },
-            initialHasMicOverride = false,
-            permissionRequester = { requested += it })
+      VoiceScreen(
+          onClose = {},
+          levelSourceFactory = { FakeMicLevelSource() },
+          initialHasMicOverride = false,
+          permissionRequester = { requested += it })
     }
 
     composeTestRule.waitForIdle()
@@ -133,9 +130,8 @@ class VoiceScreenTest {
   fun voiceScreen_toggleWithThrowingMic_revertsState() {
     val throwingSource = ThrowingMicLevelSource()
     composeTestRule.setContent {
-        VoiceScreen(
-            onClose = {}, levelSourceFactory = { throwingSource }, initialHasMicOverride = true
-        )
+      VoiceScreen(
+          onClose = {}, levelSourceFactory = { throwingSource }, initialHasMicOverride = true)
     }
 
     composeTestRule.onNodeWithContentDescription("Toggle microphone").performClick()
@@ -157,12 +153,11 @@ class VoiceScreenTest {
 
     composeTestRule.setContent {
       if (showScreen.value) {
-          VoiceScreen(
-              onClose = {},
-              levelSourceFactory = { fakeSource },
-              initialHasMicOverride = true,
-              silenceDurationOverride = Long.MAX_VALUE
-          )
+        VoiceScreen(
+            onClose = {},
+            levelSourceFactory = { fakeSource },
+            initialHasMicOverride = true,
+            silenceDurationOverride = Long.MAX_VALUE)
       }
     }
 
@@ -181,14 +176,12 @@ class VoiceScreenTest {
 
     val updated =
         updateLastVoiceTimestamp(
-            level = 0.2f, silenceThreshold = 0.1f, currentTime = now, lastVoiceTime = previous
-        )
+            level = 0.2f, silenceThreshold = 0.1f, currentTime = now, lastVoiceTime = previous)
     assertEquals(now, updated)
 
     val unchanged =
         updateLastVoiceTimestamp(
-            level = 0.05f, silenceThreshold = 0.1f, currentTime = now, lastVoiceTime = previous
-        )
+            level = 0.05f, silenceThreshold = 0.1f, currentTime = now, lastVoiceTime = previous)
     assertEquals(previous, unchanged)
   }
 
@@ -204,9 +197,7 @@ class VoiceScreenTest {
             lastVoiceTime = lastVoice,
             currentLevel = 0.01f,
             silenceThreshold = 0.05f,
-            silenceDuration = silenceDuration
-        )
-    )
+            silenceDuration = silenceDuration))
 
     assertFalse(
         shouldDeactivateMic(
@@ -214,9 +205,7 @@ class VoiceScreenTest {
             lastVoiceTime = lastVoice,
             currentLevel = 0.2f,
             silenceThreshold = 0.05f,
-            silenceDuration = silenceDuration
-        )
-    )
+            silenceDuration = silenceDuration))
 
     assertFalse(
         shouldDeactivateMic(
@@ -224,9 +213,7 @@ class VoiceScreenTest {
             lastVoiceTime = lastVoice,
             currentLevel = 0.01f,
             silenceThreshold = 0.05f,
-            silenceDuration = silenceDuration
-        )
-    )
+            silenceDuration = silenceDuration))
   }
 
   @Test
@@ -279,17 +266,17 @@ class VoiceScreenTest {
     var active = true
     val logs = mutableListOf<String>()
 
-      monitorSilence(
-          isMicActiveProvider = { active },
-          hasMicProvider = { true },
-          delayMs = { /* no-op for tests */ },
-          timeProvider = { 5_500L },
-          lastVoiceTimeProvider = { 2_000L },
-          currentLevelProvider = { 0.01f },
-          silenceThreshold = 0.05f,
-          silenceDuration = 2_500L,
-          onDeactivate = { active = false },
-          logger = { logs += it })
+    monitorSilence(
+        isMicActiveProvider = { active },
+        hasMicProvider = { true },
+        delayMs = { /* no-op for tests */},
+        timeProvider = { 5_500L },
+        lastVoiceTimeProvider = { 2_000L },
+        currentLevelProvider = { 0.01f },
+        silenceThreshold = 0.05f,
+        silenceDuration = 2_500L,
+        onDeactivate = { active = false },
+        logger = { logs += it })
 
     assertFalse(active)
     assertEquals(listOf("Silence detected (3500ms), auto deactivating mic"), logs)
@@ -300,16 +287,16 @@ class VoiceScreenTest {
   fun monitorSilence_noActionWhenInactive() = runTest {
     var active = false
 
-      monitorSilence(
-          isMicActiveProvider = { active },
-          hasMicProvider = { true },
-          delayMs = { /* no-op */ },
-          timeProvider = { 0L },
-          lastVoiceTimeProvider = { 0L },
-          currentLevelProvider = { 0f },
-          silenceThreshold = 0.05f,
-          silenceDuration = 2_500L,
-          onDeactivate = { active = true })
+    monitorSilence(
+        isMicActiveProvider = { active },
+        hasMicProvider = { true },
+        delayMs = { /* no-op */},
+        timeProvider = { 0L },
+        lastVoiceTimeProvider = { 0L },
+        currentLevelProvider = { 0f },
+        silenceThreshold = 0.05f,
+        silenceDuration = 2_500L,
+        onDeactivate = { active = true })
 
     assertFalse(active)
   }
@@ -323,8 +310,7 @@ class VoiceScreenTest {
             silenceThreshold = 0.2f,
             frameCount = 30,
             currentTime = 5_000L,
-            lastVoiceTime = previousTime
-        )
+            lastVoiceTime = previousTime)
 
     assertTrue(result.shouldLogLevel)
     assertTrue(result.voiceDetected)
@@ -340,8 +326,7 @@ class VoiceScreenTest {
             silenceThreshold = 0.2f,
             frameCount = 7,
             currentTime = 6_000L,
-            lastVoiceTime = previousTime
-        )
+            lastVoiceTime = previousTime)
 
     assertFalse(result.shouldLogLevel)
     assertFalse(result.voiceDetected)
@@ -357,8 +342,7 @@ class VoiceScreenTest {
             silenceThreshold = 0.2f,
             frameCount = 60,
             currentTime = 8_000L,
-            lastVoiceTime = previousTime
-        )
+            lastVoiceTime = previousTime)
 
     assertTrue(result.shouldLogLevel)
     assertFalse(result.voiceDetected)
@@ -377,8 +361,7 @@ class VoiceScreenTest {
             currentTime = { 1_234L },
             log = { events += it },
             errorLog = { message, _ -> events += message },
-            delayDurationMs = 0L
-        )
+            delayDurationMs = 0L)
 
     assertTrue(result.success)
     assertEquals(1_234L, result.lastVoiceTime)
@@ -398,8 +381,7 @@ class VoiceScreenTest {
             currentTime = { 0L },
             log = { events += it },
             errorLog = { message, _ -> events += message },
-            delayDurationMs = 0L
-        )
+            delayDurationMs = 0L)
 
     assertFalse(result.success)
     assertNull(result.lastVoiceTime)
@@ -410,10 +392,10 @@ class VoiceScreenTest {
   fun stopMicrophoneSafely_success() {
     val events = mutableListOf<String>()
     var stopped = false
-      stopMicrophoneSafely(
-          stopAction = { stopped = true },
-          log = { events += it },
-          errorLog = { message, _ -> events += message })
+    stopMicrophoneSafely(
+        stopAction = { stopped = true },
+        log = { events += it },
+        errorLog = { message, _ -> events += message })
 
     assertTrue(stopped)
     assertEquals(listOf("Stopping microphone...", "Microphone stopped"), events)
@@ -422,10 +404,10 @@ class VoiceScreenTest {
   @Test
   fun stopMicrophoneSafely_handlesException() {
     val events = mutableListOf<String>()
-      stopMicrophoneSafely(
-          stopAction = { throw IllegalArgumentException("boom") },
-          log = { events += it },
-          errorLog = { message, _ -> events += message })
+    stopMicrophoneSafely(
+        stopAction = { throw IllegalArgumentException("boom") },
+        log = { events += it },
+        errorLog = { message, _ -> events += message })
 
     assertEquals(listOf("Stopping microphone...", "Microphone stop error"), events)
   }
@@ -434,17 +416,17 @@ class VoiceScreenTest {
   @Test
   fun monitorSilence_returnsImmediatelyWhenMicInactive() = runTest {
     var loggerCalled = false
-      monitorSilence(
-          isMicActiveProvider = { false },
-          hasMicProvider = { true },
-          delayMs = { fail("Should not delay when mic is inactive") },
-          timeProvider = { 0L },
-          lastVoiceTimeProvider = { 0L },
-          currentLevelProvider = { 0f },
-          silenceThreshold = 0.05f,
-          silenceDuration = 2_500L,
-          onDeactivate = { fail("Should not deactivate when inactive") },
-          logger = { loggerCalled = true })
+    monitorSilence(
+        isMicActiveProvider = { false },
+        hasMicProvider = { true },
+        delayMs = { fail("Should not delay when mic is inactive") },
+        timeProvider = { 0L },
+        lastVoiceTimeProvider = { 0L },
+        currentLevelProvider = { 0f },
+        silenceThreshold = 0.05f,
+        silenceDuration = 2_500L,
+        onDeactivate = { fail("Should not deactivate when inactive") },
+        logger = { loggerCalled = true })
 
     assertFalse(loggerCalled)
   }
@@ -453,17 +435,17 @@ class VoiceScreenTest {
   @Test
   fun monitorSilence_returnsImmediatelyWhenMicUnavailable() = runTest {
     var loggerCalled = false
-      monitorSilence(
-          isMicActiveProvider = { true },
-          hasMicProvider = { false },
-          delayMs = { fail("Should not delay when mic unavailable") },
-          timeProvider = { 0L },
-          lastVoiceTimeProvider = { 0L },
-          currentLevelProvider = { 0f },
-          silenceThreshold = 0.05f,
-          silenceDuration = 2_500L,
-          onDeactivate = { fail("Should not deactivate when mic unavailable") },
-          logger = { loggerCalled = true })
+    monitorSilence(
+        isMicActiveProvider = { true },
+        hasMicProvider = { false },
+        delayMs = { fail("Should not delay when mic unavailable") },
+        timeProvider = { 0L },
+        lastVoiceTimeProvider = { 0L },
+        currentLevelProvider = { 0f },
+        silenceThreshold = 0.05f,
+        silenceDuration = 2_500L,
+        onDeactivate = { fail("Should not deactivate when mic unavailable") },
+        logger = { loggerCalled = true })
 
     assertFalse(loggerCalled)
   }

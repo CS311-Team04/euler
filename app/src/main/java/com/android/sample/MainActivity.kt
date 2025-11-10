@@ -15,9 +15,9 @@ class MainActivity : ComponentActivity() {
   private val speechHelper by lazy { SpeechToTextHelper(this, this) }
   private val speechPlayback: SpeechPlayback by lazy {
     ElevenLabsPlayback(
-      context = this,
-      apiKeyProvider = { ElevenLabsConfig.API_KEY },
-      voiceIdProvider = { ElevenLabsConfig.VOICE_ID })
+        context = this,
+        apiKeyProvider = { ElevenLabsConfig.API_KEY },
+        voiceIdProvider = { ElevenLabsConfig.VOICE_ID })
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {

@@ -5,7 +5,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
 /**
- * Test double for [com.android.sample.VoiceChat.UI.LevelSource] that records lifecycle events and allows emitting arbitrary levels.
+ * Test double for [com.android.sample.VoiceChat.UI.LevelSource] that records lifecycle events and
+ * allows emitting arbitrary levels.
  */
 class RecordingLevelSource(initial: Float = 0f) : LevelSource {
   private val levelsFlow = MutableSharedFlow<Float>(replay = 1)

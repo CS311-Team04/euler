@@ -42,161 +42,161 @@ open class ElevenLabsPlayback(
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 ) : SpeechPlayback {
 
-    // Dedicated cache directory where synthesized MP3 files are persisted between runs.
-    private val cacheDir: File by lazy {
-        File(context.cacheDir, "elevenlabs_audio").apply { if (!exists()) mkdirs() }
-    }
+  // Dedicated cache directory where synthesized MP3 files are persisted between runs.
+  private val cacheDir: File by lazy {
+    File(context.cacheDir, "elevenlabs_audio").apply { if (!exists()) mkdirs() }
+  }
 
-    // `MediaPlayer` instance currently responsible for audio playback (null when idle).
-    private var mediaPlayer: MediaPlayer? = null
-    // Active coroutine that is handling download + playback; cancelled on stop or new requests.
-    private var currentJob: Job? = null
+  // `MediaPlayer` instance currently responsible for audio playback (null when idle).
+  private var mediaPlayer: MediaPlayer? = null
+  // Active coroutine that is handling download + playback; cancelled on stop or new requests.
+  private var currentJob: Job? = null
 
-    override fun speak(
-        text: String,
-        utteranceId: String,
-        onStart: () -> Unit,
-        onDone: () -> Unit,
-        onError: (Throwable?) -> Unit
-    ) {
-        // Abort any previous job to ensure we only play a single utterance at a time.
-        currentJob?.cancel()
-        stopInternal()
+  override fun speak(
+      text: String,
+      utteranceId: String,
+      onStart: () -> Unit,
+      onDone: () -> Unit,
+      onError: (Throwable?) -> Unit
+  ) {
+    // Abort any previous job to ensure we only play a single utterance at a time.
+    currentJob?.cancel()
+    stopInternal()
 
-        // Start a fresh coroutine: download on IO, then hand off to the player on the main dispatcher.
-        currentJob =
-            coroutineScope.launch {
-                try {
-                    val audioFile = withContext(Dispatchers.IO) { getOrDownloadAudio(text, utteranceId) }
-                    startPlayback(audioFile, onStart, onDone, onError)
-                } catch (t: Throwable) {
-                    onError(t)
-                }
-            }
-    }
-
-    override fun stop() {
-        // Caller explicitly requested a stop: cancel the job and tear down the player.
-        currentJob?.cancel()
-        currentJob = null
-        stopInternal()
-    }
-
-    override fun shutdown() {
-        // Full shutdown invoked (e.g. ViewModel cleared): stop playback and cancel scope children.
-        stop()
-        coroutineScope.cancel()
-    }
-
-    protected open suspend fun getOrDownloadAudio(text: String, utteranceId: String): File {
-        // Ensure we have both voiceId and apiKey; fail fast with a descriptive error otherwise.
-        val voiceId =
-            voiceIdProvider().takeIf { it.isNotBlank() }
-                ?: throw IllegalStateException(
-                    "ElevenLabs voice ID is missing. Remplis-le dans ElevenLabsConfig.")
-        val apiKey =
-            apiKeyProvider().takeIf { it.isNotBlank() }
-                ?: throw IllegalStateException(
-                    "ElevenLabs API key manquante. Ajoute la dans ElevenLabsConfig.")
-
-        // Use a deterministic filename so we can reuse previous synthesis for identical requests.
-        val cacheFile = File(cacheDir, cacheFileName(utteranceId, voiceId))
-        if (cacheFile.exists()) return cacheFile
-
-        // Build JSON payload according to ElevenLabs REST API contract.
-        val payload =
-            JSONObject()
-                .put("text", text)
-                .put("model_id", modelId)
-                .put("voice_settings", JSONObject().put("stability", 0.3).put("similarity_boost", 0.7))
-                .toString()
-
-        // Compose the POST request with the API key and audio content type.
-        val request =
-            Request.Builder()
-                .url("$baseUrl/text-to-speech/$voiceId")
-                .header("xi-api-key", apiKey)
-                .header("Accept", "audio/mpeg")
-                .post(payload.toRequestBody("application/json".toMediaType()))
-                .build()
-
-        // Execute the HTTP call synchronously (running on Dispatchers.IO).
-        val response = httpClient.newCall(request).execute()
-        if (!response.isSuccessful) {
-            response.close()
-            throw IOException("ElevenLabs error: HTTP ${response.code}")
-        }
-
-        // Stream the MP3 response into the cache file.
-        response.body?.use { body ->
-            cacheFile.outputStream().use { output ->
-                body.byteStream().use { input -> input.copyTo(output) }
-            }
-        } ?: throw IOException("ElevenLabs response body empty")
-
-        return cacheFile
-    }
-
-    private fun cacheFileName(utteranceId: String, voiceId: String): String {
-        // Hash voice + utterance to avoid illegal filename characters and keep names short.
-        val digest = MessageDigest.getInstance("SHA-256")
-        val hashBytes = digest.digest("$voiceId|$utteranceId".toByteArray(Charsets.UTF_8))
-        val hex = hashBytes.joinToString("") { "%02x".format(it) }
-        return "$hex.mp3"
-    }
-
-    protected open fun startPlayback(
-        audioFile: File,
-        onStart: () -> Unit,
-        onDone: () -> Unit,
-        onError: (Throwable?) -> Unit
-    ) {
-        // Prepare a fresh MediaPlayer; listeners are attached to surface lifecycle events to the caller.
-        val player = MediaPlayer()
-        mediaPlayer = player
-        try {
-            player.setDataSource(audioFile.absolutePath)
-            player.setOnPreparedListener {
-                it.start()
-                onStart()
-            }
-            player.setOnCompletionListener {
-                onDone()
-                releasePlayer()
-            }
-            player.setOnErrorListener { _, what, extra ->
-                // Convert the numeric error codes into an IOException for easier reporting.
-                onError(IOException("MediaPlayer error what=$what extra=$extra"))
-                releasePlayer()
-                true
-            }
-            player.prepareAsync()
-        } catch (t: Throwable) {
-            // Any exception during setup ends playback immediately and propagates through the callback.
-            releasePlayer()
+    // Start a fresh coroutine: download on IO, then hand off to the player on the main dispatcher.
+    currentJob =
+        coroutineScope.launch {
+          try {
+            val audioFile = withContext(Dispatchers.IO) { getOrDownloadAudio(text, utteranceId) }
+            startPlayback(audioFile, onStart, onDone, onError)
+          } catch (t: Throwable) {
             onError(t)
+          }
         }
+  }
+
+  override fun stop() {
+    // Caller explicitly requested a stop: cancel the job and tear down the player.
+    currentJob?.cancel()
+    currentJob = null
+    stopInternal()
+  }
+
+  override fun shutdown() {
+    // Full shutdown invoked (e.g. ViewModel cleared): stop playback and cancel scope children.
+    stop()
+    coroutineScope.cancel()
+  }
+
+  protected open suspend fun getOrDownloadAudio(text: String, utteranceId: String): File {
+    // Ensure we have both voiceId and apiKey; fail fast with a descriptive error otherwise.
+    val voiceId =
+        voiceIdProvider().takeIf { it.isNotBlank() }
+            ?: throw IllegalStateException(
+                "ElevenLabs voice ID is missing. Remplis-le dans ElevenLabsConfig.")
+    val apiKey =
+        apiKeyProvider().takeIf { it.isNotBlank() }
+            ?: throw IllegalStateException(
+                "ElevenLabs API key manquante. Ajoute la dans ElevenLabsConfig.")
+
+    // Use a deterministic filename so we can reuse previous synthesis for identical requests.
+    val cacheFile = File(cacheDir, cacheFileName(utteranceId, voiceId))
+    if (cacheFile.exists()) return cacheFile
+
+    // Build JSON payload according to ElevenLabs REST API contract.
+    val payload =
+        JSONObject()
+            .put("text", text)
+            .put("model_id", modelId)
+            .put("voice_settings", JSONObject().put("stability", 0.3).put("similarity_boost", 0.7))
+            .toString()
+
+    // Compose the POST request with the API key and audio content type.
+    val request =
+        Request.Builder()
+            .url("$baseUrl/text-to-speech/$voiceId")
+            .header("xi-api-key", apiKey)
+            .header("Accept", "audio/mpeg")
+            .post(payload.toRequestBody("application/json".toMediaType()))
+            .build()
+
+    // Execute the HTTP call synchronously (running on Dispatchers.IO).
+    val response = httpClient.newCall(request).execute()
+    if (!response.isSuccessful) {
+      response.close()
+      throw IOException("ElevenLabs error: HTTP ${response.code}")
     }
 
-    protected open fun stopInternal() {
-        mediaPlayer?.let {
-            it.setOnCompletionListener(null)
-            if (it.isPlaying) {
-                it.stop()
-            }
-            releasePlayer()
-        }
-    }
+    // Stream the MP3 response into the cache file.
+    response.body?.use { body ->
+      cacheFile.outputStream().use { output ->
+        body.byteStream().use { input -> input.copyTo(output) }
+      }
+    } ?: throw IOException("ElevenLabs response body empty")
 
-    private fun releasePlayer() {
-        // Reset + release to free native resources and avoid leaking audio focus.
-        mediaPlayer?.reset()
-        mediaPlayer?.release()
-        mediaPlayer = null
-    }
+    return cacheFile
+  }
 
-    companion object {
-        private const val DEFAULT_BASE_URL = "https://api.elevenlabs.io/v1"
+  private fun cacheFileName(utteranceId: String, voiceId: String): String {
+    // Hash voice + utterance to avoid illegal filename characters and keep names short.
+    val digest = MessageDigest.getInstance("SHA-256")
+    val hashBytes = digest.digest("$voiceId|$utteranceId".toByteArray(Charsets.UTF_8))
+    val hex = hashBytes.joinToString("") { "%02x".format(it) }
+    return "$hex.mp3"
+  }
+
+  protected open fun startPlayback(
+      audioFile: File,
+      onStart: () -> Unit,
+      onDone: () -> Unit,
+      onError: (Throwable?) -> Unit
+  ) {
+    // Prepare a fresh MediaPlayer; listeners are attached to surface lifecycle events to the
+    // caller.
+    val player = MediaPlayer()
+    mediaPlayer = player
+    try {
+      player.setDataSource(audioFile.absolutePath)
+      player.setOnPreparedListener {
+        it.start()
+        onStart()
+      }
+      player.setOnCompletionListener {
+        onDone()
+        releasePlayer()
+      }
+      player.setOnErrorListener { _, what, extra ->
+        // Convert the numeric error codes into an IOException for easier reporting.
+        onError(IOException("MediaPlayer error what=$what extra=$extra"))
+        releasePlayer()
+        true
+      }
+      player.prepareAsync()
+    } catch (t: Throwable) {
+      // Any exception during setup ends playback immediately and propagates through the callback.
+      releasePlayer()
+      onError(t)
     }
+  }
+
+  protected open fun stopInternal() {
+    mediaPlayer?.let {
+      it.setOnCompletionListener(null)
+      if (it.isPlaying) {
+        it.stop()
+      }
+      releasePlayer()
+    }
+  }
+
+  private fun releasePlayer() {
+    // Reset + release to free native resources and avoid leaking audio focus.
+    mediaPlayer?.reset()
+    mediaPlayer?.release()
+    mediaPlayer = null
+  }
+
+  companion object {
+    private const val DEFAULT_BASE_URL = "https://api.elevenlabs.io/v1"
+  }
 }
-

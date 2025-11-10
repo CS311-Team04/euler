@@ -6,6 +6,7 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.util.Log
 import androidx.annotation.RequiresPermission
+import kotlin.math.abs
 import kotlin.math.sqrt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -15,7 +16,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 
 /** Wrapper interface around AudioRecord to enable deterministic testing. */
 interface Recorder {
@@ -114,8 +114,7 @@ class AndroidMicLevelSource(
       }
 
       if (recorder?.state != Recorder.STATE_INITIALIZED) {
-        Log.e(
-            TAG, "Error: AudioRecord is not initialized correctly, state: ${recorder?.state}")
+        Log.e(TAG, "Error: AudioRecord is not initialized correctly, state: ${recorder?.state}")
         recorder?.release()
         recorder = null
         return

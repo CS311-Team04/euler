@@ -174,7 +174,7 @@ fun VoiceScreen(
         Log.d("VoiceScreen", "Microphone stopped on dispose")
       }
       voiceChatViewModel.disconnect()
-    speechHelper?.stopListening()
+      speechHelper?.stopListening()
     }
   }
 
@@ -277,20 +277,15 @@ fun VoiceScreen(
                               voiceChatViewModel.onUserTranscript(recognized)
                               voiceChatViewModel.speak(recognized)
                             },
-                            onError = { message ->
-                              voiceChatViewModel.reportError(message)
-                            },
+                            onError = { message -> voiceChatViewModel.reportError(message) },
                             onComplete = {
                               isMicActive = false
                               speechLevelSource.update(0f)
                             },
-                            onPartial = { partial ->
-                              voiceChatViewModel.onUserTranscript(partial)
-                            },
+                            onPartial = { partial -> voiceChatViewModel.onUserTranscript(partial) },
                             onRms = { rms ->
                               val normalized =
-                                  ((rms - RMS_MIN_DB) / (RMS_MAX_DB - RMS_MIN_DB))
-                                      .coerceIn(0f, 1f)
+                                  ((rms - RMS_MIN_DB) / (RMS_MAX_DB - RMS_MIN_DB)).coerceIn(0f, 1f)
                               currentLevel = normalized
                               speechLevelSource.update(normalized)
                               lastVoiceTime = System.currentTimeMillis()
@@ -337,8 +332,7 @@ fun VoiceScreen(
 private fun StatusCard(uiState: VoiceChatViewModel.VoiceChatUiState) {
   val statusText =
       when (val state = uiState.sessionState) {
-        is LiveSessionState.Connected ->
-            "Connected ${state.sessionId.orEmpty()}"
+        is LiveSessionState.Connected -> "Connected ${state.sessionId.orEmpty()}"
         LiveSessionState.Connecting -> "Connecting…"
         LiveSessionState.Disconnected -> "Disconnected"
         is LiveSessionState.Failed -> "Error: ${state.reason}"
@@ -352,18 +346,19 @@ private fun StatusCard(uiState: VoiceChatViewModel.VoiceChatUiState) {
               .padding(vertical = 8.dp)) {
         // Primary session status (connecting / connected / error).
         Text(text = statusText, color = Color.White, fontSize = 12.sp)
-        uiState.lastTranscript?.takeIf { it.isNotBlank() }?.let { transcript ->
-          val clipped =
-              if (transcript.length > 120) transcript.take(117).trimEnd() + "…" else transcript
-          Text(
-              text = "Transcribed: \"$clipped\"",
-              color = Color.White,
-              fontSize = 12.sp,
-              modifier = Modifier.padding(top = 4.dp))
-        }
+        uiState.lastTranscript
+            ?.takeIf { it.isNotBlank() }
+            ?.let { transcript ->
+              val clipped =
+                  if (transcript.length > 120) transcript.take(117).trimEnd() + "…" else transcript
+              Text(
+                  text = "Transcribed: \"$clipped\"",
+                  color = Color.White,
+                  fontSize = 12.sp,
+                  modifier = Modifier.padding(top = 4.dp))
+            }
         uiState.lastFirstAudioMs?.let { ttfb ->
-          val bytesText =
-              uiState.lastFirstAudioBytes?.let { bytes -> " • ${bytes} bytes" } ?: ""
+          val bytesText = uiState.lastFirstAudioBytes?.let { bytes -> " • ${bytes} bytes" } ?: ""
           Text(
               text = "First audio in ${ttfb} ms$bytesText",
               color = Color(0xFF9A9A9A),
@@ -371,9 +366,9 @@ private fun StatusCard(uiState: VoiceChatViewModel.VoiceChatUiState) {
               modifier = Modifier.padding(top = 2.dp))
         }
         // Secondary line for the latest backend error (if any).
-        uiState.lastError?.takeIf { it.isNotBlank() }?.let { error ->
-          Text(text = error, color = Color(0xFFFF6F61), fontSize = 11.sp)
-        }
+        uiState.lastError
+            ?.takeIf { it.isNotBlank() }
+            ?.let { error -> Text(text = error, color = Color(0xFFFF6F61), fontSize = 11.sp) }
       }
 }
 
@@ -564,9 +559,9 @@ internal suspend fun monitorSilence(
 }
 
 /**
- * Lightweight [LevelSource] implementation that mirrors a single floating-point level.
- * VoiceScreen updates it from the SpeechRecognizer RMS callback so the visualizer can animate even
- * though we are not streaming raw PCM samples.
+ * Lightweight [LevelSource] implementation that mirrors a single floating-point level. VoiceScreen
+ * updates it from the SpeechRecognizer RMS callback so the visualizer can animate even though we
+ * are not streaming raw PCM samples.
  */
 private class MutableLevelSource : LevelSource {
   private val levelsState = MutableStateFlow(0f)
