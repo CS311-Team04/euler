@@ -441,19 +441,6 @@ private fun SuggestionChip(text: String, modifier: Modifier = Modifier, onClick:
       }
 }
 
-/* ----- Placeholders for external components (drawer + top-right panel) ----- */
-
-@Composable
-private fun TopRightPanelPlaceholder(onDismiss: () -> Unit, onDeleteClick: () -> Unit) {
-  DropdownMenuItem(text = { Text("Share") }, onClick = onDismiss)
-  DropdownMenuItem(
-      text = { Text("Delete") },
-      onClick = {
-        onDeleteClick()
-        onDismiss()
-      })
-}
-
 /**
  * Modal shown to confirm clearing the chat history. Exposes two testTags: "home_delete_cancel" and
  * "home_delete_confirm" on buttons.

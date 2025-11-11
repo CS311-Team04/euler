@@ -182,8 +182,10 @@ dependencies {
     testImplementation(libs.robolectric)
 
     // ----------       Mockito         ------------
-    androidTestImplementation("org.mockito:mockito-android:5.8.0")
-    androidTestImplementation("org.mockito:mockito-core:5.8.0")
+    testImplementation("org.mockito:mockito-inline:4.11.0")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:4.1.0")
+    androidTestImplementation("org.mockito:mockito-android:4.11.0")
+    androidTestImplementation("org.mockito:mockito-core:4.11.0")
 
     implementation("com.microsoft.identity.client:msal:6.0.1")
 

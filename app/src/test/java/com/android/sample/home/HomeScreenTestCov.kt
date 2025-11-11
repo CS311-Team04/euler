@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
+import com.android.sample.conversations.Conversation
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
@@ -25,6 +26,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -189,6 +191,125 @@ class HomeScreenTestCov {
     assertFalse(signOutCalled)
   }
 
+  @Test
+  fun settings_from_drawer_invokes_callback_and_closes_drawer() {
+    var settingsCalled = false
+    val viewModel = HomeViewModel()
+    updateUiState(viewModel) { it.copy(isDrawerOpen = true) }
+
+    composeRule.setContent {
+      MaterialTheme {
+        HomeScreen(viewModel = viewModel, onSettingsClick = { settingsCalled = true })
+      }
+    }
+
+    composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
+    composeRule.waitForIdle()
+    composeRule.onNodeWithTag(DrawerTags.ConnectorsRow).performClick()
+    composeRule.waitForIdle()
+
+    composeRule.runOnIdle {
+      assertFalse(viewModel.uiState.value.isDrawerOpen)
+      assertTrue(settingsCalled)
+    }
+  }
+
+  @Test
+  fun menu_button_opens_and_closes_drawer() {
+    val viewModel = HomeViewModel()
+    composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
+
+    composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
+    composeRule.waitForIdle()
+    composeRule.onNodeWithTag(DrawerTags.NewChatRow).assertIsDisplayed()
+
+    composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
+    composeRule.waitForIdle()
+    composeRule.runOnIdle { /* ensure coroutine completes */}
+  }
+
+  @Test
+  fun new_chat_from_drawer_resets_state_and_closes() {
+    val viewModel = HomeViewModel()
+    updateUiState(viewModel) {
+      it.copy(currentConversationId = "conv-1", messageDraft = "draft", isDrawerOpen = true)
+    }
+    injectMessages(viewModel, listOf(sampleMessage("Keep me")))
+
+    composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
+
+    composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
+    composeRule.waitForIdle()
+    composeRule.onNodeWithTag(DrawerTags.NewChatRow).performClick()
+    composeRule.waitForIdle()
+
+    composeRule.runOnIdle {
+      val state = viewModel.uiState.value
+      assertTrue(state.messages.isEmpty())
+      assertNull(state.currentConversationId)
+      assertEquals("", state.messageDraft)
+      assertFalse(state.isDrawerOpen)
+    }
+  }
+
+  @Test
+  fun pick_conversation_from_drawer_selects_conversation() {
+    val viewModel = HomeViewModel()
+    updateUiState(viewModel) {
+      it.copy(
+          isDrawerOpen = true,
+          conversations = listOf(Conversation(id = "conv-abc", title = "CS courses")))
+    }
+
+    composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
+
+    composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
+    composeRule.waitForIdle()
+    composeRule.onNodeWithText("CS courses").performClick()
+    composeRule.waitForIdle()
+
+    composeRule.runOnIdle {
+      val state = viewModel.uiState.value
+      assertEquals("conv-abc", state.currentConversationId)
+      assertFalse(state.isDrawerOpen)
+    }
+  }
+
+  @Test
+  fun top_right_menu_delete_shows_confirmation_modal() {
+    val viewModel = HomeViewModel()
+    composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
+
+    composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
+    composeRule.waitForIdle()
+    composeRule.onNodeWithText("Delete current chat").performClick()
+    composeRule.waitForIdle()
+
+    composeRule.runOnIdle { assertTrue(viewModel.uiState.value.showDeleteConfirmation) }
+    composeRule.onNodeWithText("Clear Chat?").assertIsDisplayed()
+    composeRule
+        .onNodeWithText("This will delete all messages. This action cannot be undone.")
+        .assertIsDisplayed()
+  }
+
+  @Test
+  fun delete_confirmation_buttons_dismiss_modal() {
+    val viewModel = HomeViewModel()
+    composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
+
+    composeRule.runOnIdle { viewModel.showDeleteConfirmation() }
+    composeRule.waitForIdle()
+    composeRule.onNodeWithText("Cancel").performClick()
+    composeRule.waitForIdle()
+    composeRule.runOnIdle { assertFalse(viewModel.uiState.value.showDeleteConfirmation) }
+
+    composeRule.runOnIdle { viewModel.showDeleteConfirmation() }
+    composeRule.waitForIdle()
+    composeRule.onNodeWithText("Delete").performClick()
+    composeRule.waitForIdle()
+    composeRule.runOnIdle { assertFalse(viewModel.uiState.value.showDeleteConfirmation) }
+  }
+
   private fun initFirebase() {
     val context = ApplicationProvider.getApplicationContext<Context>()
     if (FirebaseApp.getApps(context).isEmpty()) {
@@ -209,4 +330,19 @@ class HomeScreenTestCov {
     val stateFlow = field.get(viewModel) as MutableStateFlow<HomeUiState>
     stateFlow.value = stateFlow.value.copy(messages = messages)
   }
+
+  private fun updateUiState(viewModel: HomeViewModel, transform: (HomeUiState) -> HomeUiState) {
+    val field = HomeViewModel::class.java.getDeclaredField("_uiState")
+    field.isAccessible = true
+    @Suppress("UNCHECKED_CAST")
+    val stateFlow = field.get(viewModel) as MutableStateFlow<HomeUiState>
+    stateFlow.value = transform(stateFlow.value)
+  }
+
+  private fun sampleMessage(text: String = "Sample") =
+      ChatUIModel(
+          id = "msg-${text.hashCode()}",
+          text = text,
+          timestamp = System.currentTimeMillis(),
+          type = ChatType.USER)
 }

@@ -4,15 +4,27 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
+import com.android.sample.conversations.AuthNotReadyException
+import com.android.sample.conversations.Conversation
+import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.MessageDTO
 import com.android.sample.util.MainDispatcherRule
+import com.google.android.gms.tasks.Tasks
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.functions.FirebaseFunctions
+import com.google.firebase.functions.HttpsCallableReference
+import com.google.firebase.functions.HttpsCallableResult
 import java.util.UUID
+import kotlin.lazyOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -24,6 +36,13 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.kotlin.any
+import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.eq
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
@@ -58,6 +77,24 @@ class HomeViewModelTest {
     field.isAccessible = true
     @Suppress("UNCHECKED_CAST") val stateFlow = field.get(this) as MutableStateFlow<HomeUiState>
     stateFlow.value = stateFlow.value.copy(systems = systems.toList())
+  }
+
+  private fun HomeViewModel.setPrivateField(name: String, value: Any?) {
+    val field = HomeViewModel::class.java.getDeclaredField(name)
+    field.isAccessible = true
+    field.set(this, value)
+  }
+
+  private fun HomeViewModel.setFunctions(mock: FirebaseFunctions) {
+    val field = HomeViewModel::class.java.getDeclaredField("functions\$delegate")
+    field.isAccessible = true
+    field.set(this, lazyOf(mock))
+  }
+
+  private fun HomeViewModel.invokeStartData() {
+    val method = HomeViewModel::class.java.getDeclaredMethod("startData")
+    method.isAccessible = true
+    method.invoke(this)
   }
 
   @Before
@@ -398,5 +435,170 @@ class HomeViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals("conv-999", state.currentConversationId)
+      }
+
+  @Test
+  fun startData_populates_conversations_and_streams_messages() =
+      runTest(dispatcher) {
+        val viewModel = HomeViewModel()
+        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+        viewModel.setPrivateField("auth", auth)
+
+        val repo = mock<ConversationRepository>()
+        val conversationsFlow = MutableSharedFlow<List<Conversation>>(replay = 1)
+        whenever(repo.conversationsFlow()).thenReturn(conversationsFlow)
+        whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
+        whenever(repo.messagesFlow(eq("conv-1")))
+            .thenReturn(flowOf(listOf(MessageDTO(role = "assistant", text = "Hi there"))))
+        viewModel.setPrivateField("repo", repo)
+        viewModel.setPrivateField("isInLocalNewChat", false)
+
+        viewModel.invokeStartData()
+        advanceUntilIdle()
+        conversationsFlow.emit(emptyList())
+        advanceUntilIdle()
+        assertNull(viewModel.uiState.value.currentConversationId)
+
+        conversationsFlow.emit(listOf(Conversation(id = "conv-1", title = "Welcome")))
+        advanceUntilIdle()
+
+        val stateAfterList = viewModel.uiState.value
+        assertEquals(1, stateAfterList.conversations.size)
+        assertEquals("conv-1", stateAfterList.currentConversationId)
+
+        viewModel.selectConversation("conv-1")
+        advanceUntilIdle()
+
+        val messages = viewModel.uiState.value.messages
+        assertEquals(1, messages.size)
+        assertEquals(ChatType.AI, messages.first().type)
+      }
+
+  @Test
+  fun startData_withNoRemoteConversations_keeps_null_selection() =
+      runTest(dispatcher) {
+        val viewModel = HomeViewModel()
+        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+        viewModel.setPrivateField("auth", auth)
+
+        val repo = mock<ConversationRepository>()
+        val conversationsFlow = MutableSharedFlow<List<Conversation>>(replay = 1)
+        whenever(repo.conversationsFlow()).thenReturn(conversationsFlow)
+        whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
+        viewModel.setPrivateField("repo", repo)
+        viewModel.setPrivateField("isInLocalNewChat", false)
+
+        viewModel.invokeStartData()
+        advanceUntilIdle()
+        conversationsFlow.emit(emptyList())
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.currentConversationId)
+      }
+
+  @Test
+  fun sendMessage_signedIn_createsConversation_and_updates_title() =
+      runTest(dispatcher) {
+        val viewModel = HomeViewModel()
+        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+        viewModel.setPrivateField("auth", auth)
+
+        val repo = mock<ConversationRepository>()
+        whenever(repo.conversationsFlow()).thenReturn(MutableSharedFlow())
+        whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
+        runBlocking { whenever(repo.startNewConversation(any())).thenReturn("generated-id") }
+        runBlocking { whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit) }
+        runBlocking { whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit) }
+        viewModel.setPrivateField("repo", repo)
+
+        val functions = mock<FirebaseFunctions>()
+        val answerCallable = mock<HttpsCallableReference>()
+        val titleCallable = mock<HttpsCallableReference>()
+        val answerResult = mock<HttpsCallableResult>()
+        val titleResult = mock<HttpsCallableResult>()
+        whenever(answerResult.getData()).thenReturn(mapOf("reply" to "Assistant answer"))
+        whenever(titleResult.getData()).thenReturn(mapOf("title" to "Better Title"))
+        whenever(functions.getHttpsCallable("answerWithRagFn")).thenReturn(answerCallable)
+        whenever(functions.getHttpsCallable("generateTitleFn")).thenReturn(titleCallable)
+        whenever(answerCallable.call(any<Map<String, Any?>>()))
+            .thenReturn(Tasks.forResult(answerResult))
+        whenever(titleCallable.call(any<Map<String, Any?>>()))
+            .thenReturn(Tasks.forResult(titleResult))
+        viewModel.setFunctions(functions)
+
+        viewModel.updateMessageDraft("First question about Kotlin")
+        viewModel.sendMessage()
+        advanceUntilIdle()
+
+        runBlocking { verify(repo).startNewConversation(any()) }
+        runBlocking {
+          verify(repo).appendMessage("generated-id", "user", "First question about Kotlin")
+        }
+        runBlocking { verify(repo).appendMessage("generated-id", "assistant", "Assistant answer") }
+        runBlocking { verify(repo).updateConversationTitle("generated-id", "Better Title") }
+        assertEquals("generated-id", viewModel.uiState.value.currentConversationId)
+      }
+
+  @Test
+  fun sendMessage_signedIn_handles_title_generation_failure() =
+      runTest(dispatcher) {
+        val viewModel = HomeViewModel()
+        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+        viewModel.setPrivateField("auth", auth)
+
+        val repo = mock<ConversationRepository>()
+        whenever(repo.conversationsFlow()).thenReturn(MutableSharedFlow())
+        whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
+        runBlocking { whenever(repo.startNewConversation(any())).thenReturn("generated-id") }
+        runBlocking { whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit) }
+        viewModel.setPrivateField("repo", repo)
+
+        val functions = mock<FirebaseFunctions>()
+        val answerCallable = mock<HttpsCallableReference>()
+        val titleCallable = mock<HttpsCallableReference>()
+        val answerResult = mock<HttpsCallableResult>()
+        whenever(answerResult.getData()).thenReturn(mapOf("reply" to "Assistant answer"))
+        whenever(functions.getHttpsCallable("answerWithRagFn")).thenReturn(answerCallable)
+        whenever(functions.getHttpsCallable("generateTitleFn")).thenReturn(titleCallable)
+        whenever(answerCallable.call(any<Map<String, Any?>>()))
+            .thenReturn(Tasks.forResult(answerResult))
+        whenever(titleCallable.call(any<Map<String, Any?>>()))
+            .thenReturn(Tasks.forException(RuntimeException("boom")))
+        viewModel.setFunctions(functions)
+
+        viewModel.updateMessageDraft("Another question")
+        viewModel.sendMessage()
+        advanceUntilIdle()
+
+        runBlocking { verify(repo).startNewConversation(any()) }
+        runBlocking { verify(repo).appendMessage("generated-id", "user", "Another question") }
+        runBlocking { verify(repo).appendMessage("generated-id", "assistant", "Assistant answer") }
+        runBlocking { verify(repo, never()).updateConversationTitle(any(), any()) }
+      }
+
+  @Test
+  fun deleteCurrentConversation_auth_not_ready_hides_confirmation() =
+      runTest(dispatcher) {
+        val viewModel = HomeViewModel()
+        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+        viewModel.setPrivateField("auth", auth)
+        val repo = mock<ConversationRepository>()
+        runBlocking {
+          whenever(repo.deleteConversation("conv-1")).thenThrow(AuthNotReadyException())
+        }
+        viewModel.setPrivateField("repo", repo)
+
+        val field = HomeViewModel::class.java.getDeclaredField("_uiState")
+        field.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        val stateFlow = field.get(viewModel) as MutableStateFlow<HomeUiState>
+        stateFlow.value =
+            stateFlow.value.copy(currentConversationId = "conv-1", showDeleteConfirmation = true)
+
+        viewModel.deleteCurrentConversation()
+        advanceUntilIdle()
+
+        runBlocking { verify(repo).deleteConversation("conv-1") }
+        assertFalse(viewModel.uiState.value.showDeleteConfirmation)
       }
 }
