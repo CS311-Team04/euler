@@ -138,26 +138,3 @@ private fun LeadingThinkingDot() {
       tonalElevation = 0.dp,
       shadowElevation = 0.dp) {}
 }
-
-/*
-private fun BlinkingCursorLegacy() {
-  val transition = rememberInfiniteTransition(label = "cursor")
-  val alpha by transition.animateFloat(
-      initialValue = 0.15f,
-      targetValue = 0.9f,
-      animationSpec =
-          infiniteRepeatable(
-              animation = tween(durationMillis = 720, easing = FastOutSlowInEasing),
-              repeatMode = RepeatMode.Reverse),
-      label = "cursorAlpha")
-  Box(
-      modifier =
-          Modifier.padding(top = 4.dp).size(width = 12.dp, height = 16.dp).testTag("chat_ai_cursor"),
-      contentAlignment = Alignment.Center) {
-        Box(
-            modifier =
-                Modifier.fillMaxSize().background(
-                    color = Color.White.copy(alpha = alpha), shape = RoundedCornerShape(2.dp)))
-      }
-}
- */

@@ -8,7 +8,6 @@ import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
 import com.google.firebase.functions.FirebaseFunctions
 import java.util.UUID
-import kotlin.coroutines.coroutineContext
 import kotlin.getValue
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -124,29 +123,6 @@ class HomeViewModel : ViewModel() {
             streamingSequence = current.streamingSequence + 1)
 
     startStreaming(question = msg, messageId = aiMessageId)
-  }
-
-  fun stopGenerating() {
-    val currentId = _uiState.value.streamingMessageId ?: return
-    userCancelledStream = true
-    activeStreamJob?.cancel()
-
-    _uiState.update { state ->
-      val updated =
-          state.messages.map { message ->
-            if (message.id == currentId) {
-              val finalText = if (message.text.isBlank()) "Réponse interrompue." else message.text
-              message.copy(text = finalText, isThinking = false)
-            } else {
-              message
-            }
-          }
-      state.copy(
-          messages = updated,
-          streamingMessageId = null,
-          isSending = false,
-          streamingSequence = state.streamingSequence + 1)
-    }
   }
 
   private fun startStreaming(question: String, messageId: String) {
@@ -265,9 +241,17 @@ class HomeViewModel : ViewModel() {
 
   /** Clear the conversation. */
   fun clearChat() {
-    stopGenerating()
-    _uiState.value =
-        _uiState.value.copy(messages = emptyList(), streamingMessageId = null, isSending = false)
+    userCancelledStream = true
+    activeStreamJob?.cancel()
+    activeStreamJob = null
+    _uiState.update { state ->
+      state.copy(
+          messages = emptyList(),
+          streamingMessageId = null,
+          isSending = false,
+          streamingSequence = state.streamingSequence + 1)
+    }
+    userCancelledStream = false
   }
 
   /** Show/Hide the delete confirmation modal. */
