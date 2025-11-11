@@ -37,7 +37,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.answerWithRagHttp = exports.indexChunksHttp = exports.answerWithRagFn = exports.indexChunksFn = exports.ping = void 0;
+exports.answerWithRagHttp = exports.indexChunksHttp = exports.answerWithRagFn = exports.indexChunksFn = exports.ping = exports.onMessageCreate = void 0;
 exports.apertusChatFnCore = apertusChatFnCore;
 exports.indexChunksCore = indexChunksCore;
 exports.answerWithRagCore = answerWithRagCore;
@@ -48,6 +48,7 @@ const logger = __importStar(require("firebase-functions/logger"));
 const openai_1 = __importDefault(require("openai"));
 const node_crypto_1 = require("node:crypto");
 const functions = __importStar(require("firebase-functions/v1"));
+const firebase_admin_1 = __importDefault(require("firebase-admin"));
 /* ---------- helpers ---------- */
 function withV1(url) {
     const u = (url ?? "").trim();
@@ -78,6 +79,11 @@ const chatClient = new openai_1.default({
     baseURL: withV1(process.env.OPENAI_BASE_URL),
     defaultHeaders: { "User-Agent": "euler-mvp/1.0 (genkit-functions)" },
 });
+// Firebase Admin (Firestore)
+if (!firebase_admin_1.default.apps.length) {
+    firebase_admin_1.default.initializeApp();
+}
+const db = firebase_admin_1.default.firestore();
 // Embeddings = Jina
 const EMBED_URL = withV1(process.env.EMBED_BASE_URL) + "/embeddings";
 const EMBED_KEY = process.env.EMBED_API_KEY;
@@ -280,7 +286,7 @@ async function indexChunksCore({ chunks }) {
     logger.info("indexChunks", { count: chunks.length, dim });
     return { count: chunks.length, dim };
 }
-async function answerWithRagCore({ question, topK, model }) {
+async function answerWithRagCore({ question, topK, model, summary }) {
     const [queryVec] = await embedInBatches([question], 1, 0);
     // server-side hybrid search
     const raw = await qdrantSearchHybrid(queryVec, question, Math.max(topK ?? 0, MAX_CANDIDATES));
@@ -318,7 +324,10 @@ async function answerWithRagCore({ question, topK, model }) {
         const src = c.url ? `\nSource: ${c.url}` : "";
         return `${head}\n${c.text}${src}`;
     }).join("\n\n");
+    // optional rolling summary (kept concise)
+    const trimmedSummary = (summary ?? "").toString().trim().slice(0, 1200);
     const prompt = [
+        trimmedSummary ? `Résumé de la conversation:\n${trimmedSummary}\n` : "",
         "Tu es un assistant concis. Utilise le contexte fourni (plusieurs extraits) et cite les indices [1], [2], etc.",
         context ? `\nContexte:\n${context}\n` : "\n(Contexte vide)\n",
         `Question: ${question}`,
@@ -335,6 +344,94 @@ async function answerWithRagCore({ question, topK, model }) {
         sources: chosen.map((c, i) => ({ idx: i + 1, title: c.title, url: c.url, score: c.score })),
     };
 }
+function clampText(s, max = 1200) {
+    const t = (s ?? "").toString();
+    if (t.length <= max)
+        return t;
+    return t.slice(0, max);
+}
+async function buildRollingSummary({ priorSummary, recentTurns, }) {
+    // Keep inputs short and deterministic
+    const sys = "Tu maintiens un résumé concis d'une conversation entre un utilisateur et un assistant. " +
+        "Mets à jour le résumé pour refléter les points et objectifs clés, en évitant les détails triviaux. " +
+        "Garde les informations factuelles importantes, intentions, préférences, et décisions. " +
+        "Retourne un paragraphe court (max ~10 lignes).";
+    const parts = [];
+    parts.push({ role: "system", content: sys });
+    if (priorSummary) {
+        parts.push({
+            role: "user",
+            content: `Résumé précédent:\n${clampText(priorSummary, 800)}`,
+        });
+    }
+    // Include the last few turns for recency; cap to ~8 turns to be safe
+    const turns = recentTurns.slice(-8);
+    const recentStr = turns
+        .map((t) => (t.role === "user" ? `Utilisateur: ${t.content}` : `Assistant: ${t.content}`))
+        .join("\n");
+    parts.push({ role: "user", content: `Nouveaux échanges:\n${clampText(recentStr, 1500)}` });
+    parts.push({
+        role: "user",
+        content: "Mets à jour le résumé précédent en incorporant ces échanges récents. " +
+            "Ne répète pas le texte des messages, ne liste pas de sources RAG. Sois factuel et synthétique.",
+    });
+    const modelId = process.env.APERTUS_SUMMARY_MODEL_ID || process.env.APERTUS_MODEL_ID;
+    const resp = await chatClient.chat.completions.create({
+        model: modelId,
+        messages: parts,
+        temperature: 0.1,
+        max_tokens: 220,
+    });
+    const updated = (resp.choices?.[0]?.message?.content ?? "").trim();
+    return clampText(updated, 1200);
+}
+exports.onMessageCreate = functions.firestore
+    .document("users/{uid}/conversations/{cid}/messages/{mid}")
+    .onCreate(async (snap, ctx) => {
+    try {
+        const data = snap.data();
+        const content = (data?.content ?? "").toString().trim();
+        const role = (data?.role ?? "").toString();
+        if (!content || !role || data?.summary) {
+            return;
+        }
+        const { uid, cid, mid } = ctx.params;
+        const messagesCol = db
+            .collection("users").doc(uid)
+            .collection("conversations").doc(cid)
+            .collection("messages");
+        // Load recent window in ascending order
+        const recentSnap = await messagesCol.orderBy("createdAt", "asc").limitToLast(20).get();
+        const recentDocs = recentSnap.docs;
+        // Build prior summary from the most recent message BEFORE current that has one
+        let priorSummary;
+        for (let i = recentDocs.length - 1; i >= 0; i--) {
+            const d = recentDocs[i];
+            if (d.id === mid) {
+                // skip current; continue scanning earlier docs
+                continue;
+            }
+            const sd = d.data();
+            if (typeof sd?.summary === "string" && sd.summary.trim()) {
+                priorSummary = sd.summary;
+                break;
+            }
+        }
+        // Extract recent turns (role/content) from the window
+        const recentTurns = recentDocs.map((d) => {
+            const x = d.data();
+            const r = (x?.role ?? "").toString();
+            const c = (x?.content ?? "").toString();
+            return { role: r === "assistant" ? "assistant" : "user", content: c };
+        });
+        const summary = await buildRollingSummary({ priorSummary, recentTurns });
+        await snap.ref.update({ summary });
+        logger.info("summary.updated", { uid, cid, mid, len: summary.length });
+    }
+    catch (e) {
+        logger.error("summary.failed", { error: String(e) });
+    }
+});
 /* =========================================================
  *                EXPORTS: callable + HTTP twins
  * ======================================================= */
@@ -354,9 +451,10 @@ exports.answerWithRagFn = functions.https.onCall(async (data) => {
     const question = String(data?.question || "").trim();
     const topK = Number(data?.topK ?? 5);
     const model = data?.model;
+    const summary = typeof data?.summary === "string" ? data.summary : undefined;
     if (!question)
         throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
-    return await answerWithRagCore({ question, topK, model });
+    return await answerWithRagCore({ question, topK, model, summary });
 });
 // HTTP endpoints (for Python)
 const INDEX_API_KEY = process.env.INDEX_API_KEY || ""; // set in functions/.env

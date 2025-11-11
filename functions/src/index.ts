@@ -8,6 +8,7 @@ import * as logger from "firebase-functions/logger";
 import OpenAI from "openai";
 import { randomUUID } from "node:crypto";
 import * as functions from "firebase-functions/v1";
+import admin from "firebase-admin";
 
 /* ---------- helpers ---------- */
 function withV1(url?: string): string {
@@ -36,6 +37,12 @@ const chatClient = new OpenAI({
   baseURL: withV1(process.env.OPENAI_BASE_URL),
   defaultHeaders: { "User-Agent": "euler-mvp/1.0 (genkit-functions)" },
 });
+
+// Firebase Admin (Firestore)
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+const db = admin.firestore();
 
 // Embeddings = Jina
 const EMBED_URL = withV1(process.env.EMBED_BASE_URL) + "/embeddings";
@@ -293,9 +300,9 @@ export async function indexChunksCore({ chunks }: IndexChunksInput) {
 /* =========================================================
  *                ANSWER WITH RAG
  * ======================================================= */
-type AnswerWithRagInput = { question: string; topK?: number; model?: string };
+type AnswerWithRagInput = { question: string; topK?: number; model?: string; summary?: string };
 
-export async function answerWithRagCore({ question, topK, model }: AnswerWithRagInput) {
+export async function answerWithRagCore({ question, topK, model, summary }: AnswerWithRagInput) {
   const [queryVec] = await embedInBatches([question], 1, 0);
 
   // server-side hybrid search
@@ -337,7 +344,12 @@ export async function answerWithRagCore({ question, topK, model }: AnswerWithRag
     return `${head}\n${c.text}${src}`;
   }).join("\n\n");
 
+  // optional rolling summary (kept concise)
+  const trimmedSummary =
+    (summary ?? "").toString().trim().slice(0, 1200);
+
   const prompt = [
+    trimmedSummary ? `Résumé de la conversation:\n${trimmedSummary}\n` : "",
     "Tu es un assistant concis. Utilise le contexte fourni (plusieurs extraits) et cite les indices [1], [2], etc.",
     context ? `\nContexte:\n${context}\n` : "\n(Contexte vide)\n",
     `Question: ${question}`,
@@ -358,11 +370,121 @@ export async function answerWithRagCore({ question, topK, model }: AnswerWithRag
 }
 
 /* =========================================================
+ *                ROLLING SUMMARY (Firestore)
+ * ======================================================= */
+
+type ChatTurn = { role: "user" | "assistant"; content: string };
+
+function clampText(s: string | undefined | null, max = 1200): string {
+  const t = (s ?? "").toString();
+  if (t.length <= max) return t;
+  return t.slice(0, max);
+}
+
+async function buildRollingSummary({
+  priorSummary,
+  recentTurns,
+}: {
+  priorSummary?: string;
+  recentTurns: ChatTurn[];
+}): Promise<string> {
+  // Keep inputs short and deterministic
+  const sys =
+    "Tu maintiens un résumé concis d'une conversation entre un utilisateur et un assistant. " +
+    "Mets à jour le résumé pour refléter les points et objectifs clés, en évitant les détails triviaux. " +
+    "Garde les informations factuelles importantes, intentions, préférences, et décisions. " +
+    "Retourne un paragraphe court (max ~10 lignes).";
+
+  const parts: Array<{ role: "system" | "user" | "assistant"; content: string }> = [];
+  parts.push({ role: "system", content: sys });
+  if (priorSummary) {
+    parts.push({
+      role: "user",
+      content: `Résumé précédent:\n${clampText(priorSummary, 800)}`,
+    });
+  }
+  // Include the last few turns for recency; cap to ~8 turns to be safe
+  const turns = recentTurns.slice(-8);
+  const recentStr = turns
+    .map((t) => (t.role === "user" ? `Utilisateur: ${t.content}` : `Assistant: ${t.content}`))
+    .join("\n");
+  parts.push({ role: "user", content: `Nouveaux échanges:\n${clampText(recentStr, 1500)}` });
+  parts.push({
+    role: "user",
+    content:
+      "Mets à jour le résumé précédent en incorporant ces échanges récents. " +
+      "Ne répète pas le texte des messages, ne liste pas de sources RAG. Sois factuel et synthétique.",
+  });
+
+  const modelId = process.env.APERTUS_SUMMARY_MODEL_ID || process.env.APERTUS_MODEL_ID!;
+  const resp = await chatClient.chat.completions.create({
+    model: modelId,
+    messages: parts,
+    temperature: 0.1,
+    max_tokens: 220,
+  });
+  const updated = (resp.choices?.[0]?.message?.content ?? "").trim();
+  return clampText(updated, 1200);
+}
+
+export const onMessageCreate = functions.firestore
+  .document("users/{uid}/conversations/{cid}/messages/{mid}")
+  .onCreate(async (snap: functions.firestore.DocumentSnapshot, ctx: functions.EventContext) => {
+    try {
+      const data = snap.data() as any;
+      const content = (data?.content ?? "").toString().trim();
+      const role = (data?.role ?? "").toString();
+      if (!content || !role || data?.summary) {
+        return;
+      }
+
+      const { uid, cid, mid } = ctx.params as Record<string, string>;
+      const messagesCol = db
+        .collection("users").doc(uid)
+        .collection("conversations").doc(cid)
+        .collection("messages");
+
+      // Load recent window in ascending order
+      const recentSnap = await messagesCol.orderBy("createdAt", "asc").limitToLast(20).get();
+      const recentDocs = recentSnap.docs;
+
+      // Build prior summary from the most recent message BEFORE current that has one
+      let priorSummary: string | undefined;
+      for (let i = recentDocs.length - 1; i >= 0; i--) {
+        const d: admin.firestore.QueryDocumentSnapshot = recentDocs[i] as any;
+        if (d.id === mid) {
+          // skip current; continue scanning earlier docs
+          continue;
+        }
+        const sd = d.data() as any;
+        if (typeof sd?.summary === "string" && sd.summary.trim()) {
+          priorSummary = sd.summary;
+          break;
+        }
+      }
+
+      // Extract recent turns (role/content) from the window
+      const recentTurns: ChatTurn[] = recentDocs.map((d: admin.firestore.QueryDocumentSnapshot) => {
+        const x = d.data() as any;
+        const r = (x?.role ?? "").toString() as "user" | "assistant";
+        const c = (x?.content ?? "").toString();
+        return { role: r === "assistant" ? "assistant" : "user", content: c };
+      });
+
+      const summary = await buildRollingSummary({ priorSummary, recentTurns });
+      await snap.ref.update({ summary });
+      logger.info("summary.updated", { uid, cid, mid, len: summary.length });
+    } catch (e: any) {
+      logger.error("summary.failed", { error: String(e) });
+    }
+  });
+
+/* =========================================================
  *                EXPORTS: callable + HTTP twins
  * ======================================================= */
 
 // ping
-export const ping = functions.https.onRequest((_req, res) => {
+export const ping = functions.https.onRequest((_req: functions.https.Request, res: functions.Response<any>) => {
   res.status(200).send("pong");
 });
 
@@ -379,8 +501,9 @@ export const answerWithRagFn = functions.https.onCall(async (data: AnswerWithRag
   const question = String(data?.question || "").trim();
   const topK = Number(data?.topK ?? 5);
   const model = data?.model;
+  const summary = typeof data?.summary === "string" ? data.summary : undefined;
   if (!question) throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
-  return await answerWithRagCore({ question, topK, model });
+  return await answerWithRagCore({ question, topK, model, summary });
 });
 
 // HTTP endpoints (for Python)
@@ -395,7 +518,7 @@ function checkKey(req: functions.https.Request) {
   }
 }
 
-export const indexChunksHttp = functions.https.onRequest(async (req, res) => {
+export const indexChunksHttp = functions.https.onRequest(async (req: functions.https.Request, res: functions.Response<any>) => {
   try {
     if (req.method !== "POST") {
       res.status(405).end();
@@ -411,7 +534,7 @@ export const indexChunksHttp = functions.https.onRequest(async (req, res) => {
   }
 });
 
-export const answerWithRagHttp = functions.https.onRequest(async (req, res) => {
+export const answerWithRagHttp = functions.https.onRequest(async (req: functions.https.Request, res: functions.Response<any>) => {
   try {
     if (req.method !== "POST") {
       res.status(405).end();
