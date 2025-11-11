@@ -10,8 +10,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -52,30 +52,27 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
   LaunchedEffect(authState) {
     val currentState = authState
     val command = resolveAuthCommand(currentState, currentDestination)
-      executeAuthCommand(
-          command,
-          startMicrosoftSignIn = {
-            MicrosoftAuth.signIn(
-                activity = activity,
-                onSuccess = { authViewModel.onAuthenticationSuccess() },
-                onError = { exception ->
-                  val errorMessage = buildAuthenticationErrorMessage(
-                      currentState,
-                      exception.message ?: "Authentication failed"
-                  )
-                  authViewModel.onAuthenticationError(errorMessage)
-                }
-            )
-          },
-          navigateHome = {
-            nav.navigate(Routes.Home) {
-              popUpTo(Routes.SignIn) { inclusive = true }
-              launchSingleTop = true
-              // important pour éviter de restaurer un ancien état de Home
-              restoreState = false
-            }
+    executeAuthCommand(
+        command,
+        startMicrosoftSignIn = {
+          MicrosoftAuth.signIn(
+              activity = activity,
+              onSuccess = { authViewModel.onAuthenticationSuccess() },
+              onError = { exception ->
+                val errorMessage =
+                    buildAuthenticationErrorMessage(
+                        currentState, exception.message ?: "Authentication failed")
+                authViewModel.onAuthenticationError(errorMessage)
+              })
+        },
+        navigateHome = {
+          nav.navigate(Routes.Home) {
+            popUpTo(Routes.SignIn) { inclusive = true }
+            launchSingleTop = true
+            // important pour éviter de restaurer un ancien état de Home
+            restoreState = false
           }
-      )
+        })
   }
 
   NavHost(
@@ -153,8 +150,7 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
                   }
                 },
                 onSettingsClick = { nav.navigate(Routes.Settings) },
-                openDrawerOnStart = true
-            )
+                openDrawerOnStart = true)
           }
 
           // Settings
