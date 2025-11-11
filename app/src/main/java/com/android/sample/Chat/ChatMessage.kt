@@ -1,18 +1,27 @@
 package com.android.sample.Chat
 
 import android.annotation.SuppressLint
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -46,6 +55,7 @@ import androidx.compose.ui.unit.sp
 fun ChatMessage(
     message: ChatUIModel,
     modifier: Modifier = Modifier,
+    isStreaming: Boolean = false,
     userBubbleBg: Color = Color(0xFF2B2B2B),
     userBubbleText: Color = Color.White,
     aiText: Color = Color(0xFFEDEDED),
@@ -83,12 +93,71 @@ fun ChatMessage(
   } else {
     // AI: full-width plain text
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
-      Text(
-          text = message.text,
-          color = aiText,
-          style = MaterialTheme.typography.bodyMedium,
-          lineHeight = 20.sp,
-          modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+      if (isStreaming && message.text.isEmpty()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+              LeadingThinkingDot()
+              Text(
+                  text = message.text,
+                  color = aiText,
+                  style = MaterialTheme.typography.bodyMedium,
+                  lineHeight = 20.sp,
+                  modifier = Modifier.weight(1f, fill = true).testTag("chat_ai_text"))
+            }
+      } else {
+        Text(
+            text = message.text,
+            color = aiText,
+            style = MaterialTheme.typography.bodyMedium,
+            lineHeight = 20.sp,
+            modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+      }
     }
   }
 }
+
+@Composable
+private fun LeadingThinkingDot() {
+  val transition = rememberInfiniteTransition(label = "cursor")
+  val alpha by
+      transition.animateFloat(
+          initialValue = 0.25f,
+          targetValue = 1f,
+          animationSpec =
+              infiniteRepeatable(
+                  animation = tween(durationMillis = 600, easing = FastOutSlowInEasing),
+                  repeatMode = RepeatMode.Reverse),
+          label = "cursorAlpha")
+
+  Surface(
+      modifier = Modifier.size(10.dp).testTag("chat_ai_cursor"),
+      color = Color.White.copy(alpha = alpha),
+      shape = CircleShape,
+      tonalElevation = 0.dp,
+      shadowElevation = 0.dp) {}
+}
+
+/*
+private fun BlinkingCursorLegacy() {
+  val transition = rememberInfiniteTransition(label = "cursor")
+  val alpha by transition.animateFloat(
+      initialValue = 0.15f,
+      targetValue = 0.9f,
+      animationSpec =
+          infiniteRepeatable(
+              animation = tween(durationMillis = 720, easing = FastOutSlowInEasing),
+              repeatMode = RepeatMode.Reverse),
+      label = "cursorAlpha")
+  Box(
+      modifier =
+          Modifier.padding(top = 4.dp).size(width = 12.dp, height = 16.dp).testTag("chat_ai_cursor"),
+      contentAlignment = Alignment.Center) {
+        Box(
+            modifier =
+                Modifier.fillMaxSize().background(
+                    color = Color.White.copy(alpha = alpha), shape = RoundedCornerShape(2.dp)))
+      }
+}
+ */
