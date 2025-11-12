@@ -13,7 +13,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -189,16 +188,15 @@ class HomeViewModel(
   }
 
   private suspend fun simulateStreamingFromText(messageId: String, fullText: String) {
-    withContext(Dispatchers.Default) {
-      val pattern = Regex("\\S+\\s*")
-      val parts = pattern.findAll(fullText).map { it.value }.toList().ifEmpty { listOf(fullText) }
-      for (chunk in parts) {
-        coroutineContext.ensureActive()
-        appendStreamingChunk(messageId, chunk)
-        delay(60)
-      }
-      markMessageFinished(messageId)
+    // Use current dispatcher instead of Dispatchers.Default to allow test control
+    val pattern = Regex("\\S+\\s*")
+    val parts = pattern.findAll(fullText).map { it.value }.toList().ifEmpty { listOf(fullText) }
+    for (chunk in parts) {
+      // delay() already checks for cancellation, so ensureActive() is not strictly necessary
+      appendStreamingChunk(messageId, chunk)
+      delay(60)
     }
+    markMessageFinished(messageId)
   }
 
   private suspend fun clearStreamingState(messageId: String) =

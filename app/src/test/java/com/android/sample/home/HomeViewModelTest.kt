@@ -6,8 +6,11 @@ import com.android.sample.llm.FakeLlmClient
 import com.android.sample.util.MainDispatcherRule
 import java.util.UUID
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Rule
@@ -32,6 +35,131 @@ class HomeViewModelTest {
         }
     stateFlow.value = current.copy(messages = messages)
   }
+
+  @Test
+  fun sendMessage_success_updates_state() =
+      runTest(UnconfinedTestDispatcher()) {
+        val fakeClient = FakeLlmClient().apply { nextReply = "Bonjour" }
+        val viewModel = HomeViewModel(fakeClient)
+
+        viewModel.updateMessageDraft("Salut ?")
+        viewModel.sendMessage()
+
+        // Wait for streaming to complete - simulateStreamingFromText uses Dispatchers.Default
+        // which is not controlled by test dispatcher, so we need to wait for real completion
+        var attempts = 0
+        while ((viewModel.uiState.value.streamingMessageId != null ||
+            viewModel.uiState.value.isSending) && attempts < 500) {
+          delay(20) // Small real delay since we can't control Dispatchers.Default
+          attempts++
+        }
+
+        val state = viewModel.uiState.value
+        assertTrue(state.messages.any { it.type == ChatType.USER && it.text == "Salut ?" })
+        val aiMessage = state.messages.find { it.type == ChatType.AI }
+        assertNotNull("AI message should be present", aiMessage)
+        assertTrue("AI message should contain 'Bonjour'", aiMessage!!.text.contains("Bonjour"))
+        assertFalse("isSending should be false", state.isSending)
+        assertNull("streamingMessageId should be null", state.streamingMessageId)
+      }
+
+  @Test
+  fun sendMessage_with_error_shows_error_message() =
+      runTest(UnconfinedTestDispatcher()) {
+        val fakeClient = FakeLlmClient().apply { failure = IllegalStateException("Network error") }
+        val viewModel = HomeViewModel(fakeClient)
+
+        viewModel.updateMessageDraft("Test")
+        viewModel.sendMessage()
+
+        var attempts = 0
+        while ((viewModel.uiState.value.streamingMessageId != null ||
+            viewModel.uiState.value.isSending) && attempts < 200) {
+          delay(10)
+          attempts++
+        }
+
+        val state = viewModel.uiState.value
+        assertTrue(state.messages.any { it.type == ChatType.USER && it.text == "Test" })
+        val aiMessage = state.messages.find { it.type == ChatType.AI }
+        assertNotNull(aiMessage)
+        assertTrue(
+            aiMessage!!.text.contains("Erreur") ||
+                aiMessage.text.contains("error", ignoreCase = true))
+        assertFalse(state.isSending)
+        assertNull(state.streamingMessageId)
+      }
+
+  @Test
+  fun sendMessage_with_error_null_message_shows_default_error() =
+      runTest(UnconfinedTestDispatcher()) {
+        val fakeClient = FakeLlmClient().apply { failure = Exception() }
+        val viewModel = HomeViewModel(fakeClient)
+
+        viewModel.updateMessageDraft("Test")
+        viewModel.sendMessage()
+
+        var attempts = 0
+        while ((viewModel.uiState.value.streamingMessageId != null ||
+            viewModel.uiState.value.isSending) && attempts < 200) {
+          delay(10)
+          attempts++
+        }
+
+        val state = viewModel.uiState.value
+        assertTrue(state.messages.any { it.type == ChatType.USER && it.text == "Test" })
+        val aiMessage = state.messages.find { it.type == ChatType.AI }
+        assertNotNull(aiMessage)
+        assertTrue(aiMessage!!.text.contains("request failed") || aiMessage.text.contains("Erreur"))
+        assertFalse(state.isSending)
+        assertNull(state.streamingMessageId)
+      }
+
+  @Test
+  fun sendMessage_with_concurrent_send_ignores_second() =
+      runTest(UnconfinedTestDispatcher()) {
+        val fakeClient = FakeLlmClient().apply { nextReply = "Reply" }
+        val viewModel = HomeViewModel(fakeClient)
+
+        viewModel.updateMessageDraft("First")
+        viewModel.sendMessage()
+
+        // Check that isSending is true immediately after first send
+        assertTrue(
+            viewModel.uiState.value.isSending || viewModel.uiState.value.streamingMessageId != null)
+
+        // Try to send again immediately (should be ignored because isSending/streaming is active)
+        viewModel.updateMessageDraft("Second")
+        viewModel.sendMessage()
+
+        var attempts = 0
+        while ((viewModel.uiState.value.streamingMessageId != null ||
+            viewModel.uiState.value.isSending) && attempts < 200) {
+          delay(10)
+          attempts++
+        }
+
+        val state = viewModel.uiState.value
+        // Only first message should be sent
+        assertEquals(1, state.messages.count { it.type == ChatType.USER })
+        assertFalse(state.isSending)
+        assertNull(state.streamingMessageId)
+      }
+
+  @Test
+  fun sendMessage_clears_draft_after_sending() =
+      runTest(testDispatcher) {
+        val fakeClient = FakeLlmClient().apply { nextReply = "Reply" }
+        val viewModel = HomeViewModel(fakeClient)
+
+        viewModel.updateMessageDraft("Test message")
+        viewModel.sendMessage()
+
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("", state.messageDraft)
+      }
 
   @Test
   fun clearChat_empties_messages() =
@@ -73,7 +201,7 @@ class HomeViewModelTest {
   @Test
   fun simulateStreamingFromText_populates_message_and_clears_state() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
         val field = HomeViewModel::class.java.getDeclaredField("_uiState")
         field.isAccessible = true
         @Suppress("UNCHECKED_CAST")
@@ -95,6 +223,13 @@ class HomeViewModelTest {
                 isSending = true)
 
         viewModel.simulateStreamingForTest(aiId, "Bonjour EPFL")
+        advanceUntilIdle()
+        // Wait for streaming to complete - simulateStreamingFromText uses Dispatchers.Default
+        // so we need to advance time enough for all chunks (2 words * 60ms delay + buffer)
+        advanceTimeBy(200)
+        advanceUntilIdle()
+        advanceTimeBy(200)
+        advanceUntilIdle()
 
         val finalState = viewModel.uiState.value
         val aiMessage = finalState.messages.first()

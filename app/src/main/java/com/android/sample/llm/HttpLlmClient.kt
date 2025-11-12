@@ -67,9 +67,14 @@ class HttpLlmClient(
           val body =
               response.body?.string()?.trim()?.takeIf { it.isNotEmpty() }
                   ?: throw IllegalStateException("LLM HTTP response empty body")
+
+          // Parse JSON reply field using regex - simple approach for "reply":"value"
+          val replyPattern = """"reply"\s*:\s*"([^"]*)"""".toRegex()
+          val match = replyPattern.find(body)
           val reply =
-              "\"reply\"\\s*:\\s*\"([^\"]*)\"".toRegex().find(body)?.groupValues?.getOrNull(1)
+              match?.groupValues?.getOrNull(1)
                   ?: throw IllegalStateException("LLM HTTP reply empty")
+
           if (reply.isBlank()) {
             throw IllegalStateException("LLM HTTP reply empty")
           }

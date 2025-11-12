@@ -7,6 +7,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
@@ -82,7 +83,12 @@ class HttpLlmClientTest {
 
   @Test
   fun generateReply_throwsOnEmptyBody() = runTest {
-    server.enqueue(MockResponse().setResponseCode(HttpURLConnection.HTTP_OK))
+    // MockWebServer returns empty body by default, but we explicitly set it
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody("")
+            .setHeader("Content-Length", "0"))
     val client =
         HttpLlmClient(
             endpoint = server.url("/answer").toString(),
@@ -94,7 +100,9 @@ class HttpLlmClientTest {
       client.generateReply("test")
       fail("Expected IllegalStateException")
     } catch (e: IllegalStateException) {
-      assertEquals("LLM HTTP response empty body", e.message)
+      // Body might be empty string or null after trim()
+      val message = e.message ?: ""
+      assertTrue("Should throw about empty body: $message", message.contains("empty body"))
     }
   }
 

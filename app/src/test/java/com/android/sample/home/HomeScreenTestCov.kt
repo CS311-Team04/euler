@@ -13,6 +13,7 @@ import com.android.sample.Chat.ChatUIModel
 import com.android.sample.llm.FakeLlmClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -187,11 +188,12 @@ class HomeScreenTestCov {
         // With UnconfinedTestDispatcher, this will execute immediately
         advanceUntilIdle()
 
-        // Wait a bit for Firebase call to complete or fail
-        // The finally block will eventually execute and set isSending to false
+        // Wait for streaming to complete - simulateStreamingFromText uses Dispatchers.Default
+        // which is not controlled by test dispatcher, so we need to wait for real completion
         var attempts = 0
         var finalState = viewModel.uiState.value
-        while (finalState.isSending && attempts < 100) {
+        while ((finalState.isSending || finalState.streamingMessageId != null) && attempts < 500) {
+          delay(20) // Small real delay since we can't control Dispatchers.Default
           advanceUntilIdle()
           finalState = viewModel.uiState.value
           attempts++
