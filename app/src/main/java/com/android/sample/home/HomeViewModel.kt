@@ -1,5 +1,6 @@
 package com.android.sample.home
 
+import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.sample.BuildConfig
@@ -8,10 +9,15 @@ import com.android.sample.Chat.ChatUIModel
 import com.google.firebase.functions.FirebaseFunctions
 import java.util.UUID
 import kotlin.getValue
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -61,110 +67,213 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    // ---------------------------
-    // UI mutations / state helpers
-    // ---------------------------
+  private var activeStreamJob: Job? = null
+  @Volatile private var userCancelledStream: Boolean = false
 
-    /** Toggle the navigation drawer state. */
-    fun toggleDrawer() {
-        _uiState.value = _uiState.value.copy(isDrawerOpen = !_uiState.value.isDrawerOpen)
-    }
+  // ---------------------------
+  // UI mutations / state helpers
+  // ---------------------------
 
-    /** Control the top-right overflow menu visibility. */
-    fun setTopRightOpen(open: Boolean) {
-        _uiState.value = _uiState.value.copy(isTopRightOpen = open)
-    }
+  /** Toggle the navigation drawer state. */
+  fun toggleDrawer() {
+    _uiState.value = _uiState.value.copy(isDrawerOpen = !_uiState.value.isDrawerOpen)
+  }
 
-    /** Update the current message draft (bound to the input field). */
-    fun updateMessageDraft(text: String) {
-        _uiState.value = _uiState.value.copy(messageDraft = text)
-    }
+  /** Control the top-right overflow menu visibility. */
+  fun setTopRightOpen(open: Boolean) {
+    _uiState.value = _uiState.value.copy(isTopRightOpen = open)
+  }
 
-    /**
-     * Send the current draft:
-     * - Guard against concurrent sends and blank drafts
-     * - Append a USER message immediately
-     * - Call the backend for a response
-     * - Append an AI message (or an error message) on completion
-     */
-    fun sendMessage() {
-        val current = _uiState.value
-        if (current.isSending) return
-        val msg = current.messageDraft.trim()
-        if (msg.isEmpty()) return
+  /** Update the current message draft (bound to the input field). */
+  fun updateMessageDraft(text: String) {
+    _uiState.value = _uiState.value.copy(messageDraft = text)
+  }
 
-        val now = System.currentTimeMillis()
-        val userMsg =
-            ChatUIModel(
-                id = UUID.randomUUID().toString(), text = msg, timestamp = now, type = ChatType.USER)
+  /**
+   * Send the current draft:
+   * - Guard against concurrent sends and blank drafts
+   * - Append a USER message immediately
+   * - Call the backend for a response
+   * - Append an AI message (or an error message) on completion
+   */
+  fun sendMessage() {
+    val current = _uiState.value
+    if (current.isSending || current.streamingMessageId != null) return
+    val msg = current.messageDraft.trim()
+    if (msg.isEmpty()) return
 
-        _uiState.value =
-            current.copy(messages = current.messages + userMsg, messageDraft = "", isSending = true)
+    val now = System.currentTimeMillis()
+    val userMsg =
+        ChatUIModel(
+            id = UUID.randomUUID().toString(), text = msg, timestamp = now, type = ChatType.USER)
+    val aiMessageId = UUID.randomUUID().toString()
+    val placeholder =
+        ChatUIModel(
+            id = aiMessageId,
+            text = "",
+            timestamp = System.currentTimeMillis(),
+            type = ChatType.AI,
+            isThinking = true)
 
+    _uiState.value =
+        current.copy(
+            messages = current.messages + userMsg + placeholder,
+            messageDraft = "",
+            isSending = true,
+            streamingMessageId = aiMessageId,
+            streamingSequence = current.streamingSequence + 1)
+
+    startStreaming(question = msg, messageId = aiMessageId)
+  }
+
+  private fun startStreaming(question: String, messageId: String) {
+    activeStreamJob?.cancel()
+    userCancelledStream = false
+
+    activeStreamJob =
         viewModelScope.launch {
-            try {
-                val bot = callAnswerWithRag(msg)
-                val text = if (bot.url.isNullOrBlank()) bot.reply else bot.reply + "\nSource: " + bot.url
-                val aiMsg =
-                    ChatUIModel(
-                        id = UUID.randomUUID().toString(),
-                        text = text,
-                        timestamp = System.currentTimeMillis(),
-                        type = ChatType.AI)
-                _uiState.value = _uiState.value.copy(messages = _uiState.value.messages + aiMsg)
-            } catch (e: Exception) {
-                val errMsg =
-                    ChatUIModel(
-                        id = UUID.randomUUID().toString(),
-                        text = "Error: ${e.message ?: "request failed"}",
-                        timestamp = System.currentTimeMillis(),
-                        type = ChatType.AI)
-                _uiState.value = _uiState.value.copy(messages = _uiState.value.messages + errMsg)
-            } finally {
-                // Always stop the global thinking indicator.
-                _uiState.value = _uiState.value.copy(isSending = false)
+          try {
+            val reply = withContext(Dispatchers.IO) { callAnswerWithRag(question) }
+            simulateStreamingFromText(messageId, reply.reply)
+          } catch (ce: CancellationException) {
+            if (!userCancelledStream) {
+              setStreamingError(messageId, ce)
             }
+          } catch (t: Throwable) {
+            if (userCancelledStream) return@launch
+            setStreamingError(messageId, t)
+          } finally {
+            clearStreamingState(messageId)
+            activeStreamJob = null
+            userCancelledStream = false
+          }
         }
-    }
+  }
 
-    /** Toggle the connection state of a given EPFL system. */
-    fun toggleSystemConnection(systemId: String) {
-        val updated =
-            _uiState.value.systems.map { s ->
-                if (s.id == systemId) s.copy(isConnected = !s.isConnected) else s
-            }
-        _uiState.value = _uiState.value.copy(systems = updated)
-    }
+  @VisibleForTesting(otherwise = VisibleForTesting.NONE)
+  internal suspend fun simulateStreamingForTest(messageId: String, fullText: String) {
+    simulateStreamingFromText(messageId, fullText)
+    clearStreamingState(messageId)
+  }
 
-    /** Generic loading flag (unrelated to message sending). */
-    fun setLoading(loading: Boolean) {
-        _uiState.value = _uiState.value.copy(isLoading = loading)
-    }
+  private suspend fun appendStreamingChunk(messageId: String, chunk: String) =
+      withContext(Dispatchers.Main) {
+        _uiState.update { state ->
+          val updated =
+              state.messages.map { message ->
+                if (message.id == messageId) {
+                  message.copy(text = message.text + chunk, isThinking = false)
+                } else {
+                  message
+                }
+              }
+          state.copy(
+              messages = updated,
+              streamingMessageId = messageId,
+              streamingSequence = state.streamingSequence + 1)
+        }
+      }
 
-    /** Clear the conversation. */
-    fun clearChat() {
-        _uiState.value = _uiState.value.copy(messages = emptyList())
-    }
+  private suspend fun markMessageFinished(messageId: String) =
+      withContext(Dispatchers.Main) {
+        _uiState.update { state ->
+          val updated =
+              state.messages.map { message ->
+                if (message.id == messageId) message.copy(isThinking = false) else message
+              }
+          state.copy(messages = updated, streamingSequence = state.streamingSequence + 1)
+        }
+      }
 
-    /** Show/Hide the delete confirmation modal. */
-    fun showDeleteConfirmation() {
-        _uiState.value = _uiState.value.copy(showDeleteConfirmation = true)
-    }
+  private suspend fun setStreamingText(messageId: String, text: String) =
+      withContext(Dispatchers.Main) {
+        _uiState.update { state ->
+          val updated =
+              state.messages.map { message ->
+                if (message.id == messageId) message.copy(text = text, isThinking = false)
+                else message
+              }
+          state.copy(messages = updated, streamingSequence = state.streamingSequence + 1)
+        }
+      }
 
-    fun hideDeleteConfirmation() {
-        _uiState.value = _uiState.value.copy(showDeleteConfirmation = false)
-    }
+  private suspend fun setStreamingError(messageId: String, error: Throwable) {
+    val message = error.message?.takeIf { it.isNotBlank() } ?: "request failed"
+    setStreamingText(messageId, "Erreur: $message")
+  }
 
-    /**
-     * Calls the Cloud Function to get a chat reply for the given [question]. Runs on Dispatchers.IO
-     * and returns either the 'reply' string or a fallback.
-     *
-     * @return The assistant reply, or a short fallback string on invalid payload.
-     */
-    private suspend fun callAnswerWithRag(question: String): BotReply =
-        withContext(Dispatchers.IO) {
-            val data = hashMapOf("question" to question) // add "topK"/"model" if needed
-            val result = functions.getHttpsCallable("answerWithRagFn").call(data).await()
+  private suspend fun simulateStreamingFromText(messageId: String, fullText: String) {
+    withContext(Dispatchers.Default) {
+      val pattern = Regex("\\S+\\s*")
+      val parts = pattern.findAll(fullText).map { it.value }.toList().ifEmpty { listOf(fullText) }
+      for (chunk in parts) {
+        coroutineContext.ensureActive()
+        appendStreamingChunk(messageId, chunk)
+        delay(60)
+      }
+      markMessageFinished(messageId)
+    }
+  }
+
+  private suspend fun clearStreamingState(messageId: String) =
+      withContext(Dispatchers.Main) {
+        _uiState.update { state ->
+          if (state.streamingMessageId == messageId) {
+            state.copy(streamingMessageId = null, isSending = false)
+          } else {
+            state.copy(isSending = false)
+          }
+        }
+      }
+
+  /** Toggle the connection state of a given EPFL system. */
+  fun toggleSystemConnection(systemId: String) {
+    val updated =
+        _uiState.value.systems.map { s ->
+          if (s.id == systemId) s.copy(isConnected = !s.isConnected) else s
+        }
+    _uiState.value = _uiState.value.copy(systems = updated)
+  }
+
+  /** Generic loading flag (unrelated to message sending). */
+  fun setLoading(loading: Boolean) {
+    _uiState.value = _uiState.value.copy(isLoading = loading)
+  }
+
+  /** Clear the conversation. */
+  fun clearChat() {
+    userCancelledStream = true
+    activeStreamJob?.cancel()
+    activeStreamJob = null
+    _uiState.update { state ->
+      state.copy(
+          messages = emptyList(),
+          streamingMessageId = null,
+          isSending = false,
+          streamingSequence = state.streamingSequence + 1)
+    }
+    userCancelledStream = false
+  }
+
+  /** Show/Hide the delete confirmation modal. */
+  fun showDeleteConfirmation() {
+    _uiState.value = _uiState.value.copy(showDeleteConfirmation = true)
+  }
+
+  fun hideDeleteConfirmation() {
+    _uiState.value = _uiState.value.copy(showDeleteConfirmation = false)
+  }
+
+  /**
+   * Calls the Cloud Function to get a chat reply for the given [question]. Runs on Dispatchers.IO
+   * and returns either the 'reply' string or a fallback.
+   *
+   * @return The assistant reply, or a short fallback string on invalid payload.
+   */
+  private suspend fun callAnswerWithRag(question: String): BotReply =
+      withContext(Dispatchers.IO) {
+        val data = hashMapOf("question" to question) // add "topK"/"model" if needed
+        val result = functions.getHttpsCallable("answerWithRagFn").call(data).await()
 
             @Suppress("UNCHECKED_CAST")
             val map = result.getData() as? Map<String, Any?> ?: return@withContext BotReply("Invalid response",null)

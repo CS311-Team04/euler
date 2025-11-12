@@ -70,6 +70,41 @@ class HomeViewModelTest {
       }
 
   @Test
+  fun simulateStreamingFromText_populates_message_and_clears_state() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel()
+        val field = HomeViewModel::class.java.getDeclaredField("_uiState")
+        field.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        val stateFlow = field.get(viewModel) as MutableStateFlow<HomeUiState>
+        val aiId = "ai-${System.nanoTime()}"
+        val initial = stateFlow.value
+        stateFlow.value =
+            initial.copy(
+                messages =
+                    listOf(
+                        ChatUIModel(
+                            id = aiId,
+                            text = "",
+                            timestamp = 0L,
+                            type = ChatType.AI,
+                            isThinking = true)),
+                streamingMessageId = aiId,
+                streamingSequence = 0,
+                isSending = true)
+
+        viewModel.simulateStreamingForTest(aiId, "Bonjour EPFL")
+
+        val finalState = viewModel.uiState.value
+        val aiMessage = finalState.messages.first()
+        assertEquals("Bonjour EPFL", aiMessage.text)
+        assertFalse(aiMessage.isThinking)
+        assertNull(finalState.streamingMessageId)
+        assertFalse(finalState.isSending)
+        assertTrue(finalState.streamingSequence > initial.streamingSequence)
+      }
+
+  @Test
   fun toggleDrawer_changes_isDrawerOpen_state() =
       runTest(testDispatcher) {
         val viewModel = HomeViewModel()
