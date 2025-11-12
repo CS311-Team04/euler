@@ -3,7 +3,6 @@ package com.android.sample.screen
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
@@ -47,9 +46,9 @@ class HomeScreenTest {
       openDrawerOnStart: Boolean = false,
       speechHelper: SpeechToTextHelper? = null
   ) {
+    val viewModel = HomeViewModel(FakeLlmClient())
     composeRule.setContent {
       MaterialTheme {
-        val viewModel = remember { HomeViewModel(FakeLlmClient()) }
         HomeScreen(
             modifier = modifier,
             viewModel = viewModel,
