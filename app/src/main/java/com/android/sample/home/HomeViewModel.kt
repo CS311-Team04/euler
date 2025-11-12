@@ -1,5 +1,6 @@
 package com.android.sample.home
 
+import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.sample.Chat.ChatType
@@ -8,10 +9,17 @@ import com.android.sample.llm.FirebaseFunctionsLlmClient
 import com.android.sample.llm.LlmClient
 import java.util.UUID
 import kotlin.getValue
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * HomeViewModel
@@ -44,6 +52,10 @@ class HomeViewModel(
               messages = emptyList()))
   /** Public, read-only UI state. */
   val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+  private var activeStreamJob: Job? = null
+  @Volatile private var userCancelledStream: Boolean = false
+
   // ---------------------------
   // UI mutations / state helpers
   // ---------------------------
@@ -72,7 +84,7 @@ class HomeViewModel(
    */
   fun sendMessage() {
     val current = _uiState.value
-    if (current.isSending) return
+    if (current.isSending || current.streamingMessageId != null) return
     val msg = current.messageDraft.trim()
     if (msg.isEmpty()) return
 
@@ -80,34 +92,125 @@ class HomeViewModel(
     val userMsg =
         ChatUIModel(
             id = UUID.randomUUID().toString(), text = msg, timestamp = now, type = ChatType.USER)
+    val aiMessageId = UUID.randomUUID().toString()
+    val placeholder =
+        ChatUIModel(
+            id = aiMessageId,
+            text = "",
+            timestamp = System.currentTimeMillis(),
+            type = ChatType.AI,
+            isThinking = true)
 
     _uiState.value =
-        current.copy(messages = current.messages + userMsg, messageDraft = "", isSending = true)
+        current.copy(
+            messages = current.messages + userMsg + placeholder,
+            messageDraft = "",
+            isSending = true,
+            streamingMessageId = aiMessageId,
+            streamingSequence = current.streamingSequence + 1)
 
-    viewModelScope.launch {
-      try {
-        val answer = llmClient.generateReply(msg) // Suspends off the main thread.
-        val aiMsg =
-            ChatUIModel(
-                id = UUID.randomUUID().toString(),
-                text = answer,
-                timestamp = System.currentTimeMillis(),
-                type = ChatType.AI)
-        _uiState.value = _uiState.value.copy(messages = _uiState.value.messages + aiMsg)
-      } catch (e: Exception) {
-        val errMsg =
-            ChatUIModel(
-                id = UUID.randomUUID().toString(),
-                text = "Error: ${e.message ?: "request failed"}",
-                timestamp = System.currentTimeMillis(),
-                type = ChatType.AI)
-        _uiState.value = _uiState.value.copy(messages = _uiState.value.messages + errMsg)
-      } finally {
-        // Always stop the global thinking indicator.
-        _uiState.value = _uiState.value.copy(isSending = false)
+    startStreaming(question = msg, messageId = aiMessageId)
+  }
+
+  private fun startStreaming(question: String, messageId: String) {
+    activeStreamJob?.cancel()
+    userCancelledStream = false
+
+    activeStreamJob =
+        viewModelScope.launch {
+          try {
+            val reply = withContext(Dispatchers.IO) { llmClient.generateReply(question) }
+            simulateStreamingFromText(messageId, reply)
+          } catch (ce: CancellationException) {
+            if (!userCancelledStream) {
+              setStreamingError(messageId, ce)
+            }
+          } catch (t: Throwable) {
+            if (userCancelledStream) return@launch
+            setStreamingError(messageId, t)
+          } finally {
+            clearStreamingState(messageId)
+            activeStreamJob = null
+            userCancelledStream = false
+          }
+        }
+  }
+
+  @VisibleForTesting(otherwise = VisibleForTesting.NONE)
+  internal suspend fun simulateStreamingForTest(messageId: String, fullText: String) {
+    simulateStreamingFromText(messageId, fullText)
+    clearStreamingState(messageId)
+  }
+
+  private suspend fun appendStreamingChunk(messageId: String, chunk: String) =
+      withContext(Dispatchers.Main) {
+        _uiState.update { state ->
+          val updated =
+              state.messages.map { message ->
+                if (message.id == messageId) {
+                  message.copy(text = message.text + chunk, isThinking = false)
+                } else {
+                  message
+                }
+              }
+          state.copy(
+              messages = updated,
+              streamingMessageId = messageId,
+              streamingSequence = state.streamingSequence + 1)
+        }
       }
+
+  private suspend fun markMessageFinished(messageId: String) =
+      withContext(Dispatchers.Main) {
+        _uiState.update { state ->
+          val updated =
+              state.messages.map { message ->
+                if (message.id == messageId) message.copy(isThinking = false) else message
+              }
+          state.copy(messages = updated, streamingSequence = state.streamingSequence + 1)
+        }
+      }
+
+  private suspend fun setStreamingText(messageId: String, text: String) =
+      withContext(Dispatchers.Main) {
+        _uiState.update { state ->
+          val updated =
+              state.messages.map { message ->
+                if (message.id == messageId) message.copy(text = text, isThinking = false)
+                else message
+              }
+          state.copy(messages = updated, streamingSequence = state.streamingSequence + 1)
+        }
+      }
+
+  private suspend fun setStreamingError(messageId: String, error: Throwable) {
+    val message = error.message?.takeIf { it.isNotBlank() } ?: "request failed"
+    setStreamingText(messageId, "Erreur: $message")
+  }
+
+  private suspend fun simulateStreamingFromText(messageId: String, fullText: String) {
+    withContext(Dispatchers.Default) {
+      val pattern = Regex("\\S+\\s*")
+      val parts = pattern.findAll(fullText).map { it.value }.toList().ifEmpty { listOf(fullText) }
+      for (chunk in parts) {
+        coroutineContext.ensureActive()
+        appendStreamingChunk(messageId, chunk)
+        delay(60)
+      }
+      markMessageFinished(messageId)
     }
   }
+
+  private suspend fun clearStreamingState(messageId: String) =
+      withContext(Dispatchers.Main) {
+        _uiState.update { state ->
+          if (state.streamingMessageId == messageId) {
+            state.copy(streamingMessageId = null, isSending = false)
+          } else {
+            state.copy(isSending = false)
+          }
+        }
+      }
 
   /** Toggle the connection state of a given EPFL system. */
   fun toggleSystemConnection(systemId: String) {
@@ -125,7 +228,17 @@ class HomeViewModel(
 
   /** Clear the conversation. */
   fun clearChat() {
-    _uiState.value = _uiState.value.copy(messages = emptyList())
+    userCancelledStream = true
+    activeStreamJob?.cancel()
+    activeStreamJob = null
+    _uiState.update { state ->
+      state.copy(
+          messages = emptyList(),
+          streamingMessageId = null,
+          isSending = false,
+          streamingSequence = state.streamingSequence + 1)
+    }
+    userCancelledStream = false
   }
 
   /** Show/Hide the delete confirmation modal. */

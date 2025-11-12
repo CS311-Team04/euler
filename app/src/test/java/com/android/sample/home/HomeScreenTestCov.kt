@@ -59,6 +59,8 @@ class HomeScreenTestCov {
     assertEquals("", state.messageDraft)
     assertFalse(state.systems.isEmpty())
     assertTrue(state.messages.isEmpty())
+    assertNull(state.streamingMessageId)
+    assertEquals(0, state.streamingSequence)
   }
 
   @Test
@@ -175,9 +177,11 @@ class HomeScreenTestCov {
         val userMessage = stateAfterSend.messages.first()
         assertEquals("What is EPFL?", userMessage.text)
         assertEquals(com.android.sample.Chat.ChatType.USER, userMessage.type)
-        // Depending on how fast the Firebase call fails/completes, isSending might already be
-        // false.
-        // Ensure that it was toggled to true at least once by checking the final state later on.
+        // Placeholder AI message should exist while waiting for the coroutine
+        val lastMessage = stateAfterSend.messages.last()
+        if (stateAfterSend.messages.size > initialCount + 1) {
+          assertEquals(com.android.sample.Chat.ChatType.AI, lastMessage.type)
+        }
 
         // Advance time to allow coroutine to complete
         // With UnconfinedTestDispatcher, this will execute immediately
@@ -204,7 +208,6 @@ class HomeScreenTestCov {
         if (finalState.messages.size > initialCount + 1) {
           val lastMessage = finalState.messages.last()
           assertEquals(com.android.sample.Chat.ChatType.AI, lastMessage.type)
-          assertTrue(lastMessage.text.isNotEmpty())
         }
 
         // Note: isSending might still be true if Firebase is taking a long time,
