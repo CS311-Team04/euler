@@ -1,6 +1,12 @@
 package com.android.sample.Chat
 
 import android.annotation.SuppressLint
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -22,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -58,6 +65,7 @@ import com.android.sample.ui.theme.EulerTheme
 fun ChatMessage(
     message: ChatUIModel,
     modifier: Modifier = Modifier,
+    isStreaming: Boolean = false,
     userBubbleBg: Color = Color(0xFF2B2B2B),
     userBubbleText: Color = Color.White,
     aiText: Color = Color(0xFFEDEDED),
@@ -217,6 +225,40 @@ private fun BoxScope.AiVoiceButton(
                   modifier = Modifier.size(16.dp))
             }
           }
+  } else {
+    // AI: full-width plain text
+    Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
+      if (isStreaming && message.text.isEmpty()) {
+        LeadingThinkingDot()
+      } else {
+        Text(
+            text = message.text,
+            color = aiText,
+            style = MaterialTheme.typography.bodyMedium,
+            lineHeight = 20.sp,
+            modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+      }
     }
   }
+}
+
+@Composable
+private fun LeadingThinkingDot() {
+  val transition = rememberInfiniteTransition(label = "cursor")
+  val alpha by
+      transition.animateFloat(
+          initialValue = 0.25f,
+          targetValue = 1f,
+          animationSpec =
+              infiniteRepeatable(
+                  animation = tween(durationMillis = 600, easing = FastOutSlowInEasing),
+                  repeatMode = RepeatMode.Reverse),
+          label = "cursorAlpha")
+
+  Surface(
+      modifier = Modifier.size(10.dp).testTag("chat_ai_cursor"),
+      color = Color.White.copy(alpha = alpha),
+      shape = CircleShape,
+      tonalElevation = 0.dp,
+      shadowElevation = 0.dp) {}
 }

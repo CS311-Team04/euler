@@ -343,7 +343,7 @@ fun HomeScreen(
                                 unfocusedContainerColor = Color(0xFF121212),
                                 disabledContainerColor = Color(0xFF121212)))
 
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(16.dp))
                     Text(
                         text = "Powered by APERTUS",
                         color = Color.Gray,
@@ -364,7 +364,7 @@ fun HomeScreen(
                       val listState = rememberLazyListState()
 
                       // Auto-scroll to bottom when messages change or sending state changes
-                      LaunchedEffect(ui.messages.size, ui.isSending) {
+                      LaunchedEffect(ui.messages.size, ui.isSending, ui.streamingSequence) {
                         val lastIndex =
                             if (ui.messages.isEmpty()) {
                               0
@@ -426,10 +426,16 @@ fun HomeScreen(
                                       } else {
                                         null
                                       })
+                              val showLeadingDot =
+                                  item.id == ui.streamingMessageId && item.text.isEmpty()
+                              ChatMessage(
+                                  message = item,
+                                  modifier = Modifier.fillMaxWidth(),
+                                  isStreaming = showLeadingDot)
                             }
 
                             // Global thinking indicator shown AFTER the last user message.
-                            if (ui.isSending) {
+                            if (ui.isSending && ui.streamingMessageId == null) {
                               item {
                                 Spacer(Modifier.height(6.dp))
                                 ThinkingIndicator(
