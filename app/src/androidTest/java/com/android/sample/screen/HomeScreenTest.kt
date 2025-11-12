@@ -1,6 +1,5 @@
 package com.android.sample.screen
 
-import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
@@ -30,7 +29,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class HomeScreenTest {
 
-  @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
+  @get:Rule val composeRule = createAndroidComposeRule<HomeScreenTestActivity>()
 
   // Helper function to check if a node does not exist
   private fun assertNodeDoesNotExist(text: String) {
