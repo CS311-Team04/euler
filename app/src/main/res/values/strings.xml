@@ -2,4 +2,6 @@
     <string name="app_name">SampleApp</string>
     <string name="title_activity_main">MainActivity</string>
     <string name="title_activity_second">SecondActivity</string>
+    <string name="chat_ai_voice_button_play">Play message</string>
+    <string name="chat_ai_voice_button_stop">Stop playback</string>
 </resources>

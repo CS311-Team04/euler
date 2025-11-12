@@ -194,9 +194,6 @@ dependencies {
     implementation("com.google.auto.value:auto-value-annotations:1.10.4")
     implementation("com.google.code.findbugs:jsr305:3.0.2")
     implementation("com.github.spotbugs:spotbugs-annotations:4.8.3")
-
-    implementation(libs.okhttp)
-    testImplementation(libs.okhttp.mockwebserver)
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.compose.ui:ui-tooling-preview")
 

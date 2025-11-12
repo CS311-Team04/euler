@@ -579,7 +579,7 @@ class HomeScreenTestCov {
     val aiMessage =
         ChatUIModel(
             id = "voice-ai-1",
-            text = "Lecture via ElevenLabs",
+            text = "Lecture vocale du message",
             timestamp = System.currentTimeMillis(),
             type = ChatType.AI)
     viewModel.setUiStateForTest(HomeUiState(messages = listOf(aiMessage)))
@@ -597,11 +597,11 @@ class HomeScreenTestCov {
 
     playback.triggerStart()
     composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithContentDescription("Arrêter la lecture").assertIsDisplayed()
+    composeTestRule.onNodeWithContentDescription("Stop playback").assertIsDisplayed()
 
     playback.triggerDone()
     composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithContentDescription("Lire le message").assertIsDisplayed()
+    composeTestRule.onNodeWithContentDescription("Play message").assertIsDisplayed()
   }
 
   @Test
@@ -625,12 +625,12 @@ class HomeScreenTestCov {
     composeTestRule.onNodeWithTag(buttonTag).performClick()
     playback.triggerStart()
     composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithContentDescription("Arrêter la lecture").assertIsDisplayed()
+    composeTestRule.onNodeWithContentDescription("Stop playback").assertIsDisplayed()
 
-    composeTestRule.onNodeWithContentDescription("Arrêter la lecture").performClick()
+    composeTestRule.onNodeWithContentDescription("Stop playback").performClick()
     composeTestRule.waitForIdle()
     assertEquals(1, playback.stopCount)
-    composeTestRule.onNodeWithContentDescription("Lire le message").assertIsDisplayed()
+    composeTestRule.onNodeWithContentDescription("Play message").assertIsDisplayed()
   }
 
   @Test
@@ -656,7 +656,7 @@ class HomeScreenTestCov {
     playback.triggerError(RuntimeException("network"))
     composeTestRule.waitForIdle()
 
-    composeTestRule.onNodeWithContentDescription("Lire le message").assertIsDisplayed()
+    composeTestRule.onNodeWithContentDescription("Play message").assertIsDisplayed()
   }
 
   @Test
@@ -673,7 +673,7 @@ class HomeScreenTestCov {
     }
     composeTestRule.waitForIdle()
 
-    composeTestRule.onNodeWithContentDescription("Arrêter la lecture").assertIsDisplayed()
+    composeTestRule.onNodeWithContentDescription("Stop playback").assertIsDisplayed()
   }
 
   @Test
@@ -690,7 +690,7 @@ class HomeScreenTestCov {
     }
     composeTestRule.waitForIdle()
 
-    composeTestRule.onNodeWithContentDescription("Lire le message").assertIsDisplayed()
+    composeTestRule.onNodeWithContentDescription("Play message").assertIsDisplayed()
   }
 
   // ========== Tests for Suggestion Chips ==========

@@ -26,9 +26,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.android.sample.R
 
 /**
  * Renders a single chat message as either:
@@ -172,15 +174,31 @@ private fun BoxScope.AiVoiceButton(
           }
     }
     else -> {
-      val background = if (isSpeaking) Color(0xFFE53935) else Color(0x1AFFFFFF)
+      val colorScheme = MaterialTheme.colorScheme
+      val background =
+          if (isSpeaking) {
+            colorScheme.error
+          } else {
+            colorScheme.surfaceVariant.copy(alpha = 0.12f)
+          }
       val icon =
           if (isSpeaking) {
             Icons.Default.Stop
           } else {
             Icons.Default.VolumeUp
           }
-      val description = if (isSpeaking) "Arrêter la lecture" else "Lire le message"
-      val tint = if (isSpeaking) Color.White else Color.LightGray
+      val description =
+          if (isSpeaking) {
+            stringResource(R.string.chat_ai_voice_button_stop)
+          } else {
+            stringResource(R.string.chat_ai_voice_button_play)
+          }
+      val tint =
+          if (isSpeaking) {
+            colorScheme.onError
+          } else {
+            colorScheme.onSurfaceVariant
+          }
 
       Surface(
           onClick = { onSpeakClick(message) },

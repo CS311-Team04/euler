@@ -396,6 +396,10 @@ fun HomeScreen(
                                             speakingMessageId = null
                                             loadingMessageId = null
                                           } else {
+                                            if (speakingMessageId != null) {
+                                              ttsHelper.stop()
+                                              speakingMessageId = null
+                                            }
                                             loadingMessageId = message.id
                                             ttsHelper.speak(
                                                 text = message.text,
