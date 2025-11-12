@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.sample.R
+import com.android.sample.ui.theme.EulerTheme
 
 /**
  * Renders a single chat message as either:
@@ -175,11 +176,12 @@ private fun BoxScope.AiVoiceButton(
     }
     else -> {
       val colorScheme = MaterialTheme.colorScheme
+      val voiceColors = EulerTheme.voiceButtonColors
       val background =
           if (isSpeaking) {
             colorScheme.error
           } else {
-            colorScheme.surfaceVariant.copy(alpha = 0.12f)
+            voiceColors.idleContainer
           }
       val icon =
           if (isSpeaking) {
@@ -197,7 +199,7 @@ private fun BoxScope.AiVoiceButton(
           if (isSpeaking) {
             colorScheme.onError
           } else {
-            colorScheme.onSurfaceVariant
+            voiceColors.idleContent
           }
 
       Surface(

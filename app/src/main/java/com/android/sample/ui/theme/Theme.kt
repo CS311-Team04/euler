@@ -9,7 +9,9 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -34,6 +36,12 @@ private val LightColorScheme =
         */
         )
 
+data class VoiceButtonColors(val idleContainer: Color, val idleContent: Color)
+
+val LocalVoiceButtonColors = compositionLocalOf {
+  VoiceButtonColors(idleContainer = VoiceButtonIdleLight, idleContent = VoiceButtonIdleContentLight)
+}
+
 @Composable
 fun SampleAppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -50,6 +58,14 @@ fun SampleAppTheme(
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
       }
+  val voiceButtonColors =
+      if (darkTheme) {
+        VoiceButtonColors(
+            idleContainer = VoiceButtonIdleDark, idleContent = VoiceButtonIdleContentDark)
+      } else {
+        VoiceButtonColors(
+            idleContainer = VoiceButtonIdleLight, idleContent = VoiceButtonIdleContentLight)
+      }
   val view = LocalView.current
   if (!view.isInEditMode) {
     SideEffect {
@@ -60,5 +76,12 @@ fun SampleAppTheme(
     }
   }
 
-  MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
+  CompositionLocalProvider(LocalVoiceButtonColors provides voiceButtonColors) {
+    MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
+  }
+}
+
+object EulerTheme {
+  val voiceButtonColors: VoiceButtonColors
+    @Composable get() = LocalVoiceButtonColors.current
 }
