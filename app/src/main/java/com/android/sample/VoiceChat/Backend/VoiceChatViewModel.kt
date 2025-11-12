@@ -1,337 +1,231 @@
 package com.android.sample.VoiceChat.Backend
 
-import android.media.AudioAttributes
-import android.media.AudioFormat
-import android.media.AudioManager
-import android.media.AudioTrack
-import android.media.audiofx.LoudnessEnhancer
-import android.os.Build
 import android.util.Log
-import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.android.sample.VoiceChat.Backend.ElevenLabs_LiveTTSClient.ServerEvent as LiveServerEvent
-import com.android.sample.VoiceChat.Backend.ElevenLabs_LiveTTSClient.SessionState as LiveSessionState
-import com.android.sample.speech.ElevenLabsConfig
-import java.io.Closeable
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
+import com.android.sample.llm.FirebaseFunctionsLlmClient
+import com.android.sample.llm.LlmClient
+import java.util.UUID
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
- * Coordinates the real-time ElevenLabs streaming client with UI state and audio playback.
+ * Coordinates speech-to-text transcripts with the custom LLM and delegates playback to the UI.
  *
  * Responsibilities:
- * - Own a single instance of [ElevenLabs_LiveTTSClient] and surface its state to the UI.
- * - Pipe incoming PCM frames into an [AudioTrack] for low-latency playback.
- * - Provide high-level actions (connect, speak, pause, resume, disconnect) for composables.
+ * - Manage the conversational state (transcripts, replies, errors).
+ * - Call the LLM asynchronously when the user finishes speaking.
+ * - Emit `SpeechRequest` events that the UI layer can render via any `SpeechPlayback`.
+ * - Provide synthesized audio level samples so the visualizer stays animated while TTS runs.
  */
 class VoiceChatViewModel(
-    private val liveClient: LiveTtsClient =
-        ElevenLabs_LiveTTSClient(
-            apiKeyProvider = { ElevenLabsConfig.API_KEY },
-            voiceIdProvider = { ElevenLabsConfig.VOICE_ID }),
-    private val audioPlayer: AudioPlayer = StreamingAudioPlayer()
+    private val llmClient: LlmClient = FirebaseFunctionsLlmClient(),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
 
   private val _uiState = MutableStateFlow(VoiceChatUiState())
   val uiState: StateFlow<VoiceChatUiState> = _uiState.asStateFlow()
 
-  init {
-    observeSessionState()
-    observeServerEvents()
-    observeAudioFrames()
-  }
+  private val _audioLevels = MutableSharedFlow<Float>(replay = 0, extraBufferCapacity = 32)
+  val audioLevels: SharedFlow<Float> = _audioLevels.asSharedFlow()
 
-  /** Ensures a WebSocket session is active. Safe to call repeatedly (no-ops while connected). */
-  fun connect() {
-    val apiKey = ElevenLabsConfig.API_KEY
-    val voiceId = ElevenLabsConfig.VOICE_ID
-    Log.d(TAG, "Connecting to ElevenLabs voice=$voiceId apiKeyPrefix=${apiKey.take(4)}***")
-    val state = liveClient.connect()
-    _uiState.update {
-      it.copy(sessionState = state, lastError = extractError(state) ?: it.lastError)
-    }
-  }
+  private val _speechRequests =
+      MutableSharedFlow<SpeechRequest>(replay = 0, extraBufferCapacity = 8)
+  val speechRequests: SharedFlow<SpeechRequest> = _speechRequests.asSharedFlow()
 
-  /**
-   * Streams the given [text] to ElevenLabs so it can be spoken aloud.
-   *
-   * Blank messages are ignored to avoid unnecessary network calls.
-   */
-  fun speak(text: String, flush: Boolean = true, latencyHint: String = "normal") {
-    if (text.isBlank()) return
-    liveClient.speak(text = text, flush = flush, latencyOptimization = latencyHint)
-    _uiState.update { it.copy(lastError = null) }
-  }
+  private var currentGenerationJob: Job? = null
+  private var levelAnimationJob: Job? = null
+  private var lastEmittedLevel: Float = 0f
 
+  /** Receives live partial transcripts from the STT layer so the UI can reflect them instantly. */
   fun onUserTranscript(transcript: String) {
     _uiState.update { it.copy(lastTranscript = transcript, lastError = null) }
   }
 
+  /**
+   * Handles the final transcript of a user utterance by launching an LLM request and, once
+   * completed, emitting a [SpeechRequest] for playback.
+   */
+  fun handleUserUtterance(transcript: String) {
+    val cleaned = transcript.trim()
+    if (cleaned.isEmpty()) return
+
+    currentGenerationJob?.cancel()
+    currentGenerationJob =
+        viewModelScope.launch {
+          _uiState.update {
+            it.copy(
+                lastTranscript = cleaned,
+                isGenerating = true,
+                isSpeaking = false,
+                lastError = null,
+            )
+          }
+
+          try {
+            val reply = withContext(ioDispatcher) { llmClient.generateReply(cleaned) }
+            val spokenText = sanitizeForSpeech(reply)
+            val request =
+                SpeechRequest(text = spokenText, utteranceId = UUID.randomUUID().toString())
+
+            _uiState.update { it.copy(lastAiReply = reply, isGenerating = false, lastError = null) }
+
+            if (!_speechRequests.tryEmit(request)) {
+              _speechRequests.emit(request)
+            }
+          } catch (cancelled: CancellationException) {
+            throw cancelled
+          } catch (t: Throwable) {
+            Log.e(TAG, "LLM generation failed", t)
+            _uiState.update {
+              it.copy(
+                  isGenerating = false,
+                  isSpeaking = false,
+                  lastError = t.message ?: "Unable to generate response",
+              )
+            }
+          }
+        }
+  }
+
+  /** Allows other components (STT/TTS) to bubble a recoverable error into the UI banner. */
   fun reportError(message: String) {
     _uiState.update { it.copy(lastError = message) }
   }
 
-  /** Temporarily pauses synthesis and local playback. */
-  fun pause() {
-    liveClient.pause()
-    audioPlayer.pause()
+  /** Marks the beginning of playback and kicks off the fallback visualizer animation. */
+  fun onSpeechStarted() {
+    _uiState.update { it.copy(isSpeaking = true, lastError = null) }
+    startLevelAnimation()
+  }
+
+  /** Resets animation and state once TTS playback finishes normally. */
+  fun onSpeechFinished() {
+    stopLevelAnimation()
     _uiState.update { it.copy(isSpeaking = false) }
   }
 
-  /** Resumes a paused stream (both remote synthesis and local playback). */
-  fun resume() {
-    liveClient.resume()
-    audioPlayer.play()
+  /** Stops animation and records a playback failure, preserving the message for the UI. */
+  fun onSpeechError(throwable: Throwable?) {
+    stopLevelAnimation()
+    _uiState.update {
+      it.copy(
+          isSpeaking = false,
+          lastError = throwable?.message ?: "Playback is unavailable",
+      )
+    }
   }
 
-  /** Disconnects the live session and clears audio buffers. */
-  fun disconnect() {
-    liveClient.disconnect()
-    audioPlayer.stopAndRelease()
-    _uiState.update { it.copy(sessionState = LiveSessionState.Disconnected, isSpeaking = false) }
+  /** Cancels outstanding work and resets the UI. Invoked when the voice screen is dismissed. */
+  fun stopAll() {
+    currentGenerationJob?.cancel()
+    currentGenerationJob = null
+    stopLevelAnimation()
+    _uiState.update { it.copy(isGenerating = false, isSpeaking = false) }
   }
 
   override fun onCleared() {
     super.onCleared()
-    audioPlayer.stopAndRelease()
-    liveClient.close()
+    stopAll()
   }
 
-  private fun observeSessionState() {
-    viewModelScope.launch {
-      liveClient.state.collect { state ->
-        _uiState.update {
-          it.copy(
-              sessionState = state,
-              lastError = extractError(state),
-              isSpeaking = if (state is LiveSessionState.Disconnected) false else it.isSpeaking)
-        }
-        if (state is LiveSessionState.Disconnected) {
-          audioPlayer.stopAndRelease()
-        }
-      }
-    }
-  }
-
-  private fun observeServerEvents() {
-    viewModelScope.launch {
-      liveClient.events.collect { event ->
-        when (event) {
-          is LiveServerEvent.Connected -> {
-            Log.i(TAG, "ElevenLabs connected session=${event.sessionId}")
-            _uiState.update { it.copy(sessionId = event.sessionId) }
-          }
-          is LiveServerEvent.EndOfTransmission -> {
-            Log.i(TAG, "ElevenLabs end of transmission")
-            audioPlayer.pause()
-            _uiState.update { it.copy(isSpeaking = false) }
-          }
-          is LiveServerEvent.RemoteError -> {
-            Log.w(TAG, "ElevenLabs remote error ${event.code}: ${event.message}")
-            audioPlayer.pause()
-            _uiState.update { it.copy(lastError = event.message, isSpeaking = false) }
-          }
-          is LiveServerEvent.ProtocolError -> {
-            Log.w(TAG, "ElevenLabs protocol error: ${event.message}")
-            _uiState.update { it.copy(lastError = event.message) }
-          }
-          is LiveServerEvent.SocketFailure -> {
-            Log.e(TAG, "ElevenLabs socket failure", event.throwable)
-            audioPlayer.stopAndRelease()
-            val reason = event.throwable.message ?: "Socket failure"
-            _uiState.update { it.copy(lastError = reason, isSpeaking = false) }
-          }
-          is LiveServerEvent.SocketClosed -> {
-            Log.i(TAG, "ElevenLabs socket closed code=${event.code} reason=${event.reason}")
-            audioPlayer.stopAndRelease()
-            _uiState.update { it.copy(isSpeaking = false) }
-          }
-          is LiveServerEvent.FirstAudio -> {
-            _uiState.update {
-              it.copy(lastFirstAudioMs = event.ttfbMs, lastFirstAudioBytes = event.bytes)
-            }
-          }
-          is LiveServerEvent.Unhandled -> {
-            Log.w(TAG, "ElevenLabs unhandled event=${event.event}")
-            _uiState.update { it.copy(lastError = "Unhandled event: ${event.event}") }
-          }
-          is LiveServerEvent.SocketOpen -> {
-            // No UI change required; keep awaiting the "connected" payload.
+  /**
+   * Emits a looping sequence of levels so the visualizer stays alive while TextToSpeech is running.
+   */
+  private fun startLevelAnimation() {
+    levelAnimationJob?.cancel()
+    lastEmittedLevel = 0f
+    levelAnimationJob =
+        viewModelScope.launch {
+          var index = 0
+          while (isActive) {
+            val level = LEVEL_PATTERN[index % LEVEL_PATTERN.size]
+            emitLevel(level)
+            index++
+            delay(LEVEL_FRAME_DELAY_MS)
           }
         }
-      }
-    }
   }
 
-  private fun observeAudioFrames() {
-    viewModelScope.launch {
-      liveClient.audioFrames.collect { frame ->
-        audioPlayer.write(frame)
-        _uiState.update { it.copy(isSpeaking = true) }
-      }
-    }
+  /** Stops the visualizer pattern and ensures the next emission starts from zero. */
+  private fun stopLevelAnimation() {
+    levelAnimationJob?.cancel()
+    levelAnimationJob = null
+    lastEmittedLevel = 0f
+    emitLevel(0f)
   }
 
-  private fun extractError(state: LiveSessionState): String? {
-    return when (state) {
-      is LiveSessionState.Failed -> state.reason
-      else -> null
+  /** Pushes a level sample with exponential smoothing to avoid abrupt jumps between frames. */
+  private fun emitLevel(level: Float) {
+    val smoothed =
+        (lastEmittedLevel * LEVEL_SMOOTHING_ALPHA) + (level * (1 - LEVEL_SMOOTHING_ALPHA))
+    lastEmittedLevel = smoothed
+    if (!_audioLevels.tryEmit(smoothed)) {
+      viewModelScope.launch { _audioLevels.emit(smoothed) }
     }
-  }
-
-  private companion object {
-    private const val TAG = "VoiceChatViewModel"
   }
 
   data class VoiceChatUiState(
-      val sessionState: LiveSessionState = LiveSessionState.Disconnected,
-      val sessionId: String? = null,
       val isSpeaking: Boolean = false,
-      val lastError: String? = null,
+      val isGenerating: Boolean = false,
       val lastTranscript: String? = null,
-      val lastFirstAudioMs: Long? = null,
-      val lastFirstAudioBytes: Int? = null
+      val lastAiReply: String? = null,
+      val lastError: String? = null,
   )
 
-  /** Abstraction over the audio output sink so tests can inject a fake implementation. */
-  interface AudioPlayer : Closeable {
-    fun write(data: ByteArray)
+  data class SpeechRequest(val text: String, val utteranceId: String)
 
-    fun pause()
+  private companion object {
+    private const val TAG = "VoiceChatViewModel"
+    private const val LEVEL_FRAME_DELAY_MS = 120L
+    private const val LEVEL_SMOOTHING_ALPHA = 0.72f
+    private val LEVEL_PATTERN =
+        floatArrayOf(
+            0.16f,
+            0.22f,
+            0.27f,
+            0.24f,
+            0.20f,
+            0.25f,
+        )
+    private val EMOJI_REGEX =
+        Regex("[\\uD83C-\\uDBFF\\uDC00-\\uDFFF]|[\\u2600-\\u27BF]|[\\uFE0F\\uFE0E]")
+    private val MARKDOWN_REGEX = Regex("[*_`~]")
+    private val CODE_BLOCK_REGEX = Regex("```.*?```", RegexOption.DOT_MATCHES_ALL)
+    private val HTML_TAG_REGEX = Regex("<[^>]*>")
+    private val MULTI_PUNCTUATION_REGEX = Regex("([!?]){2,}")
+    private val WHITESPACE_REGEX = Regex("\\s+")
 
-    fun play()
-
-    fun stopAndRelease()
-  }
-
-  /** Lightweight PCM player that wraps [AudioTrack] for streaming playback. */
-  class StreamingAudioPlayer(
-      private val sampleRateHz: Int = 16_000,
-      private val channelConfig: Int = AudioFormat.CHANNEL_OUT_MONO,
-      private val encoding: Int = AudioFormat.ENCODING_PCM_16BIT,
-      private val playbackGain: Float = DEFAULT_GAIN,
-  ) : AudioPlayer {
-
-    private var audioTrack: AudioTrack? = null
-    private var loudnessEnhancer: LoudnessEnhancer? = null
-
-    override fun write(data: ByteArray) {
-      if (data.isEmpty()) return
-      val track =
-          audioTrack
-              ?: createTrack().also {
-                audioTrack = it
-                ensureLoudnessEnhancer(it)
-              }
-      ensureLoudnessEnhancer(track)
-      if (track.playState != AudioTrack.PLAYSTATE_PLAYING) {
-        track.play()
-      }
-      val processed = applyGainIfNeeded(data)
-      track.write(processed, 0, processed.size)
-    }
-
-    override fun pause() {
-      audioTrack?.pause()
-    }
-
-    override fun play() {
-      audioTrack?.play()
-    }
-
-    override fun stopAndRelease() {
-      audioTrack?.let { track ->
-        try {
-          track.stop()
-        } catch (_: IllegalStateException) {
-          // Ignored: stop() can throw if track was never started.
-        }
-        track.flush()
-        track.release()
-      }
-      audioTrack = null
-      loudnessEnhancer?.let {
-        try {
-          it.release()
-        } catch (_: Throwable) {}
-      }
-      loudnessEnhancer = null
-    }
-
-    override fun close() {
-      stopAndRelease()
-    }
-
-    @VisibleForTesting
-    fun isActive(): Boolean = audioTrack?.playState == AudioTrack.PLAYSTATE_PLAYING
-
-    private fun createTrack(): AudioTrack {
-      val attributes =
-          AudioAttributes.Builder()
-              .setUsage(AudioAttributes.USAGE_MEDIA)
-              .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-              .build()
-
-      val format =
-          AudioFormat.Builder()
-              .setSampleRate(sampleRateHz)
-              .setEncoding(encoding)
-              .setChannelMask(channelConfig)
-              .build()
-
-      val minBufferSize = AudioTrack.getMinBufferSize(sampleRateHz, channelConfig, encoding)
-      return AudioTrack(
-          attributes,
-          format,
-          minBufferSize,
-          AudioTrack.MODE_STREAM,
-          AudioManager.AUDIO_SESSION_ID_GENERATE)
-    }
-
-    private fun applyGainIfNeeded(source: ByteArray): ByteArray {
-      val gain = playbackGain
-      if (gain <= 1.001f) {
-        return source
-      }
-      val input = ByteBuffer.wrap(source).order(ByteOrder.LITTLE_ENDIAN)
-      val output = ByteBuffer.allocate(source.size).order(ByteOrder.LITTLE_ENDIAN)
-      while (input.remaining() >= 2) {
-        val sample = input.short.toInt()
-        val scaled =
-            (sample * gain).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
-        output.putShort(scaled.toShort())
-      }
-      while (input.hasRemaining()) {
-        output.put(input.get())
-      }
-      return output.array()
-    }
-
-    private fun ensureLoudnessEnhancer(track: AudioTrack) {
-      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) return
-      if (loudnessEnhancer != null) return
-      try {
-        loudnessEnhancer =
-            LoudnessEnhancer(track.audioSessionId).apply {
-              setTargetGain(DEFAULT_LOUDNESS_GAIN_MB)
-              enabled = true
-            }
-        Log.d(TAG, "LoudnessEnhancer enabled (gain=${DEFAULT_LOUDNESS_GAIN_MB} mB)")
-      } catch (t: Throwable) {
-        Log.w(TAG, "Unable to enable LoudnessEnhancer", t)
-        loudnessEnhancer = null
-      }
-    }
-
-    companion object {
-      private const val DEFAULT_GAIN = 10f
-      private const val DEFAULT_LOUDNESS_GAIN_MB = 1000 // +20 dB
+    /**
+     * Removes markdown, emojis, HTML tags, and extra whitespace so TextToSpeech receives clean
+     * text.
+     */
+    private fun sanitizeForSpeech(raw: String): String {
+      val withoutCodeBlocks = CODE_BLOCK_REGEX.replace(raw, " ")
+      val noHtml = HTML_TAG_REGEX.replace(withoutCodeBlocks, " ")
+      val noEmojis = EMOJI_REGEX.replace(noHtml, " ")
+      val noMarkdown = MARKDOWN_REGEX.replace(noEmojis, " ")
+      val collapsedPunctuation =
+          MULTI_PUNCTUATION_REGEX.replace(noMarkdown) { matchResult ->
+            matchResult.value.first().toString()
+          }
+      val sentenceFriendly =
+          collapsedPunctuation.replace("\n{2,}".toRegex(), ". ").replace("\n", ", ")
+      val normalizedWhitespace = WHITESPACE_REGEX.replace(sentenceFriendly, " ").trim()
+      return normalizedWhitespace.ifBlank { raw.trim() }
     }
   }
 }

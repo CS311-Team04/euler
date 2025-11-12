@@ -3,6 +3,7 @@ package com.android.sample.VoiceChat
 import android.Manifest
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.ComposeTestRule
@@ -12,7 +13,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
-import com.android.sample.VoiceChat.Backend.ElevenLabs_LiveTTSClient.SessionState as LiveSessionState
 import com.android.sample.VoiceChat.Backend.VoiceChatViewModel
 import com.android.sample.VoiceChat.UI.LevelSource
 import com.android.sample.VoiceChat.UI.VoiceOverlay
@@ -27,11 +27,14 @@ import com.android.sample.VoiceChat.UI.shouldDeactivateMic
 import com.android.sample.VoiceChat.UI.startMicrophoneSafely
 import com.android.sample.VoiceChat.UI.stopMicrophoneSafely
 import com.android.sample.VoiceChat.UI.updateLastVoiceTimestamp
+import com.android.sample.llm.FakeLlmClient
+import com.android.sample.speech.SpeechPlayback
+import com.android.sample.util.MainDispatcherRule
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
-import org.hamcrest.CoreMatchers.`is`
 import org.junit.Assert.*
 import org.junit.Assert.fail
 import org.junit.Rule
@@ -45,42 +48,74 @@ import org.robolectric.annotation.Config
 class VoiceScreenTest {
 
   @get:Rule val composeTestRule = createComposeRule()
+  @get:Rule val dispatcherRule = MainDispatcherRule(UnconfinedTestDispatcher())
+
+  private fun createVoiceViewModel(fakeLlm: FakeLlmClient = FakeLlmClient()): VoiceChatViewModel =
+      VoiceChatViewModel(fakeLlm, dispatcherRule.dispatcher)
 
   @Test
   fun voiceScreen_displays() {
-    composeTestRule.setContent { VoiceScreen(onClose = {}) }
+    composeTestRule.setContent {
+      val playback = remember { FakeSpeechPlayback() }
+      VoiceScreen(
+          onClose = {}, voiceChatViewModel = createVoiceViewModel(), speechPlayback = playback)
+    }
     composeTestRule.onRoot().assertIsDisplayed()
   }
 
   @Test
   fun voiceScreen_withModifier_displays() {
-    composeTestRule.setContent { VoiceScreen(onClose = {}, modifier = Modifier.size(100.dp)) }
+    composeTestRule.setContent {
+      val playback = remember { FakeSpeechPlayback() }
+      VoiceScreen(
+          onClose = {},
+          modifier = Modifier.size(100.dp),
+          voiceChatViewModel = createVoiceViewModel(),
+          speechPlayback = playback)
+    }
     composeTestRule.onRoot().assertIsDisplayed()
   }
 
   @Test
   fun voiceScreen_rendersWithoutCrash() {
     // Test that the screen can be composed without crashing
-    composeTestRule.setContent { VoiceScreen(onClose = {}) }
+    composeTestRule.setContent {
+      val playback = remember { FakeSpeechPlayback() }
+      VoiceScreen(
+          onClose = {}, voiceChatViewModel = createVoiceViewModel(), speechPlayback = playback)
+    }
     // If we get here without exception, the test passes
     assertTrue(true)
   }
 
   @Test
   fun voiceOverlay_displays() {
-    composeTestRule.setContent { VoiceOverlay(onDismiss = {}) }
+    composeTestRule.setContent {
+      val playback = remember { FakeSpeechPlayback() }
+      VoiceOverlay(
+          onDismiss = {}, voiceChatViewModel = createVoiceViewModel(), speechPlayback = playback)
+    }
     composeTestRule.onRoot().assertIsDisplayed()
   }
 
   @Test
   fun voiceOverlay_withModifier_displays() {
-    composeTestRule.setContent { VoiceOverlay(onDismiss = {}, modifier = Modifier.size(100.dp)) }
+    composeTestRule.setContent {
+      val playback = remember { FakeSpeechPlayback() }
+      VoiceOverlay(
+          onDismiss = {},
+          modifier = Modifier.size(100.dp),
+          voiceChatViewModel = createVoiceViewModel(),
+          speechPlayback = playback)
+    }
     composeTestRule.onRoot().assertIsDisplayed()
   }
 
   @Test
   fun voiceScreenPreviewContent_renders() {
-    composeTestRule.setContent { VoiceScreenPreviewContent(level = 0.4f) }
+    composeTestRule.setContent {
+      VoiceScreenPreviewContent(level = 0.4f, voiceChatViewModel = createVoiceViewModel())
+    }
     composeTestRule.onRoot().assertIsDisplayed()
   }
 
@@ -88,12 +123,15 @@ class VoiceScreenTest {
   fun voiceScreen_toggleControlsInjectedMic() {
     val fakeSource = FakeMicLevelSource()
     composeTestRule.setContent {
+      val playback = remember { FakeSpeechPlayback() }
       VoiceScreen(
           onClose = {},
           levelSourceFactory = { fakeSource },
           initialHasMicOverride = true,
           silenceThresholdOverride = 0.2f,
-          silenceDurationOverride = 100L)
+          silenceDurationOverride = 100L,
+          voiceChatViewModel = createVoiceViewModel(),
+          speechPlayback = playback)
     }
 
     composeTestRule.onNodeWithContentDescription("Toggle microphone").performClick()
@@ -115,11 +153,14 @@ class VoiceScreenTest {
   fun voiceScreen_requestsPermissionWhenNotGranted() {
     val requested = mutableListOf<String>()
     composeTestRule.setContent {
+      val playback = remember { FakeSpeechPlayback() }
       VoiceScreen(
           onClose = {},
           levelSourceFactory = { FakeMicLevelSource() },
           initialHasMicOverride = false,
-          permissionRequester = { requested += it })
+          permissionRequester = { requested += it },
+          voiceChatViewModel = createVoiceViewModel(),
+          speechPlayback = playback)
     }
 
     composeTestRule.waitForIdle()
@@ -130,8 +171,13 @@ class VoiceScreenTest {
   fun voiceScreen_toggleWithThrowingMic_revertsState() {
     val throwingSource = ThrowingMicLevelSource()
     composeTestRule.setContent {
+      val playback = remember { FakeSpeechPlayback() }
       VoiceScreen(
-          onClose = {}, levelSourceFactory = { throwingSource }, initialHasMicOverride = true)
+          onClose = {},
+          levelSourceFactory = { throwingSource },
+          initialHasMicOverride = true,
+          voiceChatViewModel = createVoiceViewModel(),
+          speechPlayback = playback)
     }
 
     composeTestRule.onNodeWithContentDescription("Toggle microphone").performClick()
@@ -152,12 +198,15 @@ class VoiceScreenTest {
     val showScreen = mutableStateOf(true)
 
     composeTestRule.setContent {
+      val playback = remember { FakeSpeechPlayback() }
       if (showScreen.value) {
         VoiceScreen(
             onClose = {},
             levelSourceFactory = { fakeSource },
             initialHasMicOverride = true,
-            silenceDurationOverride = Long.MAX_VALUE)
+            silenceDurationOverride = Long.MAX_VALUE,
+            voiceChatViewModel = createVoiceViewModel(),
+            speechPlayback = playback)
       }
     }
 
@@ -452,68 +501,46 @@ class VoiceScreenTest {
 
   @Test
   fun voiceScreen_showsStatusFromViewModel() {
-    val liveClient = FakeLiveTtsClient()
-    val audioPlayer = FakeAudioPlayer()
-    val viewModel = VoiceChatViewModel(liveClient, audioPlayer)
+    val viewModel = createVoiceViewModel()
 
     composeTestRule.setContent {
+      val playback = remember { FakeSpeechPlayback() }
       VoiceScreen(
           onClose = {},
           initialHasMicOverride = true,
           levelSourceFactory = { FakeMicLevelSource() },
-          voiceChatViewModel = viewModel)
+          voiceChatViewModel = viewModel,
+          speechPlayback = playback)
     }
 
-    liveClient.stateFlow.value = LiveSessionState.Connected(sessionId = "session-99")
     composeTestRule.waitForIdle()
 
-    composeTestRule.onNodeWithText("Connected session-99").assertIsDisplayed()
+    // Banner only shows errors now, so injecting an error should surface it.
+    composeTestRule.runOnIdle { viewModel.onSpeechStarted() }
+    composeTestRule.waitForIdle()
+    composeTestRule.runOnIdle { viewModel.onSpeechError(Throwable("Playback failed")) }
+    composeTestRule.onNodeWithText("Playback failed").assertIsDisplayed()
   }
 
   @Test
-  fun voiceScreen_closeButtonDisconnectsLiveClient() {
-    val liveClient = FakeLiveTtsClient()
-    val audioPlayer = FakeAudioPlayer()
-    val viewModel = VoiceChatViewModel(liveClient, audioPlayer)
+  fun voiceScreen_closeButtonInvokesOnClose() {
+    val viewModel = createVoiceViewModel()
 
     var closed = false
     composeTestRule.setContent {
+      val playback = remember { FakeSpeechPlayback() }
       VoiceScreen(
           onClose = { closed = true },
           initialHasMicOverride = true,
           levelSourceFactory = { FakeMicLevelSource() },
-          voiceChatViewModel = viewModel)
+          voiceChatViewModel = viewModel,
+          speechPlayback = playback)
     }
 
     composeTestRule.onNodeWithContentDescription("Close voice screen").performClick()
     composeTestRule.waitForIdle()
 
-    assertThat(liveClient.disconnectInvocations, `is`(1))
     assertTrue(closed)
-  }
-
-  @Test
-  fun voiceScreen_toggleMicResumesAndPausesStream() {
-    val liveClient = FakeLiveTtsClient()
-    val audioPlayer = FakeAudioPlayer()
-    val viewModel = VoiceChatViewModel(liveClient, audioPlayer)
-
-    composeTestRule.setContent {
-      VoiceScreen(
-          onClose = {},
-          initialHasMicOverride = true,
-          levelSourceFactory = { FakeMicLevelSource() },
-          voiceChatViewModel = viewModel)
-    }
-
-    val micButton = composeTestRule.onNodeWithContentDescription("Toggle microphone")
-    micButton.performClick()
-    composeTestRule.waitForIdle()
-    assertThat(liveClient.resumeInvocations, `is`(1))
-
-    micButton.performClick()
-    composeTestRule.waitForIdle()
-    assertThat(liveClient.pauseInvocations, `is`(1))
   }
 }
 
@@ -555,6 +582,26 @@ private class ThrowingMicLevelSource : LevelSource {
   override fun stop() {
     stopCount.incrementAndGet()
   }
+}
+
+private class FakeSpeechPlayback : SpeechPlayback {
+  val spoken = mutableListOf<String>()
+
+  override fun speak(
+      text: String,
+      utteranceId: String,
+      onStart: () -> Unit,
+      onDone: () -> Unit,
+      onError: (Throwable?) -> Unit
+  ) {
+    spoken += text
+    onStart()
+    onDone()
+  }
+
+  override fun stop() {}
+
+  override fun shutdown() {}
 }
 
 private fun ComposeTestRule.waitUntilTrue(timeoutMillis: Long, condition: () -> Boolean) {

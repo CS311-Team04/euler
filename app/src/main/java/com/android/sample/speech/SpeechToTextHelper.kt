@@ -27,7 +27,11 @@ import java.util.Locale
  * - Surface partial and final results through callbacks.
  * - Provide basic error reporting through callbacks and Toasts.
  */
-class SpeechToTextHelper(private val context: Context, caller: ActivityResultCaller) {
+class SpeechToTextHelper(
+    private val context: Context,
+    caller: ActivityResultCaller,
+    private val language: Locale = Locale.getDefault(),
+) {
 
   // Consumer-provided callbacks wired on each call to startListening.
   private var onResultCallback: ((String) -> Unit)? = null
@@ -90,7 +94,11 @@ class SpeechToTextHelper(private val context: Context, caller: ActivityResultCal
     }
   }
 
-  /** Stops an active recognition session, if any. */
+  /**
+   * Stops an active recognition session, if any.
+   *
+   * Cancel is called to ensure pending callbacks are dropped.
+   */
   fun stopListening() {
     if (!isListening) return
     speechRecognizer?.stopListening()
@@ -98,7 +106,9 @@ class SpeechToTextHelper(private val context: Context, caller: ActivityResultCal
     isListening = false
   }
 
-  /** Must be called when the hosting component is destroyed to release resources. */
+  /**
+   * Must be called when the hosting component is destroyed to release resources and avoid leaks.
+   */
   fun destroy() {
     speechRecognizer?.destroy()
     speechRecognizer = null
@@ -130,11 +140,16 @@ class SpeechToTextHelper(private val context: Context, caller: ActivityResultCal
       return
     }
 
+    val languageTag = language.toLanguageTag()
+
     val intent =
         Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
           putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-          putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+          putExtra(RecognizerIntent.EXTRA_LANGUAGE, languageTag)
+          putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, languageTag)
+          putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, languageTag)
           putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+          putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
           putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
         }
 
@@ -145,9 +160,13 @@ class SpeechToTextHelper(private val context: Context, caller: ActivityResultCal
 
   private val recognitionListener =
       object : RecognitionListener {
-        override fun onReadyForSpeech(params: Bundle?) {}
+        override fun onReadyForSpeech(params: Bundle?) {
+          // No-op: the mic prompt toast already informs the user.
+        }
 
-        override fun onBeginningOfSpeech() {}
+        override fun onBeginningOfSpeech() {
+          // No-op: we do not need to update state here; RMS updates drive the visualizer.
+        }
 
         override fun onRmsChanged(rmsdB: Float) {
           onRmsCallback?.let { callback ->
@@ -159,7 +178,7 @@ class SpeechToTextHelper(private val context: Context, caller: ActivityResultCal
         override fun onBufferReceived(buffer: ByteArray?) {}
 
         override fun onEndOfSpeech() {
-          // Wait for onResults / onError.
+          // Keep listening until onResults/onError arrives so we capture the final transcript.
         }
 
         override fun onError(error: Int) {
@@ -181,7 +200,9 @@ class SpeechToTextHelper(private val context: Context, caller: ActivityResultCal
           }
         }
 
-        override fun onEvent(eventType: Int, params: Bundle?) {}
+        override fun onEvent(eventType: Int, params: Bundle?) {
+          // No custom events emitted by the platform for our use-case.
+        }
       }
 
   /**
@@ -198,11 +219,17 @@ class SpeechToTextHelper(private val context: Context, caller: ActivityResultCal
     }
   }
 
+  /**
+   * Pulls the highest-confidence transcription from the speech recognizer bundle.
+   *
+   * Returns `null` if the recognizer did not produce any meaningful text.
+   */
   private fun extractBestMatch(bundle: Bundle?): String? =
       bundle?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.takeIf {
         it.isNotBlank()
       }
 
+  /** Maps platform error codes to short user-friendly messages. */
   private fun errorMessageForCode(error: Int): String =
       when (error) {
         SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
@@ -217,6 +244,10 @@ class SpeechToTextHelper(private val context: Context, caller: ActivityResultCal
         else -> "Unknown recognition error ($error)"
       }
 
+  /**
+   * Emits an error message to both the UI (Toast) and the consumer callbacks, then signals
+   * completion so the caller can reset its state.
+   */
   private fun notifyError(message: String) {
     Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     onErrorCallback?.invoke(message)

@@ -16,23 +16,28 @@ if (!isCi && hasGoogleServicesJson) {
     apply(plugin = libs.plugins.googleServices.get().pluginId)
 }
 
-val elevenLabsProperties = Properties().apply {
-    val file = rootProject.file("elevenlabs.properties")
+fun quoteBuildConfig(value: String): String = "\"${value.replace("\"", "\\\"")}\""
+
+val voiceChatOverrides = Properties().apply {
+    val file = rootProject.file("voicechat.properties")
     if (file.exists()) {
         file.inputStream().use { load(it) }
     }
 }
 
-fun resolveElevenLabsSecret(envVar: String, propertyKey: String): String {
-    val envValue = System.getenv(envVar)?.trim().orEmpty()
-    if (envValue.isNotEmpty()) return envValue
-    return elevenLabsProperties.getProperty(propertyKey, "").trim()
-}
+fun resolveVoiceChatOverride(key: String, fallback: String = ""): String =
+    voiceChatOverrides.getProperty(key, fallback).trim()
 
-fun quoteBuildConfig(value: String): String = "\"${value.replace("\"", "\\\"")}\""
-
-val elevenLabsApiKey = resolveElevenLabsSecret("ELEVENLABS_API_KEY", "elevenlabs.apiKey")
-val elevenLabsVoiceId = resolveElevenLabsSecret("ELEVENLABS_VOICE_ID", "elevenlabs.voiceId")
+val llmHttpEndpoint: String =
+    System.getenv("LLM_HTTP_ENDPOINT")?.trim().orEmpty().ifEmpty {
+        resolveVoiceChatOverride(
+            "llm.httpEndpoint",
+            "http://10.0.2.2:5002/euler-e8edb/us-central1/answerWithRagHttp")
+    }
+val llmHttpApiKey: String =
+    System.getenv("LLM_HTTP_API_KEY")?.trim().orEmpty().ifEmpty {
+        resolveVoiceChatOverride("llm.httpApiKey")
+    }
 
 android {
     namespace = "com.android.sample"
@@ -52,8 +57,8 @@ android {
         buildConfigField ("String", "FUNCTIONS_HOST", "\"10.0.2.2\"")
         buildConfigField ("int",    "FUNCTIONS_PORT", "5002")
         buildConfigField ("boolean","USE_FUNCTIONS_EMULATOR", "true")
-        buildConfigField("String", "ELEVENLABS_API_KEY", quoteBuildConfig(elevenLabsApiKey))
-        buildConfigField("String", "ELEVENLABS_VOICE_ID", quoteBuildConfig(elevenLabsVoiceId))
+        buildConfigField("String", "LLM_HTTP_ENDPOINT", quoteBuildConfig(llmHttpEndpoint))
+        buildConfigField("String", "LLM_HTTP_API_KEY", quoteBuildConfig(llmHttpApiKey))
     }
 
     buildTypes {
@@ -173,6 +178,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(platform(libs.compose.bom))
     testImplementation(libs.junit)
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     globalTestImplementation(libs.androidx.junit)
     globalTestImplementation(libs.androidx.espresso.core)
 
@@ -225,7 +231,7 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.compose.ui:ui-tooling-preview")
 
-    // Networking/WebSocket for ElevenLabs integrations
+    // Networking for HTTP clients (LLM access, etc.)
     implementation(libs.okhttp)
 
 }
