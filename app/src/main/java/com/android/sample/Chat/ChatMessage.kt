@@ -94,18 +94,7 @@ fun ChatMessage(
     // AI: full-width plain text
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
       if (isStreaming && message.text.isEmpty()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-              LeadingThinkingDot()
-              Text(
-                  text = message.text,
-                  color = aiText,
-                  style = MaterialTheme.typography.bodyMedium,
-                  lineHeight = 20.sp,
-                  modifier = Modifier.weight(1f, fill = true).testTag("chat_ai_text"))
-            }
+        LeadingThinkingDot()
       } else {
         Text(
             text = message.text,
