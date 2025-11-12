@@ -43,6 +43,13 @@ import com.android.sample.Chat.ChatType
 import com.android.sample.R
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.OpenInNew
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
 
 object HomeTags {
   const val Root = "home_root"
@@ -367,12 +374,30 @@ fun HomeScreen(
                           modifier = Modifier.fillMaxSize().padding(16.dp),
                           verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             items(items = ui.messages, key = { it.id }) { item ->
-                              val showLeadingDot =
-                                  item.id == ui.streamingMessageId && item.text.isEmpty()
-                              ChatMessage(
-                                  message = item,
-                                  modifier = Modifier.fillMaxWidth(),
-                                  isStreaming = showLeadingDot)
+                                val showLeadingDot = item.id == ui.streamingMessageId && item.text.isEmpty()
+
+                                // If this message carries a source, draw the card first
+                                if (item.source != null && !item.isThinking) {
+                                    val context = androidx.compose.ui.platform.LocalContext.current
+                                    SourceCard(
+                                        siteLabel = item.source.siteLabel,
+                                        title = item.source.title,
+                                        url = item.source.url,
+                                        retrievedAt = item.source.retrievedAt,
+                                        onVisit = {
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(item.source.url))
+                                            context.startActivity(intent)
+                                        }
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                }
+
+                                // Then render the usual chat bubble (for USER/AI text)
+                                ChatMessage(
+                                    message = item,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    isStreaming = showLeadingDot
+                                )
                             }
 
                             // Global thinking indicator shown AFTER the last user message.
@@ -669,6 +694,87 @@ internal fun AnimatedIntroTitle(modifier: Modifier = Modifier) {
         }
       }
 }
+
+@Composable
+private fun SourceCard(
+    siteLabel: String,
+    title: String,
+    url: String,
+    retrievedAt: Long,
+    onVisit: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth(0.92f)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF1C1C1E))
+            .padding(10.dp)
+    ) {
+        // Top line: “Retrieved from EPFL.ch Website”
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = null,
+                tint = Color(0xFF4CAF50),  // green tick
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "Retrieved from  $siteLabel",
+                color = Color(0xFFBDBDBD),
+                style = MaterialTheme.typography.labelMedium
+            )
+        }
+
+        Spacer(Modifier.height(6.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Title (ellipsized to one line)
+            Text(
+                text = title,
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+
+            Spacer(Modifier.width(10.dp))
+
+            Button(
+                onClick = onVisit,
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))
+            ) {
+                Text("Visit")
+                Spacer(Modifier.width(6.dp))
+                Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Outlined.OpenInNew,
+                    contentDescription = null
+                )
+            }
+        }
+
+        Spacer(Modifier.height(6.dp))
+
+        // Retrieved date
+        val dateStr = remember(retrievedAt) {
+            val d = java.time.Instant.ofEpochMilli(retrievedAt)
+                .atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+            "%02d/%02d/%02d".format(d.dayOfMonth, d.monthValue, d.year % 100)
+        }
+        Text(
+            text = "Retrieved on $dateStr",
+            color = Color.Gray,
+            style = MaterialTheme.typography.labelSmall
+        )
+    }
+}
+
 
 @Preview(showBackground = true, backgroundColor = 0x000000)
 @Composable

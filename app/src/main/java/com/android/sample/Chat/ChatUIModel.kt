@@ -1,5 +1,7 @@
 package com.android.sample.Chat
 
+import com.android.sample.home.SourceMeta
+
 /**
  * Speaker role for a chat message.
  * - [USER]: message sent by the user.
@@ -27,5 +29,6 @@ data class ChatUIModel(
     val text: String,
     val timestamp: Long,
     val type: ChatType,
-    val isThinking: Boolean = false
+    val isThinking: Boolean = false,
+    val source: SourceMeta? = null
 )

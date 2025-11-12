@@ -1,5 +1,6 @@
 package com.android.sample.home
 
+import android.net.Uri
 import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -23,6 +24,13 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
 data class BotReply(val reply: String, val url: String?)
+
+data class SourceMeta(
+    val siteLabel: String,          // e.g. "EPFL.ch Website"
+    val title: String,              // e.g. "Projet de Semestre – Bachelor"
+    val url: String,
+    val retrievedAt: Long = System.currentTimeMillis()
+)
 /**
  * HomeViewModel
  *
@@ -133,8 +141,27 @@ class HomeViewModel : ViewModel() {
     activeStreamJob =
         viewModelScope.launch {
           try {
-            val reply = withContext(Dispatchers.IO) { callAnswerWithRag(question) }
-            simulateStreamingFromText(messageId, reply.reply)
+            val bot = withContext(Dispatchers.IO) { callAnswerWithRag(question) }
+            bot.url?.let { url ->
+                val meta = SourceMeta(
+                    siteLabel = buildSiteLabel(url),
+                    title = /* if you return primary_title from backend, use it here */ buildFallbackTitle(url),
+                    url = url
+                )
+                _uiState.update { s ->
+                    s.copy(
+                        messages = s.messages + ChatUIModel(
+                            id = UUID.randomUUID().toString(),
+                            text = "",                          // card has no body text
+                            timestamp = System.currentTimeMillis(),
+                            type = ChatType.AI,
+                            source = meta                       // <—— drives the card UI
+                        ),
+                        streamingSequence = s.streamingSequence + 1
+                    )
+                }
+            }
+            simulateStreamingFromText(messageId, bot.reply)
           } catch (ce: CancellationException) {
             if (!userCancelledStream) {
               setStreamingError(messageId, ce)
@@ -148,6 +175,18 @@ class HomeViewModel : ViewModel() {
             userCancelledStream = false
           }
         }
+  }
+  private fun buildSiteLabel(url: String): String {
+      val host = runCatching { Uri.parse(url).host ?: "" }.getOrNull().orEmpty()
+      val clean = host.removePrefix("www.")
+      return if (clean.endsWith("epfl.ch")) "EPFL.ch Website" else "$clean Website"
+  }
+  private fun buildFallbackTitle(url: String): String {
+      // Simple fallback: last non-empty path segment or the domain
+      val uri = runCatching { Uri.parse(url) }.getOrNull()
+      val seg = uri?.pathSegments?.lastOrNull { it.isNotBlank() } ?: ""
+      return if (seg.isNotBlank()) seg.replace('-', ' ').replace('_', ' ').replaceFirstChar { it.uppercase() }
+      else (uri?.host?.removePrefix("www.") ?: url)
   }
 
   @VisibleForTesting(otherwise = VisibleForTesting.NONE)
