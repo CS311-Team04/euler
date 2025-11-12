@@ -37,10 +37,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.android.sample.Chat.ChatMessage
 import com.android.sample.Chat.ChatType
 import com.android.sample.R
+import com.android.sample.ui.components.GuestProfileWarningModal
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -76,12 +76,13 @@ object HomeTags {
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
-    viewModel: HomeViewModel = viewModel(),
+    viewModel: HomeViewModel,
     onAction1Click: () -> Unit = {},
     onAction2Click: () -> Unit = {},
     onSendMessage: (String) -> Unit = {},
     onSignOut: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
     openDrawerOnStart: Boolean = false,
     speechHelper: com.android.sample.speech.SpeechToTextHelper? = null
 ) {
@@ -123,6 +124,20 @@ fun HomeScreen(
               scope.launch { drawerState.close() }
               if (ui.isDrawerOpen) viewModel.toggleDrawer()
               onSettingsClick()
+            },
+            onProfileClick = {
+              scope.launch { drawerState.close() }
+              if (ui.isDrawerOpen) viewModel.toggleDrawer()
+              if (ui.isGuest) {
+                viewModel.showGuestProfileWarning()
+              } else {
+                onProfileClick()
+              }
+            },
+            onProfileDisabledClick = {
+              scope.launch { drawerState.close() }
+              if (ui.isDrawerOpen) viewModel.toggleDrawer()
+              viewModel.showGuestProfileWarning()
             },
             onClose = {
               scope.launch { drawerState.close() }
@@ -401,6 +416,19 @@ fun HomeScreen(
             },
             onCancel = { viewModel.hideDeleteConfirmation() })
       }
+
+  AnimatedVisibility(
+      visible = ui.showGuestProfileWarning,
+      enter = fadeIn(tween(200)),
+      exit = fadeOut(tween(200)),
+      modifier = Modifier.fillMaxSize()) {
+        GuestProfileWarningModal(
+            onContinueAsGuest = { viewModel.hideGuestProfileWarning() },
+            onLogin = {
+              viewModel.hideGuestProfileWarning()
+              onSignOut()
+            })
+      }
 }
 
 /** Compact, rounded action button used in the bottom actions row. */
@@ -491,6 +519,7 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
             }
       }
 }
+
 
 /**
  * Small inline indicator shown while awaiting an AI reply. Driven by HomeUiState.isSending and
@@ -669,5 +698,6 @@ internal fun AnimatedIntroTitle(modifier: Modifier = Modifier) {
 @Preview(showBackground = true, backgroundColor = 0x000000)
 @Composable
 private fun HomeScreenPreview() {
-  MaterialTheme { HomeScreen() }
+  val previewViewModel = remember { HomeViewModel() }
+  MaterialTheme { HomeScreen(viewModel = previewViewModel) }
 }

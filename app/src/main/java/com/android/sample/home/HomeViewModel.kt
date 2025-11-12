@@ -1,10 +1,13 @@
 package com.android.sample.home
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.sample.BuildConfig
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
+import com.android.sample.profile.UserProfile
+import com.android.sample.profile.UserProfileRepository
 import com.google.firebase.functions.FirebaseFunctions
 import java.util.UUID
 import kotlin.getValue
@@ -28,7 +31,9 @@ import kotlinx.coroutines.withContext
  * - Append USER/AI messages to the conversation
  * - Call the backend Cloud Function for chat responses
  */
-class HomeViewModel : ViewModel() {
+class HomeViewModel(
+    private val profileRepository: UserProfileRepository = UserProfileRepository()
+) : ViewModel() {
 
   private val _uiState =
       MutableStateFlow(
@@ -67,6 +72,83 @@ class HomeViewModel : ViewModel() {
   /** Toggle the navigation drawer state. */
   fun toggleDrawer() {
     _uiState.value = _uiState.value.copy(isDrawerOpen = !_uiState.value.isDrawerOpen)
+  }
+
+  fun setGuestMode(isGuest: Boolean) {
+    if (isGuest) {
+      _uiState.value =
+          _uiState.value.copy(
+              isGuest = true,
+              profile = null,
+              userName = "guest",
+              showGuestProfileWarning = false)
+    } else {
+      _uiState.value =
+          _uiState.value.copy(
+              isGuest = false,
+              userName = _uiState.value.userName.takeIf { it.isNotBlank() } ?: DEFAULT_USER_NAME)
+    }
+  }
+
+  fun refreshProfile() {
+    viewModelScope.launch {
+      try {
+        val profile = profileRepository.loadProfile()
+        _uiState.value =
+            if (profile != null) {
+              _uiState.value.copy(
+                  profile = profile,
+                  userName =
+                      profile.preferredName.ifBlank { profile.fullName }.ifBlank {
+                        DEFAULT_USER_NAME
+                      },
+                  isGuest = false)
+            } else {
+              _uiState.value.copy(
+                  profile = null,
+                  userName =
+                      _uiState.value.userName.takeIf { it.isNotBlank() } ?: DEFAULT_USER_NAME,
+                  isGuest = false)
+            }
+      } catch (t: Throwable) {
+        Log.e("HomeViewModel", "Failed to load profile", t)
+      }
+    }
+  }
+
+  fun saveProfile(profile: UserProfile) {
+    viewModelScope.launch {
+      try {
+        profileRepository.saveProfile(profile)
+        _uiState.value =
+            _uiState.value.copy(
+                profile = profile,
+                userName =
+                    profile.preferredName.ifBlank { profile.fullName }.ifBlank {
+                      DEFAULT_USER_NAME
+                    },
+                isGuest = false)
+      } catch (t: Throwable) {
+        Log.e("HomeViewModel", "Failed to save profile", t)
+      }
+    }
+  }
+
+  fun clearProfile() {
+    _uiState.value =
+        _uiState.value.copy(
+            profile = null,
+            userName = DEFAULT_USER_NAME,
+            isGuest = false,
+            showGuestProfileWarning = false)
+  }
+
+  fun showGuestProfileWarning() {
+    _uiState.value = _uiState.value.copy(showGuestProfileWarning = true)
+  }
+
+  fun hideGuestProfileWarning() {
+    _uiState.value = _uiState.value.copy(showGuestProfileWarning = false)
   }
 
   /** Control the top-right overflow menu visibility. */
@@ -168,4 +250,8 @@ class HomeViewModel : ViewModel() {
         val map = result.getData() as? Map<String, Any?> ?: return@withContext "Invalid response"
         (map["reply"] as? String)?.ifBlank { null } ?: "No reply"
       }
+
+  companion object {
+    private const val DEFAULT_USER_NAME = "Student"
+  }
 }

@@ -6,6 +6,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -14,6 +15,8 @@ import com.android.sample.auth.MicrosoftAuth
 import com.android.sample.authentification.AuthUIScreen
 import com.android.sample.authentification.AuthUiState
 import com.android.sample.home.HomeScreen
+import com.android.sample.home.HomeViewModel
+import com.android.sample.settings.ProfilePage
 import com.android.sample.settings.SettingsPage
 import com.android.sample.sign_in.AuthViewModel
 import com.android.sample.speech.SpeechToTextHelper
@@ -25,6 +28,7 @@ object Routes {
   const val Home = "home"
   const val HomeWithDrawer = "home_with_drawer"
   const val Settings = "settings"
+  const val Profile = "profile"
 }
 
 @Composable
@@ -35,7 +39,9 @@ fun AppNav(
 ) {
   val nav = rememberNavController()
   val authViewModel = remember { AuthViewModel() }
+  val homeViewModel: HomeViewModel = viewModel()
   val authState by authViewModel.state.collectAsState()
+  val homeUiState by homeViewModel.uiState.collectAsState()
 
   // Get current back stack entry
   val navBackStackEntry by nav.currentBackStackEntryAsState()
@@ -77,6 +83,17 @@ fun AppNav(
     }
   }
 
+  LaunchedEffect(authState) {
+    when (authState) {
+      is AuthUiState.Guest -> homeViewModel.setGuestMode(true)
+      is AuthUiState.SignedIn -> {
+        homeViewModel.setGuestMode(false)
+        homeViewModel.refreshProfile()
+      }
+      else -> {}
+    }
+  }
+
   NavHost(
       navController = nav,
       startDestination = if (startOnSignedIn) Routes.Home else Routes.Opening) {
@@ -109,12 +126,14 @@ fun AppNav(
         // Home Screen
         composable(Routes.Home) {
           HomeScreen(
+              viewModel = homeViewModel,
               onAction1Click = { /* ... */},
               onAction2Click = { /* ... */},
               onSendMessage = { /* ... */},
               speechHelper = speechHelper,
               onSignOut = {
                 android.util.Log.d("NavGraph", "Sign out button clicked")
+                homeViewModel.clearProfile()
                 authViewModel.signOut()
                 android.util.Log.d("NavGraph", "Navigating to SignIn")
                 nav.navigate(Routes.SignIn) {
@@ -122,18 +141,27 @@ fun AppNav(
                   launchSingleTop = true
                 }
               },
-              onSettingsClick = { nav.navigate(Routes.Settings) })
+              onSettingsClick = { nav.navigate(Routes.Settings) },
+              onProfileClick = {
+                if (homeUiState.isGuest) {
+                  homeViewModel.showGuestProfileWarning()
+                } else {
+                  nav.navigate(Routes.Profile)
+                }
+              })
         }
 
         // Home With Drawer
         composable(Routes.HomeWithDrawer) {
           HomeScreen(
+              viewModel = homeViewModel,
               onAction1Click = { /* ... */},
               onAction2Click = { /* ... */},
               onSendMessage = { /* ... */},
               speechHelper = speechHelper,
               onSignOut = {
                 android.util.Log.d("NavGraph", "Sign out button clicked (HomeWithDrawer)")
+                homeViewModel.clearProfile()
                 authViewModel.signOut()
                 android.util.Log.d("NavGraph", "Navigating to SignIn (HomeWithDrawer)")
                 nav.navigate(Routes.SignIn) {
@@ -142,6 +170,13 @@ fun AppNav(
                 }
               },
               onSettingsClick = { nav.navigate(Routes.Settings) },
+              onProfileClick = {
+                if (homeUiState.isGuest) {
+                  homeViewModel.showGuestProfileWarning()
+                } else {
+                  nav.navigate(Routes.Profile)
+                }
+              },
               openDrawerOnStart = true)
         }
 
@@ -153,13 +188,41 @@ fun AppNav(
               },
               onSignOut = {
                 android.util.Log.d("NavGraph", "Sign out button clicked (Settings)")
+                homeViewModel.clearProfile()
                 authViewModel.signOut()
                 android.util.Log.d("NavGraph", "Navigating to SignIn (Settings)")
                 nav.navigate(Routes.SignIn) {
                   popUpTo(Routes.Home) { inclusive = true }
                   launchSingleTop = true
                 }
-              })
+              },
+              onProfileClick = {
+                if (homeUiState.isGuest) {
+                  homeViewModel.showGuestProfileWarning()
+                } else {
+                  nav.navigate(Routes.Profile)
+                }
+              },
+              onProfileDisabledClick = { homeViewModel.showGuestProfileWarning() },
+              isProfileEnabled = !homeUiState.isGuest,
+              showProfileWarning = homeUiState.showGuestProfileWarning,
+              onDismissProfileWarning = { homeViewModel.hideGuestProfileWarning() },
+              onConnectorsClick = { nav.navigate(Routes.Settings) })
+        }
+
+        composable(Routes.Profile) {
+          if (homeUiState.isGuest) {
+            LaunchedEffect(Unit) {
+              homeViewModel.showGuestProfileWarning()
+              nav.popBackStack()
+            }
+          } else {
+            LaunchedEffect(Unit) { homeViewModel.refreshProfile() }
+            ProfilePage(
+                onBackClick = { nav.popBackStack() },
+                onSaveProfile = { profile -> homeViewModel.saveProfile(profile) },
+                initialProfile = homeUiState.profile)
+          }
         }
       }
 }
