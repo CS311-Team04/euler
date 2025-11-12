@@ -41,6 +41,7 @@ import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
+import org.mockito.kotlin.timeout
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.robolectric.RobolectricTestRunner
@@ -530,12 +531,18 @@ class HomeViewModelTest {
         viewModel.sendMessage()
         advanceUntilIdle()
 
-        runBlocking { verify(repo).startNewConversation(any()) }
+        runBlocking { verify(repo, timeout(1_000)).startNewConversation(any()) }
         runBlocking {
-          verify(repo).appendMessage("generated-id", "user", "First question about Kotlin")
+          verify(repo, timeout(1_000))
+              .appendMessage("generated-id", "user", "First question about Kotlin")
         }
-        runBlocking { verify(repo).appendMessage("generated-id", "assistant", "Assistant answer") }
-        runBlocking { verify(repo).updateConversationTitle("generated-id", "Better Title") }
+        runBlocking {
+          verify(repo, timeout(1_000))
+              .appendMessage("generated-id", "assistant", "Assistant answer")
+        }
+        runBlocking {
+          verify(repo, timeout(1_000)).updateConversationTitle("generated-id", "Better Title")
+        }
         assertEquals("generated-id", viewModel.uiState.value.currentConversationId)
       }
 
@@ -570,9 +577,14 @@ class HomeViewModelTest {
         viewModel.sendMessage()
         advanceUntilIdle()
 
-        runBlocking { verify(repo).startNewConversation(any()) }
-        runBlocking { verify(repo).appendMessage("generated-id", "user", "Another question") }
-        runBlocking { verify(repo).appendMessage("generated-id", "assistant", "Assistant answer") }
+        runBlocking { verify(repo, timeout(1_000)).startNewConversation(any()) }
+        runBlocking {
+          verify(repo, timeout(1_000)).appendMessage("generated-id", "user", "Another question")
+        }
+        runBlocking {
+          verify(repo, timeout(1_000))
+              .appendMessage("generated-id", "assistant", "Assistant answer")
+        }
         runBlocking { verify(repo, never()).updateConversationTitle(any(), any()) }
       }
 

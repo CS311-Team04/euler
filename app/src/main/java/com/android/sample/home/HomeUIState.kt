@@ -11,6 +11,8 @@ data class HomeUiState(
     val systems: List<SystemItem> = emptyList(),
     val messages: List<ChatUIModel> = emptyList(),
     val messageDraft: String = "",
+    val streamingMessageId: String? = null,
+    val streamingSequence: Int = 0,
     val isDrawerOpen: Boolean = false,
     val isTopRightOpen: Boolean = false,
     val isLoading: Boolean = false,

@@ -65,6 +65,8 @@ class HomeScreenTestCov {
     assertTrue(state.messages.isEmpty())
     assertEquals("", state.messageDraft)
     assertTrue(state.messages.isEmpty())
+    assertNull(state.streamingMessageId)
+    assertEquals(0, state.streamingSequence)
   }
 
   @Test

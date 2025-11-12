@@ -1,6 +1,7 @@
 package com.android.sample.home
 
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.sample.BuildConfig
@@ -14,7 +15,11 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
 import java.util.UUID
 import kotlin.getValue
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -79,6 +84,12 @@ class HomeViewModel : ViewModel() {
     }
   }
 
+  private var activeStreamJob: Job? = null
+  @Volatile private var userCancelledStream: Boolean = false
+
+  // ---------------------------
+  // UI mutations / state helpers
+  // ---------------------------
   // ============ INIT ============
 
   private var dataStarted = false
@@ -175,10 +186,18 @@ class HomeViewModel : ViewModel() {
               .map { it.currentConversationId }
               .distinctUntilChanged()
               .flatMapLatest { cid ->
-                if (cid == null) kotlinx.coroutines.flow.flowOf(emptyList())
-                else repo.messagesFlow(cid)
+                if (cid == null) flowOf(emptyList()) else repo.messagesFlow(cid)
               }
               .collect { msgs ->
+                // IMPORTANT: si on est en train de streamer (placeholder + chunks),
+                // on NE REMPLACE PAS la liste par Firestore, sinon on perd le streaming visuel.
+                val streamingId = _uiState.value.streamingMessageId
+                if (streamingId != null) {
+                  // On ignore cette emission Firestore pendant le streaming
+                  return@collect
+                }
+
+                // Pas de streaming en cours → on peut refléter Firestore tel quel
                 _uiState.update { st -> st.copy(messages = msgs.map { it.toUi() }) }
               }
         }
@@ -234,19 +253,11 @@ class HomeViewModel : ViewModel() {
     _uiState.update { it.copy(messageDraft = text) }
   }
 
-  fun setLoading(loading: Boolean) {
-    _uiState.update { it.copy(isLoading = loading) }
-  }
-
   /** Select a conversation by id and exit the local placeholder state. */
   fun selectConversation(id: String) {
     Log.d(TAG, "selectConversation(): $id")
     isInLocalNewChat = false
     _uiState.update { it.copy(currentConversationId = id) }
-  }
-
-  fun showDeleteConfirmation() {
-    _uiState.update { it.copy(showDeleteConfirmation = true) }
   }
 
   fun hideDeleteConfirmation() {
@@ -260,102 +271,196 @@ class HomeViewModel : ViewModel() {
    * (with quick title), then persist messages; upgrade title once.
    */
   fun sendMessage() {
-    val draft = _uiState.value.messageDraft.trim()
-    if (draft.isEmpty() || _uiState.value.isSending) return
-    Log.d(
-        TAG,
-        "sendMessage(): draft='${draft.take(50)}', current=${_uiState.value.currentConversationId}")
+    val current = _uiState.value
+    // ne pas lancer si déjà en envoi ou si un stream est en cours
+    if (current.isSending || current.streamingMessageId != null) return
 
-    // Optimistic UI: clear the input and show spinner
-    _uiState.update { it.copy(messageDraft = "", isSending = true) }
+    val msg = current.messageDraft.trim()
+    if (msg.isEmpty()) return
+
+    val now = System.currentTimeMillis()
+    val userMsg =
+        ChatUIModel(
+            id = UUID.randomUUID().toString(), text = msg, timestamp = now, type = ChatType.USER)
+
+    // placeholder AI qui sera rempli en streaming
+    val aiMessageId = UUID.randomUUID().toString()
+    val placeholder =
+        ChatUIModel(
+            id = aiMessageId,
+            text = "",
+            timestamp = System.currentTimeMillis(),
+            type = ChatType.AI,
+            isThinking = true)
+
+    // UI optimiste : on ajoute user + placeholder, on vide l’input, on marque l’état de streaming
+    _uiState.update { st ->
+      st.copy(
+          messages = st.messages + userMsg + placeholder,
+          messageDraft = "",
+          isSending = true,
+          streamingMessageId = aiMessageId,
+          streamingSequence = st.streamingSequence + 1)
+    }
 
     viewModelScope.launch {
       try {
         if (isGuest()) {
-          // -------- GUEST: fully local, no Firestore ----------
-          // append local USER message
-          _uiState.update { st ->
-            st.copy(
-                messages =
-                    st.messages +
-                        ChatUIModel(
-                            id = UUID.randomUUID().toString(),
-                            text = draft,
-                            timestamp = System.currentTimeMillis(),
-                            type = ChatType.USER))
-          }
-          // call backend function and append local AI message
-          val answer = callAnswerWithRag(draft)
-          _uiState.update { st ->
-            st.copy(
-                messages =
-                    st.messages +
-                        ChatUIModel(
-                            id = UUID.randomUUID().toString(),
-                            text = answer,
-                            timestamp = System.currentTimeMillis(),
-                            type = ChatType.AI))
-          }
+          // INVITÉ : rien dans Firestore, uniquement streaming UI
+          startStreaming(question = msg, messageId = aiMessageId, conversationId = null)
           return@launch
         }
 
-        // -------- SIGNED-IN: Firestore flow ----------
+        // CONNECTÉ : s’assurer d’avoir une conversation et persister le message USER tout de suite
         val cid =
             _uiState.value.currentConversationId
                 ?: run {
-                  val quickTitle = localTitleFrom(draft)
-                  Log.d(
-                      TAG,
-                      "sendMessage(): creating conversation with provisional title '$quickTitle'")
+                  val quickTitle = localTitleFrom(msg)
                   val newId = repo.startNewConversation(quickTitle)
                   _uiState.update { it.copy(currentConversationId = newId) }
                   isInLocalNewChat = false
 
-                  // smart title update in the background (once)
+                  // Upgrade du titre en arrière-plan (UNE fois)
                   launch {
                     try {
-                      val good = fetchTitle(draft)
+                      val good = fetchTitle(msg)
                       if (good.isNotBlank() && good != quickTitle) {
-                        Log.d(TAG, "sendMessage(): updating title to '$good' for $newId")
                         repo.updateConversationTitle(newId, good)
                       }
                     } catch (_: Exception) {
-                      Log.d(TAG, "sendMessage(): title generation failed, keeping provisional")
+                      /* keep provisional */
                     }
                   }
                   newId
                 }
-        isInLocalNewChat = false
-        Log.d(TAG, "sendMessage(): using conversationId=$cid")
 
-        repo.appendMessage(cid, "user", draft)
-        val answer = callAnswerWithRag(draft)
-        repo.appendMessage(cid, "assistant", answer)
+        isInLocalNewChat = false
+        // persister immédiatement le message USER
+        repo.appendMessage(cid, "user", msg)
+
+        // démarrer le streaming; à la fin on persiste le message AI
+        startStreaming(question = msg, messageId = aiMessageId, conversationId = cid)
       } catch (_: AuthNotReadyException) {
-        Log.d(TAG, "sendMessage(): auth not ready, deferring")
-      } catch (e: Exception) {
-        Log.e(TAG, "sendMessage(): failed ${e.message}")
-        if (isGuest()) {
-          _uiState.update { st ->
-            st.copy(
-                messages =
-                    st.messages +
-                        ChatUIModel(
-                            id = UUID.randomUUID().toString(),
-                            text = "Error: ${e.message ?: "request failed"}",
-                            timestamp = System.currentTimeMillis(),
-                            type = ChatType.AI))
-          }
-        } else {
-          _uiState.value.currentConversationId?.let { cid ->
-            repo.appendMessage(cid, "assistant", "Error: ${e.message ?: "request failed"}")
-          }
-        }
-      } finally {
-        _uiState.update { it.copy(isSending = false) }
+        // rien : l’auth se (re)stabilisera
+        setStreamingError(aiMessageId, AuthNotReadyException())
+        clearStreamingState(aiMessageId)
+      } catch (t: Throwable) {
+        setStreamingError(aiMessageId, t)
+        clearStreamingState(aiMessageId)
       }
     }
   }
+
+  private fun startStreaming(question: String, messageId: String, conversationId: String?) {
+    activeStreamJob?.cancel()
+    userCancelledStream = false
+
+    activeStreamJob =
+        viewModelScope.launch {
+          try {
+            // on appelle la fonction côté IO (pas de vrai streaming réseau ici, on simule les
+            // chunks)
+            val reply = withContext(Dispatchers.IO) { callAnswerWithRag(question) }
+
+            // animer le texte en “chunks”
+            simulateStreamingFromText(messageId, reply)
+
+            // si connecté → persister le message AI une fois le texte complet connu
+            if (conversationId != null) {
+              try {
+                repo.appendMessage(conversationId, "assistant", reply)
+              } catch (e: Exception) {
+                // on a déjà montré la réponse côté UI; on loggue seulement
+                Log.w(TAG, "Failed to persist assistant message: ${e.message}")
+              }
+            }
+          } catch (ce: CancellationException) {
+            if (!userCancelledStream) setStreamingError(messageId, ce)
+          } catch (t: Throwable) {
+            if (!userCancelledStream) setStreamingError(messageId, t)
+          } finally {
+            clearStreamingState(messageId)
+            activeStreamJob = null
+            userCancelledStream = false
+          }
+        }
+  }
+
+  @VisibleForTesting(otherwise = VisibleForTesting.NONE)
+  internal suspend fun simulateStreamingForTest(messageId: String, fullText: String) {
+    simulateStreamingFromText(messageId, fullText)
+    clearStreamingState(messageId)
+  }
+
+  private suspend fun appendStreamingChunk(messageId: String, chunk: String) =
+      withContext(Dispatchers.Main) {
+        _uiState.update { state ->
+          val updated =
+              state.messages.map { message ->
+                if (message.id == messageId) {
+                  message.copy(text = message.text + chunk, isThinking = false)
+                } else {
+                  message
+                }
+              }
+          state.copy(
+              messages = updated,
+              streamingMessageId = messageId,
+              streamingSequence = state.streamingSequence + 1)
+        }
+      }
+
+  private suspend fun markMessageFinished(messageId: String) =
+      withContext(Dispatchers.Main) {
+        _uiState.update { state ->
+          val updated =
+              state.messages.map { message ->
+                if (message.id == messageId) message.copy(isThinking = false) else message
+              }
+          state.copy(messages = updated, streamingSequence = state.streamingSequence + 1)
+        }
+      }
+
+  private suspend fun setStreamingText(messageId: String, text: String) =
+      withContext(Dispatchers.Main) {
+        _uiState.update { state ->
+          val updated =
+              state.messages.map { message ->
+                if (message.id == messageId) message.copy(text = text, isThinking = false)
+                else message
+              }
+          state.copy(messages = updated, streamingSequence = state.streamingSequence + 1)
+        }
+      }
+
+  private suspend fun setStreamingError(messageId: String, error: Throwable) {
+    val message = error.message?.takeIf { it.isNotBlank() } ?: "request failed"
+    setStreamingText(messageId, "Erreur: $message")
+  }
+
+  private suspend fun simulateStreamingFromText(messageId: String, fullText: String) {
+    withContext(Dispatchers.Default) {
+      val pattern = Regex("\\S+\\s*")
+      val parts = pattern.findAll(fullText).map { it.value }.toList().ifEmpty { listOf(fullText) }
+      for (chunk in parts) {
+        coroutineContext.ensureActive()
+        appendStreamingChunk(messageId, chunk)
+        delay(60)
+      }
+      markMessageFinished(messageId)
+    }
+  }
+
+  private suspend fun clearStreamingState(messageId: String) =
+      withContext(Dispatchers.Main) {
+        _uiState.update { state ->
+          if (state.streamingMessageId == messageId) {
+            state.copy(streamingMessageId = null, isSending = false)
+          } else {
+            state.copy(isSending = false)
+          }
+        }
+      }
 
   /** Toggle the connection state of a given EPFL system. */
   fun toggleSystemConnection(systemId: String) {
@@ -366,7 +471,30 @@ class HomeViewModel : ViewModel() {
     _uiState.value = _uiState.value.copy(systems = updated)
   }
 
-  // ============ DELETING THE CURRENT CONVERSATION ============
+  /** Generic loading flag (unrelated to message sending). */
+  fun setLoading(loading: Boolean) {
+    _uiState.value = _uiState.value.copy(isLoading = loading)
+  }
+
+  /** Clear the conversation. */
+  fun clearChat() {
+    userCancelledStream = true
+    activeStreamJob?.cancel()
+    activeStreamJob = null
+    _uiState.update { state ->
+      state.copy(
+          messages = emptyList(),
+          streamingMessageId = null,
+          isSending = false,
+          streamingSequence = state.streamingSequence + 1)
+    }
+    userCancelledStream = false
+  }
+
+  /** Show the delete confirmation modal. */
+  fun showDeleteConfirmation() {
+    _uiState.value = _uiState.value.copy(showDeleteConfirmation = true)
+  }
 
   /** Delete current conversation (guest: just clear local; signed-in: remove from Firestore). */
   fun deleteCurrentConversation() {
@@ -394,6 +522,7 @@ class HomeViewModel : ViewModel() {
       withContext(Dispatchers.IO) {
         val data = hashMapOf("question" to question)
         val result = functions.getHttpsCallable("answerWithRagFn").call(data).await()
+
         @Suppress("UNCHECKED_CAST")
         val map = result.getData() as? Map<String, Any?> ?: return@withContext "Invalid response"
         (map["reply"] as? String)?.ifBlank { null } ?: "No reply"
@@ -427,5 +556,17 @@ class HomeViewModel : ViewModel() {
       Log.d(TAG, "fetchTitle(): fallback to local extraction")
       localTitleFrom(question)
     }
+  }
+
+  override fun onCleared() {
+    super.onCleared()
+    authListener?.let { auth.removeAuthStateListener(it) }
+    authListener = null
+    conversationsJob?.cancel()
+    conversationsJob = null
+    messagesJob?.cancel()
+    messagesJob = null
+    activeStreamJob?.cancel()
+    activeStreamJob = null
   }
 }
