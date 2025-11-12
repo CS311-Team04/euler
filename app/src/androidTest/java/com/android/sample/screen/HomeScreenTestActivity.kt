@@ -13,22 +13,32 @@ import com.android.sample.llm.FakeLlmClient
  */
 class HomeScreenTestActivity : ComponentActivity() {
 
-  override fun getDefaultViewModelProviderFactory(): ViewModelProvider.Factory {
-    val delegate = super.getDefaultViewModelProviderFactory()
-    return object : ViewModelProvider.Factory {
-      override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
-        if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
-          @Suppress("UNCHECKED_CAST") return HomeViewModel(FakeLlmClient()) as T
+  override val defaultViewModelProviderFactory: ViewModelProvider.Factory
+    get() {
+      val delegate = super.defaultViewModelProviderFactory
+      return object : ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+          maybeCreate(modelClass)?.let {
+            return it
+          }
+          return delegate.create(modelClass, extras)
         }
-        return delegate.create(modelClass, extras)
-      }
 
-      override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
-          @Suppress("UNCHECKED_CAST") return HomeViewModel(FakeLlmClient()) as T
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+          maybeCreate(modelClass)?.let {
+            return it
+          }
+          return delegate.create(modelClass)
         }
-        return delegate.create(modelClass)
+
+        @Suppress("UNCHECKED_CAST")
+        private fun <T : ViewModel> maybeCreate(modelClass: Class<T>): T? {
+          return if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
+            HomeViewModel(FakeLlmClient()) as T
+          } else {
+            null
+          }
+        }
       }
     }
-  }
 }
