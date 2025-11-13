@@ -103,14 +103,10 @@ class SettingsPageTest {
   @Test
   fun language_dropdown_allows_selection() {
     composeTestRule.setContent { MaterialTheme { SettingsPage() } }
-    idleLooper()
     composeTestRule.waitForIdle()
-
     composeTestRule.onNodeWithText(Localization.t("speech_language")).performClick()
-    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithText("FR").performClick()
-    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithText("FR").assertIsDisplayed()
   }

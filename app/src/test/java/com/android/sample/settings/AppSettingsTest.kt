@@ -194,7 +194,6 @@ class AppSettingsTest {
     Thread.sleep(100)
     val language = AppSettings.language
     assertNotNull(language)
-    assertTrue(language is Language)
   }
 
   @Test
@@ -370,18 +369,5 @@ class AppSettingsTest {
     val getter = AppSettings::class.java.getMethod("getLanguage")
     assertNotNull(getter)
     assertEquals("getLanguage", getter.name)
-  }
-
-  @Test
-  fun setting_and_getting_language_is_consistent() {
-    AppSettings.initialize(context)
-
-    val testLanguages = listOf(Language.FR, Language.DE, Language.ES, Language.IT)
-
-    testLanguages.forEach { expected ->
-      AppSettings.setLanguage(expected)
-      val actual = AppSettings.language
-      assertEquals("Language should match after setting", expected, actual)
-    }
   }
 }

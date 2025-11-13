@@ -267,41 +267,6 @@ class AuthUiStateTest {
   }
 
   @Test
-  fun AuthUiState_can_be_used_in_when_expression() {
-    val state1: AuthUiState = AuthUiState.Idle
-    val state2: AuthUiState = AuthUiState.SignedIn
-    val state3: AuthUiState = AuthUiState.Loading(AuthProvider.MICROSOFT)
-    val state4: AuthUiState = AuthUiState.Error("Error")
-
-    assertTrue(state1 is AuthUiState)
-    assertTrue(state2 is AuthUiState)
-    assertTrue(state3 is AuthUiState)
-    assertTrue(state4 is AuthUiState)
-  }
-
-  @Test
-  fun AuthUiState_Loading_is_Loading_state() {
-    val state = AuthUiState.Loading(AuthProvider.MICROSOFT)
-    assertTrue(state is AuthUiState.Loading)
-  }
-
-  @Test
-  fun AuthUiState_Error_is_Error_state() {
-    val state = AuthUiState.Error("Test")
-    assertTrue(state is AuthUiState.Error)
-  }
-
-  @Test
-  fun AuthUiState_Idle_is_Idle_state() {
-    assertTrue(AuthUiState.Idle is AuthUiState.Idle)
-  }
-
-  @Test
-  fun AuthUiState_SignedIn_is_SignedIn_state() {
-    assertTrue(AuthUiState.SignedIn is AuthUiState.SignedIn)
-  }
-
-  @Test
   fun AuthUiState_Loading_with_null_provider_not_supported() {
     // This test verifies that Loading requires a provider
     val loading = AuthUiState.Loading(AuthProvider.MICROSOFT)
