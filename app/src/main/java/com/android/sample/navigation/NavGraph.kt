@@ -27,6 +27,7 @@ import com.android.sample.home.HomeScreen
 import com.android.sample.home.HomeViewModel
 import com.android.sample.settings.SettingsPage
 import com.android.sample.sign_in.AuthViewModel
+import com.android.sample.speech.SpeechPlayback
 import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.splash.OpeningScreen
 
@@ -47,7 +48,12 @@ internal typealias NavigateAction = (String, NavOptionsBuilder.() -> Unit) -> Un
 
 @SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
-fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: SpeechToTextHelper) {
+fun AppNav(
+    startOnSignedIn: Boolean = false,
+    activity: Activity,
+    speechHelper: SpeechToTextHelper,
+    textToSpeechHelper: SpeechPlayback
+) {
   val nav =
       rememberNavController().also { controller -> appNavControllerObserver?.invoke(controller) }
   val authViewModel = remember { authViewModelFactory?.invoke() ?: AuthViewModel() }
@@ -111,6 +117,7 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
                 onAction2Click = { /* ... */},
                 onSendMessage = { /* ... */},
                 speechHelper = speechHelper,
+                textToSpeechHelper = textToSpeechHelper,
                 onSignOut = {
                   authViewModel.signOut()
                   navigateHomeToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
@@ -129,6 +136,7 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
                 onAction2Click = { /* ... */},
                 onSendMessage = { /* ... */},
                 speechHelper = speechHelper,
+                textToSpeechHelper = textToSpeechHelper,
                 onSignOut = {
                   authViewModel.signOut()
                   navigateHomeToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
@@ -138,7 +146,6 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
                 openDrawerOnStart = true)
           }
 
-          // Settings
           composable(Routes.Settings) {
             SettingsPage(
                 onBackClick = {

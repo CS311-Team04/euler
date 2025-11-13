@@ -4,13 +4,16 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import com.android.sample.navigation.AppNav
+import com.android.sample.speech.SpeechPlayback
 import com.android.sample.speech.SpeechToTextHelper
+import com.android.sample.speech.TextToSpeechHelper
 import com.android.sample.ui.theme.SampleAppTheme
 import com.google.firebase.FirebaseApp
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
   private val speechHelper by lazy { SpeechToTextHelper(this, this, Locale("fr", "FR")) }
+  private val speechPlayback: SpeechPlayback by lazy { TextToSpeechHelper(this) }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -26,7 +29,11 @@ class MainActivity : ComponentActivity() {
     speechHelper
     setContent {
       SampleAppTheme {
-        AppNav(startOnSignedIn = false, activity = this@MainActivity, speechHelper = speechHelper)
+        AppNav(
+            startOnSignedIn = false,
+            activity = this@MainActivity,
+            speechHelper = speechHelper,
+            textToSpeechHelper = speechPlayback)
       }
     }
   }
@@ -34,5 +41,6 @@ class MainActivity : ComponentActivity() {
   override fun onDestroy() {
     super.onDestroy()
     speechHelper.destroy()
+    speechPlayback.shutdown()
   }
 }

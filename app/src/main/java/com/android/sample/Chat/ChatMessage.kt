@@ -8,6 +8,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,6 +19,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -26,9 +33,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.android.sample.R
+import com.android.sample.ui.theme.EulerTheme
 
 /**
  * Renders a single chat message as either:
@@ -59,7 +69,10 @@ fun ChatMessage(
     userBubbleBg: Color = Color(0xFF2B2B2B),
     userBubbleText: Color = Color.White,
     aiText: Color = Color(0xFFEDEDED),
-    maxUserBubbleWidthFraction: Float = 0.78f
+    maxUserBubbleWidthFraction: Float = 0.78f,
+    isSpeaking: Boolean = false,
+    isLoadingSpeech: Boolean = false,
+    onSpeakClick: ((ChatUIModel) -> Unit)? = null
 ) {
   val isUser = message.type == ChatType.USER
 
@@ -93,16 +106,100 @@ fun ChatMessage(
   } else {
     // AI: full-width plain text
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
-      if (isStreaming && message.text.isEmpty()) {
-        LeadingThinkingDot()
-      } else {
-        Text(
-            text = message.text,
-            color = aiText,
-            style = MaterialTheme.typography.bodyMedium,
-            lineHeight = 20.sp,
-            modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+      Box(modifier = Modifier.fillMaxWidth()) {
+        if (isStreaming && message.text.isEmpty()) {
+          Box(modifier = Modifier.align(Alignment.CenterStart)) { LeadingThinkingDot() }
+        } else {
+          Text(
+              text = message.text,
+              color = aiText,
+              style = MaterialTheme.typography.bodyMedium,
+              lineHeight = 20.sp,
+              modifier = Modifier.fillMaxWidth().padding(end = 36.dp).testTag("chat_ai_text"))
+        }
+
+        AiVoiceButton(
+            message = message,
+            isSpeaking = isSpeaking,
+            isLoadingSpeech = isLoadingSpeech,
+            onSpeakClick = onSpeakClick)
       }
+    }
+  }
+}
+
+@Composable
+private fun BoxScope.AiVoiceButton(
+    message: ChatUIModel,
+    isSpeaking: Boolean,
+    isLoadingSpeech: Boolean,
+    onSpeakClick: ((ChatUIModel) -> Unit)?
+) {
+  if (onSpeakClick == null || message.text.isEmpty()) return
+
+  val buttonModifier =
+      Modifier.align(Alignment.BottomEnd).testTag("chat_ai_voice_btn_${message.id}")
+
+  when {
+    isLoadingSpeech -> {
+      Surface(
+          shape = CircleShape,
+          color = Color(0x1AFFFFFF),
+          tonalElevation = 0.dp,
+          shadowElevation = 0.dp,
+          modifier = buttonModifier.size(28.dp)) {
+            Box(contentAlignment = Alignment.Center) {
+              CircularProgressIndicator(
+                  modifier =
+                      Modifier.size(16.dp).testTag("chat_ai_voice_btn_${message.id}_loading"),
+                  strokeWidth = 2.dp,
+                  color = Color.Gray)
+            }
+          }
+    }
+    else -> {
+      val colorScheme = MaterialTheme.colorScheme
+      val voiceColors = EulerTheme.voiceButtonColors
+      val background =
+          if (isSpeaking) {
+            colorScheme.error
+          } else {
+            voiceColors.idleContainer
+          }
+      val icon =
+          if (isSpeaking) {
+            Icons.Default.Stop
+          } else {
+            Icons.Default.VolumeUp
+          }
+      val description =
+          if (isSpeaking) {
+            stringResource(R.string.chat_ai_voice_button_stop)
+          } else {
+            stringResource(R.string.chat_ai_voice_button_play)
+          }
+      val tint =
+          if (isSpeaking) {
+            colorScheme.onError
+          } else {
+            voiceColors.idleContent
+          }
+
+      Surface(
+          onClick = { onSpeakClick(message) },
+          shape = CircleShape,
+          color = background,
+          tonalElevation = 0.dp,
+          shadowElevation = 0.dp,
+          modifier = buttonModifier.size(28.dp)) {
+            Box(contentAlignment = Alignment.Center) {
+              Icon(
+                  imageVector = icon,
+                  contentDescription = description,
+                  tint = tint,
+                  modifier = Modifier.size(16.dp))
+            }
+          }
     }
   }
 }

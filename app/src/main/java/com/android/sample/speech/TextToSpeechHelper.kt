@@ -1,13 +1,6 @@
 package com.android.sample.speech
 
 import android.content.Context
-import android.media.AudioAttributes
-import android.media.AudioFocusRequest
-import android.media.AudioManager
-import android.media.audiofx.Equalizer
-import android.media.audiofx.LoudnessEnhancer
-import android.os.Build
-import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.speech.tts.TextToSpeech
@@ -38,65 +31,16 @@ interface SpeechPlayback {
  * - Expose a simple [speak] method with callbacks for start/done/error events
  * - Allow clients to stop playback or release resources when no longer needed
  */
-/**
- * Facade around [TextToSpeech] tailored for short chat responses.
- *
- * Key features:
- * - Lazy initialization with locale selection and queuing for early calls to [speak].
- * - Audio focus management that immediately reacquires focus when the system tries to duck.
- * - Loudness and EQ processing to boost volume while attenuating hiss/crackle.
- * - Main-thread callback guarantees for start/done/error observers.
- */
 class TextToSpeechHelper(
     context: Context,
     private val preferredLocale: Locale = Locale.FRENCH,
-    private val ttsFactory: (Context, TextToSpeech.OnInitListener) -> TextToSpeech =
-        { ctx, listener ->
-          TextToSpeech(ctx, listener)
-        },
-    private val equalizerFactory: (Int) -> Equalizer? = { sessionId ->
-      runCatching { Equalizer(0, sessionId) }.getOrNull()
-    },
+    private val engineFactory: (Context, (Int) -> Unit) -> TextToSpeechEngine = { ctx, listener ->
+      AndroidTextToSpeechEngine(ctx, listener)
+    }
 ) : SpeechPlayback {
 
   private val appContext = context.applicationContext
   private val mainHandler = Handler(Looper.getMainLooper())
-  private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-  private val audioFocusChangeListener =
-      AudioManager.OnAudioFocusChangeListener { focusChange ->
-        when (focusChange) {
-          AudioManager.AUDIOFOCUS_GAIN -> {
-            hasAudioFocus = true
-          }
-          AudioManager.AUDIOFOCUS_LOSS,
-          AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-            hasAudioFocus = false
-            currentUtteranceId?.let { id ->
-              callbacks.remove(id)?.let { cb ->
-                dispatchOnMain { cb.onError(IllegalStateException("Audio focus lost")) }
-              }
-            }
-            currentUtteranceId = null
-            textToSpeech.stop()
-          }
-          AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
-            // Immediately try to regain exclusive focus so Android stops ducking our speech.
-            requestAudioFocus(force = true)
-          }
-        }
-      }
-  private var audioFocusRequest: AudioFocusRequest? = null
-  private val audioAttributes: AudioAttributes by lazy {
-    AudioAttributes.Builder()
-        .setUsage(AudioAttributes.USAGE_ASSISTANT)
-        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-        .build()
-  }
-  @Volatile private var hasAudioFocus: Boolean = false
-  @Volatile private var currentUtteranceId: String? = null
-  private var loudnessEnhancer: LoudnessEnhancer? = null
-  private var enhancerSessionId: Int = AudioManager.ERROR
-  private var equalizer: Equalizer? = null
 
   private data class PendingSpeech(
       val text: String,
@@ -115,72 +59,29 @@ class TextToSpeechHelper(
 
   @Volatile private var isReady: Boolean = false
 
-  private lateinit var textToSpeech: TextToSpeech
+  private val engine: TextToSpeechEngine
 
   init {
-    textToSpeech =
-        ttsFactory(appContext) { status ->
-          isReady =
-              if (status == TextToSpeech.SUCCESS) {
-                val languageReady = selectLanguage()
-                if (languageReady) {
-                  configureEngine()
-                }
-                languageReady
-              } else {
-                false
-              }
+    engine = engineFactory(appContext) { status -> handleInitialization(status) }
 
-          synchronized(pendingQueue) {
-            if (isReady) {
-              // Replay queued requests now that initialization succeeded.
-              val requests = pendingQueue.toList()
-              pendingQueue.clear()
-              requests.forEach { speakInternal(it) }
-            } else {
-              // Notify queued callbacks that TTS is unavailable.
-              val failure =
-                  IllegalStateException("TextToSpeech engine is not available on this device")
-              pendingQueue.forEach { pending ->
-                dispatchOnMain { pending.callbacks.onError(failure) }
-              }
-              pendingQueue.clear()
-            }
-          }
-        }
-
-    textToSpeech.setOnUtteranceProgressListener(
+    engine.setProgressListener(
         object : UtteranceProgressListener() {
           override fun onStart(utteranceId: String) {
-            enableEnhancer()
             callbacks[utteranceId]?.let { cb -> dispatchOnMain { cb.onStart() } }
           }
 
           override fun onDone(utteranceId: String) {
-            callbacks.remove(utteranceId)?.let { cb ->
-              currentUtteranceId = null
-              disableEnhancer()
-              abandonAudioFocus()
-              dispatchOnMain { cb.onDone() }
-            }
+            callbacks.remove(utteranceId)?.let { cb -> dispatchOnMain { cb.onDone() } }
           }
 
           @Deprecated("Deprecated in API 21")
           override fun onError(utteranceId: String) {
-            callbacks.remove(utteranceId)?.let { cb ->
-              currentUtteranceId = null
-              disableEnhancer()
-              abandonAudioFocus()
-              dispatchOnMain { cb.onError(null) }
-            }
+            callbacks.remove(utteranceId)?.let { cb -> dispatchOnMain { cb.onError(null) } }
           }
 
           override fun onError(utteranceId: String, errorCode: Int) {
             callbacks.remove(utteranceId)?.let { cb ->
               val error = IllegalStateException("TTS error (code=$errorCode)")
-              currentUtteranceId = null
-              disableEnhancer()
-              abandonAudioFocus()
               dispatchOnMain { cb.onError(error) }
             }
           }
@@ -196,15 +97,6 @@ class TextToSpeechHelper(
    * @param onStart Invoked on the main thread when playback begins.
    * @param onDone Invoked on the main thread when playback completes.
    * @param onError Invoked on the main thread if playback fails (initialization or runtime).
-   */
-  /**
-   * Speaks the provided text once. If the engine is still warming up, the request is enqueued.
-   *
-   * @param text sentence or paragraph to vocalise.
-   * @param utteranceId unique identifier so clients can correlate callbacks.
-   * @param onStart invoked on the main thread as soon as playback begins.
-   * @param onDone invoked after successful completion (main thread).
-   * @param onError invoked if the engine fails to enqueue or speak the utterance.
    */
   override fun speak(
       text: String,
@@ -230,66 +122,28 @@ class TextToSpeechHelper(
   }
 
   /** Stops any ongoing playback immediately. */
-  /**
-   * Stops any ongoing playback and clears callbacks.
-   *
-   * Does not release engine resources; use [shutdown] when finished with the helper entirely.
-   */
   override fun stop() {
     callbacks.clear()
-    currentUtteranceId = null
-    disableEnhancer()
-    abandonAudioFocus()
-    textToSpeech.stop()
+    engine.stop()
   }
 
   /** Releases the underlying TTS engine. Call when you no longer need speech output. */
-  /** Fully tears down TextToSpeech and audio effects. Call this from `onDestroy`. */
   override fun shutdown() {
     callbacks.clear()
-    currentUtteranceId = null
-    releaseEnhancer()
-    abandonAudioFocus()
-    textToSpeech.stop()
-    textToSpeech.shutdown()
+    engine.stop()
+    engine.shutdown()
   }
 
-  /**
-   * Enqueues speech on the underlying engine.
-   *
-   * Audio focus is requested immediately; failure results in a callback error rather than silent
-   * loss.
-   */
   private fun speakInternal(request: PendingSpeech) {
-    if (!requestAudioFocus()) {
-      callbacks.remove(request.utteranceId)
-      val failure = IllegalStateException("Audio focus not granted for text-to-speech")
-      dispatchOnMain { request.callbacks.onError(failure) }
-      return
-    }
-    currentUtteranceId = request.utteranceId
     callbacks[request.utteranceId] = request.callbacks
-    val params =
-        Bundle().apply {
-          putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
-          if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
-            @Suppress("DEPRECATION")
-            putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC)
-          }
-        }
-    val result =
-        textToSpeech.speak(request.text, TextToSpeech.QUEUE_FLUSH, params, request.utteranceId)
+    val result = engine.speak(request.text, TextToSpeech.QUEUE_FLUSH, null, request.utteranceId)
     if (result != TextToSpeech.SUCCESS) {
       callbacks.remove(request.utteranceId)
-      currentUtteranceId = null
-      disableEnhancer()
-      abandonAudioFocus()
       val failure = IllegalStateException("Failed to enqueue text-to-speech (code=$result)")
       dispatchOnMain { request.callbacks.onError(failure) }
     }
   }
 
-  /** Ensures callbacks run on the main thread even when triggered from background coroutines. */
   private fun dispatchOnMain(block: () -> Unit) {
     if (Looper.myLooper() == Looper.getMainLooper()) {
       block()
@@ -298,9 +152,6 @@ class TextToSpeechHelper(
     }
   }
 
-  /**
-   * Iterates through preferred locales, picking the first one supported by the device TTS engine.
-   */
   private fun selectLanguage(): Boolean {
     val candidates = buildList {
       add(preferredLocale)
@@ -310,7 +161,7 @@ class TextToSpeechHelper(
     }
 
     for (locale in candidates) {
-      val result = textToSpeech.setLanguage(locale)
+      val result = engine.setLanguage(locale)
       if (result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED) {
         return true
       }
@@ -318,129 +169,63 @@ class TextToSpeechHelper(
     return false
   }
 
-  /** Applies common attributes (usage, speech rate, pitch) and primes audio effects. */
-  private fun configureEngine() {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-      textToSpeech.setAudioAttributes(audioAttributes)
-    }
-    textToSpeech.setSpeechRate(DEFAULT_SPEECH_RATE)
-    textToSpeech.setPitch(DEFAULT_PITCH)
-    prepareEnhancer()
-  }
-
-  /** Requests exclusive audio focus so system ducking does not reduce TTS volume mid-utterance. */
-  private fun requestAudioFocus(force: Boolean = false): Boolean {
-    if (hasAudioFocus && !force) return true
-    val granted =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-          val request =
-              AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                  .setAudioAttributes(audioAttributes)
-                  .setOnAudioFocusChangeListener(audioFocusChangeListener, mainHandler)
-                  .setWillPauseWhenDucked(false)
-                  .build()
-          audioFocusRequest = request
-          audioManager.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+  private fun handleInitialization(status: Int) {
+    isReady =
+        if (status == TextToSpeech.SUCCESS) {
+          selectLanguage()
         } else {
-          audioManager.requestAudioFocus(
-              audioFocusChangeListener,
-              AudioManager.STREAM_MUSIC,
-              AudioManager.AUDIOFOCUS_GAIN,
-          ) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+          false
         }
-    hasAudioFocus = granted
-    return granted
-  }
 
-  /** Releases audio focus (if held) once playback and callbacks conclude. */
-  private fun abandonAudioFocus() {
-    hasAudioFocus = false
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
-      audioFocusRequest = null
-    } else {
-      audioManager.abandonAudioFocus(audioFocusChangeListener)
+    synchronized(pendingQueue) {
+      if (isReady) {
+        val requests = pendingQueue.toList()
+        pendingQueue.clear()
+        requests.forEach { speakInternal(it) }
+      } else {
+        val failure = IllegalStateException("TextToSpeech engine is not available on this device")
+        pendingQueue.forEach { pending -> dispatchOnMain { pending.callbacks.onError(failure) } }
+        pendingQueue.clear()
+      }
     }
   }
+}
 
-  /** Lazily configures `LoudnessEnhancer` and the companion equalizer for the active session ID. */
-  private fun prepareEnhancer() {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) return
-    val sessionId = resolveAudioSessionId()
-    if (sessionId == AudioManager.ERROR || sessionId <= 0) return
-    if (enhancerSessionId == sessionId) return
-    releaseEnhancer()
-    loudnessEnhancer =
-        LoudnessEnhancer(sessionId).apply {
-          setTargetGain(ENHANCER_GAIN_MB)
-          enabled = false
-        }
-    enhancerSessionId = sessionId
-    setupEqualizer(sessionId)
+interface TextToSpeechEngine {
+  fun setLanguage(locale: Locale): Int
+
+  fun speak(text: String, queueMode: Int, params: android.os.Bundle?, utteranceId: String): Int
+
+  fun stop()
+
+  fun shutdown()
+
+  fun setProgressListener(listener: UtteranceProgressListener)
+}
+
+internal class AndroidTextToSpeechEngine(context: Context, initListener: (Int) -> Unit) :
+    TextToSpeechEngine {
+
+  private val engine = TextToSpeech(context) { status -> initListener(status) }
+
+  override fun setLanguage(locale: Locale): Int = engine.setLanguage(locale)
+
+  override fun speak(
+      text: String,
+      queueMode: Int,
+      params: android.os.Bundle?,
+      utteranceId: String
+  ): Int = engine.speak(text, queueMode, params, utteranceId)
+
+  override fun stop() {
+    engine.stop()
   }
 
-  private fun enableEnhancer() {
-    prepareEnhancer()
-    loudnessEnhancer?.apply {
-      setTargetGain(ENHANCER_GAIN_MB)
-      enabled = true
-    }
-    equalizer?.enabled = true
+  override fun shutdown() {
+    engine.shutdown()
   }
 
-  private fun disableEnhancer() {
-    loudnessEnhancer?.enabled = false
-    equalizer?.enabled = false
-  }
-
-  private fun releaseEnhancer() {
-    loudnessEnhancer?.release()
-    loudnessEnhancer = null
-    enhancerSessionId = AudioManager.ERROR
-    releaseEqualizer()
-  }
-
-  /** Applies a gentle high-frequency cut and a small low-end reduction to soften artefacts. */
-  private fun setupEqualizer(sessionId: Int) {
-    releaseEqualizer()
-    val newEqualizer = equalizerFactory(sessionId) ?: return
-    equalizer =
-        newEqualizer.apply {
-          enabled = true
-          val bandRange = bandLevelRange
-          val trebleCut = (bandRange[0] / 2).coerceAtMost(0).toShort()
-          val bassCut = (bandRange[0] / 3).coerceAtMost(0).toShort()
-          val bands = numberOfBands.toInt()
-          for (band in 0 until bands) {
-            val centerHz = getCenterFreq(band.toShort()) / 1000
-            when {
-              centerHz >= TREBLE_CUTOFF_HZ -> setBandLevel(band.toShort(), trebleCut)
-              centerHz <= BASS_CUTOFF_HZ -> setBandLevel(band.toShort(), bassCut)
-              else -> setBandLevel(band.toShort(), 0)
-            }
-          }
-        }
-  }
-
-  /** Disposes the equalizer instance if one is currently attached to the audio session. */
-  private fun releaseEqualizer() {
-    equalizer?.release()
-    equalizer = null
-  }
-
-  /** Attempts to read the internal TTS audio session ID via reflection (API-dependent). */
-  private fun resolveAudioSessionId(): Int {
-    return runCatching {
-          TextToSpeech::class.java.getMethod("getAudioSessionId").invoke(textToSpeech) as? Int
-        }
-        .getOrNull() ?: AudioManager.ERROR
-  }
-
-  companion object {
-    private const val DEFAULT_SPEECH_RATE = 0.95f
-    private const val DEFAULT_PITCH = 1.0f
-    private const val ENHANCER_GAIN_MB = 1800
-    private const val TREBLE_CUTOFF_HZ = 6_500
-    private const val BASS_CUTOFF_HZ = 180
+  override fun setProgressListener(listener: UtteranceProgressListener) {
+    engine.setOnUtteranceProgressListener(listener)
   }
 }

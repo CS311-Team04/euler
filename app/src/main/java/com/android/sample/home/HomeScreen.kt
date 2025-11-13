@@ -41,6 +41,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.android.sample.Chat.ChatMessage
 import com.android.sample.Chat.ChatType
 import com.android.sample.R
+import com.android.sample.speech.SpeechPlayback
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -85,11 +86,24 @@ fun HomeScreen(
     onVoiceChatClick: () -> Unit = {},
     openDrawerOnStart: Boolean = false,
     speechHelper: com.android.sample.speech.SpeechToTextHelper? = null,
-    forceNewChatOnFirstOpen: Boolean = false
+    forceNewChatOnFirstOpen: Boolean = false,
+    textToSpeechHelper: SpeechPlayback? = null
 ) {
   val ui by viewModel.uiState.collectAsState()
   val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
   val scope = rememberCoroutineScope()
+  val ttsHelper = textToSpeechHelper
+
+  var speakingMessageId by remember { mutableStateOf<String?>(null) }
+  var loadingMessageId by remember { mutableStateOf<String?>(null) }
+
+  DisposableEffect(ttsHelper) {
+    onDispose {
+      ttsHelper?.stop()
+      speakingMessageId = null
+      loadingMessageId = null
+    }
+  }
 
   val ranNewChatOnce = remember { mutableStateOf(false) }
   LaunchedEffect(forceNewChatOnFirstOpen) {
@@ -394,12 +408,56 @@ fun HomeScreen(
                           modifier = Modifier.fillMaxSize().padding(16.dp),
                           verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             items(items = ui.messages, key = { it.id }) { item ->
+                              val isSpeaking = speakingMessageId == item.id
+                              val isLoading = loadingMessageId == item.id
                               val showLeadingDot =
                                   item.id == ui.streamingMessageId && item.text.isEmpty()
                               ChatMessage(
                                   message = item,
                                   modifier = Modifier.fillMaxWidth(),
-                                  isStreaming = showLeadingDot)
+                                  isStreaming = showLeadingDot,
+                                  isSpeaking = isSpeaking,
+                                  isLoadingSpeech = isLoading,
+                                  onSpeakClick =
+                                      if (item.type == ChatType.AI &&
+                                          ttsHelper != null &&
+                                          item.text.isNotEmpty()) {
+                                        { message ->
+                                          if (speakingMessageId == message.id) {
+                                            ttsHelper.stop()
+                                            speakingMessageId = null
+                                            loadingMessageId = null
+                                          } else {
+                                            if (speakingMessageId != null) {
+                                              ttsHelper.stop()
+                                              speakingMessageId = null
+                                            }
+                                            loadingMessageId = message.id
+                                            ttsHelper.speak(
+                                                text = message.text,
+                                                utteranceId = message.id,
+                                                onStart = {
+                                                  loadingMessageId = null
+                                                  speakingMessageId = message.id
+                                                },
+                                                onDone = {
+                                                  if (speakingMessageId == message.id) {
+                                                    speakingMessageId = null
+                                                  }
+                                                },
+                                                onError = {
+                                                  if (speakingMessageId == message.id) {
+                                                    speakingMessageId = null
+                                                  }
+                                                  if (loadingMessageId == message.id) {
+                                                    loadingMessageId = null
+                                                  }
+                                                })
+                                          }
+                                        }
+                                      } else {
+                                        null
+                                      })
                             }
 
                             // Global thinking indicator shown AFTER the last user message.
