@@ -1178,8 +1178,7 @@ class HomeViewModelTest {
         val viewModel = HomeViewModel()
 
         val title =
-            viewModel.invokeBuildFallbackTitle(
-                "https://www.epfl.ch/education/projet-de-semestre")
+            viewModel.invokeBuildFallbackTitle("https://www.epfl.ch/education/projet-de-semestre")
 
         assertTrue(title.contains("projet-de-semestre"))
       }
