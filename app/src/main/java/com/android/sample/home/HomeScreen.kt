@@ -41,6 +41,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.android.sample.Chat.ChatMessage
 import com.android.sample.Chat.ChatType
 import com.android.sample.R
+import com.android.sample.settings.Localization
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -146,7 +147,7 @@ fun HomeScreen(
                         modifier = Modifier.size(48.dp).testTag(HomeTags.MenuBtn)) {
                           Icon(
                               Icons.Default.Menu,
-                              contentDescription = "Menu",
+                              contentDescription = Localization.t("menu"),
                               tint = Color.White,
                               modifier = Modifier.size(24.dp))
                         }
@@ -154,7 +155,7 @@ fun HomeScreen(
                   title = {
                     Image(
                         painter = painterResource(R.drawable.euler_logo),
-                        contentDescription = "Euler",
+                        contentDescription = Localization.t("euler"),
                         modifier = Modifier.height(25.dp),
                         contentScale = ContentScale.Fit)
                   },
@@ -164,7 +165,7 @@ fun HomeScreen(
                         modifier = Modifier.size(48.dp).testTag(HomeTags.TopRightBtn)) {
                           Icon(
                               Icons.Default.MoreVert,
-                              contentDescription = "More",
+                              contentDescription = Localization.t("more"),
                               tint = Color.White,
                               modifier = Modifier.size(24.dp))
                         }
@@ -193,14 +194,14 @@ fun HomeScreen(
                     // Horizontal scrollable row of suggestion chips
                     val suggestions =
                         listOf(
-                            "What is EPFL",
-                            "Check Ed Discussion",
-                            "Show my schedule",
-                            "Find library resources",
-                            "Check grades on IS-Academia",
-                            "Search Moodle courses",
-                            "What's due this week?",
-                            "Help me study for CS220")
+                            Localization.t("suggestion_what_is_epfl"),
+                            Localization.t("suggestion_check_ed"),
+                            Localization.t("suggestion_show_schedule"),
+                            Localization.t("suggestion_library"),
+                            Localization.t("suggestion_check_grades"),
+                            Localization.t("suggestion_search_moodle"),
+                            Localization.t("suggestion_whats_due"),
+                            Localization.t("suggestion_study_help"))
 
                     val scrollState = rememberScrollState()
 
@@ -255,7 +256,7 @@ fun HomeScreen(
                     OutlinedTextField(
                         value = ui.messageDraft,
                         onValueChange = { viewModel.updateMessageDraft(it) },
-                        placeholder = { Text("Message EULER", color = Color.Gray) },
+                        placeholder = { Text(Localization.t("message_euler"), color = Color.Gray) },
                         modifier =
                             Modifier.fillMaxWidth()
                                 .padding(horizontal = 16.dp)
@@ -276,7 +277,7 @@ fun HomeScreen(
                                 modifier = Modifier.testTag(HomeTags.MicBtn)) {
                                   Icon(
                                       Icons.Default.Mic,
-                                      contentDescription = "Dictate",
+                                      contentDescription = Localization.t("dictate"),
                                       tint = Color.Gray)
                                 }
 
@@ -292,7 +293,7 @@ fun HomeScreen(
                                       modifier = Modifier.testTag(HomeTags.VoiceBtn)) {
                                         Icon(
                                             Icons.Default.GraphicEq,
-                                            contentDescription = "Voice mode",
+                                            contentDescription = Localization.t("voice_mode"),
                                             tint = Color.Gray)
                                       }
                                 }
@@ -331,7 +332,7 @@ fun HomeScreen(
 
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        text = "Powered by APERTUS",
+                        text = Localization.t("powered_by").uppercase(),
                         color = Color.Gray,
                         fontSize = 11.sp,
                         textAlign = TextAlign.Center,
@@ -427,9 +428,9 @@ private fun SuggestionChip(text: String, modifier: Modifier = Modifier, onClick:
 
 @Composable
 private fun TopRightPanelPlaceholder(onDismiss: () -> Unit, onDeleteClick: () -> Unit) {
-  DropdownMenuItem(text = { Text("Share") }, onClick = onDismiss)
+  DropdownMenuItem(text = { Text(Localization.t("share")) }, onClick = onDismiss)
   DropdownMenuItem(
-      text = { Text("Delete") },
+      text = { Text(Localization.t("delete")) },
       onClick = {
         onDeleteClick()
         onDismiss()
@@ -456,7 +457,7 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
                   modifier = Modifier.padding(24.dp),
                   horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "Clear Chat?",
+                        text = Localization.t("clear_chat"),
                         color = Color.White,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold)
@@ -464,7 +465,7 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = "This will delete all messages. This action cannot be undone.",
+                        text = Localization.t("clear_chat_message"),
                         color = Color.Gray,
                         fontSize = 14.sp,
                         textAlign = TextAlign.Center)
@@ -480,7 +481,7 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
                               colors =
                                   ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A2A)),
                               shape = RoundedCornerShape(8.dp)) {
-                                Text("Cancel", color = Color.White)
+                                Text(Localization.t("cancel"), color = Color.White)
                               }
 
                           Button(
@@ -488,7 +489,10 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
                               modifier = Modifier.weight(1f),
                               colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                               shape = RoundedCornerShape(8.dp)) {
-                                Text("Delete", color = Color.White, fontWeight = FontWeight.Bold)
+                                Text(
+                                    Localization.t("delete"),
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold)
                               }
                         }
                   }
@@ -509,7 +513,7 @@ private fun ThinkingIndicator(modifier: Modifier = Modifier) {
       dots = (dots + 1) % 4
     }
   }
-  val text = "Euler is thinking" + ".".repeat(dots)
+  val text = Localization.t("euler_thinking") + ".".repeat(dots)
   Surface(
       modifier = modifier,
       shape = RoundedCornerShape(12.dp),
@@ -595,7 +599,7 @@ private fun BubbleSendButton(
                 }
             Icon(
                 imageVector = icon,
-                contentDescription = "Send",
+                contentDescription = Localization.t("send"),
                 tint = Color.White,
                 modifier = Modifier.size(22.dp) // larger arrow for visibility
                 )
@@ -612,11 +616,11 @@ private fun BubbleSendButton(
 internal fun AnimatedIntroTitle(modifier: Modifier = Modifier) {
   val suggestions = remember {
     listOf(
-        "Find CS220 past exams",
-        "Check my Moodle assignments",
-        "What's on Ed Discussion?",
-        "Show my IS-Academia schedule",
-        "Search EPFL Drive files")
+        Localization.t("intro_suggestion_1"),
+        Localization.t("intro_suggestion_2"),
+        Localization.t("intro_suggestion_3"),
+        Localization.t("intro_suggestion_4"),
+        Localization.t("intro_suggestion_5"))
   }
 
   var currentIndex by remember { mutableStateOf(0) }
@@ -635,7 +639,7 @@ internal fun AnimatedIntroTitle(modifier: Modifier = Modifier) {
       verticalArrangement = Arrangement.Center) {
         // Title: "Ask Euler Anything" in deep burgundy/plum
         Text(
-            text = "Ask Euler Anything",
+            text = Localization.t("ask_euler_anything"),
             color = Color(0xFF8B0000), // Deep burgundy red
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,

@@ -198,6 +198,9 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.compose.ui:ui-tooling-preview")
 
+    // DataStore for persistent settings
+    implementation(libs.datastore.preferences)
+
 }
 
 // JaCoCo configuration with Java 17 compatibility

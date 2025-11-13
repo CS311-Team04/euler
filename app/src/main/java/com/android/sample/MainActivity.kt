@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import com.android.sample.navigation.AppNav
+import com.android.sample.settings.AppSettings
 import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.ui.theme.SampleAppTheme
 import com.google.firebase.FirebaseApp
@@ -20,6 +21,8 @@ class MainActivity : ComponentActivity() {
     if (FirebaseApp.getApps(this).isEmpty()) {
       FirebaseApp.initializeApp(this)
     }
+    // Initialize app settings (loads saved preferences)
+    AppSettings.initialize(this)
     // Initialize the helper here (lazy initialization happens on first access, but before
     // setContent)
     speechHelper
