@@ -1,5 +1,6 @@
 package com.android.sample.navigation
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,18 +9,22 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavOptionsBuilder
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navigation
 import com.android.sample.VoiceChat.UI.VoiceScreen
 import com.android.sample.auth.MicrosoftAuth
 import com.android.sample.authentification.AuthUIScreen
 import com.android.sample.authentification.AuthUiState
 import com.android.sample.home.HomeScreen
+import com.android.sample.home.HomeViewModel
 import com.android.sample.settings.SettingsPage
 import com.android.sample.sign_in.AuthViewModel
 import com.android.sample.speech.SpeechToTextHelper
@@ -40,6 +45,7 @@ object Routes {
 
 internal typealias NavigateAction = (String, NavOptionsBuilder.() -> Unit) -> Unit
 
+@SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
 fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: SpeechToTextHelper) {
   val nav =
@@ -76,7 +82,7 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
   NavHost(
       navController = nav,
       startDestination = if (startOnSignedIn) Routes.Home else Routes.Opening) {
-        // Opening Screen (nouvelle logique)
+        // Opening Screen (new flow)
         composable(Routes.Opening) {
           OpeningScreen(
               authState = authState,
@@ -95,56 +101,55 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
               onMicrosoftLogin = { authViewModel.onMicrosoftLoginClick() },
               onSwitchEduLogin = { authViewModel.onSwitchEduLoginClick() })
         }
+        navigation(startDestination = Routes.Home, route = "home_root") {
+          composable(Routes.Home) {
+            val parentEntry = remember { nav.getBackStackEntry("home_root") }
+            val vm: HomeViewModel = viewModel(parentEntry)
+            HomeScreen(
+                viewModel = vm,
+                onAction1Click = { /* ... */},
+                onAction2Click = { /* ... */},
+                onSendMessage = { /* ... */},
+                speechHelper = speechHelper,
+                onSignOut = {
+                  authViewModel.signOut()
+                  navigateHomeToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
+                },
+                onSettingsClick = { nav.navigate(Routes.Settings) },
+                onVoiceChatClick = { nav.navigate(Routes.VoiceChat) },
+                forceNewChatOnFirstOpen = false)
+          }
 
-        // Home Screen
-        composable(Routes.Home) {
-          HomeScreen(
-              onAction1Click = { /* ... */},
-              onAction2Click = { /* ... */},
-              onSendMessage = { /* ... */},
-              speechHelper = speechHelper,
-              onSignOut = {
-                android.util.Log.d("NavGraph", "Sign out button clicked")
-                authViewModel.signOut()
-                android.util.Log.d("NavGraph", "Navigating to SignIn")
-                navigateHomeToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
-              },
-              onSettingsClick = { nav.navigate(Routes.Settings) },
-              onVoiceChatClick = { nav.navigate(Routes.VoiceChat) })
+          composable(Routes.HomeWithDrawer) {
+            val parentEntry = remember { nav.getBackStackEntry("home_root") }
+            val vm: HomeViewModel = viewModel(parentEntry)
+            HomeScreen(
+                viewModel = vm,
+                onAction1Click = { /* ... */},
+                onAction2Click = { /* ... */},
+                onSendMessage = { /* ... */},
+                speechHelper = speechHelper,
+                onSignOut = {
+                  authViewModel.signOut()
+                  navigateHomeToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
+                },
+                onSettingsClick = { nav.navigate(Routes.Settings) },
+                onVoiceChatClick = { nav.navigate(Routes.VoiceChat) },
+                openDrawerOnStart = true)
+          }
+
+          // Settings
+          composable(Routes.Settings) {
+            SettingsPage(
+                onBackClick = {
+                  navigateSettingsBack { route, builder -> nav.navigate(route) { builder(this) } }
+                },
+                onSignOut = {
+                  authViewModel.signOut()
+                  navigateHomeToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
+                })
+          }
         }
-
-        // Home With Drawer
-        composable(Routes.HomeWithDrawer) {
-          HomeScreen(
-              onAction1Click = { /* ... */},
-              onAction2Click = { /* ... */},
-              onSendMessage = { /* ... */},
-              speechHelper = speechHelper,
-              onSignOut = {
-                android.util.Log.d("NavGraph", "Sign out button clicked (HomeWithDrawer)")
-                authViewModel.signOut()
-                android.util.Log.d("NavGraph", "Navigating to SignIn (HomeWithDrawer)")
-                navigateHomeToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
-              },
-              onSettingsClick = { nav.navigate(Routes.Settings) },
-              onVoiceChatClick = { nav.navigate(Routes.VoiceChat) },
-              openDrawerOnStart = true)
-        }
-
-        // Settings
-        composable(Routes.Settings) {
-          SettingsPage(
-              onBackClick = {
-                navigateSettingsBack { route, builder -> nav.navigate(route) { builder(this) } }
-              },
-              onSignOut = {
-                android.util.Log.d("NavGraph", "Sign out button clicked (Settings)")
-                authViewModel.signOut()
-                android.util.Log.d("NavGraph", "Navigating to SignIn (Settings)")
-                navigateHomeToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
-              })
-        }
-
         // Voice Chat Screen
         composable(Routes.VoiceChat) {
           VoiceScreen(

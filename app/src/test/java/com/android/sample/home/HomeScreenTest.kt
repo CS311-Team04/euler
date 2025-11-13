@@ -1,5 +1,6 @@
 package com.android.sample.home
 
+import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
@@ -7,11 +8,15 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.test.core.app.ApplicationProvider
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
 import com.android.sample.llm.FakeLlmClient
 import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.util.MainDispatcherRule
+import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
+import com.google.firebase.auth.FirebaseAuth
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -21,6 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.After
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -611,11 +617,27 @@ class HomeScreenComposeInteractionsTest {
   @get:Rule
   val dispatcherRule = MainDispatcherRule(UnconfinedTestDispatcher())
 
+  @Before
+  fun setUp() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    if (FirebaseApp.getApps(context).isEmpty()) {
+      FirebaseApp.initializeApp(
+          context,
+          FirebaseOptions.Builder()
+              .setApplicationId("1:1234567890:android:test")
+              .setProjectId("test-project")
+              .setApiKey("fake-api-key")
+              .build())
+    }
+    FirebaseAuth.getInstance().signOut()
+  }
+
   private fun createViewModel(): HomeViewModel = HomeViewModel(FakeLlmClient())
 
   @After
   fun tearDownMocks() {
     unmockkAll()
+    FirebaseAuth.getInstance().signOut()
   }
 
   private fun HomeViewModel.editState(transform: (HomeUiState) -> HomeUiState) {

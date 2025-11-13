@@ -1,9 +1,44 @@
 package com.android.sample.navigation
 
+import androidx.activity.ComponentActivity
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.test.core.app.ApplicationProvider
 import com.android.sample.authentification.AuthProvider
+import com.android.sample.authentification.AuthProvider.MICROSOFT
 import com.android.sample.authentification.AuthUiState
+import com.android.sample.home.DrawerTags
+import com.android.sample.home.HomeTags
+import com.android.sample.sign_in.AuthViewModel
+import com.android.sample.speech.SpeechToTextHelper
+import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
+import com.google.firebase.auth.FirebaseAuth
+import java.util.concurrent.TimeUnit
+import kotlin.jvm.functions.Function0
+import kotlin.jvm.functions.Function1
+import kotlin.use
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.*
+import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.mockito.Mockito
+import org.mockito.Mockito.mockConstruction
+import org.mockito.kotlin.doAnswer
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
+import org.robolectric.Robolectric
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * Unit tests for NavGraphLogic functions These tests provide code coverage for extracted navigation
@@ -296,6 +331,21 @@ class NavGraphLogicTest {
   }
 
   @Test
+  fun resolveAuthCommand_prioritises_microsoft_sign_in_command() {
+    val command = resolveAuthCommand(AuthUiState.Loading(AuthProvider.MICROSOFT), Routes.SignIn)
+    assertEquals(
+        "Loading Microsoft should trigger StartMicrosoftSignIn even when on SignIn screen",
+        AuthCommand.StartMicrosoftSignIn,
+        command)
+  }
+
+  @Test
+  fun resolveAuthCommand_returns_none_when_no_conditions_match() {
+    val command = resolveAuthCommand(AuthUiState.Error("boom"), Routes.VoiceChat)
+    assertEquals(AuthCommand.None, command)
+  }
+
+  @Test
   fun executeAuthCommand_dispatches_to_correct_action() {
     var signInCalled = 0
     var navigateCalled = 0
@@ -309,6 +359,17 @@ class NavGraphLogicTest {
   }
 
   @Test
+  fun executeAuthCommand_none_invokes_no_callbacks() {
+    var startCalled = false
+    var navigateCalled = false
+
+    executeAuthCommand(AuthCommand.None, { startCalled = true }, { navigateCalled = true })
+
+    assertFalse("Start should not be invoked for AuthCommand.None", startCalled)
+    assertFalse("Navigate should not be invoked for AuthCommand.None", navigateCalled)
+  }
+
+  @Test
   fun buildAuthenticationErrorMessage_prefers_state_message() {
     val errorState = AuthUiState.Error("")
     val fallback = "Authentication failed"
@@ -319,5 +380,215 @@ class NavGraphLogicTest {
   fun buildAuthenticationErrorMessage_uses_fallback_for_non_error_state() {
     val fallback = "Authentication failed"
     assertEquals(fallback, buildAuthenticationErrorMessage(AuthUiState.Idle, fallback))
+  }
+
+  @Test
+  fun buildAuthenticationErrorMessage_returns_specific_message_for_error_state() {
+    val message =
+        buildAuthenticationErrorMessage(AuthUiState.Error("Custom"), fallback = "Fallback")
+    assertEquals("Custom", message)
+  }
+
+  @Test
+  fun buildAuthenticationErrorMessage_returns_fallback_for_non_error_state() {
+    val message = buildAuthenticationErrorMessage(AuthUiState.SignedIn, fallback = "Fallback")
+    assertEquals("Fallback", message)
+  }
+}
+
+@Suppress("UNCHECKED_CAST")
+private fun anyFunction0(): Function0<Unit> = Mockito.any(Function0::class.java) as Function0<Unit>
+
+@Suppress("UNCHECKED_CAST")
+private fun anyFunction1(): Function1<Exception, Unit> =
+    Mockito.any(Function1::class.java) as Function1<Exception, Unit>
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [31])
+class NavGraphComposeTest {
+
+  @get:Rule val composeRule = createComposeRule()
+
+  private lateinit var activity: ComponentActivity
+
+  @Before
+  fun setup() {
+    val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+    if (FirebaseApp.getApps(context).isEmpty()) {
+      FirebaseApp.initializeApp(
+          context,
+          FirebaseOptions.Builder()
+              .setApplicationId("1:1234567890:android:test")
+              .setProjectId("test-project")
+              .setApiKey("fake-api-key")
+              .build())
+    }
+    FirebaseAuth.getInstance().signOut()
+    activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
+  }
+
+  @Test
+  fun appNav_settings_from_drawer_navigates_to_settings_screen() {
+    val speechHelper = mock<SpeechToTextHelper>()
+    val stateFlow = MutableStateFlow<AuthUiState>(AuthUiState.SignedIn)
+
+    val construction =
+        mockConstruction(AuthViewModel::class.java) { mock, _ ->
+          whenever(mock.state).thenReturn(stateFlow)
+          doAnswer {}.whenever(mock).onMicrosoftLoginClick()
+          doAnswer {}.whenever(mock).onSwitchEduLoginClick()
+          doAnswer { stateFlow.value = AuthUiState.SignedIn }
+              .whenever(mock)
+              .onAuthenticationSuccess()
+          doAnswer {}.whenever(mock).onAuthenticationError(org.mockito.kotlin.any())
+          doAnswer { stateFlow.value = AuthUiState.Idle }.whenever(mock).signOut()
+        }
+
+    construction.use {
+      composeRule.setContent {
+        MaterialTheme {
+          AppNav(startOnSignedIn = false, activity = activity, speechHelper = speechHelper)
+        }
+      }
+
+      composeRule.waitUntil(timeoutMillis = TimeUnit.SECONDS.toMillis(6)) {
+        composeRule.onAllNodesWithTag(HomeTags.MenuBtn).fetchSemanticsNodes().isNotEmpty()
+      }
+
+      composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
+      composeRule.waitForIdle()
+      composeRule.onNodeWithTag(DrawerTags.ConnectorsRow).performClick()
+      composeRule.waitForIdle()
+
+      composeRule.onNodeWithText("Settings").assertIsDisplayed()
+    }
+  }
+
+  @Test
+  fun appNav_voice_button_navigates_to_voice_screen_and_back() {
+    val speechHelper = mock<SpeechToTextHelper>()
+    val stateFlow = MutableStateFlow<AuthUiState>(AuthUiState.SignedIn)
+
+    val construction =
+        mockConstruction(AuthViewModel::class.java) { mock, _ ->
+          whenever(mock.state).thenReturn(stateFlow)
+          doAnswer {}.whenever(mock).onMicrosoftLoginClick()
+          doAnswer {}.whenever(mock).onSwitchEduLoginClick()
+          doAnswer { stateFlow.value = AuthUiState.SignedIn }
+              .whenever(mock)
+              .onAuthenticationSuccess()
+          doAnswer {}.whenever(mock).onAuthenticationError(org.mockito.kotlin.any())
+          doAnswer { stateFlow.value = AuthUiState.Idle }.whenever(mock).signOut()
+        }
+
+    construction.use {
+      composeRule.setContent {
+        MaterialTheme {
+          AppNav(startOnSignedIn = false, activity = activity, speechHelper = speechHelper)
+        }
+      }
+
+      composeRule.waitUntil(timeoutMillis = TimeUnit.SECONDS.toMillis(6)) {
+        composeRule.onAllNodesWithTag(HomeTags.VoiceBtn).fetchSemanticsNodes().isNotEmpty()
+      }
+
+      composeRule.onNodeWithTag(HomeTags.VoiceBtn).assertIsDisplayed().performClick()
+
+      composeRule.waitUntil(timeoutMillis = TimeUnit.SECONDS.toMillis(6)) {
+        composeRule
+            .onAllNodesWithText("Powered by APERTUS Swiss LLM")
+            .fetchSemanticsNodes()
+            .isNotEmpty()
+      }
+      composeRule.onNodeWithText("Powered by APERTUS Swiss LLM").assertIsDisplayed()
+
+      composeRule.onNodeWithContentDescription("Close voice screen").performClick()
+
+      composeRule.waitUntil(timeoutMillis = TimeUnit.SECONDS.toMillis(6)) {
+        composeRule.onAllNodesWithTag(HomeTags.Root).fetchSemanticsNodes().isNotEmpty()
+      }
+      composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
+    }
+  }
+
+  @Test
+  fun appNav_settings_log_out_returns_to_sign_in() {
+    val speechHelper = mock<SpeechToTextHelper>()
+    val stateFlow = MutableStateFlow<AuthUiState>(AuthUiState.SignedIn)
+
+    val construction =
+        mockConstruction(AuthViewModel::class.java) { mock, _ ->
+          whenever(mock.state).thenReturn(stateFlow)
+          doAnswer {}.whenever(mock).onMicrosoftLoginClick()
+          doAnswer {}.whenever(mock).onSwitchEduLoginClick()
+          doAnswer { stateFlow.value = AuthUiState.SignedIn }
+              .whenever(mock)
+              .onAuthenticationSuccess()
+          doAnswer {}.whenever(mock).onAuthenticationError(org.mockito.kotlin.any())
+          doAnswer { stateFlow.value = AuthUiState.Idle }.whenever(mock).signOut()
+        }
+
+    construction.use {
+      composeRule.setContent {
+        MaterialTheme {
+          AppNav(startOnSignedIn = false, activity = activity, speechHelper = speechHelper)
+        }
+      }
+
+      composeRule.waitUntil(timeoutMillis = TimeUnit.SECONDS.toMillis(6)) {
+        composeRule.onAllNodesWithTag(HomeTags.MenuBtn).fetchSemanticsNodes().isNotEmpty()
+      }
+
+      composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
+      composeRule.waitForIdle()
+      composeRule.onNodeWithTag(DrawerTags.ConnectorsRow).performClick()
+
+      composeRule.waitUntil(timeoutMillis = TimeUnit.SECONDS.toMillis(6)) {
+        composeRule.onAllNodesWithText("Log out").fetchSemanticsNodes().isNotEmpty()
+      }
+      composeRule.onNodeWithText("Log out").assertIsDisplayed().performClick()
+
+      composeRule.waitUntil(timeoutMillis = TimeUnit.SECONDS.toMillis(6)) {
+        composeRule
+            .onAllNodesWithText("Continue with Microsoft Entra ID")
+            .fetchSemanticsNodes()
+            .isNotEmpty()
+      }
+      composeRule.onNodeWithText("Continue with Microsoft Entra ID").assertIsDisplayed()
+    }
+  }
+
+  @Test
+  fun appNav_opening_idle_navigates_to_sign_in() {
+    val speechHelper = mock<SpeechToTextHelper>()
+    val stateFlow = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
+
+    val construction =
+        mockConstruction(AuthViewModel::class.java) { mock, _ ->
+          whenever(mock.state).thenReturn(stateFlow)
+          doAnswer {}.whenever(mock).onMicrosoftLoginClick()
+          doAnswer {}.whenever(mock).onSwitchEduLoginClick()
+          doAnswer {}.whenever(mock).onAuthenticationSuccess()
+          doAnswer {}.whenever(mock).onAuthenticationError(org.mockito.kotlin.any())
+          doAnswer {}.whenever(mock).signOut()
+        }
+
+    construction.use {
+      composeRule.setContent {
+        MaterialTheme {
+          AppNav(startOnSignedIn = false, activity = activity, speechHelper = speechHelper)
+        }
+      }
+
+      composeRule.mainClock.advanceTimeBy(3_000)
+
+      composeRule.waitUntil(timeoutMillis = TimeUnit.SECONDS.toMillis(6)) {
+        composeRule
+            .onAllNodesWithText("Continue with Microsoft Entra ID")
+            .fetchSemanticsNodes()
+            .isNotEmpty()
+      }
+      composeRule.onNodeWithText("Continue with Microsoft Entra ID").assertIsDisplayed()
+    }
   }
 }

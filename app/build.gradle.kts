@@ -126,8 +126,8 @@ android {
         }
     }
 
-    // Correctif JaCoCo : exclure les libs du SDK et BouncyCastle
-    // pour éviter les erreurs d'instrumentation pendant les tests
+    // JaCoCo fix: exclude SDK and BouncyCastle libraries
+    // to avoid instrumentation errors during tests
     tasks.withType<Test> {
         configure<JacocoTaskExtension> {
             isIncludeNoLocationClasses = true
@@ -223,10 +223,14 @@ dependencies {
     testImplementation(libs.mockk)
     androidTestImplementation("org.mockito:mockito-android:5.8.0")
     androidTestImplementation("org.mockito:mockito-core:5.8.0")
+    testImplementation("org.mockito:mockito-inline:4.11.0")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:4.1.0")
+    androidTestImplementation("org.mockito:mockito-android:4.11.0")
+    androidTestImplementation("org.mockito:mockito-core:4.11.0")
 
     implementation("com.microsoft.identity.client:msal:6.0.1")
 
-    // --- Dépendances de sécurité manquantes requises par MSAL ---
+    // --- Additional security dependencies required by MSAL ---
     implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
     implementation("com.google.crypto.tink:tink-android:1.12.0")
