@@ -1,9 +1,14 @@
 package com.android.sample
 
+import android.content.Context
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.google.firebase.FirebaseApp
+import org.junit.AfterClass
 import org.junit.Assert.*
+import org.junit.BeforeClass
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -21,6 +26,23 @@ import org.junit.runner.RunWith
 class MainActivityTest {
 
   @get:Rule val composeRule = createAndroidComposeRule<MainActivity>()
+
+  companion object {
+    @JvmStatic
+    @BeforeClass
+    fun setupFirebase() {
+      val context = ApplicationProvider.getApplicationContext<Context>()
+      if (FirebaseApp.getApps(context).isEmpty()) {
+        FirebaseApp.initializeApp(context)
+      }
+    }
+
+    @JvmStatic
+    @AfterClass
+    fun tearDownFirebase() {
+      FirebaseApp.clearInstancesForTest()
+    }
+  }
 
   @Test
   fun mainActivity_launches_successfully() {
