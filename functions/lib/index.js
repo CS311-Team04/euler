@@ -37,8 +37,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.answerWithRagHttp = exports.indexChunksHttp = exports.answerWithRagFn = exports.indexChunksFn = exports.ping = void 0;
+exports.generateTitleFn = exports.answerWithRagHttp = exports.indexChunksHttp = exports.answerWithRagFn = exports.indexChunksFn = exports.ping = void 0;
 exports.apertusChatFnCore = apertusChatFnCore;
+exports.generateTitleCore = generateTitleCore;
 exports.indexChunksCore = indexChunksCore;
 exports.answerWithRagCore = answerWithRagCore;
 const node_path_1 = __importDefault(require("node:path"));
@@ -94,6 +95,25 @@ async function apertusChatFnCore({ messages, model, temperature, }) {
     const reply = resp.choices?.[0]?.message?.content ?? "";
     logger.info("apertusChat success", { length: reply.length });
     return { reply };
+}
+async function generateTitleCore({ question, model }) {
+    const prompt = [
+        "Generate a concise conversation title (4-5 words max, no trailing punctuation).",
+        `User's first question: "${question.trim()}"`,
+        "Return ONLY the title.",
+    ].join("\n");
+    // réutilise le même client Apertus
+    const { reply } = await apertusChatFnCore({
+        messages: [{ role: "user", content: prompt }],
+        model,
+        temperature: 0.2,
+    });
+    const title = (reply || "")
+        .replace(/\s+/g, " ")
+        .replace(/^["'“”]+|["'“”]+$/g, "")
+        .trim()
+        .slice(0, 60);
+    return { title: title || "New conversation" };
 }
 // collection is already created with hybrid schema; only verify existence
 async function qdrantEnsureCollection(_) {
@@ -400,5 +420,12 @@ exports.answerWithRagHttp = functions.https.onRequest(async (req, res) => {
         res.status(e.code === 401 ? 401 : 400).json({ error: String(e) });
         return;
     }
+});
+exports.generateTitleFn = functions.https.onCall(async (data) => {
+    const q = String(data?.question || "").trim();
+    const model = data?.model;
+    if (!q)
+        throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
+    return await generateTitleCore({ question: q, model });
 });
 //# sourceMappingURL=index.js.map
