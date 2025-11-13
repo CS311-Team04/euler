@@ -9,12 +9,17 @@ import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.MessageDTO
 import com.android.sample.llm.FakeLlmClient
 import com.android.sample.util.MainDispatcherRule
+import com.google.android.gms.tasks.Tasks
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.functions.FirebaseFunctions
+import com.google.firebase.functions.HttpsCallableReference
+import com.google.firebase.functions.HttpsCallableResult
 import java.util.UUID
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +36,7 @@ import org.junit.runner.RunWith
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
 import org.mockito.kotlin.timeout
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -244,6 +250,139 @@ class HomeViewModelTest {
     assertEquals("Salut", chat.text)
   }
 
+  @Test
+  fun selectConversation_sets_current_and_exits_local_placeholder() {
+    val viewModel = HomeViewModel(FakeLlmClient())
+    viewModel.setPrivateField("isInLocalNewChat", true)
+
+    viewModel.selectConversation("remote-42")
+
+    assertEquals("remote-42", viewModel.uiState.value.currentConversationId)
+    assertFalse(viewModel.getBooleanField("isInLocalNewChat"))
+  }
+
+  @Test
+  fun clearChat_cancels_active_stream_and_resets_state() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel(FakeLlmClient())
+        val streamingId = "ai-1"
+        viewModel.updateUiState {
+          it.copy(
+              messages =
+                  listOf(
+                      ChatUIModel(
+                          id = "user-1", text = "Hello", timestamp = 0L, type = ChatType.USER),
+                      ChatUIModel(
+                          id = streamingId,
+                          text = "thinking",
+                          timestamp = 0L,
+                          type = ChatType.AI,
+                          isThinking = true)),
+              streamingMessageId = streamingId,
+              isSending = true,
+              streamingSequence = 3)
+        }
+        val job = Job()
+        viewModel.setPrivateField("activeStreamJob", job)
+
+        viewModel.clearChat()
+
+        assertTrue(job.isCancelled)
+        val state = viewModel.uiState.value
+        assertTrue(state.messages.isEmpty())
+        assertNull(state.streamingMessageId)
+        assertFalse(state.isSending)
+        assertEquals(4, state.streamingSequence)
+      }
+
+  @Test
+  fun startData_withEmptyRemoteList_keeps_null_selection() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel(FakeLlmClient())
+        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+        viewModel.setPrivateField("auth", auth)
+
+        val repo = mock<ConversationRepository>()
+        val conversationsFlow = MutableSharedFlow<List<Conversation>>(replay = 1)
+        whenever(repo.conversationsFlow()).thenReturn(conversationsFlow)
+        whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
+        viewModel.setPrivateField("repo", repo)
+        viewModel.setPrivateField("isInLocalNewChat", false)
+
+        viewModel.invokeStartData()
+        advanceUntilIdle()
+
+        conversationsFlow.emit(emptyList())
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.currentConversationId)
+      }
+
+  @Test
+  fun sendMessage_signedIn_creates_conversation_and_updates_title() =
+      runTest(testDispatcher) {
+        val fakeClient = FakeLlmClient().apply { nextReply = "AI reply" }
+        val viewModel = HomeViewModel(fakeClient)
+        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+        viewModel.setPrivateField("auth", auth)
+
+        val repo = mock<ConversationRepository>()
+        runBlocking { whenever(repo.startNewConversation(any())).thenReturn("conv-123") }
+        runBlocking { whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit) }
+        runBlocking { whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit) }
+        viewModel.setPrivateField("repo", repo)
+
+        val functions = mock<FirebaseFunctions>()
+        val callable = mock<HttpsCallableReference>()
+        val result = mock<HttpsCallableResult>()
+        whenever(functions.getHttpsCallable("generateTitleFn")).thenReturn(callable)
+        whenever(callable.call(any<Map<String, String>>())).thenReturn(Tasks.forResult(result))
+        whenever(result.getData()).thenReturn(mapOf("title" to "Generated title"))
+        viewModel.setFunctions(functions)
+
+        viewModel.updateMessageDraft("Hello from EPFL student")
+        viewModel.sendMessage()
+        advanceUntilIdle()
+        viewModel.awaitStreamingCompletion()
+        advanceUntilIdle()
+
+        assertEquals("conv-123", viewModel.uiState.value.currentConversationId)
+        runBlocking { verify(repo).startNewConversation("Hello from EPFL student") }
+        runBlocking { verify(repo).appendMessage("conv-123", "user", "Hello from EPFL student") }
+        runBlocking { verify(repo).updateConversationTitle("conv-123", "Generated title") }
+      }
+
+  @Test
+  fun sendMessage_signedIn_title_generation_failure_keeps_quick_title() =
+      runTest(testDispatcher) {
+        val fakeClient = FakeLlmClient().apply { nextReply = "AI reply" }
+        val viewModel = HomeViewModel(fakeClient)
+        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+        viewModel.setPrivateField("auth", auth)
+
+        val repo = mock<ConversationRepository>()
+        runBlocking { whenever(repo.startNewConversation(any())).thenReturn("conv-999") }
+        runBlocking { whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit) }
+        runBlocking { whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit) }
+        viewModel.setPrivateField("repo", repo)
+
+        val functions = mock<FirebaseFunctions>()
+        val callable = mock<HttpsCallableReference>()
+        whenever(functions.getHttpsCallable("generateTitleFn")).thenReturn(callable)
+        whenever(callable.call(any<Map<String, String>>()))
+            .thenReturn(Tasks.forException(Exception("boom")))
+        viewModel.setFunctions(functions)
+
+        viewModel.updateMessageDraft("Short prompt")
+        viewModel.sendMessage()
+        advanceUntilIdle()
+        viewModel.awaitStreamingCompletion()
+        advanceUntilIdle()
+
+        runBlocking { verify(repo).startNewConversation("Short prompt") }
+        runBlocking { verify(repo, never()).updateConversationTitle(any(), any()) }
+      }
+
   private fun HomeViewModel.setPrivateField(name: String, value: Any?) {
     val field = HomeViewModel::class.java.getDeclaredField(name)
     field.isAccessible = true
@@ -273,6 +412,18 @@ class HomeViewModelTest {
     field.isAccessible = true
     @Suppress("UNCHECKED_CAST") val stateFlow = field.get(this) as MutableStateFlow<HomeUiState>
     stateFlow.value = transform(stateFlow.value)
+  }
+
+  private fun HomeViewModel.getBooleanField(name: String): Boolean {
+    val field = HomeViewModel::class.java.getDeclaredField(name)
+    field.isAccessible = true
+    return field.getBoolean(this)
+  }
+
+  private fun HomeViewModel.setFunctions(fake: FirebaseFunctions) {
+    val delegateField = HomeViewModel::class.java.getDeclaredField("functions\$delegate")
+    delegateField.isAccessible = true
+    delegateField.set(this, lazyOf(fake))
   }
 
   private suspend fun HomeViewModel.awaitStreamingCompletion(timeoutMs: Long = 2_000L) {

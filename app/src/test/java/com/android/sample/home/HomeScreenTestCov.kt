@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -11,6 +13,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
+import com.android.sample.conversations.Conversation
 import com.android.sample.llm.FakeLlmClient
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
@@ -146,6 +149,73 @@ class HomeScreenTestCov {
 
     val messages = viewModel.uiState.value.messages
     assertTrue(messages.any { it.type == ChatType.USER && it.text == "Hello" })
+  }
+
+  @Test
+  fun openDrawerOnStart_opens_drawer_and_updates_state() {
+    val viewModel = HomeViewModel(FakeLlmClient())
+
+    composeRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = viewModel, openDrawerOnStart = true) }
+    }
+
+    composeRule.waitUntil(timeoutMillis = 5_000) {
+      composeRule.onAllNodesWithTag(DrawerTags.Root).fetchSemanticsNodes().isNotEmpty()
+    }
+
+    composeRule.onNodeWithTag(DrawerTags.Root).assertIsDisplayed()
+    assertTrue(viewModel.uiState.value.isDrawerOpen)
+  }
+
+  @Test
+  fun suggestion_chip_click_triggers_callbacks_and_sends_message() {
+    var action1Called = false
+    val sentMessages = mutableListOf<String>()
+    val fakeClient = FakeLlmClient().apply { nextReply = "Sure" }
+    val viewModel = HomeViewModel(fakeClient)
+
+    composeRule.setContent {
+      MaterialTheme {
+        HomeScreen(
+            viewModel = viewModel,
+            onAction1Click = { action1Called = true },
+            onSendMessage = { sentMessages += it })
+      }
+    }
+
+    composeRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed().performClick()
+    composeRule.waitForIdle()
+
+    assertTrue(action1Called)
+    assertTrue(sentMessages.contains("What is EPFL"))
+    assertTrue(
+        viewModel.uiState.value.messages.any {
+          it.type == ChatType.USER && it.text == "What is EPFL"
+        })
+  }
+
+  @Test
+  fun pick_conversation_from_drawer_selects_and_closes() {
+    val viewModel = HomeViewModel(FakeLlmClient())
+    updateUiState(viewModel) {
+      it.copy(
+          conversations = listOf(Conversation(id = "remote-1", title = "Linear Algebra")),
+          currentConversationId = null)
+    }
+
+    composeRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = viewModel, openDrawerOnStart = true) }
+    }
+
+    composeRule.waitUntil(timeoutMillis = 5_000) {
+      composeRule.onAllNodesWithText("Linear Algebra").fetchSemanticsNodes().isNotEmpty()
+    }
+
+    composeRule.onNodeWithText("Linear Algebra").assertIsDisplayed().performClick()
+    composeRule.waitForIdle()
+
+    assertEquals("remote-1", viewModel.uiState.value.currentConversationId)
+    assertFalse(viewModel.uiState.value.isDrawerOpen)
   }
 
   private fun initFirebase() {
