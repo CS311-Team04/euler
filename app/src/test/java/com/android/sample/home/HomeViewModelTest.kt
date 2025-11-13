@@ -32,6 +32,19 @@ class HomeViewModelTest {
     stateFlow.value = current.copy(messages = messages)
   }
 
+  private fun HomeViewModel.invokeBuildSiteLabel(url: String): String {
+    val method = HomeViewModel::class.java.getDeclaredMethod("buildSiteLabel", String::class.java)
+    method.isAccessible = true
+    return method.invoke(this, url) as String
+  }
+
+  private fun HomeViewModel.invokeBuildFallbackTitle(url: String): String {
+    val method =
+        HomeViewModel::class.java.getDeclaredMethod("buildFallbackTitle", String::class.java)
+    method.isAccessible = true
+    return method.invoke(this, url) as String
+  }
+
   @Test
   fun clearChat_empties_messages() =
       runTest(testDispatcher) {
@@ -1135,5 +1148,49 @@ class HomeViewModelTest {
         assertFalse(state.isTopRightOpen)
         assertFalse(state.isLoading)
         assertFalse(state.showDeleteConfirmation)
+      }
+
+  @Test
+  fun buildSiteLabel_returns_non_empty_label_even_when_host_unavailable() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel()
+
+        val label = viewModel.invokeBuildSiteLabel("https://www.epfl.ch/education/projects")
+
+        assertTrue(label.isNotBlank())
+        assertEquals("Website", label.trim())
+      }
+
+  @Test
+  fun buildSiteLabel_returns_generic_label_for_external_domain_without_host() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel()
+
+        val label = viewModel.invokeBuildSiteLabel("https://docs.kotlinlang.org/api/latest")
+
+        assertTrue(label.isNotBlank())
+        assertEquals("Website", label.trim())
+      }
+
+  @Test
+  fun buildFallbackTitle_contains_url_when_segments_cannot_be_parsed() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel()
+
+        val title =
+            viewModel.invokeBuildFallbackTitle(
+                "https://www.epfl.ch/education/projet-de-semestre")
+
+        assertTrue(title.contains("projet-de-semestre"))
+      }
+
+  @Test
+  fun buildFallbackTitle_returns_original_url_when_no_host_found() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel()
+
+        val title = viewModel.invokeBuildFallbackTitle("https://epfl.ch")
+
+        assertEquals("https://epfl.ch", title)
       }
 }

@@ -1,5 +1,7 @@
 package com.android.sample.home
 
+import com.android.sample.Chat.ChatType
+import com.android.sample.Chat.ChatUIModel
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -574,5 +576,58 @@ class HomeScreenTest {
     val firstAccess = listOf(HomeTags.Root, HomeTags.MenuBtn, HomeTags.TopRightBtn)
     val secondAccess = listOf(HomeTags.Root, HomeTags.MenuBtn, HomeTags.TopRightBtn)
     assertEquals(firstAccess, secondAccess)
+  }
+
+  @Test
+  fun SourceMeta_default_retrievedAt_is_recent() {
+    val before = System.currentTimeMillis()
+
+    val meta =
+        SourceMeta(
+            siteLabel = "EPFL.ch Website",
+            title = "Projet de Semestre – Bachelor",
+            url = "https://www.epfl.ch/education/projects")
+
+    val after = System.currentTimeMillis()
+
+    assertTrue(meta.retrievedAt in before..after)
+  }
+
+  @Test
+  fun HomeUiState_preserves_source_meta_in_messages() {
+    val meta =
+        SourceMeta(
+            siteLabel = "EPFL.ch Website",
+            title = "Projet de Semestre – Bachelor",
+            url = "https://www.epfl.ch/education/projects",
+            retrievedAt = 123456789L)
+    val state =
+        HomeUiState(
+            messages =
+                listOf(
+                    ChatUIModel(
+                        id = "ai-source",
+                        text = "",
+                        timestamp = 0L,
+                        type = ChatType.AI,
+                        source = meta)))
+
+    assertEquals(meta, state.messages.single().source)
+  }
+
+  @Test
+  fun SourceMeta_copy_allows_timestamp_override() {
+    val original =
+        SourceMeta(
+            siteLabel = "EPFL.ch Website",
+            title = "Projet de Semestre – Bachelor",
+            url = "https://www.epfl.ch/education/projects")
+
+    val overridden = original.copy(retrievedAt = 99L)
+
+    assertEquals(99L, overridden.retrievedAt)
+    assertEquals(original.siteLabel, overridden.siteLabel)
+    assertEquals(original.title, overridden.title)
+    assertEquals(original.url, overridden.url)
   }
 }
