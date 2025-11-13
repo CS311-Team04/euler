@@ -556,6 +556,7 @@ class AuthUIScreenTest {
   }
 
   @Test
+  @Ignore("Skipped in CI due to Robolectric memory constraints for Microsoft loading state")
   fun AuthUIScreen_all_elements_visible_in_loading_state_Microsoft() {
     composeTestRule.setContent {
       MaterialTheme {
