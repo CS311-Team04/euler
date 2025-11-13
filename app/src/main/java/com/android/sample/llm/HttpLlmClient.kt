@@ -78,13 +78,9 @@ class HttpLlmClient(
                 throw IllegalStateException("Invalid LLM HTTP response", t)
               }
           val replyText =
-              try {
-                obj.optString("reply", "").takeIf { it.isNotBlank() }
-              } catch (t: Throwable) {
-                throw IllegalStateException("Invalid LLM reply field", t)
-              }
+              obj.optString("reply", null)?.takeIf { it.isNotBlank() }
                   ?: throw IllegalStateException("Empty LLM reply")
-          val url = obj.optString("primary_url").takeIf { it.isNotBlank() }
+          val url = obj.optString("primary_url", "").takeIf { it.isNotBlank() }
           BotReply(replyText, url)
         }
       }
