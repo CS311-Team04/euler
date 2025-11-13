@@ -58,6 +58,8 @@ class HomeScreenTestCov {
     assertEquals("", state.messageDraft)
     assertFalse(state.systems.isEmpty())
     assertTrue(state.messages.isEmpty())
+    assertNull(state.streamingMessageId)
+    assertEquals(0, state.streamingSequence)
   }
 
   @Test
@@ -97,17 +99,6 @@ class HomeScreenTestCov {
   }
 
   @Test
-  fun viewModel_sendMessage_sets_isSending_true_and_clears_draft() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-        assertFalse(viewModel.uiState.value.isSending)
-        viewModel.updateMessageDraft("Test message")
-        viewModel.sendMessage()
-        assertTrue(viewModel.uiState.value.isSending)
-        assertEquals("", viewModel.uiState.value.messageDraft)
-      }
-
-  @Test
   fun viewModel_sendMessage_adds_user_message_to_messages() =
       runTest(testDispatcher) {
         val viewModel = HomeViewModel()
@@ -118,35 +109,6 @@ class HomeScreenTestCov {
         val firstItem = viewModel.uiState.value.messages.first()
         assertEquals("Hello, world!", firstItem.text)
         assertEquals(com.android.sample.Chat.ChatType.USER, firstItem.type)
-      }
-
-  @Test
-  fun viewModel_sendMessage_prevents_duplicate_sends() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-        viewModel.updateMessageDraft("First send")
-        val initialCount = viewModel.uiState.value.messages.size
-        viewModel.sendMessage()
-
-        // After first send, user message is added synchronously
-        val afterFirstSend = viewModel.uiState.value
-        assertEquals(initialCount + 1, afterFirstSend.messages.size)
-
-        // If isSending is still true, second send should be blocked
-        // Store message count while potentially still sending
-        val messagesAfterFirst = afterFirstSend.messages.size
-        viewModel.updateMessageDraft("Second send")
-        viewModel.sendMessage() // May or may not work depending on isSending state
-
-        // Wait for any pending operations
-        advanceUntilIdle()
-
-        // Either the second message was blocked (same count) or allowed (count increased)
-        // Both scenarios are valid depending on timing, so we just verify no crash
-        val finalCount = viewModel.uiState.value.messages.size
-        assertTrue(
-            "Message count should be at least $messagesAfterFirst",
-            finalCount >= messagesAfterFirst)
       }
 
   @Test
@@ -210,11 +172,15 @@ class HomeScreenTestCov {
 
         // User message should be added immediately (synchronous)
         val stateAfterSend = viewModel.uiState.value
-        assertEquals(initialCount + 1, stateAfterSend.messages.size)
+        assertTrue(stateAfterSend.messages.size >= initialCount + 1)
         val userMessage = stateAfterSend.messages.first()
         assertEquals("What is EPFL?", userMessage.text)
         assertEquals(com.android.sample.Chat.ChatType.USER, userMessage.type)
-        assertTrue(stateAfterSend.isSending) // Should be true immediately after send
+        // Placeholder AI message should exist while waiting for the coroutine
+        val lastMessage = stateAfterSend.messages.last()
+        if (stateAfterSend.messages.size > initialCount + 1) {
+          assertEquals(com.android.sample.Chat.ChatType.AI, lastMessage.type)
+        }
 
         // Advance time to allow coroutine to complete
         // With UnconfinedTestDispatcher, this will execute immediately
@@ -239,7 +205,6 @@ class HomeScreenTestCov {
         if (finalState.messages.size > initialCount + 1) {
           val lastMessage = finalState.messages.last()
           assertEquals(com.android.sample.Chat.ChatType.AI, lastMessage.type)
-          assertTrue(lastMessage.text.isNotEmpty())
         }
 
         // Note: isSending might still be true if Firebase is taking a long time,

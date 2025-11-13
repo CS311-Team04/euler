@@ -1,5 +1,8 @@
 package com.android.sample.navigation
 
+import android.app.Activity
+import androidx.annotation.VisibleForTesting
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -7,10 +10,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.android.sample.VoiceChat.VoiceScreen
 import com.android.sample.auth.MicrosoftAuth
 import com.android.sample.authentification.AuthUIScreen
 import com.android.sample.authentification.AuthUiState
@@ -29,14 +34,11 @@ object Routes {
   const val HomeWithDrawer = "home_with_drawer"
   const val Settings = "settings"
   const val Profile = "profile"
+  const val VoiceChat = "voice_chat"
 }
 
 @Composable
-fun AppNav(
-    startOnSignedIn: Boolean = false,
-    activity: android.app.Activity,
-    speechHelper: SpeechToTextHelper
-) {
+fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: SpeechToTextHelper) {
   val nav = rememberNavController()
   val authViewModel = remember { AuthViewModel() }
   val homeViewModel: HomeViewModel = viewModel()
@@ -50,37 +52,27 @@ fun AppNav(
   // Handle Microsoft authentication when loading
   LaunchedEffect(authState) {
     val currentState = authState
-    when {
-      shouldTriggerMicrosoftAuth(currentState) -> {
-        // Handle Microsoft authentication using Firebase Auth
-        MicrosoftAuth.signIn(
-            activity = activity,
-            onSuccess = { authViewModel.onAuthenticationSuccess() },
-            onError = { exception ->
-              val errorMessage =
-                  if (currentState is AuthUiState.Error) {
-                    getErrorMessage(currentState, exception.message ?: "Authentication failed")
-                  } else {
-                    exception.message ?: "Authentication failed"
-                  }
-              authViewModel.onAuthenticationError(errorMessage)
-            })
-      }
-      shouldNavigateToHomeFromSignIn(currentState, currentDestination) -> {
-        // Only navigate to Home from SignIn screen, not from Opening screen
-        nav.navigate(Routes.Home) {
-          popUpTo(Routes.SignIn) { inclusive = true }
-          launchSingleTop = true
-          restoreState = true
-        }
-      }
-      isErrorState(currentState) -> {
-        // Handle error state - could show snackbar or toast
-      }
-      else -> {
-        /* Idle state - no navigation */
-      }
-    }
+    val command = resolveAuthCommand(currentState, currentDestination)
+    executeAuthCommand(
+        command,
+        startMicrosoftSignIn = {
+          MicrosoftAuth.signIn(
+              activity = activity,
+              onSuccess = { authViewModel.onAuthenticationSuccess() },
+              onError = { exception ->
+                val errorMessage =
+                    buildAuthenticationErrorMessage(
+                        currentState, exception.message ?: "Authentication failed")
+                authViewModel.onAuthenticationError(errorMessage)
+              })
+        },
+        navigateHome = {
+          nav.navigate(Routes.Home) {
+            popUpTo(Routes.SignIn) { inclusive = true }
+            launchSingleTop = true
+            restoreState = true
+          }
+        })
   }
 
   LaunchedEffect(authState) {
@@ -149,6 +141,7 @@ fun AppNav(
                   nav.navigate(Routes.Profile)
                 }
               })
+              onVoiceChatClick = { nav.navigate(Routes.VoiceChat) })
         }
 
         // Home With Drawer
@@ -177,6 +170,7 @@ fun AppNav(
                   nav.navigate(Routes.Profile)
                 }
               },
+              onVoiceChatClick = { nav.navigate(Routes.VoiceChat) },
               openDrawerOnStart = true)
         }
 
@@ -224,5 +218,45 @@ fun AppNav(
                 initialProfile = homeUiState.profile)
           }
         }
+
+        // Voice Chat Screen
+        composable(Routes.VoiceChat) {
+          VoiceScreen(onClose = { nav.popBackStack() }, modifier = Modifier.fillMaxSize())
+        }
       }
+}
+
+internal sealed class AuthCommand {
+  object StartMicrosoftSignIn : AuthCommand()
+
+  object NavigateHome : AuthCommand()
+
+  object None : AuthCommand()
+}
+
+@VisibleForTesting
+internal fun resolveAuthCommand(authState: AuthUiState, currentDestination: String?): AuthCommand {
+  return when {
+    shouldTriggerMicrosoftAuth(authState) -> AuthCommand.StartMicrosoftSignIn
+    shouldNavigateToHomeFromSignIn(authState, currentDestination) -> AuthCommand.NavigateHome
+    else -> AuthCommand.None
+  }
+}
+
+@VisibleForTesting
+internal fun executeAuthCommand(
+    command: AuthCommand,
+    startMicrosoftSignIn: () -> Unit,
+    navigateHome: () -> Unit
+) {
+  when (command) {
+    AuthCommand.StartMicrosoftSignIn -> startMicrosoftSignIn()
+    AuthCommand.NavigateHome -> navigateHome()
+    AuthCommand.None -> {}
+  }
+}
+
+@VisibleForTesting
+internal fun buildAuthenticationErrorMessage(authState: AuthUiState, fallback: String): String {
+  return if (authState is AuthUiState.Error) getErrorMessage(authState, fallback) else fallback
 }

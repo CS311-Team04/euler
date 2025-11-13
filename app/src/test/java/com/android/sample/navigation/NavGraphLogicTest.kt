@@ -159,7 +159,7 @@ class NavGraphLogicTest {
             AuthUiState.SignedIn,
             AuthUiState.Error("Test error"))
 
-    val destinations = listOf(Routes.Opening, Routes.SignIn, Routes.Home, null)
+    val destinations = listOf(Routes.Opening, Routes.SignIn, Routes.Home, Routes.VoiceChat, null)
 
     for (state in states) {
       for (destination in destinations) {
@@ -191,5 +191,133 @@ class NavGraphLogicTest {
     // Whitespace is not empty, so it should be returned
     assertEquals(
         "Should use whitespace message", "   ", getErrorMessage(errorWhitespace, "Default"))
+  }
+
+  @Test
+  fun routes_object_contains_all_constants() {
+    assertNotNull("Opening route should be defined", Routes.Opening)
+    assertNotNull("SignIn route should be defined", Routes.SignIn)
+    assertNotNull("Home route should be defined", Routes.Home)
+    assertNotNull("HomeWithDrawer route should be defined", Routes.HomeWithDrawer)
+    assertNotNull("Settings route should be defined", Routes.Settings)
+    assertNotNull("VoiceChat route should be defined", Routes.VoiceChat)
+  }
+
+  @Test
+  fun routes_have_correct_values_and_are_unique() {
+    assertEquals("opening", Routes.Opening)
+    assertEquals("signin", Routes.SignIn)
+    assertEquals("home", Routes.Home)
+    assertEquals("home_with_drawer", Routes.HomeWithDrawer)
+    assertEquals("settings", Routes.Settings)
+    assertEquals("voice_chat", Routes.VoiceChat)
+
+    val allRoutes =
+        setOf(
+            Routes.Opening,
+            Routes.SignIn,
+            Routes.Home,
+            Routes.HomeWithDrawer,
+            Routes.Settings,
+            Routes.VoiceChat)
+    assertEquals("All routes should be unique", 6, allRoutes.size)
+  }
+
+  @Test
+  fun routes_follow_naming_convention() {
+    val routes =
+        listOf(
+            Routes.Opening,
+            Routes.SignIn,
+            Routes.Home,
+            Routes.HomeWithDrawer,
+            Routes.Settings,
+            Routes.VoiceChat)
+    routes.forEach { route ->
+      assertTrue("Route should be lowercase: $route", route == route.lowercase())
+      assertFalse("Route should not contain spaces: $route", route.contains(" "))
+    }
+  }
+
+  @Test
+  fun navigation_edge_cases_include_empty_destination() {
+    assertFalse(
+        "SignedIn with empty destination should not navigate",
+        shouldNavigateToHomeFromSignIn(AuthUiState.SignedIn, ""))
+  }
+
+  @Test
+  fun state_checking_functions_are_mutually_exclusive() {
+    val states =
+        listOf(
+            AuthUiState.Idle,
+            AuthUiState.Loading(AuthProvider.MICROSOFT),
+            AuthUiState.Loading(AuthProvider.SWITCH_EDU),
+            AuthUiState.SignedIn,
+            AuthUiState.Error("Test"))
+    for (state in states) {
+      val flags =
+          listOf(
+              isIdleState(state),
+              isLoadingState(state),
+              isSignedInState(state),
+              isErrorState(state))
+      assertEquals("Exactly one state predicate should be true for $state", 1, flags.count { it })
+    }
+  }
+
+  @Test
+  fun state_immutability_after_operations() {
+    val idleState = AuthUiState.Idle
+    assertTrue("Idle is idle", isIdleState(idleState))
+    assertFalse("Idle is not loading", isLoadingState(idleState))
+    assertFalse("Idle is not signed in", isSignedInState(idleState))
+    assertFalse("Idle is not error", isErrorState(idleState))
+  }
+
+  @Test
+  fun resolveAuthCommand_returns_start_signin_when_loadingMicrosoft() {
+    val command = resolveAuthCommand(AuthUiState.Loading(AuthProvider.MICROSOFT), Routes.SignIn)
+    assertEquals(AuthCommand.StartMicrosoftSignIn, command)
+  }
+
+  @Test
+  fun resolveAuthCommand_returns_navigate_home_when_signedInOnSignIn() {
+    val command = resolveAuthCommand(AuthUiState.SignedIn, Routes.SignIn)
+    assertEquals(AuthCommand.NavigateHome, command)
+  }
+
+  @Test
+  fun resolveAuthCommand_returns_none_for_other_states() {
+    val commandIdle = resolveAuthCommand(AuthUiState.Idle, Routes.SignIn)
+    val commandError = resolveAuthCommand(AuthUiState.Error("oops"), Routes.Home)
+    assertEquals(AuthCommand.None, commandIdle)
+    assertEquals(AuthCommand.None, commandError)
+  }
+
+  @Test
+  fun executeAuthCommand_dispatches_to_correct_action() {
+    var signInCalled = 0
+    var navigateCalled = 0
+
+    executeAuthCommand(AuthCommand.StartMicrosoftSignIn, { signInCalled++ }, { navigateCalled++ })
+    executeAuthCommand(AuthCommand.NavigateHome, { signInCalled++ }, { navigateCalled++ })
+    executeAuthCommand(AuthCommand.None, { signInCalled++ }, { navigateCalled++ })
+
+    assertEquals(1, signInCalled)
+    assertEquals(1, navigateCalled)
+  }
+
+  @Test
+  fun buildAuthenticationErrorMessage_prefers_state_message() {
+    val errorState = AuthUiState.Error("")
+    val fallback = "Authentication failed"
+    assertEquals(fallback, buildAuthenticationErrorMessage(errorState, fallback))
+  }
+
+  @Test
+  fun buildAuthenticationErrorMessage_uses_fallback_for_non_error_state() {
+    val fallback = "Authentication failed"
+    assertEquals(fallback, buildAuthenticationErrorMessage(AuthUiState.Idle, fallback))
   }
 }
