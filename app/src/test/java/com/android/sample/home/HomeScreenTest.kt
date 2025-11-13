@@ -19,8 +19,8 @@ import io.mockk.unmockkAll
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import org.junit.Assert.*
 import org.junit.After
+import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -618,19 +618,15 @@ class HomeScreenComposeInteractionsTest {
     unmockkAll()
   }
 
-  private fun HomeViewModel.editState(
-      transform: (HomeUiState) -> HomeUiState
-  ) {
+  private fun HomeViewModel.editState(transform: (HomeUiState) -> HomeUiState) {
     val field = HomeViewModel::class.java.getDeclaredField("_uiState")
     field.isAccessible = true
     val flow = field.get(this) as MutableStateFlow<HomeUiState>
     flow.value = transform(flow.value)
   }
 
-  private fun userMessage(
-      id: String = "user-${System.nanoTime()}",
-      text: String = "Hello"
-  ) = ChatUIModel(id = id, text = text, timestamp = 0L, type = ChatType.USER)
+  private fun userMessage(id: String = "user-${System.nanoTime()}", text: String = "Hello") =
+      ChatUIModel(id = id, text = text, timestamp = 0L, type = ChatType.USER)
 
   @Test
   fun deleteConfirmation_cancel_hides_modal() {
@@ -685,10 +681,7 @@ class HomeScreenComposeInteractionsTest {
   fun thinkingIndicator_visible_when_sending_without_streaming_id() {
     val viewModel = createViewModel()
     viewModel.editState { state ->
-      state.copy(
-          messages = listOf(userMessage()),
-          isSending = true,
-          streamingMessageId = null)
+      state.copy(messages = listOf(userMessage()), isSending = true, streamingMessageId = null)
     }
 
     composeRule.setContent { HomeScreen(viewModel = viewModel) }
@@ -706,15 +699,12 @@ class HomeScreenComposeInteractionsTest {
     }
     var sent: String? = null
 
-    composeRule.setContent {
-      HomeScreen(viewModel = viewModel, onSendMessage = { sent = it })
-    }
+    composeRule.setContent { HomeScreen(viewModel = viewModel, onSendMessage = { sent = it }) }
 
     composeRule.waitForIdle()
 
     composeRule
-        .onNode(
-            hasTestTag(HomeTags.SendBtn) and hasClickAction(), useUnmergedTree = true)
+        .onNode(hasTestTag(HomeTags.SendBtn) and hasClickAction(), useUnmergedTree = true)
         .performClick()
     composeRule.waitForIdle()
 
@@ -722,7 +712,9 @@ class HomeScreenComposeInteractionsTest {
       assertEquals("", viewModel.uiState.value.messageDraft)
       assertEquals("Ping Euler", sent)
       assertTrue(
-          viewModel.uiState.value.messages.any { it.type == ChatType.USER && it.text == "Ping Euler" })
+          viewModel.uiState.value.messages.any {
+            it.type == ChatType.USER && it.text == "Ping Euler"
+          })
     }
   }
 
@@ -741,8 +733,6 @@ class HomeScreenComposeInteractionsTest {
     composeRule.onNodeWithTag(HomeTags.MicBtn, useUnmergedTree = true).performClick()
     composeRule.waitForIdle()
 
-    composeRule.runOnIdle {
-      assertEquals("Bonjour Euler", viewModel.uiState.value.messageDraft)
-    }
+    composeRule.runOnIdle { assertEquals("Bonjour Euler", viewModel.uiState.value.messageDraft) }
   }
 }
