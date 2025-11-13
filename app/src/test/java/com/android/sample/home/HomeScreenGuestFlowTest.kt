@@ -29,12 +29,10 @@ class HomeScreenGuestFlowTest {
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
     composeRule.onNodeWithContentDescription("Menu").performClick()
-    composeRule.waitForIdle()
-    composeRule.runOnIdle { assertTrue(viewModel.uiState.value.isDrawerOpen) }
+    composeRule.waitUntil(timeoutMillis = 2_000) { viewModel.uiState.value.isDrawerOpen }
 
     composeRule.onNodeWithContentDescription("Menu").performClick()
-    composeRule.waitForIdle()
-    composeRule.runOnIdle { assertFalse(viewModel.uiState.value.isDrawerOpen) }
+    composeRule.waitUntil(timeoutMillis = 2_000) { !viewModel.uiState.value.isDrawerOpen }
   }
 
   @Test
