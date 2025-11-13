@@ -89,10 +89,11 @@ android {
             isReturnDefaultValues = true
             // Configure test environment for better stability in CI
             all {
-                it.systemProperty("robolectric.looper.mode", "LEGACY")
+                it.systemProperty("robolectric.looper.mode", "PAUSED")
                 it.systemProperty("robolectric.enabledSdks", "28,33,34")
             }
         }
+        animationsDisabled = true
     }
 
     // Correctif JaCoCo : exclure les libs du SDK et BouncyCastle

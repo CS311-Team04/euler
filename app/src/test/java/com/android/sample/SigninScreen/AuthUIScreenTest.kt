@@ -1,5 +1,6 @@
 package com.android.sample.signinscreen
 
+import android.os.Looper
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -25,11 +26,14 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.LooperMode
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], qualifiers = "w1080dp-h1920dp")
+@LooperMode(LooperMode.Mode.PAUSED)
 class AuthUIScreenTest {
 
   @get:Rule val composeTestRule = createComposeRule()
@@ -39,12 +43,19 @@ class AuthUIScreenTest {
   fun setup() {
     Dispatchers.setMain(testDispatcher)
     com.android.sample.settings.AppSettings.setDispatcher(testDispatcher)
+    // Flush any pending looper tasks from initialization
+    shadowOf(Looper.getMainLooper()).idle()
   }
 
   @After
   fun tearDown() {
     com.android.sample.settings.AppSettings.resetDispatcher()
     Dispatchers.resetMain()
+  }
+
+  // Helper to idle the main looper in PAUSED mode
+  private fun idleLooper() {
+    shadowOf(Looper.getMainLooper()).idle()
   }
 
   // ==================== ROOT ELEMENT TESTS ====================
@@ -56,6 +67,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.Root).assertIsDisplayed()
   }
@@ -67,6 +79,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.Card).assertIsDisplayed()
   }
@@ -80,6 +93,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.LogosRow).assertIsDisplayed()
   }
@@ -91,6 +105,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.LogoEpfl).assertIsDisplayed()
   }
@@ -102,6 +117,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     // Logo separator is a very small Box (0.5dp width), use unmerged tree to find it
     composeTestRule.onNodeWithTag(AuthTags.LogoPoint, useUnmergedTree = true)
@@ -114,6 +130,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.LogoEuler).assertIsDisplayed()
   }
@@ -125,6 +142,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNode(hasContentDescription("EPFL Logo")).assertIsDisplayed()
     composeTestRule.onNode(hasContentDescription("Euler Logo")).assertIsDisplayed()
@@ -139,6 +157,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.Title).assertIsDisplayed()
     composeTestRule.onNodeWithText("Ask anything, do everything").assertIsDisplayed()
@@ -151,6 +170,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.Subtitle).assertIsDisplayed()
     composeTestRule.onNodeWithText("Welcome to EULER").assertIsDisplayed()
@@ -165,6 +185,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsDisplayed()
   }
@@ -176,6 +197,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsDisplayed()
   }
@@ -187,6 +209,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithText("Continue with Microsoft Entra ID").assertIsDisplayed()
   }
@@ -198,6 +221,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithText("Continue as a guest").assertIsDisplayed()
   }
@@ -209,6 +233,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNode(hasContentDescription("Microsoft Logo")).assertIsDisplayed()
   }
@@ -220,6 +245,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNode(hasContentDescription("Continue")).assertIsDisplayed()
   }
@@ -235,8 +261,10 @@ class AuthUIScreenTest {
             state = AuthUiState.Idle, onMicrosoftLogin = { clicked = true }, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.BtnMicrosoft).performClick()
+    idleLooper()
     composeTestRule.waitForIdle()
     assertTrue("Microsoft button should trigger callback", clicked)
   }
@@ -250,8 +278,10 @@ class AuthUIScreenTest {
             state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = { clicked = true })
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.BtnSwitchEdu).performClick()
+    idleLooper()
     composeTestRule.waitForIdle()
     assertTrue("Guest button should trigger callback", clicked)
   }
@@ -265,6 +295,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsEnabled()
     composeTestRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsEnabled()
@@ -278,6 +309,7 @@ class AuthUIScreenTest {
             state = AuthUiState.Error("Test error"), onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsEnabled()
     composeTestRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsEnabled()
@@ -290,6 +322,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.SignedIn, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsEnabled()
     composeTestRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsEnabled()
@@ -305,6 +338,7 @@ class AuthUIScreenTest {
             onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     // Button should be disabled - verify by trying to assert it's enabled
     try {
@@ -325,6 +359,7 @@ class AuthUIScreenTest {
             onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     // Button should be disabled - verify by trying to assert it's enabled
     try {
@@ -345,6 +380,7 @@ class AuthUIScreenTest {
             onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsEnabled()
   }
@@ -359,6 +395,7 @@ class AuthUIScreenTest {
             onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsEnabled()
   }
@@ -375,6 +412,7 @@ class AuthUIScreenTest {
             onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     Thread.sleep(1000) // Allow animation to complete
     composeTestRule.onNodeWithTag(AuthTags.MsProgress, useUnmergedTree = true)
@@ -390,6 +428,7 @@ class AuthUIScreenTest {
             onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.SwitchProgress).assertIsDisplayed()
   }
@@ -401,6 +440,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     try {
       composeTestRule.onNodeWithTag(AuthTags.MsProgress, useUnmergedTree = true).assertIsDisplayed()
@@ -417,6 +457,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     try {
       composeTestRule.onNodeWithTag(AuthTags.SwitchProgress).assertIsDisplayed()
@@ -436,6 +477,7 @@ class AuthUIScreenTest {
             onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     // Arrow icon should not exist when loading (replaced by progress indicator)
     try {
@@ -453,6 +495,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNode(hasContentDescription("Continue")).assertIsDisplayed()
   }
@@ -466,6 +509,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.OrSeparator).assertIsDisplayed()
   }
@@ -477,6 +521,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithText("OR").assertIsDisplayed()
   }
@@ -490,6 +535,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.TermsText).assertIsDisplayed()
   }
@@ -501,6 +547,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNode(hasText("Privacy Policy", substring = true)).assertIsDisplayed()
   }
@@ -512,6 +559,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule
         .onNode(hasText("By continuing, you acknowledge", substring = true))
@@ -525,6 +573,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.ByEpflText).assertIsDisplayed()
     composeTestRule.onNodeWithText("BY EPFL").assertIsDisplayed()
@@ -539,6 +588,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.Title).assertIsDisplayed()
     composeTestRule.onNodeWithTag(AuthTags.Subtitle).assertIsDisplayed()
@@ -557,6 +607,7 @@ class AuthUIScreenTest {
             state = AuthUiState.Error("Test error"), onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.Title).assertIsDisplayed()
     composeTestRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsDisplayed()
@@ -570,6 +621,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.SignedIn, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.Title).assertIsDisplayed()
     composeTestRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsDisplayed()
@@ -586,6 +638,7 @@ class AuthUIScreenTest {
             onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     Thread.sleep(1000)
     composeTestRule.onNodeWithTag(AuthTags.Title).assertIsDisplayed()
@@ -603,6 +656,7 @@ class AuthUIScreenTest {
             onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.Title).assertIsDisplayed()
     composeTestRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsDisplayed()
@@ -620,9 +674,11 @@ class AuthUIScreenTest {
             state = AuthUiState.Idle, onMicrosoftLogin = { clickCount++ }, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     repeat(3) {
       composeTestRule.onNodeWithTag(AuthTags.BtnMicrosoft).performClick()
+      idleLooper()
       composeTestRule.waitForIdle()
     }
     assertEquals("All clicks should register", 3, clickCount)
@@ -637,9 +693,11 @@ class AuthUIScreenTest {
             state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = { clickCount++ })
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     repeat(3) {
       composeTestRule.onNodeWithTag(AuthTags.BtnSwitchEdu).performClick()
+      idleLooper()
       composeTestRule.waitForIdle()
     }
     assertEquals("All clicks should register", 3, clickCount)
@@ -657,6 +715,7 @@ class AuthUIScreenTest {
             onSwitchEduLogin = { guestClicked = true })
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     // Microsoft button is disabled, so callback should not fire
     try {
@@ -664,10 +723,12 @@ class AuthUIScreenTest {
     } catch (e: Exception) {
       // Expected - disabled button may throw
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     assertFalse("Microsoft button should not trigger when disabled", msClicked)
     // Guest button is enabled, so callback should fire
     composeTestRule.onNodeWithTag(AuthTags.BtnSwitchEdu).performClick()
+    idleLooper()
     composeTestRule.waitForIdle()
     assertTrue("Guest button should trigger when enabled", guestClicked)
   }
@@ -684,6 +745,7 @@ class AuthUIScreenTest {
             onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     Thread.sleep(1000)
     // Loading indicator should exist
@@ -702,6 +764,7 @@ class AuthUIScreenTest {
             onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     // Loading indicator should exist
     composeTestRule.onNodeWithTag(AuthTags.SwitchProgress).assertIsDisplayed()
@@ -725,6 +788,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    idleLooper()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.Root).assertIsDisplayed()
     composeTestRule.onNodeWithTag(AuthTags.Card).assertIsDisplayed()
