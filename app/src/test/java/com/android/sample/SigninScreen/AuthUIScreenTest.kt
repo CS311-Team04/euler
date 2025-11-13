@@ -56,6 +56,7 @@ class AuthUIScreenTest {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
+    composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.Root).assertIsDisplayed()
   }
 

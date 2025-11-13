@@ -50,6 +50,7 @@ class SettingsPageTest {
   @Test
   fun renders_all_core_elements() {
     composeTestRule.setContent { MaterialTheme { SettingsPage() } }
+    composeTestRule.waitForIdle()
 
     // Title
     composeTestRule.onNodeWithText(Localization.t("settings_title")).assertIsDisplayed()
@@ -73,6 +74,7 @@ class SettingsPageTest {
         SettingsPage(onBackClick = { backClicked = true }, onInfoClick = { infoClicked = true })
       }
     }
+    composeTestRule.waitForIdle()
 
     composeTestRule.onNodeWithContentDescription(Localization.t("close")).performClick()
     composeTestRule.onNodeWithContentDescription(Localization.t("info")).performClick()
@@ -84,6 +86,7 @@ class SettingsPageTest {
   @Test
   fun language_dropdown_allows_selection() {
     composeTestRule.setContent { MaterialTheme { SettingsPage() } }
+    composeTestRule.waitForIdle()
 
     composeTestRule.onNodeWithText(Localization.t("speech_language")).performClick()
     composeTestRule.onNodeWithText("FR").performClick()
@@ -97,6 +100,7 @@ class SettingsPageTest {
     composeTestRule.setContent {
       MaterialTheme { SettingsPage(onSignOut = { signOutClicked = true }) }
     }
+    composeTestRule.waitForIdle()
 
     composeTestRule.onNodeWithText(Localization.t("log_out")).performClick()
 
