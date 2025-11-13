@@ -546,9 +546,13 @@ class VoiceScreenTest {
           speechPlayback = playback)
     }
 
-    // Don't use waitForIdle() as LaunchedEffect collect infinite flows
-    // Just verify the screen renders without crashing
-    assertTrue(true)
+    composeTestRule.mainClock.advanceTimeByFrame()
+    composeTestRule.runOnIdle { viewModel.handleUserUtterance("Hello") }
+    composeTestRule.mainClock.advanceTimeByFrame()
+
+    composeTestRule.waitUntil(timeoutMillis = 5_000) { playback.spoken.isNotEmpty() }
+
+    assertEquals(listOf("Test text"), playback.spoken)
   }
 
   @OptIn(ExperimentalCoroutinesApi::class)
@@ -567,8 +571,13 @@ class VoiceScreenTest {
           speechPlayback = playback)
     }
 
-    // Don't use waitForIdle() as LaunchedEffect collect infinite flows
-    assertTrue(true)
+    composeTestRule.mainClock.advanceTimeByFrame()
+    composeTestRule.runOnIdle { viewModel.handleUserUtterance("Bonjour") }
+    composeTestRule.mainClock.advanceTimeByFrame()
+
+    composeTestRule.waitUntil(timeoutMillis = 5_000) { playback.onStartCalled }
+
+    assertTrue(playback.onStartCalled)
   }
 
   @OptIn(ExperimentalCoroutinesApi::class)
@@ -587,8 +596,13 @@ class VoiceScreenTest {
           speechPlayback = playback)
     }
 
-    // Don't use waitForIdle() as LaunchedEffect collect infinite flows
-    assertTrue(true)
+    composeTestRule.mainClock.advanceTimeByFrame()
+    composeTestRule.runOnIdle { viewModel.handleUserUtterance("Salut") }
+    composeTestRule.mainClock.advanceTimeByFrame()
+
+    composeTestRule.waitUntil(timeoutMillis = 5_000) { playback.onDoneCalled }
+
+    assertTrue(playback.onDoneCalled)
   }
 
   @OptIn(ExperimentalCoroutinesApi::class)
@@ -608,8 +622,13 @@ class VoiceScreenTest {
           speechPlayback = playback)
     }
 
-    // Don't use waitForIdle() as LaunchedEffect collect infinite flows
-    assertTrue(true)
+    composeTestRule.mainClock.advanceTimeByFrame()
+    composeTestRule.runOnIdle { viewModel.handleUserUtterance("Erreur") }
+    composeTestRule.mainClock.advanceTimeByFrame()
+
+    composeTestRule.waitUntil(timeoutMillis = 5_000) { playback.onErrorCalled }
+
+    composeTestRule.runOnIdle { assertEquals("Test error", viewModel.uiState.value.lastError) }
   }
 
   @OptIn(ExperimentalCoroutinesApi::class)
@@ -743,20 +762,25 @@ class VoiceScreenTest {
   @Test(timeout = 5000)
   fun voiceScreen_onClick_noSpeechHelper_togglesMicActive() = runTest {
     val viewModel = createVoiceViewModel()
+    val fakeSource = FakeMicLevelSource()
 
     composeTestRule.setContent {
       VoiceScreen(
           onClose = {},
           initialHasMicOverride = true,
           speechHelper = null,
+          levelSourceFactory = { fakeSource },
           voiceChatViewModel = viewModel)
     }
 
-    // Click mic button - should toggle isMicActive
+    composeTestRule.mainClock.advanceTimeByFrame()
     composeTestRule.onNodeWithContentDescription("Toggle microphone").performClick()
+    composeTestRule.mainClock.advanceTimeByFrame()
+    composeTestRule.waitUntil(timeoutMillis = 5_000) { fakeSource.startCount.get() > 0 }
 
-    // Can't verify internal state, just verify it doesn't crash
-    assertTrue(true)
+    composeTestRule.onNodeWithContentDescription("Toggle microphone").performClick()
+    composeTestRule.mainClock.advanceTimeByFrame()
+    composeTestRule.waitUntil(timeoutMillis = 5_000) { fakeSource.stopCount.get() > 0 }
   }
 
   @OptIn(ExperimentalCoroutinesApi::class)

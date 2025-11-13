@@ -9,6 +9,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavHostController
+import androidx.navigation.NavOptionsBuilder
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -32,10 +34,17 @@ object Routes {
   const val VoiceChat = "voice_chat"
 }
 
+@VisibleForTesting internal var appNavControllerObserver: ((NavHostController) -> Unit)? = null
+
+@VisibleForTesting internal var authViewModelFactory: (() -> AuthViewModel)? = null
+
+internal typealias NavigateAction = (String, NavOptionsBuilder.() -> Unit) -> Unit
+
 @Composable
 fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: SpeechToTextHelper) {
-  val nav = rememberNavController()
-  val authViewModel = remember { AuthViewModel() }
+  val nav =
+      rememberNavController().also { controller -> appNavControllerObserver?.invoke(controller) }
+  val authViewModel = remember { authViewModelFactory?.invoke() ?: AuthViewModel() }
   val authState by authViewModel.state.collectAsState()
 
   // Get current back stack entry
@@ -60,11 +69,7 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
               })
         },
         navigateHome = {
-          nav.navigate(Routes.Home) {
-            popUpTo(Routes.SignIn) { inclusive = true }
-            launchSingleTop = true
-            restoreState = true
-          }
+          navigateHomeFromSignIn { route, builder -> nav.navigate(route) { builder(this) } }
         })
   }
 
@@ -76,16 +81,10 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
           OpeningScreen(
               authState = authState,
               onNavigateToSignIn = {
-                nav.navigate(Routes.SignIn) {
-                  popUpTo(Routes.Opening) { inclusive = true }
-                  launchSingleTop = true
-                }
+                navigateOpeningToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
               },
               onNavigateToHome = {
-                nav.navigate(Routes.Home) {
-                  popUpTo(Routes.Opening) { inclusive = true }
-                  launchSingleTop = true
-                }
+                navigateOpeningToHome { route, builder -> nav.navigate(route) { builder(this) } }
               })
         }
 
@@ -108,10 +107,7 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
                 android.util.Log.d("NavGraph", "Sign out button clicked")
                 authViewModel.signOut()
                 android.util.Log.d("NavGraph", "Navigating to SignIn")
-                nav.navigate(Routes.SignIn) {
-                  popUpTo(Routes.Home) { inclusive = true }
-                  launchSingleTop = true
-                }
+                navigateHomeToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
               },
               onSettingsClick = { nav.navigate(Routes.Settings) },
               onVoiceChatClick = { nav.navigate(Routes.VoiceChat) })
@@ -128,10 +124,7 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
                 android.util.Log.d("NavGraph", "Sign out button clicked (HomeWithDrawer)")
                 authViewModel.signOut()
                 android.util.Log.d("NavGraph", "Navigating to SignIn (HomeWithDrawer)")
-                nav.navigate(Routes.SignIn) {
-                  popUpTo(Routes.Home) { inclusive = true }
-                  launchSingleTop = true
-                }
+                navigateHomeToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
               },
               onSettingsClick = { nav.navigate(Routes.Settings) },
               onVoiceChatClick = { nav.navigate(Routes.VoiceChat) },
@@ -142,16 +135,13 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
         composable(Routes.Settings) {
           SettingsPage(
               onBackClick = {
-                nav.navigate(Routes.HomeWithDrawer) { popUpTo(Routes.Home) { inclusive = false } }
+                navigateSettingsBack { route, builder -> nav.navigate(route) { builder(this) } }
               },
               onSignOut = {
                 android.util.Log.d("NavGraph", "Sign out button clicked (Settings)")
                 authViewModel.signOut()
                 android.util.Log.d("NavGraph", "Navigating to SignIn (Settings)")
-                nav.navigate(Routes.SignIn) {
-                  popUpTo(Routes.Home) { inclusive = true }
-                  launchSingleTop = true
-                }
+                navigateHomeToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
               })
         }
 
@@ -198,4 +188,42 @@ internal fun executeAuthCommand(
 @VisibleForTesting
 internal fun buildAuthenticationErrorMessage(authState: AuthUiState, fallback: String): String {
   return if (authState is AuthUiState.Error) getErrorMessage(authState, fallback) else fallback
+}
+
+@VisibleForTesting
+internal fun navigateOpeningToSignIn(navigate: NavigateAction) {
+  navigate(Routes.SignIn) {
+    popUpTo(Routes.Opening) { inclusive = true }
+    launchSingleTop = true
+  }
+}
+
+@VisibleForTesting
+internal fun navigateOpeningToHome(navigate: NavigateAction) {
+  navigate(Routes.Home) {
+    popUpTo(Routes.Opening) { inclusive = true }
+    launchSingleTop = true
+  }
+}
+
+@VisibleForTesting
+internal fun navigateHomeFromSignIn(navigate: NavigateAction) {
+  navigate(Routes.Home) {
+    popUpTo(Routes.SignIn) { inclusive = true }
+    launchSingleTop = true
+    restoreState = true
+  }
+}
+
+@VisibleForTesting
+internal fun navigateHomeToSignIn(navigate: NavigateAction) {
+  navigate(Routes.SignIn) {
+    popUpTo(Routes.Home) { inclusive = true }
+    launchSingleTop = true
+  }
+}
+
+@VisibleForTesting
+internal fun navigateSettingsBack(navigate: NavigateAction) {
+  navigate(Routes.HomeWithDrawer) { popUpTo(Routes.Home) { inclusive = false } }
 }

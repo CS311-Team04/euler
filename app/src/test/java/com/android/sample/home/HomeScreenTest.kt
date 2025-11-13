@@ -1,7 +1,20 @@
 package com.android.sample.home
 
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import com.android.sample.llm.FakeLlmClient
+import com.android.sample.util.MainDispatcherRule
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.Assert.*
+import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 class HomeScreenTest {
 
@@ -574,5 +587,67 @@ class HomeScreenTest {
     val firstAccess = listOf(HomeTags.Root, HomeTags.MenuBtn, HomeTags.TopRightBtn)
     val secondAccess = listOf(HomeTags.Root, HomeTags.MenuBtn, HomeTags.TopRightBtn)
     assertEquals(firstAccess, secondAccess)
+  }
+}
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28])
+class HomeScreenComposeInteractionsTest {
+
+  @get:Rule val composeRule = createComposeRule()
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  @get:Rule
+  val dispatcherRule = MainDispatcherRule(UnconfinedTestDispatcher())
+
+  private fun createViewModel(): HomeViewModel = HomeViewModel(FakeLlmClient())
+
+  @Test
+  fun deleteConfirmation_cancel_hides_modal() {
+    val viewModel = createViewModel()
+    viewModel.showDeleteConfirmation()
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+
+    composeRule.onNodeWithText("Cancel").assertIsDisplayed().performClick()
+
+    composeRule.runOnIdle { assertFalse(viewModel.uiState.value.showDeleteConfirmation) }
+  }
+
+  @Test
+  fun deleteConfirmation_confirm_hides_modal() {
+    val viewModel = createViewModel()
+    viewModel.showDeleteConfirmation()
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+
+    composeRule.onNodeWithText("Delete").assertIsDisplayed().performClick()
+
+    composeRule.runOnIdle { assertFalse(viewModel.uiState.value.showDeleteConfirmation) }
+  }
+
+  @Test
+  fun drawerSettings_click_triggers_callback_and_closes_drawer() {
+    val viewModel = createViewModel()
+    // Open the drawer before composition so drawer content is visible
+    viewModel.toggleDrawer()
+    var settingsInvoked = false
+
+    composeRule.setContent {
+      HomeScreen(viewModel = viewModel, onSettingsClick = { settingsInvoked = true })
+    }
+
+    // Allow drawer state transitions to run
+    composeRule.mainClock.advanceTimeByFrame()
+
+    composeRule
+        .onNodeWithTag(DrawerTags.ConnectorsRow, useUnmergedTree = true)
+        .assertIsDisplayed()
+        .performClick()
+
+    composeRule.runOnIdle {
+      assertTrue(settingsInvoked)
+      assertFalse(viewModel.uiState.value.isDrawerOpen)
+    }
   }
 }

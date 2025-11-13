@@ -215,6 +215,8 @@ dependencies {
     testImplementation(libs.robolectric)
 
     // ----------       Mockito         ------------
+    testImplementation(libs.mockito.core)
+    testImplementation(libs.mockk)
     androidTestImplementation("org.mockito:mockito-android:5.8.0")
     androidTestImplementation("org.mockito:mockito-core:5.8.0")
 

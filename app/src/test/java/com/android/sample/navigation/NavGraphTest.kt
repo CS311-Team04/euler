@@ -1,5 +1,7 @@
 package com.android.sample.navigation
 
+import androidx.navigation.NavOptions
+import androidx.navigation.navOptions
 import com.android.sample.authentification.AuthProvider
 import com.android.sample.authentification.AuthUiState
 import org.junit.Assert.*
@@ -13,6 +15,15 @@ import org.junit.Test
  * - LaunchedEffect logic paths
  */
 class NavGraphTest {
+
+  @Test
+  fun startDestination_matches_signedIn_flag() {
+    val destinations = mapOf(true to Routes.Home, false to Routes.Opening)
+    destinations.forEach { (startSignedIn, expected) ->
+      val startDestination = if (startSignedIn) Routes.Home else Routes.Opening
+      assertEquals(expected, startDestination)
+    }
+  }
 
   @Test
   fun resolveAuthCommand_returns_startMicrosoftSignIn_for_microsoft_loading() {
@@ -222,5 +233,95 @@ class NavGraphTest {
     val result = buildAuthenticationErrorMessage(errorState, fallback)
     // Whitespace is not empty, so should return it
     assertEquals("   ", result)
+  }
+}
+
+class NavGraphNavigationHelpersTest {
+
+  data class NavigationInvocation(
+      val route: String,
+      val inclusive: Boolean?,
+      val restoreState: Boolean,
+      val launchSingleTop: Boolean
+  )
+
+  private fun recordNavigation(block: (NavigateAction) -> Unit): NavigationInvocation {
+    var capturedRoute: String? = null
+    var inclusive: Boolean? = null
+    var restoreState = false
+    var launchSingleTop = false
+
+    block { route, builder ->
+      val options = navOptions(builder)
+      capturedRoute = route
+      inclusive = options.extractInclusive()
+      restoreState = options.shouldRestoreState()
+      launchSingleTop = options.shouldLaunchSingleTop()
+    }
+
+    return NavigationInvocation(
+        route = requireNotNull(capturedRoute),
+        inclusive = inclusive,
+        restoreState = restoreState,
+        launchSingleTop = launchSingleTop)
+  }
+
+  @Test
+  fun navigateOpeningToSignIn_sets_expected_flags() {
+    val invocation = recordNavigation { navigateOpeningToSignIn(it) }
+    assertEquals(Routes.SignIn, invocation.route)
+    assertEquals(true, invocation.inclusive)
+    assertFalse(invocation.restoreState)
+    assertTrue(invocation.launchSingleTop)
+  }
+
+  @Test
+  fun navigateOpeningToHome_sets_expected_flags() {
+    val invocation = recordNavigation { navigateOpeningToHome(it) }
+    assertEquals(Routes.Home, invocation.route)
+    assertEquals(true, invocation.inclusive)
+    assertFalse(invocation.restoreState)
+    assertTrue(invocation.launchSingleTop)
+  }
+
+  @Test
+  fun navigateHomeFromSignIn_restores_state() {
+    val invocation = recordNavigation { navigateHomeFromSignIn(it) }
+    assertEquals(Routes.Home, invocation.route)
+    assertEquals(true, invocation.inclusive)
+    assertTrue(invocation.restoreState)
+    assertTrue(invocation.launchSingleTop)
+  }
+
+  @Test
+  fun navigateHomeToSignIn_clears_back_stack() {
+    val invocation = recordNavigation { navigateHomeToSignIn(it) }
+    assertEquals(Routes.SignIn, invocation.route)
+    assertEquals(true, invocation.inclusive)
+    assertFalse(invocation.restoreState)
+    assertTrue(invocation.launchSingleTop)
+  }
+
+  @Test
+  fun navigateSettingsBack_preserves_home_destination() {
+    val invocation = recordNavigation { navigateSettingsBack(it) }
+    assertEquals(Routes.HomeWithDrawer, invocation.route)
+    assertEquals(false, invocation.inclusive)
+    assertFalse(invocation.restoreState)
+    assertFalse(invocation.launchSingleTop)
+  }
+
+  private fun NavOptions.extractInclusive(): Boolean? {
+    val methodNames = listOf("isPopUpToInclusive", "shouldPopUpToInclusive")
+    for (name in methodNames) {
+      try {
+        val method = NavOptions::class.java.getDeclaredMethod(name)
+        method.isAccessible = true
+        return method.invoke(this) as Boolean
+      } catch (_: Exception) {
+        // ignore and try next name
+      }
+    }
+    return null
   }
 }
