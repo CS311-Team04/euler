@@ -472,6 +472,8 @@ class HomeUIStateMoreTest {
 
     val (
         userName,
+        isGuest,
+        profile,
         systems,
         messages,
         messageDraft,
@@ -480,10 +482,14 @@ class HomeUIStateMoreTest {
         isDrawerOpen,
         isTopRightOpen,
         isLoading,
-        showDeleteConfirmation) =
+        showDeleteConfirmation,
+        showGuestWarning,
+        isSending) =
         state
 
     assertEquals("TestUser", userName)
+    assertFalse(isGuest)
+    assertNull(profile)
     assertTrue(systems.isEmpty())
     assertTrue(messages.isEmpty())
     assertEquals("Draft", messageDraft)
@@ -493,6 +499,8 @@ class HomeUIStateMoreTest {
     assertFalse(isTopRightOpen)
     assertFalse(isLoading)
     assertFalse(showDeleteConfirmation)
+    assertFalse(showGuestWarning)
+    assertFalse(isSending)
   }
 
   @Test
@@ -642,14 +650,18 @@ class HomeUIStateMoreTest {
             showDeleteConfirmation = true)
 
     assertEquals("User", state.component1())
-    assertEquals(1, state.component2().size)
-    assertEquals(1, state.component3().size)
-    assertEquals("Draft", state.component4())
-    assertEquals("mid", state.component5())
-    assertEquals(3, state.component6())
-    assertTrue(state.component7())
-    assertTrue(state.component8())
+    assertFalse(state.component2())
+    assertNull(state.component3())
+    assertEquals(1, state.component4().size)
+    assertEquals(1, state.component5().size)
+    assertEquals("Draft", state.component6())
+    assertEquals("mid", state.component7())
+    assertEquals(3, state.component8())
     assertTrue(state.component9())
     assertTrue(state.component10())
+    assertTrue(state.component11())
+    assertTrue(state.component12())
+    assertFalse(state.component13())
+    assertTrue(state.component14())
   }
 }

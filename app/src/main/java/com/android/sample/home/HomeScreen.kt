@@ -3,7 +3,6 @@ package com.android.sample.home
 import androidx.compose.animation.*
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -37,6 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.android.sample.Chat.ChatMessage
 import com.android.sample.Chat.ChatType
 import com.android.sample.R
@@ -76,7 +76,7 @@ object HomeTags {
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
-    viewModel: HomeViewModel,
+    viewModel: HomeViewModel = viewModel(),
     onAction1Click: () -> Unit = {},
     onAction2Click: () -> Unit = {},
     onSendMessage: (String) -> Unit = {},
@@ -279,55 +279,59 @@ fun HomeScreen(
                         enabled = !ui.isSending,
                         singleLine = true,
                         trailingIcon = {
-                          Row(horizontalArrangement = Arrangement.spacedBy(0.2.dp)) {
-                            // Voice chat button - opens voice visualizer
-                            IconButton(
-                                onClick = {
-                                  speechHelper?.startListening { recognized ->
-                                    viewModel.updateMessageDraft(recognized)
-                                  }
-                                },
-                                enabled = speechHelper != null,
-                                modifier = Modifier.testTag(HomeTags.MicBtn)) {
-                                  Icon(
-                                      Icons.Default.Mic,
-                                      contentDescription = "Dictate",
-                                      tint = Color.Gray)
-                                }
-
-                            val canSend = ui.messageDraft.isNotBlank() && !ui.isSending
-
-                            // Voice mode button (equalizer icon) - shown when there's no text
-                            AnimatedVisibility(
-                                visible = !canSend,
-                                enter = fadeIn() + scaleIn(),
-                                exit = fadeOut() + scaleOut()) {
-                                  IconButton(
-                                      onClick = { onVoiceChatClick() },
-                                      modifier = Modifier.testTag(HomeTags.VoiceBtn)) {
-                                        Icon(
-                                            Icons.Default.GraphicEq,
-                                            contentDescription = "Voice mode",
-                                            tint = Color.Gray)
+                          val canSend = ui.messageDraft.isNotBlank() && !ui.isSending
+                          Row(
+                              modifier = Modifier.padding(end = 6.dp),
+                              verticalAlignment = Alignment.CenterVertically,
+                              horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                IconButton(
+                                    onClick = {
+                                      speechHelper?.startListening { recognized ->
+                                        viewModel.updateMessageDraft(recognized)
                                       }
-                                }
+                                    },
+                                    enabled = speechHelper != null,
+                                    modifier = Modifier.size(36.dp).testTag(HomeTags.MicBtn)) {
+                                      Icon(
+                                          Icons.Default.Mic,
+                                          contentDescription = "Dictate",
+                                          tint = Color.Gray,
+                                          modifier = Modifier.size(18.dp))
+                                    }
 
-                            // Send button - shown only when there's text
-                            AnimatedVisibility(
-                                visible = canSend,
-                                enter = fadeIn() + scaleIn(),
-                                exit = fadeOut() + scaleOut()) {
-                                  BubbleSendButton(
-                                      enabled = canSend,
-                                      isSending = ui.isSending,
-                                      onClick = {
-                                        if (canSend) {
-                                          onSendMessage(ui.messageDraft)
-                                          viewModel.sendMessage()
+                                Box(
+                                    modifier = Modifier.size(36.dp),
+                                    contentAlignment = Alignment.Center) {
+                                      Crossfade(targetState = canSend, label = "voice-button") {
+                                          readyToSend ->
+                                        if (!readyToSend) {
+                                          IconButton(
+                                              onClick = onVoiceChatClick,
+                                              modifier =
+                                                  Modifier.fillMaxSize()
+                                                      .testTag(HomeTags.VoiceBtn)) {
+                                                Icon(
+                                                    Icons.Default.GraphicEq,
+                                                    contentDescription = "Voice mode",
+                                                    tint = Color.Gray,
+                                                    modifier = Modifier.size(18.dp))
+                                              }
+                                        } else {
+                                          Spacer(modifier = Modifier.size(18.dp))
                                         }
-                                      })
-                                }
-                          }
+                                      }
+                                    }
+
+                                BubbleSendButton(
+                                    enabled = canSend,
+                                    isSending = ui.isSending,
+                                    onClick = {
+                                      if (canSend) {
+                                        onSendMessage(ui.messageDraft)
+                                        viewModel.sendMessage()
+                                      }
+                                    })
+                              }
                         },
                         shape = RoundedCornerShape(50),
                         colors =
@@ -565,44 +569,29 @@ private fun BubbleSendButton(
     isSending: Boolean,
     onClick: () -> Unit,
 ) {
-  val targetSize =
-      when {
-        isSending -> 40.dp
-        enabled -> 42.dp
-        else -> 40.dp
-      }
-  val size by animateDpAsState(targetValue = targetSize, label = "bubble-size")
-
-  // Colors: bright red when enabled, deeper red while sending, neutral gray when disabled
-  val targetContainer =
-      when {
-        isSending -> Color(0xFFC62828) // deeper red
-        enabled -> Color(0xFFE53935) // bright red
-        else -> Color(0xFF3C3C3C) // gray
-      }
-  val container by animateColorAsState(targetValue = targetContainer, label = "bubble-color")
-
-  val borderColor =
-      when {
-        enabled || isSending -> Color(0x33FFFFFF) // subtle white ring for separation
-        else -> Color(0x22000000)
-      }
-  val elevation by
-      animateDpAsState(targetValue = if (enabled) 8.dp else 0.dp, label = "bubble-elev")
-
+  val size = 40.dp
   val interaction = remember { MutableInteractionSource() }
 
+  val containerColor by
+      animateColorAsState(
+          targetValue =
+              when {
+                isSending -> Color(0xFFC62828)
+                enabled -> Color(0xFFE53935)
+                else -> Color(0xFF3C3C3C)
+              },
+          label = "bubble-color")
+
   Surface(
-      modifier = Modifier.size(size).padding(end = 6.dp).testTag(HomeTags.SendBtn),
-      color = container,
+      modifier = Modifier.size(size).testTag(HomeTags.SendBtn),
+      color = containerColor,
       shape = CircleShape,
       tonalElevation = 0.dp,
-      shadowElevation = elevation,
+      shadowElevation = 0.dp,
   ) {
     Box(
         modifier =
             Modifier.fillMaxSize()
-                .padding(6.dp)
                 .testTag(HomeTags.SendBtn)
                 .then(
                     if (enabled && !isSending)
@@ -613,7 +602,7 @@ private fun BubbleSendButton(
         contentAlignment = Alignment.Center) {
           if (isSending) {
             CircularProgressIndicator(
-                strokeWidth = 2.dp, modifier = Modifier.size(20.dp), color = Color.White)
+                strokeWidth = 2.dp, modifier = Modifier.size(18.dp), color = Color.White)
           } else {
             val icon =
                 try {
@@ -621,12 +610,13 @@ private fun BubbleSendButton(
                 } catch (_: Throwable) {
                   androidx.compose.material.icons.Icons.Default.Send
                 }
-            Icon(
-                imageVector = icon,
-                contentDescription = "Send",
-                tint = Color.White,
-                modifier = Modifier.size(22.dp) // larger arrow for visibility
-                )
+            Crossfade(targetState = enabled, label = "send-button-state") { canSend ->
+              Icon(
+                  imageVector = icon,
+                  contentDescription = "Send",
+                  tint = if (canSend) Color.White else Color.White.copy(alpha = 0.35f),
+                  modifier = Modifier.size(18.dp))
+            }
           }
         }
   }
