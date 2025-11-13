@@ -1,4 +1,4 @@
-package com.android.sample.VoiceChat
+package com.android.sample.VoiceChat.UI
 
 import kotlinx.coroutines.flow.Flow
 

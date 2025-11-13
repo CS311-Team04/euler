@@ -1,5 +1,6 @@
 package com.android.sample.VoiceChat
 
+import com.android.sample.VoiceChat.UI.LevelSmoother
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
