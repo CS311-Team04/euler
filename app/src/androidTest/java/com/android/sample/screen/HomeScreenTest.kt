@@ -1,5 +1,6 @@
 package com.android.sample.screen
 
+import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -11,12 +12,14 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.sample.TestConstants
 import com.android.sample.home.HomeScreen
 import com.android.sample.home.HomeTags
 import com.android.sample.home.HomeViewModel
 import com.android.sample.llm.FakeLlmClient
+import com.google.firebase.FirebaseApp
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -28,7 +31,15 @@ class HomeScreenTest {
 
   @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
 
+  private fun ensureFirebaseInitialized() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    if (FirebaseApp.getApps(context).isEmpty()) {
+      FirebaseApp.initializeApp(context)
+    }
+  }
+
   private fun launchHomeScreen() {
+    ensureFirebaseInitialized()
     composeRule.setContent {
       MaterialTheme { HomeScreen(viewModel = HomeViewModel(FakeLlmClient())) }
     }
@@ -36,6 +47,7 @@ class HomeScreenTest {
 
   @Test
   fun action1_button_triggers_callback() {
+    ensureFirebaseInitialized()
     var action1Clicked = false
 
     composeRule.setContent {
@@ -53,6 +65,7 @@ class HomeScreenTest {
 
   @Test
   fun action2_button_triggers_callback() {
+    ensureFirebaseInitialized()
     var action2Clicked = false
 
     composeRule.setContent {
@@ -74,7 +87,6 @@ class HomeScreenTest {
 
     composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.MenuBtn), timeoutMillis = 5_000)
     composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
-    // Drawer contents include "New chat" entry
     composeRule.onNodeWithText("New chat").assertIsDisplayed()
   }
 
