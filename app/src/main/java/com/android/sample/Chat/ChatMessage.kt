@@ -74,35 +74,157 @@ fun ChatMessage(
     isLoadingSpeech: Boolean = false,
     onSpeakClick: ((ChatUIModel) -> Unit)? = null
 ) {
-  val isUser = message.type == ChatType.USER
+  when (message.type) {
+    ChatType.USER ->
+        UserChatMessage(
+            message = message,
+            modifier = modifier,
+            maxUserBubbleWidthFraction = maxUserBubbleWidthFraction,
+            userBubbleBg = userBubbleBg,
+            userBubbleText = userBubbleText)
+    ChatType.AI ->
+        AiChatMessage(
+            message = message,
+            modifier = modifier,
+            aiText = aiText,
+            isSpeaking = isSpeaking,
+            isLoadingSpeech = isLoadingSpeech,
+            onSpeakClick = onSpeakClick)
+  }
+}
 
-  if (isUser) {
-    // RIGHT-ALIGNED row; bubble wraps content (no fillMaxWidth on bubble or text)
-    Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-      BoxWithConstraints {
-        val maxBubbleWidth = maxWidth * maxUserBubbleWidthFraction
+@SuppressLint("UnusedBoxWithConstraintsScope")
+@Composable
+private fun UserChatMessage(
+    message: ChatUIModel,
+    modifier: Modifier,
+    maxUserBubbleWidthFraction: Float,
+    userBubbleBg: Color,
+    userBubbleText: Color
+) {
+  Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+    BoxWithConstraints {
+      val maxBubbleWidth = maxWidth * maxUserBubbleWidthFraction
 
-        Surface(
-            color = userBubbleBg,
-            shape = RoundedCornerShape(18.dp),
-            tonalElevation = 0.dp,
-            shadowElevation = 0.dp,
-            modifier =
-                Modifier.widthIn(max = maxBubbleWidth) // cap width
-                    .testTag("chat_user_bubble")) {
-              Text(
-                  text = message.text,
-                  color = userBubbleText,
-                  style = MaterialTheme.typography.bodyMedium,
-                  lineHeight = 18.sp,
-                  textAlign = TextAlign.Start,
-                  // IMPORTANT: no fillMaxWidth here → wrap content
-                  modifier =
-                      Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
-                          .testTag("chat_user_text"))
-            }
-      }
+      Surface(
+          color = userBubbleBg,
+          shape = RoundedCornerShape(18.dp),
+          tonalElevation = 0.dp,
+          shadowElevation = 0.dp,
+          modifier = Modifier.widthIn(max = maxBubbleWidth).testTag("chat_user_bubble")) {
+            Text(
+                text = message.text,
+                color = userBubbleText,
+                style = MaterialTheme.typography.bodyMedium,
+                lineHeight = 18.sp,
+                textAlign = TextAlign.Start,
+                modifier =
+                    Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                        .testTag("chat_user_text"))
+          }
     }
+  }
+}
+
+@Composable
+private fun AiChatMessage(
+    message: ChatUIModel,
+    modifier: Modifier,
+    aiText: Color,
+    isSpeaking: Boolean,
+    isLoadingSpeech: Boolean,
+    onSpeakClick: ((ChatUIModel) -> Unit)?
+) {
+  Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
+    Box(modifier = Modifier.fillMaxWidth()) {
+      Text(
+          text = message.text,
+          color = aiText,
+          style = MaterialTheme.typography.bodyMedium,
+          lineHeight = 20.sp,
+          modifier = Modifier.fillMaxWidth().padding(end = 36.dp).testTag("chat_ai_text"))
+
+      AiVoiceButton(
+          message = message,
+          isSpeaking = isSpeaking,
+          isLoadingSpeech = isLoadingSpeech,
+          onSpeakClick = onSpeakClick)
+    }
+  }
+}
+
+@Composable
+private fun BoxScope.AiVoiceButton(
+    message: ChatUIModel,
+    isSpeaking: Boolean,
+    isLoadingSpeech: Boolean,
+    onSpeakClick: ((ChatUIModel) -> Unit)?
+) {
+  if (onSpeakClick == null) return
+
+  val buttonModifier =
+      Modifier.align(Alignment.BottomEnd).testTag("chat_ai_voice_btn_${message.id}")
+
+  when {
+    isLoadingSpeech -> {
+      Surface(
+          shape = CircleShape,
+          color = Color(0x1AFFFFFF),
+          tonalElevation = 0.dp,
+          shadowElevation = 0.dp,
+          modifier = buttonModifier.size(28.dp)) {
+            Box(contentAlignment = Alignment.Center) {
+              CircularProgressIndicator(
+                  modifier =
+                      Modifier.size(16.dp).testTag("chat_ai_voice_btn_${message.id}_loading"),
+                  strokeWidth = 2.dp,
+                  color = Color.Gray)
+            }
+          }
+    }
+    else -> {
+      val colorScheme = MaterialTheme.colorScheme
+      val voiceColors = EulerTheme.voiceButtonColors
+      val background =
+          if (isSpeaking) {
+            colorScheme.error
+          } else {
+            voiceColors.idleContainer
+          }
+      val icon =
+          if (isSpeaking) {
+            Icons.Default.Stop
+          } else {
+            Icons.Default.VolumeUp
+          }
+      val description =
+          if (isSpeaking) {
+            stringResource(R.string.chat_ai_voice_button_stop)
+          } else {
+            stringResource(R.string.chat_ai_voice_button_play)
+          }
+      val tint =
+          if (isSpeaking) {
+            colorScheme.onError
+          } else {
+            voiceColors.idleContent
+          }
+
+      Surface(
+          onClick = { onSpeakClick(message) },
+          shape = CircleShape,
+          color = background,
+          tonalElevation = 0.dp,
+          shadowElevation = 0.dp,
+          modifier = buttonModifier.size(28.dp)) {
+            Box(contentAlignment = Alignment.Center) {
+              Icon(
+                  imageVector = icon,
+                  contentDescription = description,
+                  tint = tint,
+                  modifier = Modifier.size(16.dp))
+            }
+          }
   } else {
     // AI: full-width plain text
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
