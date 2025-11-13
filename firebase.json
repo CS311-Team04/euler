@@ -25,7 +25,8 @@
   "emulators": {
     "extensions": {
       "host": "127.0.0.1",
-      "port": 5001 },
+      "port": 5001
+    },
     "functions": {
       "host": "127.0.0.1",
       "port": 5002
