@@ -1,15 +1,26 @@
 package com.android.sample.home
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import com.android.sample.Chat.ChatType
+import com.android.sample.Chat.ChatUIModel
 import com.android.sample.llm.FakeLlmClient
+import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.util.MainDispatcherRule
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.slot
+import io.mockk.unmockkAll
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.Assert.*
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -602,6 +613,25 @@ class HomeScreenComposeInteractionsTest {
 
   private fun createViewModel(): HomeViewModel = HomeViewModel(FakeLlmClient())
 
+  @After
+  fun tearDownMocks() {
+    unmockkAll()
+  }
+
+  private fun HomeViewModel.editState(
+      transform: (HomeUiState) -> HomeUiState
+  ) {
+    val field = HomeViewModel::class.java.getDeclaredField("_uiState")
+    field.isAccessible = true
+    val flow = field.get(this) as MutableStateFlow<HomeUiState>
+    flow.value = transform(flow.value)
+  }
+
+  private fun userMessage(
+      id: String = "user-${System.nanoTime()}",
+      text: String = "Hello"
+  ) = ChatUIModel(id = id, text = text, timestamp = 0L, type = ChatType.USER)
+
   @Test
   fun deleteConfirmation_cancel_hides_modal() {
     val viewModel = createViewModel()
@@ -648,6 +678,71 @@ class HomeScreenComposeInteractionsTest {
     composeRule.runOnIdle {
       assertTrue(settingsInvoked)
       assertFalse(viewModel.uiState.value.isDrawerOpen)
+    }
+  }
+
+  @Test
+  fun thinkingIndicator_visible_when_sending_without_streaming_id() {
+    val viewModel = createViewModel()
+    viewModel.editState { state ->
+      state.copy(
+          messages = listOf(userMessage()),
+          isSending = true,
+          streamingMessageId = null)
+    }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+
+    composeRule.waitForIdle()
+
+    composeRule.onNodeWithTag("home_thinking_indicator", useUnmergedTree = true).assertIsDisplayed()
+  }
+
+  @Test
+  fun sendButton_click_dispatches_message_and_clears_draft() {
+    val viewModel = createViewModel()
+    viewModel.editState { state ->
+      state.copy(messageDraft = "Ping Euler", isSending = false, streamingMessageId = null)
+    }
+    var sent: String? = null
+
+    composeRule.setContent {
+      HomeScreen(viewModel = viewModel, onSendMessage = { sent = it })
+    }
+
+    composeRule.waitForIdle()
+
+    composeRule
+        .onNode(
+            hasTestTag(HomeTags.SendBtn) and hasClickAction(), useUnmergedTree = true)
+        .performClick()
+    composeRule.waitForIdle()
+
+    composeRule.runOnIdle {
+      assertEquals("", viewModel.uiState.value.messageDraft)
+      assertEquals("Ping Euler", sent)
+      assertTrue(
+          viewModel.uiState.value.messages.any { it.type == ChatType.USER && it.text == "Ping Euler" })
+    }
+  }
+
+  @Test
+  fun micButton_click_invokes_speech_helper_and_updates_draft() {
+    val viewModel = createViewModel()
+    val speechHelper = mockk<SpeechToTextHelper>()
+    val resultSlot = slot<(String) -> Unit>()
+    every { speechHelper.startListening(capture(resultSlot), any(), any(), any(), any()) } answers
+        {
+          resultSlot.captured.invoke("Bonjour Euler")
+        }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel, speechHelper = speechHelper) }
+
+    composeRule.onNodeWithTag(HomeTags.MicBtn, useUnmergedTree = true).performClick()
+    composeRule.waitForIdle()
+
+    composeRule.runOnIdle {
+      assertEquals("Bonjour Euler", viewModel.uiState.value.messageDraft)
     }
   }
 }
