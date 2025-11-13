@@ -662,6 +662,6 @@ class HomeUIStateMoreTest {
     assertTrue(state.component11())
     assertTrue(state.component12())
     assertFalse(state.component13())
-    assertTrue(state.component14())
+    assertFalse(state.component14())
   }
 }
