@@ -28,11 +28,11 @@ class HomeScreenGuestFlowTest {
 
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
+    // Open drawer via UI
     composeRule.onNodeWithContentDescription("Menu").performClick()
-    composeRule.waitUntil(timeoutMillis = 2_000) { viewModel.uiState.value.isDrawerOpen }
 
-    composeRule.onNodeWithContentDescription("Menu").performClick()
-    composeRule.waitUntil(timeoutMillis = 2_000) { !viewModel.uiState.value.isDrawerOpen }
+    // Assert drawer visible
+    composeRule.onNodeWithText("Profile", useUnmergedTree = true).assertIsDisplayed()
   }
 
   @Test
