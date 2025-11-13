@@ -8,6 +8,12 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -16,21 +22,29 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class SettingsPageTest {
   @get:Rule val composeTestRule = createComposeRule()
 
   private lateinit var context: Context
+  private val testDispatcher = UnconfinedTestDispatcher()
 
   @Before
   fun setup() {
+    Dispatchers.setMain(testDispatcher)
+    AppSettings.setDispatcher(testDispatcher)
     context = ApplicationProvider.getApplicationContext()
     AppSettings.initialize(context)
-    Thread.sleep(100)
     // Reset to English for consistent tests
     AppSettings.setLanguage(Language.EN)
-    Thread.sleep(100)
+  }
+
+  @After
+  fun tearDown() {
+    AppSettings.resetDispatcher()
+    Dispatchers.resetMain()
   }
 
   @Test

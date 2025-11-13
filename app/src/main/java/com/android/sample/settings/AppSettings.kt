@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -33,7 +34,11 @@ object AppSettings {
     get() = _languageState.value
 
   private var dataStore: DataStore<Preferences>? = null
-  private val scope = CoroutineScope(Dispatchers.IO)
+  
+  // Allow dispatcher injection for testing
+  private var dispatcher: CoroutineDispatcher = Dispatchers.IO
+  private val scope: CoroutineScope
+    get() = CoroutineScope(dispatcher)
 
   /**
    * Initialize AppSettings with the app context. This loads saved settings from disk. Call this
@@ -60,5 +65,21 @@ object AppSettings {
   fun setLanguage(value: Language) {
     _languageState.value = value
     scope.launch { dataStore?.edit { preferences -> preferences[LANGUAGE_KEY] = value.code } }
+  }
+
+  /**
+   * Set the dispatcher to use for coroutines. This is primarily for testing purposes.
+   * Call this before initialize() in test setup.
+   */
+  internal fun setDispatcher(dispatcher: CoroutineDispatcher) {
+    this.dispatcher = dispatcher
+  }
+
+  /**
+   * Reset the dispatcher to the default (Dispatchers.IO).
+   * This is primarily for testing purposes to reset state after tests.
+   */
+  internal fun resetDispatcher() {
+    this.dispatcher = Dispatchers.IO
   }
 }

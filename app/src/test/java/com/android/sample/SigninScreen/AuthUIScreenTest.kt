@@ -13,18 +13,39 @@ import com.android.sample.authentification.AuthProvider
 import com.android.sample.authentification.AuthTags
 import com.android.sample.authentification.AuthUIScreen
 import com.android.sample.authentification.AuthUiState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28])
+@Config(sdk = [28], qualifiers = "w1080dp-h1920dp")
 class AuthUIScreenTest {
 
   @get:Rule val composeTestRule = createComposeRule()
+  private val testDispatcher = UnconfinedTestDispatcher()
+
+  @Before
+  fun setup() {
+    Dispatchers.setMain(testDispatcher)
+    com.android.sample.settings.AppSettings.setDispatcher(testDispatcher)
+  }
+
+  @After
+  fun tearDown() {
+    com.android.sample.settings.AppSettings.resetDispatcher()
+    Dispatchers.resetMain()
+  }
 
   // ==================== ROOT ELEMENT TESTS ====================
 
