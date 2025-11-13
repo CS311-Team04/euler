@@ -34,7 +34,7 @@ object AppSettings {
     get() = _languageState.value
 
   private var dataStore: DataStore<Preferences>? = null
-  
+
   // Allow dispatcher injection for testing
   private var dispatcher: CoroutineDispatcher = Dispatchers.IO
   private val scope: CoroutineScope
@@ -68,16 +68,16 @@ object AppSettings {
   }
 
   /**
-   * Set the dispatcher to use for coroutines. This is primarily for testing purposes.
-   * Call this before initialize() in test setup.
+   * Set the dispatcher to use for coroutines. This is primarily for testing purposes. Call this
+   * before initialize() in test setup.
    */
   internal fun setDispatcher(dispatcher: CoroutineDispatcher) {
     this.dispatcher = dispatcher
   }
 
   /**
-   * Reset the dispatcher to the default (Dispatchers.IO).
-   * This is primarily for testing purposes to reset state after tests.
+   * Reset the dispatcher to the default (Dispatchers.IO). This is primarily for testing purposes to
+   * reset state after tests.
    */
   internal fun resetDispatcher() {
     this.dispatcher = Dispatchers.IO
