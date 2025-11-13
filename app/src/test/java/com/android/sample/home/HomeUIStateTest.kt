@@ -475,6 +475,8 @@ class HomeUIStateMoreTest {
         systems,
         messages,
         messageDraft,
+        streamingMessageId,
+        streamingSequence,
         isDrawerOpen,
         isTopRightOpen,
         isLoading,
@@ -485,6 +487,8 @@ class HomeUIStateMoreTest {
     assertTrue(systems.isEmpty())
     assertTrue(messages.isEmpty())
     assertEquals("Draft", messageDraft)
+    assertNull(streamingMessageId)
+    assertEquals(0, streamingSequence)
     assertTrue(isDrawerOpen)
     assertFalse(isTopRightOpen)
     assertFalse(isLoading)
@@ -509,7 +513,9 @@ class HomeUIStateMoreTest {
             isDrawerOpen = false,
             isTopRightOpen = false,
             isLoading = false,
-            showDeleteConfirmation = false)
+            showDeleteConfirmation = false,
+            streamingMessageId = null,
+            streamingSequence = 0)
 
     assertFalse(state.isDrawerOpen)
     assertFalse(state.isTopRightOpen)
@@ -525,7 +531,9 @@ class HomeUIStateMoreTest {
             isDrawerOpen = true,
             isTopRightOpen = true,
             isLoading = true,
-            showDeleteConfirmation = true)
+            showDeleteConfirmation = true,
+            streamingMessageId = "id",
+            streamingSequence = 5)
 
     assertTrue(state.isDrawerOpen)
     assertTrue(state.isTopRightOpen)
@@ -626,6 +634,8 @@ class HomeUIStateMoreTest {
             systems = listOf(SystemItem("1", "S", true)),
             messages = listOf(ChatUIModel("1", "A", System.currentTimeMillis(), ChatType.USER)),
             messageDraft = "Draft",
+            streamingMessageId = "mid",
+            streamingSequence = 3,
             isDrawerOpen = true,
             isTopRightOpen = true,
             isLoading = true,
@@ -635,9 +645,11 @@ class HomeUIStateMoreTest {
     assertEquals(1, state.component2().size)
     assertEquals(1, state.component3().size)
     assertEquals("Draft", state.component4())
-    assertTrue(state.component5())
-    assertTrue(state.component6())
+    assertEquals("mid", state.component5())
+    assertEquals(3, state.component6())
     assertTrue(state.component7())
     assertTrue(state.component8())
+    assertTrue(state.component9())
+    assertTrue(state.component10())
   }
 }

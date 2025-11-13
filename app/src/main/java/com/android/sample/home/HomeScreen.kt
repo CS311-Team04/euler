@@ -268,9 +268,10 @@ fun HomeScreen(
                             // Voice chat button - opens voice visualizer
                             IconButton(
                                 onClick = {
-                                  speechHelper?.startListening { recognized ->
-                                    viewModel.updateMessageDraft(recognized)
-                                  }
+                                  speechHelper?.startListening(
+                                      onResult = { recognized ->
+                                        viewModel.updateMessageDraft(recognized)
+                                      })
                                 },
                                 enabled = speechHelper != null,
                                 modifier = Modifier.testTag(HomeTags.MicBtn)) {
@@ -329,7 +330,7 @@ fun HomeScreen(
                                 unfocusedContainerColor = Color(0xFF121212),
                                 disabledContainerColor = Color(0xFF121212)))
 
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(16.dp))
                     Text(
                         text = "Powered by APERTUS",
                         color = Color.Gray,
@@ -350,7 +351,7 @@ fun HomeScreen(
                       val listState = rememberLazyListState()
 
                       // Auto-scroll to bottom when messages change or sending state changes
-                      LaunchedEffect(ui.messages.size, ui.isSending) {
+                      LaunchedEffect(ui.messages.size, ui.isSending, ui.streamingSequence) {
                         val lastIndex =
                             if (ui.messages.isEmpty()) {
                               0
@@ -367,11 +368,16 @@ fun HomeScreen(
                           modifier = Modifier.fillMaxSize().padding(16.dp),
                           verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             items(items = ui.messages, key = { it.id }) { item ->
-                              ChatMessage(message = item, modifier = Modifier.fillMaxWidth())
+                              val showLeadingDot =
+                                  item.id == ui.streamingMessageId && item.text.isEmpty()
+                              ChatMessage(
+                                  message = item,
+                                  modifier = Modifier.fillMaxWidth(),
+                                  isStreaming = showLeadingDot)
                             }
 
                             // Global thinking indicator shown AFTER the last user message.
-                            if (ui.isSending) {
+                            if (ui.isSending && ui.streamingMessageId == null) {
                               item {
                                 Spacer(Modifier.height(6.dp))
                                 ThinkingIndicator(

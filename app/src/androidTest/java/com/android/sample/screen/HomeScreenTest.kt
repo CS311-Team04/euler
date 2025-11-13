@@ -20,6 +20,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.sample.TestConstants
 import com.android.sample.home.HomeScreen
 import com.android.sample.home.HomeTags
+import com.android.sample.home.HomeViewModel
+import com.android.sample.llm.FakeLlmClient
+import com.android.sample.speech.SpeechToTextHelper
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Rule
@@ -31,6 +34,35 @@ import org.junit.runner.RunWith
 class HomeScreenTest {
 
   @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
+
+  private fun setHomeScreenContent(
+      modifier: Modifier = Modifier,
+      onAction1Click: () -> Unit = {},
+      onAction2Click: () -> Unit = {},
+      onSendMessage: (String) -> Unit = {},
+      onSignOut: () -> Unit = {},
+      onSettingsClick: () -> Unit = {},
+      onVoiceChatClick: () -> Unit = {},
+      openDrawerOnStart: Boolean = false,
+      speechHelper: SpeechToTextHelper? = null
+  ) {
+    val viewModel = HomeViewModel(FakeLlmClient())
+    composeRule.setContent {
+      MaterialTheme {
+        HomeScreen(
+            modifier = modifier,
+            viewModel = viewModel,
+            onAction1Click = onAction1Click,
+            onAction2Click = onAction2Click,
+            onSendMessage = onSendMessage,
+            onSignOut = onSignOut,
+            onSettingsClick = onSettingsClick,
+            onVoiceChatClick = onVoiceChatClick,
+            openDrawerOnStart = openDrawerOnStart,
+            speechHelper = speechHelper)
+      }
+    }
+  }
 
   // Helper function to check if a node does not exist
   private fun assertNodeDoesNotExist(text: String) {
@@ -72,12 +104,8 @@ class HomeScreenTest {
     var action1Clicked = false
     var action2Clicked = false
 
-    composeRule.setContent {
-      MaterialTheme {
-        HomeScreen(
-            onAction1Click = { action1Clicked = true }, onAction2Click = { action2Clicked = true })
-      }
-    }
+    setHomeScreenContent(
+        onAction1Click = { action1Clicked = true }, onAction2Click = { action2Clicked = true })
 
     // Wait for buttons to be visible
     composeRule.waitForIdle()
@@ -92,7 +120,7 @@ class HomeScreenTest {
 
   @Test
   fun displays_correct_action_button_texts() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     composeRule.onNodeWithText(TestConstants.ButtonTexts.WHAT_IS_EPFL).assertIsDisplayed()
     composeRule.onNodeWithText(TestConstants.ButtonTexts.CHECK_ED_DISCUSSION).assertIsDisplayed()
@@ -100,14 +128,14 @@ class HomeScreenTest {
 
   @Test
   fun displays_correct_placeholder_text() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     composeRule.onNodeWithText(TestConstants.PlaceholderTexts.MESSAGE_EULER).assertIsDisplayed()
   }
 
   //  @Test
   //  fun displays_icons_with_correct_content_descriptions() {
-  //    composeRule.setContent { MaterialTheme { HomeScreen() } }
+  //    setHomeScreenContent()
   //    composeRule.waitForIdle()
   //
   //    composeRule.waitUntilAtLeastOneExists(
@@ -141,7 +169,7 @@ class HomeScreenTest {
 
   @Test
   fun menu_button_click_triggers_viewmodel_toggle() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // The menu button should trigger the drawer toggle
     composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
@@ -152,7 +180,7 @@ class HomeScreenTest {
 
   @Test
   fun topRight_button_click_triggers_viewmodel_setTopRightOpen() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // The top-right button should trigger the menu opening
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
@@ -163,7 +191,7 @@ class HomeScreenTest {
 
   @Test
   fun message_field_text_input_updates_viewmodel() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     val testMessage = "Test message input"
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput(testMessage)
@@ -176,9 +204,7 @@ class HomeScreenTest {
   fun send_button_is_disabled_when_text_is_empty() {
     var sendMessageCalled = false
 
-    composeRule.setContent {
-      MaterialTheme { HomeScreen(onSendMessage = { sendMessageCalled = true }) }
-    }
+    setHomeScreenContent(onSendMessage = { _ -> sendMessageCalled = true })
 
     // Wait for the screen to be fully loaded
     composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
@@ -191,7 +217,7 @@ class HomeScreenTest {
 
   @Test
   fun multiple_text_inputs_work_correctly() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Test multiple consecutive inputs
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("First")
@@ -207,12 +233,8 @@ class HomeScreenTest {
     var action1Clicked = false
     var action2Clicked = false
 
-    composeRule.setContent {
-      MaterialTheme {
-        HomeScreen(
-            onAction1Click = { action1Clicked = true }, onAction2Click = { action2Clicked = true })
-      }
-    }
+    setHomeScreenContent(
+        onAction1Click = { action1Clicked = true }, onAction2Click = { action2Clicked = true })
 
     // Wait for buttons to be visible
     composeRule.waitForIdle()
@@ -228,7 +250,7 @@ class HomeScreenTest {
 
   @Test
   fun drawer_state_synchronization_works() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Test that the menu button can be clicked without error
     composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
@@ -240,7 +262,7 @@ class HomeScreenTest {
 
   @Test
   fun message_field_accepts_multiline_text() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     val multilineText = "Line 1\nLine 2\nLine 3"
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput(multilineText)
@@ -250,7 +272,7 @@ class HomeScreenTest {
 
   @Test
   fun top_right_menu_appears_and_disappears() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Click the top right button
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
@@ -261,14 +283,14 @@ class HomeScreenTest {
 
   @Test
   fun message_field_placeholder_is_displayed() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     composeRule.onNodeWithText(TestConstants.PlaceholderTexts.MESSAGE_EULER).assertIsDisplayed()
   }
 
   @Test
   fun action_buttons_display_correct_labels() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     composeRule.onNodeWithText(TestConstants.ButtonTexts.WHAT_IS_EPFL).assertIsDisplayed()
     composeRule.onNodeWithText(TestConstants.ButtonTexts.CHECK_ED_DISCUSSION).assertIsDisplayed()
@@ -276,7 +298,7 @@ class HomeScreenTest {
 
   @Test
   fun message_field_can_be_cleared_and_retyped() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Type and clear
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("First")
@@ -288,7 +310,7 @@ class HomeScreenTest {
 
   //  @Test
   //  fun all_icons_have_content_descriptions() {
-  //    composeRule.setContent { MaterialTheme { HomeScreen() } }
+  //    setHomeScreenContent()
   //    composeRule.waitForIdle()
   //
   //    composeRule.waitUntilAtLeastOneExists(
@@ -322,7 +344,7 @@ class HomeScreenTest {
 
   @Test
   fun screen_handles_special_characters_in_message() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     val specialText = "Hello! @#$%^&*()_+-=[]{}|;:',.<>?"
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput(specialText)
@@ -332,7 +354,7 @@ class HomeScreenTest {
 
   @Test
   fun screen_handles_unicode_characters() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     val unicodeText = "Hello 你好 مرحبا Bonjour こんにちは"
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput(unicodeText)
@@ -342,7 +364,7 @@ class HomeScreenTest {
 
   @Test
   fun drawer_button_responds_correctly() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // The drawer button should be visible and clickable
     composeRule.onNodeWithTag(HomeTags.MenuBtn).assertIsDisplayed()
@@ -364,7 +386,7 @@ class HomeScreenTest {
 
   @Test
   fun delete_menu_flow_shows_confirmation_and_cancel_hides_it() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Open top-right menu
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
@@ -381,7 +403,7 @@ class HomeScreenTest {
 
   @Test
   fun delete_confirmation_delete_opens_and_closes_modal() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
     composeRule.waitForIdle()
 
     // Open menu -> Delete -> confirm Delete
@@ -397,7 +419,7 @@ class HomeScreenTest {
 
   @Test
   fun share_item_dismisses_menu() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Open menu and click Share, which calls onDismiss
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
@@ -410,7 +432,7 @@ class HomeScreenTest {
   @Test
   fun homeScreen_with_default_parameters_renders() {
     // Test that all default parameters work
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
     composeRule.onNodeWithTag(HomeTags.MenuBtn).assertIsDisplayed()
@@ -419,7 +441,7 @@ class HomeScreenTest {
   @Test
   fun homeScreen_with_custom_modifier() {
     // Test the modifier parameter - verify that the modifier is applied
-    composeRule.setContent { MaterialTheme { HomeScreen(modifier = Modifier.fillMaxSize()) } }
+    setHomeScreenContent(modifier = Modifier.fillMaxSize())
 
     // The Root should always be present with its testTag
     composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
@@ -428,7 +450,7 @@ class HomeScreenTest {
   @Test
   fun homeScreen_with_openDrawerOnStart_true() {
     // Test the openDrawerOnStart = true parameter
-    composeRule.setContent { MaterialTheme { HomeScreen(openDrawerOnStart = true) } }
+    setHomeScreenContent(openDrawerOnStart = true)
 
     composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
     // The drawer should be opened automatically
@@ -439,7 +461,7 @@ class HomeScreenTest {
   fun homeScreen_onSignOut_callback_is_called() {
     var signOutCalled = false
 
-    composeRule.setContent { MaterialTheme { HomeScreen(onSignOut = { signOutCalled = true }) } }
+    setHomeScreenContent(onSignOut = { signOutCalled = true })
 
     // Open the drawer to access sign out
     composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
@@ -458,9 +480,7 @@ class HomeScreenTest {
   fun homeScreen_onSettingsClick_callback_is_called() {
     var settingsClicked = false
 
-    composeRule.setContent {
-      MaterialTheme { HomeScreen(onSettingsClick = { settingsClicked = true }) }
-    }
+    setHomeScreenContent(onSettingsClick = { settingsClicked = true })
 
     composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
     // The callback will be tested via the drawer, but we verify that the component works
@@ -474,16 +494,12 @@ class HomeScreenTest {
     var signOutCalled = false
     var settingsCalled = false
 
-    composeRule.setContent {
-      MaterialTheme {
-        HomeScreen(
-            onAction1Click = { action1Called = true },
-            onAction2Click = { action2Called = true },
-            onSendMessage = { sendCalled = true },
-            onSignOut = { signOutCalled = true },
-            onSettingsClick = { settingsCalled = true })
-      }
-    }
+    setHomeScreenContent(
+        onAction1Click = { action1Called = true },
+        onAction2Click = { action2Called = true },
+        onSendMessage = { _ -> sendCalled = true },
+        onSignOut = { signOutCalled = true },
+        onSettingsClick = { settingsCalled = true })
 
     // Wait for the UI to be completely rendered (important for CI)
     composeRule.waitForIdle()
@@ -506,7 +522,7 @@ class HomeScreenTest {
 
   @Test
   fun delete_modal_background_click_cancels() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Open menu and click Delete
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
@@ -523,7 +539,7 @@ class HomeScreenTest {
 
   @Test
   fun delete_modal_shows_correct_texts() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
     composeRule.onNodeWithText("Delete").performClick()
@@ -539,7 +555,7 @@ class HomeScreenTest {
 
   @Test
   fun dropdown_menu_dismisses_when_requested() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
     composeRule.onNodeWithTag(HomeTags.TopRightMenu).assertIsDisplayed()
@@ -556,7 +572,7 @@ class HomeScreenTest {
 
   @Test
   fun menu_button_toggles_drawer_multiple_times() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Toggle multiple times
     for (i in 1..5) {
@@ -569,7 +585,7 @@ class HomeScreenTest {
 
   @Test
   fun message_field_updates_with_multiple_changes() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("A")
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("B")
@@ -580,7 +596,7 @@ class HomeScreenTest {
 
   @Test
   fun send_button_with_empty_message_still_calls_callback() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Wait for the UI to be completely rendered
     composeRule.waitForIdle()
@@ -598,7 +614,7 @@ class HomeScreenTest {
 
   @Test
   fun loading_indicator_shows_when_isLoading_true() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // We cannot directly set isLoading in the ViewModel from the UI test
     // but we can verify that the component renders correctly
@@ -607,7 +623,7 @@ class HomeScreenTest {
 
   @Test
   fun messages_list_is_empty_initially() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
     composeRule.waitForIdle()
 
     // Initially, the messages list is empty
@@ -618,7 +634,7 @@ class HomeScreenTest {
 
   @Test
   fun topRight_menu_open_and_close_cycle() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Open
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
@@ -635,7 +651,7 @@ class HomeScreenTest {
 
   @Test
   fun delete_menu_item_calls_onDeleteClick_and_onDismiss() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
     composeRule.onNodeWithText("Delete").performClick()
@@ -647,7 +663,7 @@ class HomeScreenTest {
 
   @Test
   fun delete_confirmation_modal_confirm_closes_modal() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
     composeRule.waitForIdle()
 
     // Open menu -> Delete -> Confirm
@@ -663,7 +679,7 @@ class HomeScreenTest {
 
   @Test
   fun delete_confirmation_modal_cancel_closes_modal() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
     composeRule.waitForIdle()
 
     // Open menu -> Delete -> Cancel
@@ -681,14 +697,8 @@ class HomeScreenTest {
   fun homeScreen_with_all_parameters_combined() {
     var action1Called = false
 
-    composeRule.setContent {
-      MaterialTheme {
-        HomeScreen(
-            modifier = Modifier,
-            onAction1Click = { action1Called = true },
-            openDrawerOnStart = false)
-      }
-    }
+    setHomeScreenContent(
+        modifier = Modifier, onAction1Click = { action1Called = true }, openDrawerOnStart = false)
 
     composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
     composeRule.onNodeWithTag(HomeTags.Action1Btn).performClick()
@@ -697,7 +707,7 @@ class HomeScreenTest {
 
   @Test
   fun multiple_delete_confirmation_cycles() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Multiple open/close modal cycles
     for (i in 1..3) {
@@ -711,7 +721,7 @@ class HomeScreenTest {
 
   @Test
   fun message_field_clears_after_send() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Wait for the UI to be completely rendered (important for CI)
     composeRule.waitForIdle()
@@ -728,7 +738,7 @@ class HomeScreenTest {
 
   @Test
   fun topRight_menu_items_are_clickable() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
     composeRule.onNodeWithText("Share").assertIsDisplayed()
@@ -745,7 +755,7 @@ class HomeScreenTest {
 
   @Test
   fun screen_handles_state_changes() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Change multiple states quickly
     composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
@@ -758,7 +768,7 @@ class HomeScreenTest {
 
   @Test
   fun action_buttons_labels_are_displayed() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     composeRule.onNodeWithText("What is EPFL").assertIsDisplayed()
     composeRule.onNodeWithText("Check Ed Discussion").assertIsDisplayed()
@@ -766,14 +776,14 @@ class HomeScreenTest {
 
   @Test
   fun placeholder_text_in_message_field() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     composeRule.onNodeWithText("Message EULER").assertIsDisplayed()
   }
 
   @Test
   fun messages_list_container_is_displayed() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
     composeRule.waitForIdle()
 
     // Verify that the messages container is present
@@ -783,7 +793,7 @@ class HomeScreenTest {
 
   //  @Test
   //  fun all_ui_elements_have_correct_content_descriptions() {
-  //    composeRule.setContent { MaterialTheme { HomeScreen() } }
+  //    setHomeScreenContent()
   //    composeRule.waitForIdle()
   //
   //    composeRule.waitUntilAtLeastOneExists(hasContentDescription("Menu"), timeoutMillis = 5000)
@@ -801,7 +811,7 @@ class HomeScreenTest {
 
   @Test
   fun delete_modal_cannot_be_dismissed_by_clicking_delete_button() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
     composeRule.onNodeWithText("Delete").performClick()
@@ -816,7 +826,7 @@ class HomeScreenTest {
 
   @Test
   fun delete_modal_shows_when_showDeleteConfirmation_is_true() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // The modal should not be visible initially
     assertNodeDoesNotExist("Clear Chat?")
@@ -832,7 +842,7 @@ class HomeScreenTest {
   @Test
   fun homeScreen_handles_null_callbacks_gracefully() {
     // Test with default callbacks (empty lambdas)
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Wait for the UI to be completely rendered (important for CI)
     composeRule.waitForIdle()
@@ -854,7 +864,7 @@ class HomeScreenTest {
 
   @Test
   fun message_field_updates_realtime() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     val testText = "Hello World Test"
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput(testText)
@@ -866,7 +876,7 @@ class HomeScreenTest {
 
   @Test
   fun topRight_button_opens_menu_every_time() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     for (i in 1..3) {
       composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
@@ -880,7 +890,7 @@ class HomeScreenTest {
 
   @Test
   fun delete_flow_complete_workflow() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
     composeRule.waitForIdle()
 
     // Complete workflow: open menu -> delete -> confirm
@@ -896,7 +906,7 @@ class HomeScreenTest {
 
   @Test
   fun microphone_button_is_displayed_when_empty() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Microphone button should always be visible
     composeRule.onNodeWithTag(HomeTags.MicBtn).assertIsDisplayed()
@@ -904,7 +914,7 @@ class HomeScreenTest {
 
   @Test
   fun voice_mode_button_is_displayed_when_empty() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Voice mode button should be visible when input is empty
     composeRule.onNodeWithTag(HomeTags.VoiceBtn).assertIsDisplayed()
@@ -912,7 +922,7 @@ class HomeScreenTest {
 
   @Test
   fun voice_mode_button_disappears_when_text_entered() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Initially, voice mode button should be visible
     composeRule.onNodeWithTag(HomeTags.VoiceBtn).assertIsDisplayed()
@@ -932,7 +942,7 @@ class HomeScreenTest {
 
   @Test
   fun voice_mode_button_reappears_when_text_cleared() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Enter and clear text
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test")
@@ -946,7 +956,7 @@ class HomeScreenTest {
 
   @Test
   fun send_button_appears_when_text_entered() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Initially, send button should NOT be visible
     try {
@@ -966,7 +976,7 @@ class HomeScreenTest {
 
   @Test
   fun send_button_disappears_when_text_cleared() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Enter text to make send button appear
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test")
@@ -988,7 +998,7 @@ class HomeScreenTest {
 
   @Test
   fun microphone_button_always_stays_visible() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Microphone should be visible initially
     composeRule.onNodeWithTag(HomeTags.MicBtn).assertIsDisplayed()
@@ -1012,9 +1022,7 @@ class HomeScreenTest {
   fun voice_mode_button_can_be_clicked() {
     var voiceClicked = false
 
-    composeRule.setContent {
-      MaterialTheme { HomeScreen(onAction1Click = {}, onAction2Click = {}) }
-    }
+    setHomeScreenContent(onAction1Click = {}, onAction2Click = {})
 
     // Click voice mode button - it should not crash
     composeRule.onNodeWithTag(HomeTags.VoiceBtn).performClick()
@@ -1026,7 +1034,7 @@ class HomeScreenTest {
 
   @Test
   fun microphone_and_voice_mode_buttons_transition_smoothly() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+    setHomeScreenContent()
 
     // Both buttons should be visible initially
     composeRule.onNodeWithTag(HomeTags.MicBtn).assertIsDisplayed()
