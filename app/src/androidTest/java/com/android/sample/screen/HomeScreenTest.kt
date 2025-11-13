@@ -585,15 +585,15 @@ class HomeScreenTest {
     // Wait for the UI to be completely rendered
     composeRule.waitForIdle()
 
-    // The send button should NOT be visible when message is empty
-    // This is the new expected behavior - verify it doesn't exist
-    assertNodeWithContentDescriptionDoesNotExist("Send")
+    val sendMatcher = hasContentDescription("Send")
+    composeRule.waitUntilAtLeastOneExists(sendMatcher, timeoutMillis = 5_000)
+    composeRule.onAllNodes(sendMatcher)[0].assertIsDisplayed()
 
     // Enter text to make send button appear
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test")
     composeRule.waitForIdle()
-    composeRule.waitUntilAtLeastOneExists(hasContentDescription("Send"), timeoutMillis = 5000)
-    composeRule.onAllNodesWithContentDescription("Send").get(0).assertIsDisplayed()
+    composeRule.waitUntilAtLeastOneExists(sendMatcher, timeoutMillis = 5_000)
+    composeRule.onAllNodes(sendMatcher)[0].assertIsDisplayed()
   }
 
   @Test
