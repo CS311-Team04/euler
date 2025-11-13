@@ -26,8 +26,8 @@ import kotlinx.coroutines.withContext
 data class BotReply(val reply: String, val url: String?)
 
 data class SourceMeta(
-    val siteLabel: String,          // e.g. "EPFL.ch Website"
-    val title: String,              // e.g. "Projet de Semestre – Bachelor"
+    val siteLabel: String, // e.g. "EPFL.ch Website"
+    val title: String, // e.g. "Projet de Semestre – Bachelor"
     val url: String,
     val retrievedAt: Long = System.currentTimeMillis()
 )
@@ -45,35 +45,35 @@ data class SourceMeta(
  */
 class HomeViewModel : ViewModel() {
 
-    private val _uiState =
-        MutableStateFlow(
-            HomeUiState(
-                systems =
-                    listOf(
-                        SystemItem(id = "isa", name = "IS-Academia", isConnected = true),
-                        SystemItem(id = "moodle", name = "Moodle", isConnected = true),
-                        SystemItem(id = "ed", name = "Ed Discussion", isConnected = true),
-                        SystemItem(id = "camipro", name = "Camipro", isConnected = false),
-                        SystemItem(id = "mail", name = "EPFL Mail", isConnected = false),
-                        SystemItem(id = "drive", name = "EPFL Drive", isConnected = true),
-                    ),
-                messages = emptyList()))
-    /** Public, read-only UI state. */
-    val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
-    // private val endpoint = "http://10.0.2.2:5001/euler-e8edb/us-central1/answerWithRagHttp"
-    // private val apiKey = "db8e16080302b511c256794b26a6e80089c80e1c15b7927193e754b7fd87fc4e"
+  private val _uiState =
+      MutableStateFlow(
+          HomeUiState(
+              systems =
+                  listOf(
+                      SystemItem(id = "isa", name = "IS-Academia", isConnected = true),
+                      SystemItem(id = "moodle", name = "Moodle", isConnected = true),
+                      SystemItem(id = "ed", name = "Ed Discussion", isConnected = true),
+                      SystemItem(id = "camipro", name = "Camipro", isConnected = false),
+                      SystemItem(id = "mail", name = "EPFL Mail", isConnected = false),
+                      SystemItem(id = "drive", name = "EPFL Drive", isConnected = true),
+                  ),
+              messages = emptyList()))
+  /** Public, read-only UI state. */
+  val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+  // private val endpoint = "http://10.0.2.2:5001/euler-e8edb/us-central1/answerWithRagHttp"
+  // private val apiKey = "db8e16080302b511c256794b26a6e80089c80e1c15b7927193e754b7fd87fc4e"
 
-    /**
-     * Firebase Functions handle for the chat backend. Uses local emulator when configured via
-     * BuildConfig flags.
-     */
-    private val functions: FirebaseFunctions by lazy {
-        FirebaseFunctions.getInstance("us-central1").apply {
-            if (BuildConfig.USE_FUNCTIONS_EMULATOR) {
-                useEmulator(BuildConfig.FUNCTIONS_HOST, BuildConfig.FUNCTIONS_PORT)
-            }
-        }
+  /**
+   * Firebase Functions handle for the chat backend. Uses local emulator when configured via
+   * BuildConfig flags.
+   */
+  private val functions: FirebaseFunctions by lazy {
+    FirebaseFunctions.getInstance("us-central1").apply {
+      if (BuildConfig.USE_FUNCTIONS_EMULATOR) {
+        useEmulator(BuildConfig.FUNCTIONS_HOST, BuildConfig.FUNCTIONS_PORT)
+      }
     }
+  }
 
   private var activeStreamJob: Job? = null
   @Volatile private var userCancelledStream: Boolean = false
@@ -144,25 +144,26 @@ class HomeViewModel : ViewModel() {
             val bot = withContext(Dispatchers.IO) { callAnswerWithRag(question) }
             simulateStreamingFromText(messageId, bot.reply)
             bot.url?.let { url ->
-                val meta = SourceMeta(
-                    siteLabel = buildSiteLabel(url),
-                    title = /* if you return primary_title from backend, use it here */ buildFallbackTitle(url),
-                    url = url
-                )
-                _uiState.update { s ->
-                    s.copy(
-                        messages = s.messages + ChatUIModel(
-                            id = UUID.randomUUID().toString(),
-                            text = "",                          // card has no body text
-                            timestamp = System.currentTimeMillis(),
-                            type = ChatType.AI,
-                            source = meta                       // <—— drives the card UI
-                        ),
-                        streamingSequence = s.streamingSequence + 1
-                    )
-                }
+              val meta =
+                  SourceMeta(
+                      siteLabel = buildSiteLabel(url),
+                      title = /* if you return primary_title from backend, use it here */
+                          buildFallbackTitle(url),
+                      url = url)
+              _uiState.update { s ->
+                s.copy(
+                    messages =
+                        s.messages +
+                            ChatUIModel(
+                                id = UUID.randomUUID().toString(),
+                                text = "", // card has no body text
+                                timestamp = System.currentTimeMillis(),
+                                type = ChatType.AI,
+                                source = meta // <—— drives the card UI
+                                ),
+                    streamingSequence = s.streamingSequence + 1)
+              }
             }
-
           } catch (ce: CancellationException) {
             if (!userCancelledStream) {
               setStreamingError(messageId, ce)
@@ -177,17 +178,20 @@ class HomeViewModel : ViewModel() {
           }
         }
   }
+
   private fun buildSiteLabel(url: String): String {
-      val host = runCatching { Uri.parse(url).host ?: "" }.getOrNull().orEmpty()
-      val clean = host.removePrefix("www.")
-      return if (clean.endsWith("epfl.ch")) "EPFL.ch Website" else "$clean Website"
+    val host = runCatching { Uri.parse(url).host ?: "" }.getOrNull().orEmpty()
+    val clean = host.removePrefix("www.")
+    return if (clean.endsWith("epfl.ch")) "EPFL.ch Website" else "$clean Website"
   }
+
   private fun buildFallbackTitle(url: String): String {
-      // Simple fallback: last non-empty path segment or the domain
-      val uri = runCatching { Uri.parse(url) }.getOrNull()
-      val seg = uri?.pathSegments?.lastOrNull { it.isNotBlank() } ?: ""
-      return if (seg.isNotBlank()) seg.replace('-', ' ').replace('_', ' ').replaceFirstChar { it.uppercase() }
-      else (uri?.host?.removePrefix("www.") ?: url)
+    // Simple fallback: last non-empty path segment or the domain
+    val uri = runCatching { Uri.parse(url) }.getOrNull()
+    val seg = uri?.pathSegments?.lastOrNull { it.isNotBlank() } ?: ""
+    return if (seg.isNotBlank())
+        seg.replace('-', ' ').replace('_', ' ').replaceFirstChar { it.uppercase() }
+    else (uri?.host?.removePrefix("www.") ?: url)
   }
 
   @VisibleForTesting(otherwise = VisibleForTesting.NONE)
@@ -315,11 +319,13 @@ class HomeViewModel : ViewModel() {
         val data = hashMapOf("question" to question) // add "topK"/"model" if needed
         val result = functions.getHttpsCallable("answerWithRagFn").call(data).await()
 
-            @Suppress("UNCHECKED_CAST")
-            val map = result.getData() as? Map<String, Any?> ?: return@withContext BotReply("Invalid response",null)
-            //(map["reply"] as? String)?.ifBlank { null } ?: "No reply"
-            val reply = (map["reply"] as? String)?.ifBlank { null } ?: "No reply"
-            val url = map["primary_url"] as? String
-            BotReply(reply, url)
-        }
+        @Suppress("UNCHECKED_CAST")
+        val map =
+            result.getData() as? Map<String, Any?>
+                ?: return@withContext BotReply("Invalid response", null)
+        // (map["reply"] as? String)?.ifBlank { null } ?: "No reply"
+        val reply = (map["reply"] as? String)?.ifBlank { null } ?: "No reply"
+        val url = map["primary_url"] as? String
+        BotReply(reply, url)
+      }
 }
