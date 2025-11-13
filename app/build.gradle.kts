@@ -16,6 +16,10 @@ if (!isCi && hasGoogleServicesJson) {
     apply(plugin = libs.plugins.googleServices.get().pluginId)
 }
 
+/**
+ * Gradle's `buildConfigField` expects string literals to be wrapped in quotes and have any embedded
+ * quotes escaped. This helper normalises values coming from env/properties before we inject them.
+ */
 fun quoteBuildConfig(value: String): String = "\"${value.replace("\"", "\\\"")}\""
 
 val voiceChatOverrides = Properties().apply {
