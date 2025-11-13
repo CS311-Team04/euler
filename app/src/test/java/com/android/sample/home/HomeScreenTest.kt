@@ -1,7 +1,5 @@
 package com.android.sample.home
 
-import com.android.sample.Chat.ChatType
-import com.android.sample.Chat.ChatUIModel
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction

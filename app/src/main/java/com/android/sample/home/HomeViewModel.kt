@@ -1,7 +1,7 @@
 package com.android.sample.home
 
-import android.util.Log
 import android.net.Uri
+import android.util.Log
 import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -22,7 +22,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,8 +33,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-
-
 
 data class SourceMeta(
     val siteLabel: String, // e.g. "EPFL.ch Website"
@@ -403,12 +400,12 @@ class HomeViewModel(
             }
             // si connecté → persister le message AI une fois le texte complet connu
             if (conversationId != null) {
-                try {
-                    repo.appendMessage(conversationId, "assistant", reply)
-                } catch (e: Exception) {
-                    // on a déjà montré la réponse côté UI; on loggue seulement
-                    Log.w(TAG, "Failed to persist assistant message: ${e.message}")
-                }
+              try {
+                repo.appendMessage(conversationId, "assistant", reply.reply)
+              } catch (e: Exception) {
+                // on a déjà montré la réponse côté UI; on loggue seulement
+                Log.w(TAG, "Failed to persist assistant message: ${e.message}")
+              }
             }
           } catch (ce: CancellationException) {
             if (!userCancelledStream) setStreamingError(messageId, ce)

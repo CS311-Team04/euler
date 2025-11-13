@@ -7,6 +7,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 
 /**
  * LLM client backed by a plain HTTP endpoint (e.g. Cloud Functions HTTPS trigger).
@@ -25,7 +26,7 @@ class HttpLlmClient(
   private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
   /** Performs a blocking HTTP call on [Dispatchers.IO] and returns the non-empty `reply` field. */
-  override suspend fun generateReply(prompt: String): String =
+  override suspend fun generateReply(prompt: String): BotReply =
       withContext(Dispatchers.IO) {
         if (endpoint.isBlank()) {
           throw IllegalStateException("LLM HTTP endpoint not configured")
@@ -48,37 +49,43 @@ class HttpLlmClient(
         val payloadString = """{"question":"$escapedPrompt"}"""
         val payload = payloadString.toRequestBody(jsonMediaType)
 
-        val request =
+        val builder =
             Request.Builder()
                 .url(endpoint)
                 .post(payload)
-                .apply {
-                  if (apiKey.isNotBlank()) {
-                    addHeader("x-api-key", apiKey)
-                  }
-                  addHeader("Content-Type", "application/json")
-                }
-                .build()
+                .addHeader("Content-Type", "application/json")
+
+        if (apiKey.isNotBlank()) {
+          // adapt header if your backend expects a different header (e.g. "x-api-key")
+          builder.addHeader("Authorization", "Bearer $apiKey")
+        }
+
+        val request = builder.build()
 
         client.newCall(request).execute().use { response ->
           if (!response.isSuccessful) {
-            throw IllegalStateException("LLM HTTP call failed with ${response.code}")
+            throw IllegalStateException("LLM HTTP error ${response.code}: ${response.message}")
           }
           val body =
-              response.body?.string()?.trim()?.takeIf { it.isNotEmpty() }
-                  ?: throw IllegalStateException("LLM HTTP response empty body")
-
-          // Parse JSON reply field using regex - simple approach for "reply":"value"
-          val replyPattern = """"reply"\s*:\s*"([^"]*)"""".toRegex()
-          val match = replyPattern.find(body)
-          val reply =
-              match?.groupValues?.getOrNull(1)
-                  ?: throw IllegalStateException("LLM HTTP reply empty")
-
-          if (reply.isBlank()) {
-            throw IllegalStateException("LLM HTTP reply empty")
+              response.body?.string() ?: throw IllegalStateException("Empty LLM HTTP response")
+          if (body.isBlank()) {
+            throw IllegalStateException("Empty LLM HTTP response")
           }
-          reply
+          val obj =
+              try {
+                JSONObject(body)
+              } catch (t: Throwable) {
+                throw IllegalStateException("Invalid LLM HTTP response", t)
+              }
+          val replyText =
+              try {
+                obj.optString("reply", "").takeIf { it.isNotBlank() }
+              } catch (t: Throwable) {
+                throw IllegalStateException("Invalid LLM reply field", t)
+              }
+                  ?: throw IllegalStateException("Empty LLM reply")
+          val url = obj.optString("primary_url").takeIf { it.isNotBlank() }
+          BotReply(replyText, url)
         }
       }
 }

@@ -4,11 +4,12 @@ package com.android.sample.llm
 class FakeLlmClient : LlmClient {
   val prompts = mutableListOf<String>()
   var nextReply: String = "test-reply"
+  var nextUrl: String? = null
   var failure: Throwable? = null
 
-  override suspend fun generateReply(prompt: String): String {
+  override suspend fun generateReply(prompt: String): BotReply {
     prompts += prompt
     failure?.let { throw it }
-    return nextReply
+    return BotReply(nextReply, nextUrl)
   }
 }

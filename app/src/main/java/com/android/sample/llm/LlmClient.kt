@@ -65,14 +65,13 @@ class FirebaseFunctionsLlmClient(
                 ?: return@withContext fallback?.generateReply(prompt)
                     ?: throw IllegalStateException("Invalid LLM response payload")
 
-        val replyText = (map["reply"] as? String)?.takeIf { it.isNotBlank() }
-            ?: return@withContext fallback?.generateReply(prompt)
-                ?: throw IllegalStateException("Empty LLM reply")
+        val replyText =
+            (map["reply"] as? String)?.takeIf { it.isNotBlank() }
+                ?: return@withContext fallback?.generateReply(prompt)
+                    ?: throw IllegalStateException("Empty LLM reply")
 
         val url = (map["primary_url"] as? String)
         BotReply(replyText, url)
-
-
       }
 
   companion object {
