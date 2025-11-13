@@ -1,24 +1,33 @@
 package com.android.sample.home
 
+import android.content.Context
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
-import com.android.sample.Chat.ChatMessage
+import androidx.test.core.app.ApplicationProvider
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
+import com.android.sample.conversations.Conversation
+import com.android.sample.llm.FakeLlmClient
+import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -29,21 +38,23 @@ import org.robolectric.annotation.Config
 private fun createHomeViewModel() = HomeViewModel(FakeProfileRepository())
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28])
+@Config(sdk = [31])
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeScreenTestCov {
 
-  @get:Rule val composeTestRule = createComposeRule()
-
-  private val testDispatcher = UnconfinedTestDispatcher()
+  @get:Rule val composeRule = createComposeRule()
+  private val dispatcher = UnconfinedTestDispatcher()
 
   @Before
   fun setup() {
-    Dispatchers.setMain(testDispatcher)
+    Dispatchers.setMain(dispatcher)
+    initFirebase()
+    FirebaseAuth.getInstance().signOut()
   }
 
   @After
   fun tearDown() {
+    FirebaseAuth.getInstance().signOut()
     Dispatchers.resetMain()
   }
 
@@ -253,15 +264,42 @@ class HomeScreenTestCov {
             onAction1Click = { action1Clicked = true },
             onAction2Click = { action2Clicked = true })
       }
+  @Test
+  fun suggestions_are_displayed_initially() {
+    val viewModel = HomeViewModel(FakeLlmClient())
+
+    composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
+
+    composeRule.onNodeWithText("What is EPFL").assertIsDisplayed()
+    composeRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed()
+    composeRule.onNodeWithTag(HomeTags.Action2Btn).assertIsDisplayed()
+  }
+
+  @Test
+  fun menu_button_opens_and_closes_drawer() {
+    val viewModel = HomeViewModel(FakeLlmClient())
+
+    composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
+
+    composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
+    composeRule.waitForIdle()
+    composeRule.onNodeWithText("New chat").assertIsDisplayed()
+  }
+
+  @Test
+  fun new_chat_from_drawer_resets_state_and_closes() {
+    val viewModel = HomeViewModel(FakeLlmClient())
+    updateUiState(viewModel) {
+      it.copy(currentConversationId = "conv-1", messageDraft = "draft", isDrawerOpen = true)
     }
-    composeTestRule.waitForIdle()
+    injectMessages(viewModel, listOf(sampleMessage("Keep me")))
 
-    // Verify suggestions are displayed before trying to click
-    composeTestRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed()
+    composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
-    // Click on Action1Btn (should be visible)
-    composeTestRule.onNodeWithTag(HomeTags.Action1Btn).performClick()
-    composeTestRule.waitForIdle()
+    composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
+    composeRule.waitForIdle()
+    composeRule.onNodeWithTag(DrawerTags.NewChatRow).performClick()
+    composeRule.waitForIdle()
 
     // Verify Action1Btn callback was called
     assertTrue("Action1 should be clicked", action1Clicked)
@@ -277,9 +315,12 @@ class HomeScreenTestCov {
     composeTestRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
     composeTestRule.onNodeWithTag(HomeTags.MessageField).performTextInput("New message")
     assertEquals("New message", viewModel.uiState.value.messageDraft)
+    val state = viewModel.uiState.value
+    assertTrue(state.messages.isEmpty())
+    assertEquals(null, state.currentConversationId)
+    assertEquals("", state.messageDraft)
+    assertFalse(state.isDrawerOpen)
   }
-
-  // ========== Tests for UNCOVERED CODE ==========
 
   @Test
   fun screen_displays_thinking_indicator_when_sending() =
@@ -299,13 +340,14 @@ class HomeScreenTestCov {
 
         // sendMessage() adds user message synchronously and sets isSending = true
         viewModel.sendMessage()
+  fun settings_from_drawer_invokes_callback() {
+    var settingsCalled = false
+    val viewModel = HomeViewModel(FakeLlmClient())
+    updateUiState(viewModel) { it.copy(isDrawerOpen = true) }
 
-        // Check IMMEDIATELY after sendMessage (before coroutine has chance to complete)
-        // The user message should be added and isSending should be true
-        val stateAfterSend = viewModel.uiState.value
-        assertTrue(stateAfterSend.isSending || stateAfterSend.messages.isNotEmpty())
-        // At minimum, the user message should have been added synchronously
-        assertTrue(stateAfterSend.messages.isNotEmpty())
+    composeRule.setContent {
+      MaterialTheme {
+        HomeScreen(viewModel = viewModel, onSettingsClick = { settingsCalled = true })
       }
 
   @Test
@@ -322,7 +364,6 @@ class HomeScreenTestCov {
     } catch (_: AssertionError) {
       assertTrue(true) // Menu may be off-screen
     }
-  }
 
   @Test
   fun viewModel_messages_displayed_when_sending() =
@@ -342,9 +383,13 @@ class HomeScreenTestCov {
   fun viewModel_drawer_sync_with_viewModel() {
     val viewModel = createHomeViewModel()
     composeTestRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
+    composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
+    composeRule.waitForIdle()
+    composeRule.onNodeWithTag(DrawerTags.ConnectorsRow).performClick()
+    composeRule.waitForIdle()
+
+    assertTrue(settingsCalled)
     assertFalse(viewModel.uiState.value.isDrawerOpen)
-    viewModel.toggleDrawer()
-    assertTrue(viewModel.uiState.value.isDrawerOpen)
   }
 
   @Test
@@ -367,11 +412,13 @@ class HomeScreenTestCov {
     val viewModel = createHomeViewModel()
     composeTestRule.setContent {
       MaterialTheme { HomeScreen(viewModel = viewModel, onSignOut = { signOutCalled = true }) }
+  fun voice_button_triggers_callback_when_visible() {
+    var voiceCalled = false
+    val viewModel = HomeViewModel(FakeLlmClient())
+
+    composeRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = viewModel, onVoiceChatClick = { voiceCalled = true }) }
     }
-    composeTestRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
-    // Verify callback is set up (will be called when drawer sign out is triggered)
-    assertFalse(signOutCalled)
-  }
 
   @Test
   fun screen_onSettingsClick_callback_sets_up_correctly() {
@@ -413,14 +460,22 @@ class HomeScreenTestCov {
 
         // Trigger isSending state
         viewModel.updateMessageDraft("Trigger thinking")
+    composeRule.onNodeWithTag(HomeTags.VoiceBtn).performClick()
+    composeRule.waitForIdle()
 
-        // sendMessage() adds user message and sets isSending = true synchronously
-        viewModel.sendMessage()
+    assertTrue(voiceCalled)
+  }
 
-        // Check immediately - user message should be added
-        val stateAfterSend = viewModel.uiState.value
-        assertTrue(stateAfterSend.messages.isNotEmpty())
-        assertEquals("Trigger thinking", stateAfterSend.messages.first().text)
+  @Test
+  fun send_message_updates_ui_state() {
+    val fakeClient = FakeLlmClient().apply { nextReply = "Reply" }
+    val viewModel = HomeViewModel(fakeClient)
+
+    composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
+
+    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Hello")
+    composeRule.onNodeWithTag(HomeTags.SendBtn).performClick()
+    composeRule.waitForIdle()
 
         // Note: isSending might be false if Firebase failed immediately,
         // but the important thing is that sendMessage() executed and added the message
@@ -460,60 +515,28 @@ class HomeScreenTestCov {
       MaterialTheme { HomeScreen(viewModel = viewModel, openDrawerOnStart = true) }
     }
     composeTestRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
-  }
-
-  // ========== Tests for ChatMessage Component ==========
-
-  @Test
-  fun chatMessage_displays_ai_message_with_correct_testTag() {
-    // Create an AI message
-    val aiMessage =
-        ChatUIModel(
-            id = "test-ai-1",
-            text = "This is an AI response",
-            timestamp = System.currentTimeMillis(),
-            type = ChatType.AI)
-
-    // Render the ChatMessage composable directly
-    composeTestRule.setContent { MaterialTheme { ChatMessage(message = aiMessage) } }
-
-    // Verify that the AI message text is displayed with the correct testTag
-    composeTestRule.onNodeWithTag("chat_ai_text").assertIsDisplayed()
-    composeTestRule.onNodeWithText("This is an AI response").assertIsDisplayed()
+    val messages = viewModel.uiState.value.messages
+    assertTrue(messages.any { it.type == ChatType.USER && it.text == "Hello" })
   }
 
   @Test
-  fun chatMessage_displays_ai_message_with_different_text() {
-    // Test with a different AI message to ensure the Column and Text render correctly
-    val aiMessage =
-        ChatUIModel(
-            id = "test-ai-2",
-            text = "Another AI response with different content",
-            timestamp = System.currentTimeMillis(),
-            type = ChatType.AI)
+  fun openDrawerOnStart_opens_drawer_and_updates_state() {
+    val viewModel = HomeViewModel(FakeLlmClient())
 
-    // Render the ChatMessage composable directly
-    composeTestRule.setContent { MaterialTheme { ChatMessage(message = aiMessage) } }
-
-    // Verify that the AI message text is displayed with the correct testTag
-    // This covers the Column(horizontalAlignment = Alignment.Start) and Text composables
-    composeTestRule.onNodeWithTag("chat_ai_text").assertIsDisplayed()
-    composeTestRule.onNodeWithText("Another AI response with different content").assertIsDisplayed()
-  }
-
-  // ========== Tests for Suggestion Chips ==========
+    composeRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = viewModel, openDrawerOnStart = true) }
+    }
 
   @Test
   fun screen_suggestions_are_displayed_initially() {
     val viewModel = createHomeViewModel()
     composeTestRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
+    composeRule.waitUntil(timeoutMillis = 5_000) {
+      composeRule.onAllNodesWithTag(DrawerTags.Root).fetchSemanticsNodes().isNotEmpty()
+    }
 
-    // Verify that Action1Btn and Action2Btn are visible (suggestions are shown)
-    composeTestRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed()
-    composeTestRule.onNodeWithTag(HomeTags.Action2Btn).assertIsDisplayed()
-    // Verify suggestion texts are displayed
-    composeTestRule.onNodeWithText("What is EPFL").assertIsDisplayed()
-    composeTestRule.onNodeWithText("Check Ed Discussion").assertIsDisplayed()
+    composeRule.onNodeWithTag(DrawerTags.Root).assertIsDisplayed()
+    assertTrue(viewModel.uiState.value.isDrawerOpen)
   }
 
   @Test
@@ -570,21 +593,30 @@ class HomeScreenTestCov {
     viewModel.sendMessage()
 
     composeTestRule.setContent {
+  fun suggestion_chip_click_triggers_callbacks_and_sends_message() {
+    var action1Called = false
+    val sentMessages = mutableListOf<String>()
+    val fakeClient = FakeLlmClient().apply { nextReply = "Sure" }
+    val viewModel = HomeViewModel(fakeClient)
+
+    composeRule.setContent {
       MaterialTheme {
         HomeScreen(
             viewModel = viewModel,
-            onSendMessage = {},
-            // Manually inject state with AI message for testing visibility logic
-        )
+            onAction1Click = { action1Called = true },
+            onSendMessage = { sentMessages += it })
       }
     }
 
-    composeTestRule.waitForIdle()
+    composeRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed().performClick()
+    composeRule.waitForIdle()
 
-    // Since hasAiResponded checks ui.messages.any { it.type == ChatType.AI },
-    // and we have an AI message, suggestions should be hidden
-    // Note: This test verifies the logic, but UI rendering may vary
-    // The key is testing that hasAiResponded calculation works correctly
+    assertTrue(action1Called)
+    assertTrue(sentMessages.contains("What is EPFL"))
+    assertTrue(
+        viewModel.uiState.value.messages.any {
+          it.type == ChatType.USER && it.text == "What is EPFL"
+        })
   }
 
   @Test
@@ -742,27 +774,31 @@ class HomeScreenTestCov {
 
     // Initially, no AI messages, so suggestions should be visible
     composeTestRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed()
+  fun pick_conversation_from_drawer_selects_and_closes() {
+    val viewModel = HomeViewModel(FakeLlmClient())
+    updateUiState(viewModel) {
+      it.copy(
+          conversations = listOf(Conversation(id = "remote-1", title = "Linear Algebra")),
+          currentConversationId = null)
+    }
 
-    // Verify the logic: hasAiResponded = ui.messages.any { it.type == ChatType.AI }
-    // Initially, messages are empty, so hasAiResponded = false, visible = true
-    val initialState = viewModel.uiState.value
-    val hasAiResponded = initialState.messages.any { it.type == ChatType.AI }
-    assertFalse("Initially no AI messages", hasAiResponded)
-  }
+    composeRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = viewModel, openDrawerOnStart = true) }
+    }
 
   @Test
   fun screen_suggestion_chips_have_correct_test_tags() {
     val viewModel = createHomeViewModel()
     composeTestRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
+    composeRule.waitUntil(timeoutMillis = 5_000) {
+      composeRule.onAllNodesWithText("Linear Algebra").fetchSemanticsNodes().isNotEmpty()
+    }
 
-    // First two suggestions (index 0 and 1) should have testTags
-    composeTestRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed()
-    composeTestRule.onNodeWithTag(HomeTags.Action2Btn).assertIsDisplayed()
+    composeRule.onNodeWithText("Linear Algebra").assertIsDisplayed().performClick()
+    composeRule.waitForIdle()
 
-    // Other suggestions (index > 1) should not have specific testTags
-    // They should still be visible via their text content
-    composeTestRule.onNodeWithText("Show my schedule").assertIsDisplayed()
-    composeTestRule.onNodeWithText("Find library resources").assertIsDisplayed()
+    assertEquals("remote-1", viewModel.uiState.value.currentConversationId)
+    assertFalse(viewModel.uiState.value.isDrawerOpen)
   }
 
   @Test
@@ -1041,8 +1077,39 @@ class HomeScreenTestCov {
     val initialState = viewModel.uiState.value
     val hasAiRespondedInitial = initialState.messages.any { it.type == ChatType.AI }
     assertFalse("Initially no AI messages", hasAiRespondedInitial)
-
-    // Verify that suggestions are visible when hasAiResponded is false
-    composeTestRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed()
+  private fun initFirebase() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    if (FirebaseApp.getApps(context).isEmpty()) {
+      FirebaseApp.initializeApp(
+          context,
+          FirebaseOptions.Builder()
+              .setApplicationId("1:1234567890:android:test")
+              .setProjectId("test-project")
+              .setApiKey("fake-api-key")
+              .build())
+    }
   }
+
+  private fun injectMessages(viewModel: HomeViewModel, messages: List<ChatUIModel>) {
+    val field = HomeViewModel::class.java.getDeclaredField("_uiState")
+    field.isAccessible = true
+    @Suppress("UNCHECKED_CAST")
+    val stateFlow = field.get(viewModel) as MutableStateFlow<HomeUiState>
+    stateFlow.value = stateFlow.value.copy(messages = messages)
+  }
+
+  private fun updateUiState(viewModel: HomeViewModel, transform: (HomeUiState) -> HomeUiState) {
+    val field = HomeViewModel::class.java.getDeclaredField("_uiState")
+    field.isAccessible = true
+    @Suppress("UNCHECKED_CAST")
+    val stateFlow = field.get(viewModel) as MutableStateFlow<HomeUiState>
+    stateFlow.value = transform(stateFlow.value)
+  }
+
+  private fun sampleMessage(text: String) =
+      ChatUIModel(
+          id = "msg-${text.hashCode()}",
+          text = text,
+          timestamp = System.currentTimeMillis(),
+          type = ChatType.USER)
 }

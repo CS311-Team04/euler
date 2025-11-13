@@ -31,3 +31,6 @@ local.properties
 firestore-debug.log
 firebase-debug.log
 firebase-debug.*.log
+
+# Node lockfiles (managed locally, not tracked)
+package-lock.json

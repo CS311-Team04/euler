@@ -9,6 +9,13 @@ import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
 import com.android.sample.profile.UserProfile
 import com.android.sample.profile.UserProfileRepository
+import com.android.sample.conversations.AuthNotReadyException
+import com.android.sample.conversations.ConversationRepository
+import com.android.sample.conversations.MessageDTO
+import com.android.sample.llm.FirebaseFunctionsLlmClient
+import com.android.sample.llm.LlmClient
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
 import java.util.UUID
 import kotlin.getValue
@@ -16,10 +23,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -28,19 +38,36 @@ import kotlinx.coroutines.withContext
 /**
  * HomeViewModel
  *
- * Holds the UI state for the HomeScreen and exposes mutations. The Compose UI collects [uiState]
- * and reacts to updates.
+ * Drives the chat screen.
+ * - Keeps all UI state in [uiState] (drawer, draft text, messages, loading).
+ * - Two modes: • Signed in → conversations/messages are read & written in Firestore. • Guest →
+ *   everything stays local (no Firestore).
+ * - Sends user prompts to the Cloud Function `answerWithRagFn` and shows the reply.
+ * - Creates a conversation only on the FIRST message; shows a local placeholder before that.
+ * - Generates a quick local title, then upgrades it once via `generateTitleFn`.
  *
- * Responsibilities:
- * - Manage drawer/menu state
- * - Manage the message draft and the send flow
- * - Append USER/AI messages to the conversation
- * - Call the backend Cloud Function for chat responses
+ * Lifecycle:
+ * - Listens to Firebase auth changes. • On sign-out → stop Firestore, clear UI, start a local empty
+ *   chat. • On sign-in → attach Firestore, still show a local empty chat until first send.
  */
 class HomeViewModel(
     private val profileRepository: com.android.sample.profile.ProfileDataSource =
         UserProfileRepository()
 ) : ViewModel() {
+    private val llmClient: LlmClient = FirebaseFunctionsLlmClient(),
+) : ViewModel() {
+
+  companion object {
+    private const val TAG = "HomeViewModel"
+  }
+
+  private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+  private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
+  private val repo = ConversationRepository(auth, db)
+  private var isInLocalNewChat = false
+  private var conversationsJob: kotlinx.coroutines.Job? = null
+  private var messagesJob: kotlinx.coroutines.Job? = null
+  private var lastUid: String? = null
 
   private val _uiState =
       MutableStateFlow(
@@ -57,13 +84,7 @@ class HomeViewModel(
               messages = emptyList()))
   /** Public, read-only UI state. */
   val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
-  // private val endpoint = "http://10.0.2.2:5001/euler-e8edb/us-central1/answerWithRagHttp"
-  // private val apiKey = "db8e16080302b511c256794b26a6e80089c80e1c15b7927193e754b7fd87fc4e"
 
-  /**
-   * Firebase Functions handle for the chat backend. Uses local emulator when configured via
-   * BuildConfig flags.
-   */
   private val functions: FirebaseFunctions by lazy {
     FirebaseFunctions.getInstance("us-central1").apply {
       if (BuildConfig.USE_FUNCTIONS_EMULATOR) {
@@ -78,10 +99,159 @@ class HomeViewModel(
   // ---------------------------
   // UI mutations / state helpers
   // ---------------------------
+  // ============ INIT ============
 
-  /** Toggle the navigation drawer state. */
+  private var dataStarted = false
+  private var authListener: FirebaseAuth.AuthStateListener? = null
+
+  init {
+    val current = auth.currentUser?.uid
+    lastUid = current
+
+    authListener =
+        FirebaseAuth.AuthStateListener { a ->
+          val uid = a.currentUser?.uid
+          if (uid != lastUid) {
+            if (uid == null) {
+              // SIGN-OUT → guest
+              onSignedOutInternal() // reset UI
+              startLocalNewChat() // local blank screen
+            } else {
+              // SIGN-IN
+              startLocalNewChat() // local placeholder until the first send
+              startData() // attach Firestore
+            }
+            lastUid = uid
+          }
+        }
+    auth.addAuthStateListener(requireNotNull(authListener))
+
+    if (current != null) {
+      // already signed in
+      startLocalNewChat()
+      startData()
+    } else {
+      // guest at startup
+      onSignedOutInternal()
+      startLocalNewChat()
+    }
+  }
+
+  /**
+   * Returns true when the user is **not** authenticated. Guest mode disables Firestore listeners
+   * and keeps all messages in memory only.
+   */
+  private fun isGuest(): Boolean = auth.currentUser == null
+
+  /**
+   * Start Firestore listeners (conversations + messages) **only when signed in**. No-op in guest
+   * mode or if already attached.
+   *
+   * Selection logic:
+   * - Keeps current selection if still present.
+   * - If nothing is selected and we're not in a local placeholder, auto-select the most recent.
+   * - If the list is empty, keep `currentConversationId = null`.
+   */
+  private fun startData() {
+    if (dataStarted || isGuest()) return
+    dataStarted = true
+    Log.d(TAG, "startData(): attaching listeners (isInLocalNewChat=$isInLocalNewChat)")
+
+    // 1) Conversation list
+    conversationsJob?.cancel()
+    conversationsJob =
+        viewModelScope.launch {
+          repo.conversationsFlow().collect { list ->
+            Log.d(
+                TAG,
+                "conversationsFlow -> size=${list.size}, current=${_uiState.value.currentConversationId}, isInLocalNewChat=$isInLocalNewChat")
+            _uiState.update { it.copy(conversations = list) }
+
+            val currentId = _uiState.value.currentConversationId
+            val hasCurrent = currentId != null && list.any { it.id == currentId }
+
+            when {
+              hasCurrent -> Log.d(TAG, "Keeping current conversation $currentId")
+              currentId == null && list.isNotEmpty() && !isInLocalNewChat -> {
+                val next = list.first().id
+                Log.d(TAG, "Auto-selecting conversation $next (not in local placeholder mode)")
+                isInLocalNewChat = false
+                _uiState.update { it.copy(currentConversationId = next) }
+              }
+              list.isEmpty() -> {
+                Log.d(TAG, "No remote conversations available; staying with null selection")
+                _uiState.update { it.copy(currentConversationId = null) }
+              }
+              else -> Log.d(TAG, "Local new chat active; leaving selection as null")
+            }
+          }
+        }
+
+    // 2) Messages for the selected conversation (flatMapLatest strategy)
+    messagesJob?.cancel()
+    messagesJob =
+        viewModelScope.launch {
+          uiState
+              .map { it.currentConversationId }
+              .distinctUntilChanged()
+              .flatMapLatest { cid ->
+                if (cid == null) flowOf(emptyList()) else repo.messagesFlow(cid)
+              }
+              .collect { msgs ->
+                // IMPORTANT: si on est en train de streamer (placeholder + chunks),
+                // on NE REMPLACE PAS la liste par Firestore, sinon on perd le streaming visuel.
+                val streamingId = _uiState.value.streamingMessageId
+                if (streamingId != null) {
+                  // On ignore cette emission Firestore pendant le streaming
+                  return@collect
+                }
+
+                // Pas de streaming en cours → on peut refléter Firestore tel quel
+                _uiState.update { st -> st.copy(messages = msgs.map { it.toUi() }) }
+              }
+        }
+  }
+
+  /**
+   * Handles **sign-out** transitions:
+   * - Cancels Firestore jobs, clears flags, resets [uiState] to defaults. Used when auth listener
+   *   reports `uid == null`.
+   */
+  private fun onSignedOutInternal() {
+    // cancel Firestore listeners
+    conversationsJob?.cancel()
+    conversationsJob = null
+    messagesJob?.cancel()
+    messagesJob = null
+    dataStarted = false
+    isInLocalNewChat = false
+    // reset UI
+    Log.d(TAG, "onSignedOutInternal(): reset UI state to defaults")
+    _uiState.value = HomeUiState() // vide messages, currentConversationId=null, etc.
+  }
+
+  /**
+   * Enters a **local, unsaved** new chat state:
+   * - Clears selection and message list, resets draft and UI flags.
+   * - Prevents auto-selection of a remote conversation until the user sends the first message.
+   */
+  fun startLocalNewChat() {
+    isInLocalNewChat = true
+    Log.d(TAG, "startLocalNewChat(): clearing current conversation selection")
+    _uiState.update {
+      it.copy(
+          currentConversationId = null,
+          messages = emptyList(),
+          messageDraft = "",
+          isSending = false,
+          showDeleteConfirmation = false)
+    }
+  }
+
+  // ============ UI BASICS (unchanged) ============
+
   fun toggleDrawer() {
-    _uiState.value = _uiState.value.copy(isDrawerOpen = !_uiState.value.isDrawerOpen)
+    _uiState.update { it.copy(isDrawerOpen = !it.isDrawerOpen) }
   }
 
   fun setGuestMode(isGuest: Boolean) {
@@ -159,21 +329,35 @@ class HomeViewModel(
   }
 
   /** Control the top-right overflow menu visibility. */
+
   fun setTopRightOpen(open: Boolean) {
-    _uiState.value = _uiState.value.copy(isTopRightOpen = open)
+    _uiState.update { it.copy(isTopRightOpen = open) }
   }
 
-  /** Update the current message draft (bound to the input field). */
   fun updateMessageDraft(text: String) {
-    _uiState.value = _uiState.value.copy(messageDraft = text)
+    _uiState.update { it.copy(messageDraft = text) }
   }
+
+  /** Select a conversation by id and exit the local placeholder state. */
+  fun selectConversation(id: String) {
+    Log.d(TAG, "selectConversation(): $id")
+    isInLocalNewChat = false
+    _uiState.update { it.copy(currentConversationId = id) }
+  }
+
+  fun hideDeleteConfirmation() {
+    _uiState.update { it.copy(showDeleteConfirmation = false) }
+  }
+
+  // ============ SENDING MESSAGE -> Firestore ============
 
   /**
-   * Send the current draft:
-   * - Guard against concurrent sends and blank drafts
-   * - Append a USER message immediately
-   * - Call the backend for a response
-   * - Append an AI message (or an error message) on completion
+   * Send flow. Guest: append user + AI messages locally. Signed-in: create convo on first send
+   * (with quick title), then persist messages; upgrade title once. Send the current draft:
+   * - Guard against concurrent sends and blank drafts.
+   * - Append a USER message immediately so the UI feels responsive.
+   * - Call the shared [LlmClient] (Firebase/HTTP) on a background coroutine.
+   * - Append an AI message (or an error bubble) on completion.
    */
   fun sendMessage() {
     val current = _uiState.value
@@ -194,33 +378,87 @@ class HomeViewModel(
             type = ChatType.AI,
             isThinking = true)
 
-    _uiState.value =
-        current.copy(
-            messages = current.messages + userMsg + placeholder,
-            messageDraft = "",
-            isSending = true,
-            streamingMessageId = aiMessageId,
-            streamingSequence = current.streamingSequence + 1)
+    // UI optimiste : on ajoute user + placeholder, on vide l’input, on marque l’état de streaming
+    _uiState.update { st ->
+      st.copy(
+          messages = st.messages + userMsg + placeholder,
+          messageDraft = "",
+          isSending = true,
+          streamingMessageId = aiMessageId,
+          streamingSequence = st.streamingSequence + 1)
+    }
 
-    startStreaming(question = msg, messageId = aiMessageId)
+    viewModelScope.launch {
+      try {
+        if (isGuest()) {
+          // INVITÉ : rien dans Firestore, uniquement streaming UI
+          startStreaming(question = msg, messageId = aiMessageId, conversationId = null)
+          return@launch
+        }
+
+        // CONNECTÉ : s’assurer d’avoir une conversation et persister le message USER tout de suite
+        val cid =
+            _uiState.value.currentConversationId
+                ?: run {
+                  val quickTitle = localTitleFrom(msg)
+                  val newId = repo.startNewConversation(quickTitle)
+                  _uiState.update { it.copy(currentConversationId = newId) }
+                  isInLocalNewChat = false
+
+                  // Upgrade du titre en arrière-plan (UNE fois)
+                  launch {
+                    try {
+                      val good = fetchTitle(msg)
+                      if (good.isNotBlank() && good != quickTitle) {
+                        repo.updateConversationTitle(newId, good)
+                      }
+                    } catch (_: Exception) {
+                      /* keep provisional */
+                    }
+                  }
+                  newId
+                }
+
+        isInLocalNewChat = false
+        // persister immédiatement le message USER
+        repo.appendMessage(cid, "user", msg)
+
+        // démarrer le streaming; à la fin on persiste le message AI
+        startStreaming(question = msg, messageId = aiMessageId, conversationId = cid)
+      } catch (_: AuthNotReadyException) {
+        // rien : l’auth se (re)stabilisera
+        setStreamingError(aiMessageId, AuthNotReadyException())
+        clearStreamingState(aiMessageId)
+      } catch (t: Throwable) {
+        setStreamingError(aiMessageId, t)
+        clearStreamingState(aiMessageId)
+      }
+    }
   }
 
-  private fun startStreaming(question: String, messageId: String) {
+  private fun startStreaming(question: String, messageId: String, conversationId: String?) {
     activeStreamJob?.cancel()
     userCancelledStream = false
 
     activeStreamJob =
         viewModelScope.launch {
           try {
-            val reply = withContext(Dispatchers.IO) { callAnswerWithRag(question) }
+            val reply = withContext(Dispatchers.IO) { llmClient.generateReply(question) }
             simulateStreamingFromText(messageId, reply)
-          } catch (ce: CancellationException) {
-            if (!userCancelledStream) {
-              setStreamingError(messageId, ce)
+
+            // si connecté → persister le message AI une fois le texte complet connu
+            if (conversationId != null) {
+              try {
+                repo.appendMessage(conversationId, "assistant", reply)
+              } catch (e: Exception) {
+                // on a déjà montré la réponse côté UI; on loggue seulement
+                Log.w(TAG, "Failed to persist assistant message: ${e.message}")
+              }
             }
+          } catch (ce: CancellationException) {
+            if (!userCancelledStream) setStreamingError(messageId, ce)
           } catch (t: Throwable) {
-            if (userCancelledStream) return@launch
-            setStreamingError(messageId, t)
+            if (!userCancelledStream) setStreamingError(messageId, t)
           } finally {
             clearStreamingState(messageId)
             activeStreamJob = null
@@ -282,16 +520,15 @@ class HomeViewModel(
   }
 
   private suspend fun simulateStreamingFromText(messageId: String, fullText: String) {
-    withContext(Dispatchers.Default) {
-      val pattern = Regex("\\S+\\s*")
-      val parts = pattern.findAll(fullText).map { it.value }.toList().ifEmpty { listOf(fullText) }
-      for (chunk in parts) {
-        coroutineContext.ensureActive()
-        appendStreamingChunk(messageId, chunk)
-        delay(60)
-      }
-      markMessageFinished(messageId)
+    // Use current dispatcher instead of Dispatchers.Default to allow test control
+    val pattern = Regex("\\S+\\s*")
+    val parts = pattern.findAll(fullText).map { it.value }.toList().ifEmpty { listOf(fullText) }
+    for (chunk in parts) {
+      // delay() already checks for cancellation, so ensureActive() is not strictly necessary
+      appendStreamingChunk(messageId, chunk)
+      delay(60)
     }
+    markMessageFinished(messageId)
   }
 
   private suspend fun clearStreamingState(messageId: String) =
@@ -334,32 +571,75 @@ class HomeViewModel(
     userCancelledStream = false
   }
 
-  /** Show/Hide the delete confirmation modal. */
+  /** Show the delete confirmation modal. */
   fun showDeleteConfirmation() {
     _uiState.value = _uiState.value.copy(showDeleteConfirmation = true)
   }
 
-  fun hideDeleteConfirmation() {
-    _uiState.value = _uiState.value.copy(showDeleteConfirmation = false)
+  /** Delete current conversation (guest: just clear local; signed-in: remove from Firestore). */
+  fun deleteCurrentConversation() {
+    if (isGuest()) {
+      // guest: simply reset locally
+      startLocalNewChat()
+      return
+    }
+    val cid = _uiState.value.currentConversationId ?: return
+    Log.d(TAG, "deleteCurrentConversation(): deleting $cid")
+    viewModelScope.launch {
+      try {
+        startLocalNewChat()
+        repo.deleteConversation(cid)
+      } catch (_: AuthNotReadyException) {} catch (_: Exception) {
+        _uiState.update { it.copy(showDeleteConfirmation = false) }
+      }
+    }
   }
 
-  /**
-   * Calls the Cloud Function to get a chat reply for the given [question]. Runs on Dispatchers.IO
-   * and returns either the 'reply' string or a fallback.
-   *
-   * @return The assistant reply, or a short fallback string on invalid payload.
-   */
-  private suspend fun callAnswerWithRag(question: String): String =
-      withContext(Dispatchers.IO) {
-        val data = hashMapOf("question" to question) // add "topK"/"model" if needed
-        val result = functions.getHttpsCallable("answerWithRagFn").call(data).await()
+  // ============ BACKEND CHAT ============
 
-        @Suppress("UNCHECKED_CAST")
-        val map = result.getData() as? Map<String, Any?> ?: return@withContext "Invalid response"
-        (map["reply"] as? String)?.ifBlank { null } ?: "No reply"
+  // mapping MessageDTO -> UI
+  private fun MessageDTO.toUi(): ChatUIModel =
+      ChatUIModel(
+          id = UUID.randomUUID().toString(),
+          text = this.text,
+          timestamp = this.createdAt?.toDate()?.time ?: System.currentTimeMillis(),
+          type = if (this.role == "user") ChatType.USER else ChatType.AI)
+
+  /** Make a short provisional title from the first prompt. */
+  private fun localTitleFrom(question: String, maxLen: Int = 60, maxWords: Int = 8): String {
+    val cleaned = question.replace(Regex("\\s+"), " ").trim()
+    val head = cleaned.split(" ").filter { it.isNotBlank() }.take(maxWords).joinToString(" ")
+    return (if (head.length <= maxLen) head else head.take(maxLen)).trim()
+  }
+
+  /** Ask `generateTitleFn` for a better title; fallback to [localTitleFrom] on errors. */
+  private suspend fun fetchTitle(question: String): String {
+    return try {
+      val res =
+          functions.getHttpsCallable("generateTitleFn").call(mapOf("question" to question)).await()
+      val t = (res.getData() as? Map<*, *>)?.get("title") as? String
+      (t?.takeIf { it.isNotBlank() } ?: localTitleFrom(question)).also {
+        Log.d(TAG, "fetchTitle(): generated='$it'")
       }
 
+  
+    } catch (_: Exception) {
+      Log.d(TAG, "fetchTitle(): fallback to local extraction")
+      localTitleFrom(question)
+    }
+  }
+
+  override fun onCleared() {
+    super.onCleared()
+    authListener?.let { auth.removeAuthStateListener(it) }
+    authListener = null
+    conversationsJob?.cancel()
+    conversationsJob = null
+    messagesJob?.cancel()
+    messagesJob = null
+    activeStreamJob?.cancel()
+    activeStreamJob = null
+  }
   companion object {
     private const val DEFAULT_USER_NAME = "Student"
-  }
 }

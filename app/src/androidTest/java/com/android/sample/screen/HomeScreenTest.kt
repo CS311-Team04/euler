@@ -1,27 +1,27 @@
 package com.android.sample.screen
 
+import android.content.Context
 import androidx.activity.ComponentActivity
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.sample.TestConstants
 import com.android.sample.home.HomeScreen
 import com.android.sample.home.HomeTags
+import com.android.sample.home.HomeViewModel
+import com.android.sample.llm.FakeLlmClient
+import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -32,243 +32,91 @@ class HomeScreenTest {
 
   @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
 
-  // Helper function to check if a node does not exist
-  private fun assertNodeDoesNotExist(text: String) {
-    try {
-      composeRule.onNodeWithText(text).assertIsDisplayed()
-      fail("Node with text '$text' should not exist but was found")
-    } catch (e: AssertionError) {
-      // Expected: node does not exist
+  private fun ensureFirebaseInitialized() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    if (FirebaseApp.getApps(context).isEmpty()) {
+      val options =
+          FirebaseOptions.Builder()
+              .setApplicationId("1:1234567890:android:integration-test")
+              .setProjectId("integration-test")
+              .setApiKey("fake-api-key")
+              .build()
+      FirebaseApp.initializeApp(context, options)
     }
   }
 
-  // Helper function to check if a node with content description does not exist
-  private fun assertNodeWithContentDescriptionDoesNotExist(contentDescription: String) {
-    val nodes = composeRule.onAllNodesWithContentDescription(contentDescription)
-    assertTrue(
-        "Node with content description '$contentDescription' should not exist but was found",
-        nodes.fetchSemanticsNodes().isEmpty())
-  }
-
-  // Helper function to wait for Send button to be available and click it
-  // This is more robust for CI environments where timing can vary
-  private fun waitAndClickSendButton() {
-    // Wait until the Send button is found (either by testTag or contentDescription)
-    composeRule.waitUntilAtLeastOneExists(hasContentDescription("Send"), timeoutMillis = 5000)
-    composeRule.waitForIdle()
-    // Try testTag first, fallback to contentDescription
-    try {
-      composeRule.onNodeWithTag(HomeTags.SendBtn).assertIsDisplayed()
-      composeRule.onNodeWithTag(HomeTags.SendBtn).performClick()
-    } catch (e: AssertionError) {
-      // Fallback to contentDescription if testTag doesn't work
-      composeRule.onAllNodesWithContentDescription("Send").get(0).assertIsDisplayed()
-      composeRule.onAllNodesWithContentDescription("Send").get(0).performClick()
+  private fun launchHomeScreen() {
+    ensureFirebaseInitialized()
+    composeRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = HomeViewModel(FakeLlmClient())) }
     }
   }
 
   @Test
-  fun action_buttons_trigger_callbacks() {
+  fun action1_button_triggers_callback() {
+    ensureFirebaseInitialized()
     var action1Clicked = false
+
+    composeRule.setContent {
+      MaterialTheme {
+        HomeScreen(
+            viewModel = HomeViewModel(FakeLlmClient()), onAction1Click = { action1Clicked = true })
+      }
+    }
+
+    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.Action1Btn), timeoutMillis = 5_000)
+    composeRule.onNodeWithTag(HomeTags.Action1Btn).performClick()
+
+    assertTrue(action1Clicked)
+  }
+
+  @Test
+  fun action2_button_triggers_callback() {
+    ensureFirebaseInitialized()
     var action2Clicked = false
 
     composeRule.setContent {
       MaterialTheme {
         HomeScreen(
-            onAction1Click = { action1Clicked = true }, onAction2Click = { action2Clicked = true })
+            viewModel = HomeViewModel(FakeLlmClient()), onAction2Click = { action2Clicked = true })
       }
     }
 
-    // Wait for buttons to be visible
-    composeRule.waitForIdle()
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.Action1Btn), timeoutMillis = 5000)
+    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.Action2Btn), timeoutMillis = 5_000)
+    composeRule.onNodeWithTag(HomeTags.Action2Btn).performClick()
 
-    composeRule.onNodeWithTag(HomeTags.Action1Btn).performClick()
-    assertTrue(action1Clicked)
-
-    // Note: After clicking Action1Btn, suggestions might disappear if a message is sent
-    // So we only test Action1Btn in this test
+    assertTrue(action2Clicked)
   }
 
   @Test
-  fun displays_correct_action_button_texts() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+  fun menu_button_click_toggles_drawer_state() {
+    launchHomeScreen()
 
-    composeRule.onNodeWithText(TestConstants.ButtonTexts.WHAT_IS_EPFL).assertIsDisplayed()
-    composeRule.onNodeWithText(TestConstants.ButtonTexts.CHECK_ED_DISCUSSION).assertIsDisplayed()
-  }
-
-  @Test
-  fun displays_correct_placeholder_text() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    composeRule.onNodeWithText(TestConstants.PlaceholderTexts.MESSAGE_EULER).assertIsDisplayed()
-  }
-
-  //  @Test
-  //  fun displays_icons_with_correct_content_descriptions() {
-  //    composeRule.setContent { MaterialTheme { HomeScreen() } }
-  //    composeRule.waitForIdle()
-  //
-  //    composeRule.waitUntilAtLeastOneExists(
-  //        hasContentDescription(TestConstants.ContentDescriptions.MENU), timeoutMillis = 5000)
-  //    composeRule
-  //        .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.MENU)
-  //        .get(0)
-  //        .assertIsDisplayed()
-  //    composeRule.waitUntilAtLeastOneExists(
-  //        hasContentDescription(TestConstants.ContentDescriptions.MORE), timeoutMillis = 5000)
-  //    composeRule
-  //        .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.MORE)
-  //        .get(0)
-  //        .assertIsDisplayed()
-  //    // Send button only appears when there's text
-  //    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test")
-  //    composeRule.waitForIdle()
-  //    composeRule.waitUntilAtLeastOneExists(
-  //        hasContentDescription(TestConstants.ContentDescriptions.SEND), timeoutMillis = 5000)
-  //    composeRule
-  //        .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.SEND)
-  //        .get(0)
-  //        .assertIsDisplayed()
-  //    composeRule.waitUntilAtLeastOneExists(
-  //        hasContentDescription(TestConstants.ContentDescriptions.EULER), timeoutMillis = 5000)
-  //    composeRule
-  //        .onAllNodesWithContentDescription(TestConstants.ContentDescriptions.EULER)
-  //        .get(0)
-  //        .assertIsDisplayed()
-  //  }
-
-  @Test
-  fun menu_button_click_triggers_viewmodel_toggle() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    // The menu button should trigger the drawer toggle
+    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.MenuBtn), timeoutMillis = 5_000)
     composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
-
-    // Verify that the component is still displayed (no crash)
-    composeRule.onNodeWithTag(HomeTags.MenuBtn).assertIsDisplayed()
+    composeRule.onNodeWithText("New chat").assertIsDisplayed()
   }
 
   @Test
-  fun topRight_button_click_triggers_viewmodel_setTopRightOpen() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+  fun top_right_menu_can_be_opened() {
+    launchHomeScreen()
 
-    // The top-right button should trigger the menu opening
+    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.TopRightBtn), timeoutMillis = 5_000)
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-
-    // Verify that the menu is displayed
     composeRule.onNodeWithTag(HomeTags.TopRightMenu).assertIsDisplayed()
   }
 
   @Test
-  fun message_field_text_input_updates_viewmodel() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+  fun message_field_accepts_text_input() {
+    launchHomeScreen()
 
-    val testMessage = "Test message input"
-    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput(testMessage)
-
-    // Verify that the field accepts the input
+    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Hello Euler")
     composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
   }
 
   @Test
-  fun send_button_is_disabled_when_text_is_empty() {
-    var sendMessageCalled = false
-
-    composeRule.setContent {
-      MaterialTheme { HomeScreen(onSendMessage = { sendMessageCalled = true }) }
-    }
-
-    // Wait for the screen to be fully loaded
-    composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
-    composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
-
-    // Verify that without any text input, the callback should not be triggered
-    // The send button is disabled when there's no text
-    assertTrue(!sendMessageCalled)
-  }
-
-  @Test
-  fun multiple_text_inputs_work_correctly() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    // Test multiple consecutive inputs
-    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("First")
-    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Second")
-    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Third")
-
-    // Verify that the field always accepts input
-    composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
-  }
-
-  @Test
-  fun action_buttons_have_correct_styling_and_behavior() {
-    var action1Clicked = false
-    var action2Clicked = false
-
-    composeRule.setContent {
-      MaterialTheme {
-        HomeScreen(
-            onAction1Click = { action1Clicked = true }, onAction2Click = { action2Clicked = true })
-      }
-    }
-
-    // Wait for buttons to be visible
-    composeRule.waitForIdle()
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.Action1Btn), timeoutMillis = 5000)
-
-    // Test that buttons are clickable and trigger callbacks
-    composeRule.onNodeWithTag(HomeTags.Action1Btn).performClick()
-    assertTrue(action1Clicked)
-
-    // Note: After clicking Action1Btn, the suggestions might disappear if a message is sent
-    // So we only test Action1Btn in this test
-  }
-
-  @Test
-  fun drawer_state_synchronization_works() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    // Test that the menu button can be clicked without error
-    composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
-
-    // Verify that the screen remains stable
-    composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
-    composeRule.onNodeWithTag(HomeTags.MenuBtn).assertIsDisplayed()
-  }
-
-  @Test
-  fun message_field_accepts_multiline_text() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    val multilineText = "Line 1\nLine 2\nLine 3"
-    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput(multilineText)
-
-    composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
-  }
-
-  @Test
-  fun top_right_menu_appears_and_disappears() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    // Click the top right button
-    composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-
-    // Menu should appear
-    composeRule.onNodeWithTag(HomeTags.TopRightMenu).assertIsDisplayed()
-  }
-
-  @Test
-  fun message_field_placeholder_is_displayed() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
-
-    composeRule.onNodeWithText(TestConstants.PlaceholderTexts.MESSAGE_EULER).assertIsDisplayed()
-  }
-
-  @Test
-  fun action_buttons_display_correct_labels() {
-    composeRule.setContent { MaterialTheme { HomeScreen() } }
+  fun displays_expected_button_and_placeholder_texts() {
+    launchHomeScreen()
 
     composeRule.onNodeWithText(TestConstants.ButtonTexts.WHAT_IS_EPFL).assertIsDisplayed()
     composeRule.onNodeWithText(TestConstants.ButtonTexts.CHECK_ED_DISCUSSION).assertIsDisplayed()
@@ -1059,5 +907,6 @@ class HomeScreenTest {
     } catch (e: AssertionError) {
       // Expected
     }
+    composeRule.onNodeWithText(TestConstants.PlaceholderTexts.MESSAGE_EULER).assertIsDisplayed()
   }
 }
