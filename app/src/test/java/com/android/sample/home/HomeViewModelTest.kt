@@ -1,31 +1,35 @@
 package com.android.sample.home
 
-import kotlinx.coroutines.Dispatchers
+import com.android.sample.Chat.ChatType
+import com.android.sample.Chat.ChatUIModel
+import com.android.sample.util.MainDispatcherRule
+import java.util.UUID
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
-import org.junit.After
 import org.junit.Assert.*
-import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
 
-  private val testDispatcher = UnconfinedTestDispatcher()
+  @get:Rule val mainDispatcherRule = MainDispatcherRule()
+  private val testDispatcher
+    get() = mainDispatcherRule.dispatcher
 
-  @Before
-  fun setup() {
-    // Configure Main dispatcher BEFORE any ViewModel creation
-    Dispatchers.setMain(testDispatcher)
-  }
-
-  @After
-  fun tearDown() {
-    Dispatchers.resetMain()
+  private fun HomeViewModel.replaceMessages(vararg texts: String) {
+    val field = HomeViewModel::class.java.getDeclaredField("_uiState")
+    field.isAccessible = true
+    @Suppress("UNCHECKED_CAST") val stateFlow = field.get(this) as MutableStateFlow<HomeUiState>
+    val current = stateFlow.value
+    val messages =
+        texts.map { text ->
+          ChatUIModel(
+              id = UUID.randomUUID().toString(), text = text, timestamp = 0L, type = ChatType.USER)
+        }
+    stateFlow.value = current.copy(messages = messages)
   }
 
   @Test
@@ -33,9 +37,7 @@ class HomeViewModelTest {
       runTest(testDispatcher) {
         val viewModel = HomeViewModel()
 
-        // Add some messages first - message is added synchronously before coroutine
-        viewModel.updateMessageDraft("Test message")
-        viewModel.sendMessage()
+        viewModel.replaceMessages("Test message")
 
         // Initial state should have messages now (user message added synchronously)
         val initialState = viewModel.uiState.value
@@ -65,6 +67,41 @@ class HomeViewModelTest {
         val stateAfterClear = viewModel.uiState.value
         assertEquals(initialUserName, stateAfterClear.userName)
         assertEquals(initialSystems, stateAfterClear.systems)
+      }
+
+  @Test
+  fun simulateStreamingFromText_populates_message_and_clears_state() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel()
+        val field = HomeViewModel::class.java.getDeclaredField("_uiState")
+        field.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        val stateFlow = field.get(viewModel) as MutableStateFlow<HomeUiState>
+        val aiId = "ai-${System.nanoTime()}"
+        val initial = stateFlow.value
+        stateFlow.value =
+            initial.copy(
+                messages =
+                    listOf(
+                        ChatUIModel(
+                            id = aiId,
+                            text = "",
+                            timestamp = 0L,
+                            type = ChatType.AI,
+                            isThinking = true)),
+                streamingMessageId = aiId,
+                streamingSequence = 0,
+                isSending = true)
+
+        viewModel.simulateStreamingForTest(aiId, "Bonjour EPFL")
+
+        val finalState = viewModel.uiState.value
+        val aiMessage = finalState.messages.first()
+        assertEquals("Bonjour EPFL", aiMessage.text)
+        assertFalse(aiMessage.isThinking)
+        assertNull(finalState.streamingMessageId)
+        assertFalse(finalState.isSending)
+        assertTrue(finalState.streamingSequence > initial.streamingSequence)
       }
 
   @Test
@@ -99,7 +136,7 @@ class HomeViewModelTest {
         viewModel.sendMessage()
 
         // Advance time
-        advanceTimeBy(100)
+        testDispatcher.scheduler.advanceTimeBy(100)
 
         // Verify nothing changed
         val stateAfterSend = viewModel.uiState.value
@@ -207,9 +244,7 @@ class HomeViewModelTest {
       runTest(testDispatcher) {
         val viewModel = HomeViewModel()
 
-        // Add some messages first - message is added synchronously before coroutine
-        viewModel.updateMessageDraft("Test message")
-        viewModel.sendMessage()
+        viewModel.replaceMessages("Test message")
 
         val initialState = viewModel.uiState.value
         assertTrue(initialState.messages.isNotEmpty())
@@ -267,7 +302,7 @@ class HomeViewModelTest {
         viewModel.updateMessageDraft("    ")
         viewModel.sendMessage()
 
-        advanceTimeBy(100)
+        testDispatcher.scheduler.advanceTimeBy(100)
 
         val stateAfterSend = viewModel.uiState.value
         assertEquals(initialCount, stateAfterSend.messages.size)
@@ -649,7 +684,7 @@ class HomeViewModelTest {
 
   @Test
   fun multiple_state_changes_in_sequence() =
-      runTest(UnconfinedTestDispatcher()) {
+      runTest(testDispatcher) {
         val viewModel = HomeViewModel()
 
         viewModel.toggleDrawer()
@@ -1021,9 +1056,7 @@ class HomeViewModelTest {
       runTest(testDispatcher) {
         val viewModel = HomeViewModel()
 
-        // Add some messages first - message is added synchronously before coroutine
-        viewModel.updateMessageDraft("Test message")
-        viewModel.sendMessage()
+        viewModel.replaceMessages("Test message")
 
         val initialState = viewModel.uiState.value
         assertTrue(initialState.messages.isNotEmpty())

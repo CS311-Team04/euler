@@ -3,6 +3,7 @@ plugins {
     id("org.sonarqube") version "6.3.1.5724"
     alias(libs.plugins.androidApplication) apply false
     alias(libs.plugins.jetbrainsKotlinAndroid) apply false
+    alias(libs.plugins.googleServices) apply false
 }
 
 sonar {
