@@ -77,7 +77,9 @@ class SettingsPageTest {
     composeTestRule.waitForIdle()
 
     composeTestRule.onNodeWithContentDescription(Localization.t("close")).performClick()
+    composeTestRule.waitForIdle()
     composeTestRule.onNodeWithContentDescription(Localization.t("info")).performClick()
+    composeTestRule.waitForIdle()
 
     assertTrue(backClicked)
     assertTrue(infoClicked)
@@ -89,7 +91,9 @@ class SettingsPageTest {
     composeTestRule.waitForIdle()
 
     composeTestRule.onNodeWithText(Localization.t("speech_language")).performClick()
+    composeTestRule.waitForIdle()
     composeTestRule.onNodeWithText("FR").performClick()
+    composeTestRule.waitForIdle()
     composeTestRule.onNodeWithText("FR").assertIsDisplayed()
   }
 
@@ -103,6 +107,7 @@ class SettingsPageTest {
     composeTestRule.waitForIdle()
 
     composeTestRule.onNodeWithText(Localization.t("log_out")).performClick()
+    composeTestRule.waitForIdle()
 
     assertTrue(signOutClicked)
   }

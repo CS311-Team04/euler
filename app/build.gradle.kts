@@ -87,9 +87,9 @@ android {
         unitTests {
             isIncludeAndroidResources = true
             isReturnDefaultValues = true
-            // Ensure all animations complete immediately in unit tests
+            // Configure test environment for better stability in CI
             all {
-                it.systemProperty("robolectric.looper.mode", "PAUSED")
+                it.systemProperty("robolectric.looper.mode", "LEGACY")
                 it.systemProperty("robolectric.enabledSdks", "28,33,34")
             }
         }

@@ -237,6 +237,7 @@ class AuthUIScreenTest {
     }
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.BtnMicrosoft).performClick()
+    composeTestRule.waitForIdle()
     assertTrue("Microsoft button should trigger callback", clicked)
   }
 
@@ -251,6 +252,7 @@ class AuthUIScreenTest {
     }
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag(AuthTags.BtnSwitchEdu).performClick()
+    composeTestRule.waitForIdle()
     assertTrue("Guest button should trigger callback", clicked)
   }
 
@@ -619,7 +621,10 @@ class AuthUIScreenTest {
       }
     }
     composeTestRule.waitForIdle()
-    repeat(3) { composeTestRule.onNodeWithTag(AuthTags.BtnMicrosoft).performClick() }
+    repeat(3) {
+      composeTestRule.onNodeWithTag(AuthTags.BtnMicrosoft).performClick()
+      composeTestRule.waitForIdle()
+    }
     assertEquals("All clicks should register", 3, clickCount)
   }
 
@@ -633,7 +638,10 @@ class AuthUIScreenTest {
       }
     }
     composeTestRule.waitForIdle()
-    repeat(3) { composeTestRule.onNodeWithTag(AuthTags.BtnSwitchEdu).performClick() }
+    repeat(3) {
+      composeTestRule.onNodeWithTag(AuthTags.BtnSwitchEdu).performClick()
+      composeTestRule.waitForIdle()
+    }
     assertEquals("All clicks should register", 3, clickCount)
   }
 
@@ -656,9 +664,11 @@ class AuthUIScreenTest {
     } catch (e: Exception) {
       // Expected - disabled button may throw
     }
+    composeTestRule.waitForIdle()
     assertFalse("Microsoft button should not trigger when disabled", msClicked)
     // Guest button is enabled, so callback should fire
     composeTestRule.onNodeWithTag(AuthTags.BtnSwitchEdu).performClick()
+    composeTestRule.waitForIdle()
     assertTrue("Guest button should trigger when enabled", guestClicked)
   }
 
