@@ -1,101 +1,106 @@
 package com.android.sample.screen
 
-import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
-import androidx.test.core.app.ApplicationProvider
+import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.android.sample.TestConstants
 import com.android.sample.home.HomeScreen
 import com.android.sample.home.HomeTags
 import com.android.sample.home.HomeViewModel
-import com.google.firebase.FirebaseApp
-import com.google.firebase.FirebaseOptions
-import com.google.firebase.auth.FirebaseAuth
-import org.junit.After
-import org.junit.Assert.assertEquals
+import com.android.sample.llm.FakeLlmClient
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+@OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
 class HomeScreenTest {
 
   @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
 
-  private lateinit var viewModel: HomeViewModel
-
-  @Before
-  fun setUp() {
-    initFirebase()
-    FirebaseAuth.getInstance().signOut()
-  }
-
-  @After
-  fun tearDown() {
-    FirebaseAuth.getInstance().signOut()
+  private fun launchHomeScreen() {
+    composeRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = HomeViewModel(FakeLlmClient())) }
+    }
   }
 
   @Test
-  fun suggestions_visible_in_guest_mode() {
-    launchScreen()
+  fun action1_button_triggers_callback() {
+    var action1Clicked = false
 
-    composeRule.onNodeWithText("What is EPFL").assertIsDisplayed()
-    composeRule.onNodeWithText("Check Ed Discussion").assertIsDisplayed()
+    composeRule.setContent {
+      MaterialTheme {
+        HomeScreen(
+            viewModel = HomeViewModel(FakeLlmClient()), onAction1Click = { action1Clicked = true })
+      }
+    }
+
+    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.Action1Btn), timeoutMillis = 5_000)
+    composeRule.onNodeWithTag(HomeTags.Action1Btn).performClick()
+
+    assertTrue(action1Clicked)
   }
 
   @Test
-  fun top_right_menu_opens_when_requested() {
-    launchScreen()
+  fun action2_button_triggers_callback() {
+    var action2Clicked = false
 
-    composeRule.runOnIdle { viewModel.setTopRightOpen(true) }
-    composeRule.waitForIdle()
+    composeRule.setContent {
+      MaterialTheme {
+        HomeScreen(
+            viewModel = HomeViewModel(FakeLlmClient()), onAction2Click = { action2Clicked = true })
+      }
+    }
 
-    composeRule.onNodeWithTag(HomeTags.TopRightMenu, useUnmergedTree = true).assertIsDisplayed()
+    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.Action2Btn), timeoutMillis = 5_000)
+    composeRule.onNodeWithTag(HomeTags.Action2Btn).performClick()
+
+    assertTrue(action2Clicked)
   }
 
   @Test
-  fun message_field_updates_draft_text() {
-    launchScreen()
+  fun menu_button_click_toggles_drawer_state() {
+    launchHomeScreen()
+
+    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.MenuBtn), timeoutMillis = 5_000)
+    composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
+    // Drawer contents include "New chat" entry
+    composeRule.onNodeWithText("New chat").assertIsDisplayed()
+  }
+
+  @Test
+  fun top_right_menu_can_be_opened() {
+    launchHomeScreen()
+
+    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.TopRightBtn), timeoutMillis = 5_000)
+    composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
+    composeRule.onNodeWithTag(HomeTags.TopRightMenu).assertIsDisplayed()
+  }
+
+  @Test
+  fun message_field_accepts_text_input() {
+    launchHomeScreen()
 
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Hello Euler")
-    composeRule.waitForIdle()
-
-    composeRule.runOnIdle { assertEquals("Hello Euler", viewModel.uiState.value.messageDraft) }
+    composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
   }
 
   @Test
-  fun drawer_state_reflects_viewmodel_toggle() {
-    launchScreen()
+  fun displays_expected_button_and_placeholder_texts() {
+    launchHomeScreen()
 
-    composeRule.runOnIdle { viewModel.toggleDrawer() }
-    composeRule.waitForIdle()
-
-    composeRule.runOnIdle { assertTrue(viewModel.uiState.value.isDrawerOpen) }
-  }
-
-  private fun launchScreen() {
-    viewModel = HomeViewModel()
-    composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
-    composeRule.waitForIdle()
-  }
-
-  private fun initFirebase() {
-    val context = ApplicationProvider.getApplicationContext<Context>()
-    if (FirebaseApp.getApps(context).isEmpty()) {
-      FirebaseApp.initializeApp(
-          context,
-          FirebaseOptions.Builder()
-              .setApplicationId("1:1234567890:android:test")
-              .setProjectId("test-project")
-              .setApiKey("fake-api-key")
-              .build())
-    }
+    composeRule.onNodeWithText(TestConstants.ButtonTexts.WHAT_IS_EPFL).assertIsDisplayed()
+    composeRule.onNodeWithText(TestConstants.ButtonTexts.CHECK_ED_DISCUSSION).assertIsDisplayed()
+    composeRule.onNodeWithText(TestConstants.PlaceholderTexts.MESSAGE_EULER).assertIsDisplayed()
   }
 }

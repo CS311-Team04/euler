@@ -10,6 +10,8 @@ import com.android.sample.Chat.ChatUIModel
 import com.android.sample.conversations.AuthNotReadyException
 import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.MessageDTO
+import com.android.sample.llm.FirebaseFunctionsLlmClient
+import com.android.sample.llm.LlmClient
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
@@ -19,7 +21,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -47,7 +48,9 @@ import kotlinx.coroutines.withContext
  * - Listens to Firebase auth changes. • On sign-out → stop Firestore, clear UI, start a local empty
  *   chat. • On sign-in → attach Firestore, still show a local empty chat until first send.
  */
-class HomeViewModel : ViewModel() {
+class HomeViewModel(
+    private val llmClient: LlmClient = FirebaseFunctionsLlmClient(),
+) : ViewModel() {
 
   companion object {
     private const val TAG = "HomeViewModel"
@@ -74,6 +77,7 @@ class HomeViewModel : ViewModel() {
                       SystemItem(id = "drive", name = "EPFL Drive", isConnected = true),
                   ),
               messages = emptyList()))
+  /** Public, read-only UI state. */
   val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
   private val functions: FirebaseFunctions by lazy {
@@ -268,13 +272,15 @@ class HomeViewModel : ViewModel() {
 
   /**
    * Send flow. Guest: append user + AI messages locally. Signed-in: create convo on first send
-   * (with quick title), then persist messages; upgrade title once.
+   * (with quick title), then persist messages; upgrade title once. Send the current draft:
+   * - Guard against concurrent sends and blank drafts.
+   * - Append a USER message immediately so the UI feels responsive.
+   * - Call the shared [LlmClient] (Firebase/HTTP) on a background coroutine.
+   * - Append an AI message (or an error bubble) on completion.
    */
   fun sendMessage() {
     val current = _uiState.value
-    // ne pas lancer si déjà en envoi ou si un stream est en cours
     if (current.isSending || current.streamingMessageId != null) return
-
     val msg = current.messageDraft.trim()
     if (msg.isEmpty()) return
 
@@ -282,8 +288,6 @@ class HomeViewModel : ViewModel() {
     val userMsg =
         ChatUIModel(
             id = UUID.randomUUID().toString(), text = msg, timestamp = now, type = ChatType.USER)
-
-    // placeholder AI qui sera rempli en streaming
     val aiMessageId = UUID.randomUUID().toString()
     val placeholder =
         ChatUIModel(
@@ -358,11 +362,7 @@ class HomeViewModel : ViewModel() {
     activeStreamJob =
         viewModelScope.launch {
           try {
-            // on appelle la fonction côté IO (pas de vrai streaming réseau ici, on simule les
-            // chunks)
-            val reply = withContext(Dispatchers.IO) { callAnswerWithRag(question) }
-
-            // animer le texte en “chunks”
+            val reply = withContext(Dispatchers.IO) { llmClient.generateReply(question) }
             simulateStreamingFromText(messageId, reply)
 
             // si connecté → persister le message AI une fois le texte complet connu
@@ -439,16 +439,15 @@ class HomeViewModel : ViewModel() {
   }
 
   private suspend fun simulateStreamingFromText(messageId: String, fullText: String) {
-    withContext(Dispatchers.Default) {
-      val pattern = Regex("\\S+\\s*")
-      val parts = pattern.findAll(fullText).map { it.value }.toList().ifEmpty { listOf(fullText) }
-      for (chunk in parts) {
-        coroutineContext.ensureActive()
-        appendStreamingChunk(messageId, chunk)
-        delay(60)
-      }
-      markMessageFinished(messageId)
+    // Use current dispatcher instead of Dispatchers.Default to allow test control
+    val pattern = Regex("\\S+\\s*")
+    val parts = pattern.findAll(fullText).map { it.value }.toList().ifEmpty { listOf(fullText) }
+    for (chunk in parts) {
+      // delay() already checks for cancellation, so ensureActive() is not strictly necessary
+      appendStreamingChunk(messageId, chunk)
+      delay(60)
     }
+    markMessageFinished(messageId)
   }
 
   private suspend fun clearStreamingState(messageId: String) =
@@ -516,17 +515,6 @@ class HomeViewModel : ViewModel() {
   }
 
   // ============ BACKEND CHAT ============
-
-  /** Call Cloud Function `answerWithRagFn` and return the reply text. */
-  private suspend fun callAnswerWithRag(question: String): String =
-      withContext(Dispatchers.IO) {
-        val data = hashMapOf("question" to question)
-        val result = functions.getHttpsCallable("answerWithRagFn").call(data).await()
-
-        @Suppress("UNCHECKED_CAST")
-        val map = result.getData() as? Map<String, Any?> ?: return@withContext "Invalid response"
-        (map["reply"] as? String)?.ifBlank { null } ?: "No reply"
-      }
 
   // mapping MessageDTO -> UI
   private fun MessageDTO.toUi(): ChatUIModel =

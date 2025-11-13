@@ -294,9 +294,10 @@ fun HomeScreen(
                             // Voice chat button - opens voice visualizer
                             IconButton(
                                 onClick = {
-                                  speechHelper?.startListening { recognized ->
-                                    viewModel.updateMessageDraft(recognized)
-                                  }
+                                  speechHelper?.startListening(
+                                      onResult = { recognized ->
+                                        viewModel.updateMessageDraft(recognized)
+                                      })
                                 },
                                 enabled = speechHelper != null,
                                 modifier = Modifier.testTag(HomeTags.MicBtn)) {
