@@ -9,10 +9,9 @@ plugins {
     alias(libs.plugins.googleServices) apply false
 }
 
-// Apply Google Services only locally when the JSON is present (not on CI)
-val isCi = !System.getenv("CI").isNullOrEmpty()
+// Apply Google Services whenever the JSON is present (file can be provisioned on CI)
 val hasGoogleServicesJson = file("google-services.json").exists()
-if (!isCi && hasGoogleServicesJson) {
+if (hasGoogleServicesJson) {
     apply(plugin = libs.plugins.googleServices.get().pluginId)
 }
 
@@ -21,6 +20,17 @@ if (!isCi && hasGoogleServicesJson) {
  * quotes escaped. This helper normalises values coming from env/properties before we inject them.
  */
 fun quoteBuildConfig(value: String): String = "\"${value.replace("\"", "\\\"")}\""
+
+val localProperties = Properties().apply {
+    val propertiesFile = rootProject.file("local.properties")
+    if (propertiesFile.exists()) {
+        propertiesFile.inputStream().use { load(it) }
+    }
+}
+
+fun resolveConfigValue(key: String): String? =
+    localProperties.getProperty(key)?.trim().takeUnless { it.isNullOrEmpty() }
+        ?: System.getenv(key)?.trim().takeUnless { it.isNullOrEmpty() }
 
 val voiceChatOverrides = Properties().apply {
     val file = rootProject.file("voicechat.properties")
@@ -33,19 +43,38 @@ fun resolveVoiceChatOverride(key: String, fallback: String = ""): String =
     voiceChatOverrides.getProperty(key, fallback).trim()
 
 val llmHttpEndpoint: String =
-    System.getenv("LLM_HTTP_ENDPOINT")?.trim().orEmpty().ifEmpty {
+    resolveConfigValue("LLM_HTTP_ENDPOINT") ?: run {
         resolveVoiceChatOverride(
             "llm.httpEndpoint",
             "http://10.0.2.2:5002/euler-e8edb/us-central1/answerWithRagHttp")
     }
 val llmHttpApiKey: String =
-    System.getenv("LLM_HTTP_API_KEY")?.trim().orEmpty().ifEmpty {
-        resolveVoiceChatOverride("llm.httpApiKey")
-    }
+    resolveConfigValue("LLM_HTTP_API_KEY") ?: resolveVoiceChatOverride("llm.httpApiKey")
 
 android {
     namespace = "com.android.sample"
     compileSdk = 34
+
+    signingConfigs {
+        val releaseStoreFile = resolveConfigValue("RELEASE_STORE_FILE")
+        val releaseStorePassword = resolveConfigValue("RELEASE_STORE_PASSWORD")
+        val releaseKeyAlias = resolveConfigValue("RELEASE_KEY_ALIAS")
+        val releaseKeyPassword = resolveConfigValue("RELEASE_KEY_PASSWORD")
+
+        if (
+            releaseStoreFile != null &&
+                releaseStorePassword != null &&
+                releaseKeyAlias != null &&
+                releaseKeyPassword != null
+        ) {
+            create("release") {
+                storeFile = rootProject.file(releaseStoreFile)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "com.android.sample"
@@ -67,6 +96,7 @@ android {
 
     buildTypes {
         release {
+            signingConfigs.findByName("release")?.let { signingConfig = it }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
