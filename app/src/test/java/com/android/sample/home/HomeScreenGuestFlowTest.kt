@@ -33,6 +33,11 @@ class HomeScreenGuestFlowTest {
 
     // Assert drawer visible
     composeRule.onNodeWithText("Profile", useUnmergedTree = true).assertIsDisplayed()
+
+    // Close drawer via ViewModel + wait (Compose rule still observing same state)
+    composeRule.runOnIdle { viewModel.toggleDrawer() }
+    composeRule.waitForIdle()
+    composeRule.onAllNodesWithText("Profile", useUnmergedTree = true).assertCountEquals(0)
   }
 
   @Test
