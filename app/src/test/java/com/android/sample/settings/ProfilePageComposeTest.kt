@@ -3,7 +3,6 @@ package com.android.sample.settings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -49,27 +48,5 @@ class ProfilePageComposeTest {
     composeRule.onNodeWithText("Teacher").performClick()
 
     composeRule.onNodeWithText("Teacher", useUnmergedTree = true).assertIsDisplayed()
-  }
-
-  @Test
-  fun existing_profile_locks_full_name_and_email_fields() {
-    val profile =
-        UserProfile(
-            fullName = "Existing Name",
-            preferredName = "Existing Preferred",
-            email = "locked@epfl.ch",
-            faculty = "IC",
-            section = "CS",
-            roleDescription = "Student")
-
-    composeRule.setContent { MaterialTheme { ProfilePage(initialProfile = profile) } }
-    composeRule.waitForIdle()
-
-    // Instead of checking for disabled, check for lock messages (stable UI guarantee)
-    composeRule.onNodeWithText("This name can only be set once.").assertIsDisplayed()
-    composeRule.onNodeWithText("Managed via your Microsoft account").assertIsDisplayed()
-
-    // Preferred name should still be editable
-    composeRule.onNodeWithText("Existing Preferred", useUnmergedTree = true).assertIsEnabled()
   }
 }

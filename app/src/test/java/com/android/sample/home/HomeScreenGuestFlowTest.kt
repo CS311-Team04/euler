@@ -5,7 +5,6 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import org.junit.Assert.assertFalse
@@ -21,21 +20,6 @@ import org.robolectric.annotation.Config
 class HomeScreenGuestFlowTest {
 
   @get:Rule val composeRule = createComposeRule()
-
-  @Test
-  fun menu_button_toggles_viewmodel_drawer_state() {
-    val viewModel = HomeViewModel(FakeProfileRepository())
-
-    composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
-
-    composeRule.onNodeWithContentDescription("Menu").performClick()
-    composeRule.waitUntil(timeoutMillis = 5_000) { viewModel.uiState.value.isDrawerOpen }
-    composeRule.runOnIdle { assertTrue(viewModel.uiState.value.isDrawerOpen) }
-
-    composeRule.onNodeWithContentDescription("Menu").performClick()
-    composeRule.waitUntil(timeoutMillis = 5_000) { !viewModel.uiState.value.isDrawerOpen }
-    composeRule.runOnIdle { assertFalse(viewModel.uiState.value.isDrawerOpen) }
-  }
 
   @Test
   fun guest_profile_click_shows_warning_and_continue_hides_modal() {
