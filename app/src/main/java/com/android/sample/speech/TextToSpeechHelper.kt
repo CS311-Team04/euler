@@ -47,8 +47,17 @@ interface SpeechPlayback {
  * - Loudness and EQ processing to boost volume while attenuating hiss/crackle.
  * - Main-thread callback guarantees for start/done/error observers.
  */
-class TextToSpeechHelper(context: Context, private val preferredLocale: Locale = Locale.FRENCH) :
-    SpeechPlayback {
+class TextToSpeechHelper(
+    context: Context,
+    private val preferredLocale: Locale = Locale.FRENCH,
+    private val ttsFactory: (Context, TextToSpeech.OnInitListener) -> TextToSpeech =
+        { ctx, listener ->
+          TextToSpeech(ctx, listener)
+        },
+    private val equalizerFactory: (Int) -> Equalizer? = { sessionId ->
+      runCatching { Equalizer(0, sessionId) }.getOrNull()
+    },
+) : SpeechPlayback {
 
   private val appContext = context.applicationContext
   private val mainHandler = Handler(Looper.getMainLooper())
@@ -110,7 +119,7 @@ class TextToSpeechHelper(context: Context, private val preferredLocale: Locale =
 
   init {
     textToSpeech =
-        TextToSpeech(appContext) { status ->
+        ttsFactory(appContext) { status ->
           isReady =
               if (status == TextToSpeech.SUCCESS) {
                 val languageReady = selectLanguage()
@@ -394,25 +403,23 @@ class TextToSpeechHelper(context: Context, private val preferredLocale: Locale =
   /** Applies a gentle high-frequency cut and a small low-end reduction to soften artefacts. */
   private fun setupEqualizer(sessionId: Int) {
     releaseEqualizer()
+    val newEqualizer = equalizerFactory(sessionId) ?: return
     equalizer =
-        runCatching { Equalizer(0, sessionId) }
-            .onFailure { releaseEqualizer() }
-            .getOrNull()
-            ?.apply {
-              enabled = true
-              val bandRange = bandLevelRange
-              val trebleCut = (bandRange[0] / 2).coerceAtMost(0).toShort()
-              val bassCut = (bandRange[0] / 3).coerceAtMost(0).toShort()
-              val bands = numberOfBands.toInt()
-              for (band in 0 until bands) {
-                val centerHz = getCenterFreq(band.toShort()) / 1000
-                when {
-                  centerHz >= TREBLE_CUTOFF_HZ -> setBandLevel(band.toShort(), trebleCut)
-                  centerHz <= BASS_CUTOFF_HZ -> setBandLevel(band.toShort(), bassCut)
-                  else -> setBandLevel(band.toShort(), 0)
-                }
-              }
+        newEqualizer.apply {
+          enabled = true
+          val bandRange = bandLevelRange
+          val trebleCut = (bandRange[0] / 2).coerceAtMost(0).toShort()
+          val bassCut = (bandRange[0] / 3).coerceAtMost(0).toShort()
+          val bands = numberOfBands.toInt()
+          for (band in 0 until bands) {
+            val centerHz = getCenterFreq(band.toShort()) / 1000
+            when {
+              centerHz >= TREBLE_CUTOFF_HZ -> setBandLevel(band.toShort(), trebleCut)
+              centerHz <= BASS_CUTOFF_HZ -> setBandLevel(band.toShort(), bassCut)
+              else -> setBandLevel(band.toShort(), 0)
             }
+          }
+        }
   }
 
   /** Disposes the equalizer instance if one is currently attached to the audio session. */
