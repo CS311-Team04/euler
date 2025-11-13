@@ -34,4 +34,3 @@ firebase-debug.*.log
 
 # Node lockfiles (managed locally, not tracked)
 package-lock.json
-functions/package-lock.json
