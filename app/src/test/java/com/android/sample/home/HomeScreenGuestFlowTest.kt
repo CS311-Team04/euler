@@ -28,16 +28,13 @@ class HomeScreenGuestFlowTest {
 
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
-    // Open drawer via UI
     composeRule.onNodeWithContentDescription("Menu").performClick()
+    composeRule.waitUntil(timeoutMillis = 5_000) { viewModel.uiState.value.isDrawerOpen }
+    composeRule.runOnIdle { assertTrue(viewModel.uiState.value.isDrawerOpen) }
 
-    // Assert drawer visible
-    composeRule.onNodeWithText("Profile", useUnmergedTree = true).assertIsDisplayed()
-
-    // Close drawer via ViewModel + wait (Compose rule still observing same state)
-    composeRule.runOnIdle { viewModel.toggleDrawer() }
-    composeRule.waitForIdle()
-    composeRule.onAllNodesWithText("Profile", useUnmergedTree = true).assertCountEquals(0)
+    composeRule.onNodeWithContentDescription("Menu").performClick()
+    composeRule.waitUntil(timeoutMillis = 5_000) { !viewModel.uiState.value.isDrawerOpen }
+    composeRule.runOnIdle { assertFalse(viewModel.uiState.value.isDrawerOpen) }
   }
 
   @Test

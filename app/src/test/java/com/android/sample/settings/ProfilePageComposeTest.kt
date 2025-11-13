@@ -63,6 +63,7 @@ class ProfilePageComposeTest {
             roleDescription = "Student")
 
     composeRule.setContent { MaterialTheme { ProfilePage(initialProfile = profile) } }
+    composeRule.waitForIdle()
 
     // Instead of checking for disabled, check for lock messages (stable UI guarantee)
     composeRule.onNodeWithText("This name can only be set once.").assertIsDisplayed()
