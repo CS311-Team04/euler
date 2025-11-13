@@ -142,6 +142,7 @@ class HomeViewModel : ViewModel() {
         viewModelScope.launch {
           try {
             val bot = withContext(Dispatchers.IO) { callAnswerWithRag(question) }
+            simulateStreamingFromText(messageId, bot.reply)
             bot.url?.let { url ->
                 val meta = SourceMeta(
                     siteLabel = buildSiteLabel(url),
@@ -161,7 +162,7 @@ class HomeViewModel : ViewModel() {
                     )
                 }
             }
-            simulateStreamingFromText(messageId, bot.reply)
+
           } catch (ce: CancellationException) {
             if (!userCancelledStream) {
               setStreamingError(messageId, ce)

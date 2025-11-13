@@ -705,10 +705,10 @@ private fun SourceCard(
 ) {
     Column(
         modifier = Modifier
-            .fillMaxWidth(0.92f)
-            .clip(RoundedCornerShape(12.dp))
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
             .background(Color(0xFF1C1C1E))
-            .padding(10.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
         // Top line: “Retrieved from EPFL.ch Website”
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -716,17 +716,17 @@ private fun SourceCard(
                 imageVector = Icons.Default.CheckCircle,
                 contentDescription = null,
                 tint = Color(0xFF4CAF50),  // green tick
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(14.dp)
             )
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(4.dp))
             Text(
                 text = "Retrieved from  $siteLabel",
                 color = Color(0xFFBDBDBD),
-                style = MaterialTheme.typography.labelMedium
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp)
             )
         }
 
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(4.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -734,32 +734,34 @@ private fun SourceCard(
         ) {
             // Title (ellipsized to one line)
             Text(
-                text = title,
+                text = url,
                 color = Color.White,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
 
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(6.dp))
 
             Button(
                 onClick = onVisit,
-                shape = RoundedCornerShape(8.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(6.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))
             ) {
                 Text("Visit")
                 Spacer(Modifier.width(6.dp))
                 Icon(
                     imageVector = androidx.compose.material.icons.Icons.Outlined.OpenInNew,
-                    contentDescription = null
+                    contentDescription = null,
+                    modifier = Modifier.size(10.dp),
+                    tint = Color.White
                 )
             }
         }
 
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(2.dp))
 
         // Retrieved date
         val dateStr = remember(retrievedAt) {
@@ -770,7 +772,7 @@ private fun SourceCard(
         Text(
             text = "Retrieved on $dateStr",
             color = Color.Gray,
-            style = MaterialTheme.typography.labelSmall
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp)
         )
     }
 }
