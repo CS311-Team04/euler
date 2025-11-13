@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.android.sample.authentification.AuthProvider
+import com.android.sample.authentification.AuthProvider.MICROSOFT
 import com.android.sample.authentification.AuthUiState
 import com.android.sample.home.DrawerTags
 import com.android.sample.home.HomeTags
@@ -21,6 +22,8 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
 import java.util.concurrent.TimeUnit
+import kotlin.jvm.functions.Function0
+import kotlin.jvm.functions.Function1
 import kotlin.use
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.*
@@ -28,6 +31,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.Mockito
 import org.mockito.Mockito.mockConstruction
 import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.mock
@@ -392,6 +396,13 @@ class NavGraphLogicTest {
   }
 }
 
+@Suppress("UNCHECKED_CAST")
+private fun anyFunction0(): Function0<Unit> = Mockito.any(Function0::class.java) as Function0<Unit>
+
+@Suppress("UNCHECKED_CAST")
+private fun anyFunction1(): Function1<Exception, Unit> =
+    Mockito.any(Function1::class.java) as Function1<Exception, Unit>
+
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [31])
 class NavGraphComposeTest {
@@ -536,6 +547,40 @@ class NavGraphComposeTest {
         composeRule.onAllNodesWithText("Log out").fetchSemanticsNodes().isNotEmpty()
       }
       composeRule.onNodeWithText("Log out").assertIsDisplayed().performClick()
+
+      composeRule.waitUntil(timeoutMillis = TimeUnit.SECONDS.toMillis(6)) {
+        composeRule
+            .onAllNodesWithText("Continue with Microsoft Entra ID")
+            .fetchSemanticsNodes()
+            .isNotEmpty()
+      }
+      composeRule.onNodeWithText("Continue with Microsoft Entra ID").assertIsDisplayed()
+    }
+  }
+
+  @Test
+  fun appNav_opening_idle_navigates_to_sign_in() {
+    val speechHelper = mock<SpeechToTextHelper>()
+    val stateFlow = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
+
+    val construction =
+        mockConstruction(AuthViewModel::class.java) { mock, _ ->
+          whenever(mock.state).thenReturn(stateFlow)
+          doAnswer {}.whenever(mock).onMicrosoftLoginClick()
+          doAnswer {}.whenever(mock).onSwitchEduLoginClick()
+          doAnswer {}.whenever(mock).onAuthenticationSuccess()
+          doAnswer {}.whenever(mock).onAuthenticationError(org.mockito.kotlin.any())
+          doAnswer {}.whenever(mock).signOut()
+        }
+
+    construction.use {
+      composeRule.setContent {
+        MaterialTheme {
+          AppNav(startOnSignedIn = false, activity = activity, speechHelper = speechHelper)
+        }
+      }
+
+      composeRule.mainClock.advanceTimeBy(3_000)
 
       composeRule.waitUntil(timeoutMillis = TimeUnit.SECONDS.toMillis(6)) {
         composeRule

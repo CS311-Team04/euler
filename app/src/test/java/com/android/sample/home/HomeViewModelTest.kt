@@ -539,6 +539,36 @@ class HomeViewModelTest {
       }
 
   @Test
+  fun auth_listener_sign_in_triggers_startData() =
+      runTest(dispatcher) {
+        val viewModel = HomeViewModel()
+
+        val repo = mock<ConversationRepository>()
+        val conversationsFlow = MutableSharedFlow<List<Conversation>>(replay = 1)
+        whenever(repo.conversationsFlow()).thenReturn(conversationsFlow)
+        whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
+        viewModel.setPrivateField("repo", repo)
+
+        viewModel.setPrivateField("lastUid", null)
+
+        val listenerField = HomeViewModel::class.java.getDeclaredField("authListener")
+        listenerField.isAccessible = true
+        val listener = listenerField.get(viewModel) as FirebaseAuth.AuthStateListener
+
+        val signedInAuth = mock<FirebaseAuth>()
+        val user = mock<FirebaseUser>()
+        whenever(signedInAuth.currentUser).thenReturn(user)
+        whenever(user.uid).thenReturn("user-789")
+        viewModel.setPrivateField("auth", signedInAuth)
+
+        listener.onAuthStateChanged(signedInAuth)
+        advanceUntilIdle()
+
+        runBlocking { verify(repo, timeout(1_000)).conversationsFlow() }
+        assertTrue(viewModel.uiState.value.messages.isEmpty())
+      }
+
+  @Test
   fun sendMessage_signedIn_createsConversation_and_updates_title() =
       runTest(dispatcher) {
         val viewModel = HomeViewModel()
