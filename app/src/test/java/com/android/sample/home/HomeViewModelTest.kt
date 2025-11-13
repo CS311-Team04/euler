@@ -2,11 +2,13 @@ package com.android.sample.home
 
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
+import com.android.sample.profile.UserProfile
 import com.android.sample.util.MainDispatcherRule
 import java.util.UUID
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Rule
@@ -33,6 +35,143 @@ class HomeViewModelTest {
         }
     stateFlow.value = current.copy(messages = messages)
   }
+
+  private fun HomeViewModel.setUserNameForTest(name: String) {
+    val field = HomeViewModel::class.java.getDeclaredField("_uiState")
+    field.isAccessible = true
+    @Suppress("UNCHECKED_CAST") val stateFlow = field.get(this) as MutableStateFlow<HomeUiState>
+    val current = stateFlow.value
+    stateFlow.value = current.copy(userName = name)
+  }
+
+  @Test
+  fun setGuestMode_true_sets_guest_state() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel()
+
+        viewModel.setGuestMode(true)
+
+        val state = viewModel.uiState.value
+        assertTrue(state.isGuest)
+        assertEquals("guest", state.userName)
+        assertNull(state.profile)
+        assertFalse(state.showGuestProfileWarning)
+      }
+
+  @Test
+  fun setGuestMode_false_restores_default_name_when_blank() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel()
+        viewModel.setUserNameForTest("")
+        viewModel.setGuestMode(false)
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isGuest)
+        assertEquals("Student", state.userName)
+      }
+
+  @Test
+  fun refreshProfile_updates_state_from_repository() =
+      runTest(testDispatcher) {
+        val repo = FakeProfileRepository()
+        val profile =
+            UserProfile(
+                fullName = "Jane Doe",
+                preferredName = "JD",
+                faculty = "IC",
+                section = "CS",
+                email = "jane@epfl.ch",
+                phone = "+41 79 123 45 67",
+                roleDescription = "Student")
+        repo.savedProfile = profile
+        val viewModel = HomeViewModel(repo)
+
+        viewModel.refreshProfile()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(profile, state.profile)
+        assertEquals("JD", state.userName)
+        assertFalse(state.isGuest)
+      }
+
+  @Test
+  fun refreshProfile_with_null_profile_keeps_defaults() =
+      runTest(testDispatcher) {
+        val repo = FakeProfileRepository()
+        val viewModel = HomeViewModel(repo)
+        viewModel.setUserNameForTest("")
+
+        viewModel.refreshProfile()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNull(state.profile)
+        assertEquals("Student", state.userName)
+        assertFalse(state.isGuest)
+      }
+
+  @Test
+  fun saveProfile_persists_and_updates_ui_state() =
+      runTest(testDispatcher) {
+        val repo = FakeProfileRepository()
+        val viewModel = HomeViewModel(repo)
+        val profile =
+            UserProfile(
+                fullName = "Alice Example",
+                preferredName = "Alice",
+                faculty = "SV",
+                section = "Bio",
+                email = "alice@epfl.ch",
+                phone = "+41 79 765 43 21",
+                roleDescription = "PhD")
+
+        viewModel.saveProfile(profile)
+        advanceUntilIdle()
+
+        assertEquals(profile, repo.savedProfile)
+        val state = viewModel.uiState.value
+        assertEquals(profile, state.profile)
+        assertEquals("Alice", state.userName)
+        assertFalse(state.isGuest)
+      }
+
+  @Test
+  fun clearProfile_resets_profile_and_guest_flags() =
+      runTest(testDispatcher) {
+        val repo = FakeProfileRepository()
+        val viewModel = HomeViewModel(repo)
+        val profile =
+            UserProfile(
+                fullName = "Bob Example",
+                preferredName = "Bob",
+                email = "bob@epfl.ch",
+                roleDescription = "Staff")
+
+        viewModel.saveProfile(profile)
+        advanceUntilIdle()
+        viewModel.setGuestMode(true)
+
+        viewModel.clearProfile()
+
+        val state = viewModel.uiState.value
+        assertNull(state.profile)
+        assertEquals("Student", state.userName)
+        assertFalse(state.isGuest)
+        assertFalse(state.showGuestProfileWarning)
+      }
+
+  @Test
+  fun guest_profile_warning_visiblity_toggles_correctly() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel()
+
+        viewModel.showGuestProfileWarning()
+        assertTrue(viewModel.uiState.value.showGuestProfileWarning)
+
+        viewModel.hideGuestProfileWarning()
+        assertFalse(viewModel.uiState.value.showGuestProfileWarning)
+      }
 
   @Test
   fun clearChat_empties_messages() =
