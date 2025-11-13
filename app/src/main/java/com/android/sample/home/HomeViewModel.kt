@@ -78,10 +78,7 @@ class HomeViewModel(
     if (isGuest) {
       _uiState.value =
           _uiState.value.copy(
-              isGuest = true,
-              profile = null,
-              userName = "guest",
-              showGuestProfileWarning = false)
+              isGuest = true, profile = null, userName = "guest", showGuestProfileWarning = false)
     } else {
       _uiState.value =
           _uiState.value.copy(
@@ -99,9 +96,9 @@ class HomeViewModel(
               _uiState.value.copy(
                   profile = profile,
                   userName =
-                      profile.preferredName.ifBlank { profile.fullName }.ifBlank {
-                        DEFAULT_USER_NAME
-                      },
+                      profile.preferredName
+                          .ifBlank { profile.fullName }
+                          .ifBlank { DEFAULT_USER_NAME },
                   isGuest = false)
             } else {
               _uiState.value.copy(
@@ -124,9 +121,9 @@ class HomeViewModel(
             _uiState.value.copy(
                 profile = profile,
                 userName =
-                    profile.preferredName.ifBlank { profile.fullName }.ifBlank {
-                      DEFAULT_USER_NAME
-                    },
+                    profile.preferredName
+                        .ifBlank { profile.fullName }
+                        .ifBlank { DEFAULT_USER_NAME },
                 isGuest = false)
       } catch (t: Throwable) {
         Log.e("HomeViewModel", "Failed to save profile", t)

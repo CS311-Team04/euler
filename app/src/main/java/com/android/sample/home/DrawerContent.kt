@@ -41,8 +41,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import java.util.Locale
 import com.android.sample.R
+import java.util.Locale
 
 object DrawerTags {
   const val Root = "drawer_root"
@@ -181,48 +181,45 @@ fun DrawerContent(
         val displayName = formatUserName(ui.userName)
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier =
-                Modifier.fillMaxWidth()
-                    .alpha(if (ui.isGuest) 0.4f else 1f)) {
-          Box(
-              modifier =
-                  Modifier.size(36.dp)
-                      .clip(CircleShape)
-                      .background(Color(0xFF2A2A2A))
-                      .clickable {
-                        if (ui.isGuest) {
-                          onProfileDisabledClick()
-                        } else {
-                          onProfileClick()
-                        }
-                      },
-              contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.Person, contentDescription = null, tint = Color.White)
-              }
-          Spacer(Modifier.width(12.dp))
-          Text(
-              displayName,
-              color = Color.White,
-              fontSize = 16.sp,
-              fontWeight = FontWeight.Normal,
-              modifier =
-                  Modifier.weight(1f)
-                      .clickable {
+            modifier = Modifier.fillMaxWidth().alpha(if (ui.isGuest) 0.4f else 1f)) {
+              Box(
+                  modifier =
+                      Modifier.size(36.dp)
+                          .clip(CircleShape)
+                          .background(Color(0xFF2A2A2A))
+                          .clickable {
+                            if (ui.isGuest) {
+                              onProfileDisabledClick()
+                            } else {
+                              onProfileClick()
+                            }
+                          },
+                  contentAlignment = Alignment.Center) {
+                    Icon(Icons.Filled.Person, contentDescription = null, tint = Color.White)
+                  }
+              Spacer(Modifier.width(12.dp))
+              Text(
+                  displayName,
+                  color = Color.White,
+                  fontSize = 16.sp,
+                  fontWeight = FontWeight.Normal,
+                  modifier =
+                      Modifier.weight(1f).clickable {
                         if (ui.isGuest) {
                           onProfileDisabledClick()
                         } else {
                           onProfileClick()
                         }
                       })
-          Icon(
-              Icons.Filled.Settings,
-              contentDescription = "Settings",
-              tint = Color.White,
-              modifier =
-                  Modifier.size(20.dp)
-                      .clickable { onSettingsClick() }
-                      .testTag(DrawerTags.UserSettings))
-        }
+              Icon(
+                  Icons.Filled.Settings,
+                  contentDescription = "Settings",
+                  tint = Color.White,
+                  modifier =
+                      Modifier.size(20.dp)
+                          .clickable { onSettingsClick() }
+                          .testTag(DrawerTags.UserSettings))
+            }
         Spacer(Modifier.height(12.dp))
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -235,13 +232,11 @@ fun DrawerContent(
 private fun formatUserName(raw: String): String {
   val trimmed = raw.trim()
   if (trimmed.isEmpty()) return "Student"
-  return trimmed
-      .split("\\s+".toRegex())
-      .joinToString(" ") { word ->
-        word.replaceFirstChar { ch ->
-          if (ch.isLowerCase()) ch.titlecase(Locale.getDefault()) else ch.toString()
-        }
-      }
+  return trimmed.split("\\s+".toRegex()).joinToString(" ") { word ->
+    word.replaceFirstChar { ch ->
+      if (ch.isLowerCase()) ch.titlecase(Locale.getDefault()) else ch.toString()
+    }
+  }
 }
 
 @Composable

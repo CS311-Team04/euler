@@ -1,6 +1,5 @@
 package com.android.sample.ui.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,7 +14,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -35,10 +33,7 @@ fun GuestProfileWarningModal(onContinueAsGuest: () -> Unit, onLogin: () -> Unit)
               .clickable(onClick = onContinueAsGuest),
       contentAlignment = Alignment.Center) {
         Card(
-            modifier =
-                Modifier.wrapContentWidth()
-                    .width(280.dp)
-                    .padding(16.dp),
+            modifier = Modifier.wrapContentWidth().width(280.dp).padding(16.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
             shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)) {
               Column(
@@ -83,11 +78,11 @@ fun GuestProfileWarningModal(onContinueAsGuest: () -> Unit, onLogin: () -> Unit)
                               contentPadding =
                                   androidx.compose.foundation.layout.PaddingValues(
                                       horizontal = 16.dp, vertical = 12.dp)) {
-                                Text("Log in now", color = Color.White, fontWeight = FontWeight.Bold)
+                                Text(
+                                    "Log in now", color = Color.White, fontWeight = FontWeight.Bold)
                               }
                         }
                   }
             }
       }
 }
-

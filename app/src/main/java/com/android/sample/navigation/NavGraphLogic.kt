@@ -68,7 +68,6 @@ fun isSignedInState(authState: AuthUiState): Boolean {
   return authState is AuthUiState.SignedIn
 }
 
-
 /**
  * Checks if the authentication state is idle
  *

@@ -520,7 +520,6 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
       }
 }
 
-
 /**
  * Small inline indicator shown while awaiting an AI reply. Driven by HomeUiState.isSending and
  * rendered after the last message in the list.

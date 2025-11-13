@@ -15,21 +15,28 @@ class ProfileFormManager(
 ) {
   var fullName by mutableStateOf("")
     private set
+
   var username by mutableStateOf("")
     private set
+
   var role by mutableStateOf("")
     private set
+
   var faculty by mutableStateOf("")
     private set
+
   var section by mutableStateOf("")
     private set
+
   var email by mutableStateOf("")
     private set
+
   var phone by mutableStateOf("")
     private set
 
   var isFullNameLocked by mutableStateOf(false)
     private set
+
   var isEmailLocked by mutableStateOf(false)
     private set
 
@@ -134,4 +141,3 @@ class ProfileFormManager(
         roleDescription = sanitizedRole)
   }
 }
-

@@ -110,4 +110,3 @@ class ProfilePageTests {
     assertEquals("", manager.email)
   }
 }
-

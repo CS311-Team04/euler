@@ -10,7 +10,6 @@ import kotlinx.coroutines.tasks.await
  * Firestore access layer for reading and writing the authenticated user's profile information.
  *
  * Firestore structure created/used by this repository:
- *
  * ```
  * users (collection)
  *   └── {uid} (document)
@@ -52,8 +51,8 @@ class UserProfileRepository(
   }
 
   /**
-   * Retrieve the stored profile for the currently signed-in user. Returns `null` when no profile has
-   * been saved yet.
+   * Retrieve the stored profile for the currently signed-in user. Returns `null` when no profile
+   * has been saved yet.
    */
   suspend fun loadProfile(): UserProfile? {
     val uid =
@@ -106,4 +105,3 @@ data class UserProfile(
             roleDescription = map["roleDescription"] as? String ?: "")
   }
 }
-

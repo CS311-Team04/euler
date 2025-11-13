@@ -25,12 +25,11 @@ import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -46,15 +45,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.firebase.auth.FirebaseAuth
 import com.android.sample.profile.UserProfile
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 
 @Composable
@@ -69,10 +66,9 @@ fun ProfilePage(
   val textSecondary = Color(0xFF9E9E9E)
   val accent = Color(0xFFEB5757)
 
-  val authEmail =
-      remember {
-        runCatching { FirebaseAuth.getInstance().currentUser?.email.orEmpty() }.getOrDefault("")
-      }
+  val authEmail = remember {
+    runCatching { FirebaseAuth.getInstance().currentUser?.email.orEmpty() }.getOrDefault("")
+  }
 
   val formManager = remember { ProfileFormManager(authEmail, initialProfile) }
   var showSavedConfirmation by remember { mutableStateOf(false) }
@@ -92,31 +88,29 @@ fun ProfilePage(
             Modifier.fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 16.dp)) {
-          Row(
-              modifier = Modifier.fillMaxWidth(),
-              verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBackClick) {
-                  Icon(
-                      imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                      contentDescription = "Back",
-                      tint = textPrimary)
+          Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBackClick) {
+              Icon(
+                  imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                  contentDescription = "Back",
+                  tint = textPrimary)
+            }
+            Text(
+                text = "Profile",
+                color = textPrimary,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Center)
+            TextButton(
+                onClick = {
+                  val formState = formManager.buildSanitizedProfile()
+                  onSaveProfile(formState)
+                  showSavedConfirmation = true
+                }) {
+                  Text(text = "Save", color = textPrimary)
                 }
-                Text(
-                    text = "Profile",
-                    color = textPrimary,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center)
-                TextButton(
-                    onClick = {
-                      val formState = formManager.buildSanitizedProfile()
-                      onSaveProfile(formState)
-                      showSavedConfirmation = true
-                    }) {
-                      Text(text = "Save", color = textPrimary)
-                    }
-              }
+          }
 
           Spacer(modifier = Modifier.height(12.dp))
 
@@ -253,7 +247,6 @@ private data class ProfileFieldState(
     val showSupportingTextWhenNotBlank: Boolean = false
 )
 
-
 @Composable
 private fun EditableInfoSection(
     title: String,
@@ -322,8 +315,7 @@ private fun EditableInfoRow(
             }
 
         if (field.options != null) {
-          var expanded by
-              rememberSaveable(field.definition.label) { mutableStateOf(false) }
+          var expanded by rememberSaveable(field.definition.label) { mutableStateOf(false) }
           val displayText =
               if (field.value.isNotBlank()) field.value else field.definition.placeholder
           val displayColor =
@@ -345,7 +337,8 @@ private fun EditableInfoRow(
               color = Color(0xFF161616),
               shape = RoundedCornerShape(12.dp)) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                    modifier =
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween) {
                       Text(text = displayText, color = displayColor, fontSize = 15.sp)
@@ -424,6 +417,3 @@ private fun ProfileTextField(
               disabledPlaceholderColor = placeholderColor),
       shape = RoundedCornerShape(12.dp))
 }
-
-
-
