@@ -91,11 +91,20 @@ fun HomeScreen(
     onSettingsClick: () -> Unit = {},
     onVoiceChatClick: () -> Unit = {},
     openDrawerOnStart: Boolean = false,
-    speechHelper: com.android.sample.speech.SpeechToTextHelper? = null
+    speechHelper: com.android.sample.speech.SpeechToTextHelper? = null,
+    forceNewChatOnFirstOpen: Boolean = false
 ) {
   val ui by viewModel.uiState.collectAsState()
   val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
   val scope = rememberCoroutineScope()
+
+  val ranNewChatOnce = remember { mutableStateOf(false) }
+  LaunchedEffect(forceNewChatOnFirstOpen) {
+    if (forceNewChatOnFirstOpen && !ranNewChatOnce.value) {
+      ranNewChatOnce.value = true
+      viewModel.startLocalNewChat()
+    }
+  }
 
   // Synchronize ViewModel state <-> Drawer component
   LaunchedEffect(ui.isDrawerOpen) {
@@ -121,11 +130,11 @@ fun HomeScreen(
             ui = ui,
             onToggleSystem = { id -> viewModel.toggleSystemConnection(id) },
             onSignOut = {
-              // TODO: connect your actual sign-out
-              // Close drawer visually + sync VM
-              scope.launch { drawerState.close() }
-              if (ui.isDrawerOpen) viewModel.toggleDrawer()
-              onSignOut()
+              scope.launch {
+                drawerState.close()
+                if (ui.isDrawerOpen) viewModel.toggleDrawer()
+                onSignOut()
+              }
             },
             onSettingsClick = {
               scope.launch { drawerState.close() }
@@ -135,6 +144,20 @@ fun HomeScreen(
             onClose = {
               scope.launch { drawerState.close() }
               if (ui.isDrawerOpen) viewModel.toggleDrawer()
+            },
+            onNewChat = {
+              scope.launch {
+                drawerState.close()
+                if (ui.isDrawerOpen) viewModel.toggleDrawer()
+                viewModel.startLocalNewChat()
+              }
+            },
+            onPickConversation = { cid ->
+              scope.launch {
+                viewModel.selectConversation(cid)
+                drawerState.close()
+                if (ui.isDrawerOpen) viewModel.toggleDrawer()
+              }
             })
       }) {
         Scaffold(
@@ -181,9 +204,12 @@ fun HomeScreen(
                         expanded = ui.isTopRightOpen,
                         onDismissRequest = { viewModel.setTopRightOpen(false) },
                         modifier = Modifier.testTag(HomeTags.TopRightMenu)) {
-                          TopRightPanelPlaceholder(
-                              onDismiss = { viewModel.setTopRightOpen(false) },
-                              onDeleteClick = { viewModel.showDeleteConfirmation() })
+                          DropdownMenuItem(
+                              text = { Text("Delete current chat") },
+                              onClick = {
+                                viewModel.setTopRightOpen(false)
+                                viewModel.showDeleteConfirmation()
+                              })
                         }
                   },
                   colors =
@@ -275,9 +301,10 @@ fun HomeScreen(
                             // Voice chat button - opens voice visualizer
                             IconButton(
                                 onClick = {
-                                  speechHelper?.startListening { recognized ->
-                                    viewModel.updateMessageDraft(recognized)
-                                  }
+                                  speechHelper?.startListening(
+                                      onResult = { recognized ->
+                                        viewModel.updateMessageDraft(recognized)
+                                      })
                                 },
                                 enabled = speechHelper != null,
                                 modifier = Modifier.testTag(HomeTags.MicBtn)) {
@@ -424,10 +451,7 @@ fun HomeScreen(
       exit = fadeOut(tween(200)),
       modifier = Modifier.fillMaxSize()) {
         DeleteConfirmationModal(
-            onConfirm = {
-              viewModel.clearChat()
-              viewModel.hideDeleteConfirmation()
-            },
+            onConfirm = { viewModel.deleteCurrentConversation() },
             onCancel = { viewModel.hideDeleteConfirmation() })
       }
 }
@@ -446,19 +470,6 @@ private fun SuggestionChip(text: String, modifier: Modifier = Modifier, onClick:
               Text(text = text, color = Color.White, fontSize = 14.sp)
             }
       }
-}
-
-/* ----- Placeholders for external components (drawer + top-right panel) ----- */
-
-@Composable
-private fun TopRightPanelPlaceholder(onDismiss: () -> Unit, onDeleteClick: () -> Unit) {
-  DropdownMenuItem(text = { Text("Share") }, onClick = onDismiss)
-  DropdownMenuItem(
-      text = { Text("Delete") },
-      onClick = {
-        onDeleteClick()
-        onDismiss()
-      })
 }
 
 /**

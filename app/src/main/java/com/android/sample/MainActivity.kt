@@ -7,9 +7,10 @@ import com.android.sample.navigation.AppNav
 import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.ui.theme.SampleAppTheme
 import com.google.firebase.FirebaseApp
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
-  private val speechHelper by lazy { SpeechToTextHelper(this, this) }
+  private val speechHelper by lazy { SpeechToTextHelper(this, this, Locale("fr", "FR")) }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -28,5 +29,10 @@ class MainActivity : ComponentActivity() {
         AppNav(startOnSignedIn = false, activity = this@MainActivity, speechHelper = speechHelper)
       }
     }
+  }
+
+  override fun onDestroy() {
+    super.onDestroy()
+    speechHelper.destroy()
   }
 }

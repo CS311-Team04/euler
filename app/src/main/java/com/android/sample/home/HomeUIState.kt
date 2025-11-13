@@ -17,7 +17,9 @@ data class HomeUiState(
     val isTopRightOpen: Boolean = false,
     val isLoading: Boolean = false,
     val showDeleteConfirmation: Boolean = false,
-    val isSending: Boolean = false
+    val isSending: Boolean = false,
+    val conversations: List<com.android.sample.conversations.Conversation> = emptyList(),
+    val currentConversationId: String? = null
 )
 
 /** Represents an EPFL system (e.g., IS-Academia, Moodle, Drive) and its connection state. */

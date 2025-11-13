@@ -61,6 +61,34 @@ export async function apertusChatFnCore({
 }
 
 /* =========================================================
+ *            GENERATE CONVERSATION TITLE (Apertus)
+ * ======================================================= */
+type GenerateTitleInput = { question: string; model?: string };
+
+export async function generateTitleCore({ question, model }: GenerateTitleInput) {
+  const prompt = [
+    "Generate a concise conversation title (4-5 words max, no trailing punctuation).",
+    `User's first question: "${question.trim()}"`,
+    "Return ONLY the title.",
+  ].join("\n");
+
+  // reuse the same Apertus client
+  const { reply } = await apertusChatFnCore({
+    messages: [{ role: "user", content: prompt }],
+    model,
+    temperature: 0.2,
+  });
+
+  const title = (reply || "")
+    .replace(/\s+/g, " ")
+    .replace(/^["'“”]+|["'“”]+$/g, "")
+    .trim()
+    .slice(0, 60);
+
+  return { title: title || "New conversation" };
+}
+
+/* =========================================================
  *                   QDRANT HELPERS
  * ======================================================= */
 // named dense vector to match hybrid collection schema
@@ -441,4 +469,11 @@ export const answerWithRagHttp = functions.https.onRequest(async (req, res) => {
   } catch (e: any) {
     res.status(e.code === 401 ? 401 : 400).json({ error: String(e) });
   }
+});
+
+export const generateTitleFn = functions.https.onCall(async (data: GenerateTitleInput) => {
+  const q = String(data?.question || "").trim();
+  const model = data?.model;
+  if (!q) throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
+  return await generateTitleCore({ question: q, model });
 });

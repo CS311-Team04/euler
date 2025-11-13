@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsKotlinAndroid)
@@ -13,6 +15,33 @@ val hasGoogleServicesJson = file("google-services.json").exists()
 if (!isCi && hasGoogleServicesJson) {
     apply(plugin = libs.plugins.googleServices.get().pluginId)
 }
+
+/**
+ * Gradle's `buildConfigField` expects string literals to be wrapped in quotes and have any embedded
+ * quotes escaped. This helper normalises values coming from env/properties before we inject them.
+ */
+fun quoteBuildConfig(value: String): String = "\"${value.replace("\"", "\\\"")}\""
+
+val voiceChatOverrides = Properties().apply {
+    val file = rootProject.file("voicechat.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
+}
+
+fun resolveVoiceChatOverride(key: String, fallback: String = ""): String =
+    voiceChatOverrides.getProperty(key, fallback).trim()
+
+val llmHttpEndpoint: String =
+    System.getenv("LLM_HTTP_ENDPOINT")?.trim().orEmpty().ifEmpty {
+        resolveVoiceChatOverride(
+            "llm.httpEndpoint",
+            "http://10.0.2.2:5002/euler-e8edb/us-central1/answerWithRagHttp")
+    }
+val llmHttpApiKey: String =
+    System.getenv("LLM_HTTP_API_KEY")?.trim().orEmpty().ifEmpty {
+        resolveVoiceChatOverride("llm.httpApiKey")
+    }
 
 android {
     namespace = "com.android.sample"
@@ -32,11 +61,18 @@ android {
         buildConfigField ("String", "FUNCTIONS_HOST", "\"10.0.2.2\"")
         buildConfigField ("int",    "FUNCTIONS_PORT", "5002")
         buildConfigField ("boolean","USE_FUNCTIONS_EMULATOR", "true")
+        buildConfigField("String", "LLM_HTTP_ENDPOINT", quoteBuildConfig(llmHttpEndpoint))
+        buildConfigField("String", "LLM_HTTP_API_KEY", quoteBuildConfig(llmHttpApiKey))
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
 
         debug {
@@ -90,8 +126,8 @@ android {
         }
     }
 
-    // Correctif JaCoCo : exclure les libs du SDK et BouncyCastle
-    // pour éviter les erreurs d'instrumentation pendant les tests
+    // JaCoCo fix: exclude SDK and BouncyCastle libraries
+    // to avoid instrumentation errors during tests
     tasks.withType<Test> {
         configure<JacocoTaskExtension> {
             isIncludeNoLocationClasses = true
@@ -146,6 +182,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(platform(libs.compose.bom))
     testImplementation(libs.junit)
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     globalTestImplementation(libs.androidx.junit)
     globalTestImplementation(libs.androidx.espresso.core)
 
@@ -182,12 +219,18 @@ dependencies {
     testImplementation(libs.robolectric)
 
     // ----------       Mockito         ------------
+    testImplementation(libs.mockito.core)
+    testImplementation(libs.mockk)
     androidTestImplementation("org.mockito:mockito-android:5.8.0")
     androidTestImplementation("org.mockito:mockito-core:5.8.0")
+    testImplementation("org.mockito:mockito-inline:4.11.0")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:4.1.0")
+    androidTestImplementation("org.mockito:mockito-android:4.11.0")
+    androidTestImplementation("org.mockito:mockito-core:4.11.0")
 
     implementation("com.microsoft.identity.client:msal:6.0.1")
 
-    // --- Dépendances de sécurité manquantes requises par MSAL ---
+    // --- Additional security dependencies required by MSAL ---
     implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
     implementation("com.google.crypto.tink:tink-android:1.12.0")
@@ -197,6 +240,9 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.compose.ui:ui-tooling-preview")
+
+    // Networking for HTTP clients (LLM access, etc.)
+    implementation(libs.okhttp)
 
 }
 
