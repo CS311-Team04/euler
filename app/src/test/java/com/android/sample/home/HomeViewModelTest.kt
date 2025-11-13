@@ -2,11 +2,15 @@ package com.android.sample.home
 
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
+import com.android.sample.llm.FakeLlmClient
 import com.android.sample.util.MainDispatcherRule
 import java.util.UUID
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Rule
@@ -33,9 +37,134 @@ class HomeViewModelTest {
   }
 
   @Test
+  fun sendMessage_success_updates_state() =
+      runTest(UnconfinedTestDispatcher()) {
+        val fakeClient = FakeLlmClient().apply { nextReply = "Bonjour" }
+        val viewModel = HomeViewModel(fakeClient)
+
+        viewModel.updateMessageDraft("Salut ?")
+        viewModel.sendMessage()
+
+        // Wait for streaming to complete - simulateStreamingFromText uses Dispatchers.Default
+        // which is not controlled by test dispatcher, so we need to wait for real completion
+        var attempts = 0
+        while ((viewModel.uiState.value.streamingMessageId != null ||
+            viewModel.uiState.value.isSending) && attempts < 500) {
+          delay(20) // Small real delay since we can't control Dispatchers.Default
+          attempts++
+        }
+
+        val state = viewModel.uiState.value
+        assertTrue(state.messages.any { it.type == ChatType.USER && it.text == "Salut ?" })
+        val aiMessage = state.messages.find { it.type == ChatType.AI }
+        assertNotNull("AI message should be present", aiMessage)
+        assertTrue("AI message should contain 'Bonjour'", aiMessage!!.text.contains("Bonjour"))
+        assertFalse("isSending should be false", state.isSending)
+        assertNull("streamingMessageId should be null", state.streamingMessageId)
+      }
+
+  @Test
+  fun sendMessage_with_error_shows_error_message() =
+      runTest(UnconfinedTestDispatcher()) {
+        val fakeClient = FakeLlmClient().apply { failure = IllegalStateException("Network error") }
+        val viewModel = HomeViewModel(fakeClient)
+
+        viewModel.updateMessageDraft("Test")
+        viewModel.sendMessage()
+
+        var attempts = 0
+        while ((viewModel.uiState.value.streamingMessageId != null ||
+            viewModel.uiState.value.isSending) && attempts < 200) {
+          delay(10)
+          attempts++
+        }
+
+        val state = viewModel.uiState.value
+        assertTrue(state.messages.any { it.type == ChatType.USER && it.text == "Test" })
+        val aiMessage = state.messages.find { it.type == ChatType.AI }
+        assertNotNull(aiMessage)
+        assertTrue(
+            aiMessage!!.text.contains("Erreur") ||
+                aiMessage.text.contains("error", ignoreCase = true))
+        assertFalse(state.isSending)
+        assertNull(state.streamingMessageId)
+      }
+
+  @Test
+  fun sendMessage_with_error_null_message_shows_default_error() =
+      runTest(UnconfinedTestDispatcher()) {
+        val fakeClient = FakeLlmClient().apply { failure = Exception() }
+        val viewModel = HomeViewModel(fakeClient)
+
+        viewModel.updateMessageDraft("Test")
+        viewModel.sendMessage()
+
+        var attempts = 0
+        while ((viewModel.uiState.value.streamingMessageId != null ||
+            viewModel.uiState.value.isSending) && attempts < 200) {
+          delay(10)
+          attempts++
+        }
+
+        val state = viewModel.uiState.value
+        assertTrue(state.messages.any { it.type == ChatType.USER && it.text == "Test" })
+        val aiMessage = state.messages.find { it.type == ChatType.AI }
+        assertNotNull(aiMessage)
+        assertTrue(aiMessage!!.text.contains("request failed") || aiMessage.text.contains("Erreur"))
+        assertFalse(state.isSending)
+        assertNull(state.streamingMessageId)
+      }
+
+  @Test
+  fun sendMessage_with_concurrent_send_ignores_second() =
+      runTest(UnconfinedTestDispatcher()) {
+        val fakeClient = FakeLlmClient().apply { nextReply = "Reply" }
+        val viewModel = HomeViewModel(fakeClient)
+
+        viewModel.updateMessageDraft("First")
+        viewModel.sendMessage()
+
+        // Check that isSending is true immediately after first send
+        assertTrue(
+            viewModel.uiState.value.isSending || viewModel.uiState.value.streamingMessageId != null)
+
+        // Try to send again immediately (should be ignored because isSending/streaming is active)
+        viewModel.updateMessageDraft("Second")
+        viewModel.sendMessage()
+
+        var attempts = 0
+        while ((viewModel.uiState.value.streamingMessageId != null ||
+            viewModel.uiState.value.isSending) && attempts < 200) {
+          delay(10)
+          attempts++
+        }
+
+        val state = viewModel.uiState.value
+        // Only first message should be sent
+        assertEquals(1, state.messages.count { it.type == ChatType.USER })
+        assertFalse(state.isSending)
+        assertNull(state.streamingMessageId)
+      }
+
+  @Test
+  fun sendMessage_clears_draft_after_sending() =
+      runTest(testDispatcher) {
+        val fakeClient = FakeLlmClient().apply { nextReply = "Reply" }
+        val viewModel = HomeViewModel(fakeClient)
+
+        viewModel.updateMessageDraft("Test message")
+        viewModel.sendMessage()
+
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("", state.messageDraft)
+      }
+
+  @Test
   fun clearChat_empties_messages() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.replaceMessages("Test message")
 
@@ -54,7 +183,7 @@ class HomeViewModelTest {
   @Test
   fun clearChat_preserves_other_state() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val initialState = viewModel.uiState.value
         val initialUserName = initialState.userName
@@ -72,7 +201,7 @@ class HomeViewModelTest {
   @Test
   fun simulateStreamingFromText_populates_message_and_clears_state() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
         val field = HomeViewModel::class.java.getDeclaredField("_uiState")
         field.isAccessible = true
         @Suppress("UNCHECKED_CAST")
@@ -94,6 +223,13 @@ class HomeViewModelTest {
                 isSending = true)
 
         viewModel.simulateStreamingForTest(aiId, "Bonjour EPFL")
+        advanceUntilIdle()
+        // Wait for streaming to complete - simulateStreamingFromText uses Dispatchers.Default
+        // so we need to advance time enough for all chunks (2 words * 60ms delay + buffer)
+        advanceTimeBy(200)
+        advanceUntilIdle()
+        advanceTimeBy(200)
+        advanceUntilIdle()
 
         val finalState = viewModel.uiState.value
         val aiMessage = finalState.messages.first()
@@ -107,7 +243,7 @@ class HomeViewModelTest {
   @Test
   fun toggleDrawer_changes_isDrawerOpen_state() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val initialState = viewModel.uiState.value
         assertFalse(initialState.isDrawerOpen)
@@ -126,7 +262,7 @@ class HomeViewModelTest {
   @Test
   fun sendMessage_with_empty_draft_does_nothing() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val initialState = viewModel.uiState.value
         val initialMessagesCount = initialState.messages.size
@@ -146,7 +282,7 @@ class HomeViewModelTest {
   @Test
   fun updateMessageDraft_updates_draft_text() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.updateMessageDraft("Hello")
         val state1 = viewModel.uiState.value
@@ -160,7 +296,7 @@ class HomeViewModelTest {
   @Test
   fun toggleSystemConnection_flips_connection_state() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val initialState = viewModel.uiState.value
         val moodleSystem = initialState.systems.find { it.id == "moodle" }
@@ -179,7 +315,7 @@ class HomeViewModelTest {
   @Test
   fun setTopRightOpen_changes_top_right_open_state() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val initialState = viewModel.uiState.value
         assertFalse(initialState.isTopRightOpen)
@@ -198,7 +334,7 @@ class HomeViewModelTest {
   @Test
   fun setLoading_changes_loading_state() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val initialState = viewModel.uiState.value
         assertFalse(initialState.isLoading)
@@ -215,7 +351,7 @@ class HomeViewModelTest {
   @Test
   fun showDeleteConfirmation_sets_showDeleteConfirmation_to_true() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val initialState = viewModel.uiState.value
         assertFalse(initialState.showDeleteConfirmation)
@@ -228,7 +364,7 @@ class HomeViewModelTest {
   @Test
   fun hideDeleteConfirmation_sets_showDeleteConfirmation_to_false() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.showDeleteConfirmation()
         val stateAfterShow = viewModel.uiState.value
@@ -242,7 +378,7 @@ class HomeViewModelTest {
   @Test
   fun clearChat_with_confirmation_workflow() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.replaceMessages("Test message")
 
@@ -269,7 +405,7 @@ class HomeViewModelTest {
   @Test
   fun initial_state_has_default_values() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val state = viewModel.uiState.value
         assertEquals("Student", state.userName)
@@ -285,7 +421,7 @@ class HomeViewModelTest {
   @Test
   fun updateMessageDraft_with_whitespace() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.updateMessageDraft("  Test with spaces  ")
         val state = viewModel.uiState.value
@@ -295,7 +431,7 @@ class HomeViewModelTest {
   @Test
   fun sendMessage_with_whitespace_only_does_nothing() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val initialCount = viewModel.uiState.value.messages.size
 
@@ -311,7 +447,7 @@ class HomeViewModelTest {
   @Test
   fun toggleSystemConnection_for_isa_system() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val initialState = viewModel.uiState.value
         val isaSystem = initialState.systems.find { it.id == "isa" }
@@ -329,7 +465,7 @@ class HomeViewModelTest {
   @Test
   fun toggleSystemConnection_for_camipro_system() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val initialState = viewModel.uiState.value
         val camiproSystem = initialState.systems.find { it.id == "camipro" }
@@ -347,7 +483,7 @@ class HomeViewModelTest {
   @Test
   fun toggleSystemConnection_for_nonexistent_system() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val initialState = viewModel.uiState.value
         val initialSystems = initialState.systems.toList()
@@ -361,7 +497,7 @@ class HomeViewModelTest {
   @Test
   fun setLoading_preserves_other_state() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val initialState = viewModel.uiState.value
         val initialUserName = initialState.userName
@@ -378,7 +514,7 @@ class HomeViewModelTest {
   @Test
   fun toggleDrawer_preserves_other_state() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val initialState = viewModel.uiState.value
         val initialUserName = initialState.userName
@@ -395,7 +531,7 @@ class HomeViewModelTest {
   @Test
   fun setTopRightOpen_preserves_other_state() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val initialState = viewModel.uiState.value
         val initialUserName = initialState.userName
@@ -412,7 +548,7 @@ class HomeViewModelTest {
   @Test
   fun clearChat_does_not_affect_flags() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         // Put some flags to true
         viewModel.setTopRightOpen(true)
@@ -432,7 +568,7 @@ class HomeViewModelTest {
   @Test
   fun top_right_and_delete_confirmation_are_independent() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.setTopRightOpen(true)
         val openState = viewModel.uiState.value
@@ -453,7 +589,7 @@ class HomeViewModelTest {
   @Test
   fun ui_state_copy_keeps_immutability_contract() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
         val s1 = viewModel.uiState.value
         val s2 = s1.copy()
         assertEquals(s1, s2)
@@ -463,7 +599,7 @@ class HomeViewModelTest {
   @Test
   fun updateMessageDraft_can_be_updated() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.updateMessageDraft("Test message")
         val stateAfterUpdate = viewModel.uiState.value
@@ -487,7 +623,7 @@ class HomeViewModelTest {
   @Test
   fun showDeleteConfirmation_preserves_other_state() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val initialState = viewModel.uiState.value
         val initialUserName = initialState.userName
@@ -506,7 +642,7 @@ class HomeViewModelTest {
   @Test
   fun hideDeleteConfirmation_preserves_other_state() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.showDeleteConfirmation()
         val stateWithShow = viewModel.uiState.value
@@ -523,7 +659,7 @@ class HomeViewModelTest {
   @Test
   fun toggleSystemConnection_multiple_times() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.toggleSystemConnection("moodle")
         val state1 = viewModel.uiState.value
@@ -544,7 +680,7 @@ class HomeViewModelTest {
   @Test
   fun toggleSystemConnection_for_drive_system() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val initialState = viewModel.uiState.value
         val driveSystem = initialState.systems.find { it.id == "drive" }
@@ -562,7 +698,7 @@ class HomeViewModelTest {
   @Test
   fun toggleSystemConnection_for_empty_string() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val initialState = viewModel.uiState.value
         val initialSystems = initialState.systems.toList()
@@ -576,7 +712,7 @@ class HomeViewModelTest {
   @Test
   fun uiState_maintains_reference_stability() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val stateRef1 = viewModel.uiState
         val stateRef2 = viewModel.uiState
@@ -587,7 +723,7 @@ class HomeViewModelTest {
   @Test
   fun clearChat_when_already_empty() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.clearChat()
         val state1 = viewModel.uiState.value
@@ -601,7 +737,7 @@ class HomeViewModelTest {
   @Test
   fun initialState_systems_count() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val state = viewModel.uiState.value
         assertEquals(6, state.systems.size)
@@ -610,7 +746,7 @@ class HomeViewModelTest {
   @Test
   fun initialState_messages_count() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val state = viewModel.uiState.value
         assertEquals(0, state.messages.size)
@@ -619,7 +755,7 @@ class HomeViewModelTest {
   @Test
   fun initialState_systems_have_correct_states() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val state = viewModel.uiState.value
         val isa = state.systems.find { it.id == "isa" }
@@ -646,7 +782,7 @@ class HomeViewModelTest {
   @Test
   fun updateMessageDraft_with_newline_characters() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.updateMessageDraft("Line1\nLine2\r\nLine3")
         val state = viewModel.uiState.value
@@ -656,7 +792,7 @@ class HomeViewModelTest {
   @Test
   fun updateMessageDraft_with_special_unicode() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.updateMessageDraft("Hello 世界 🌍")
         val state = viewModel.uiState.value
@@ -666,7 +802,7 @@ class HomeViewModelTest {
   @Test
   fun toggleSystemConnection_affects_only_target_system() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val initialState = viewModel.uiState.value
         val moodleBefore = initialState.systems.find { it.id == "moodle" }!!.isConnected
@@ -685,7 +821,7 @@ class HomeViewModelTest {
   @Test
   fun multiple_state_changes_in_sequence() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.toggleDrawer()
         viewModel.setTopRightOpen(true)
@@ -700,7 +836,7 @@ class HomeViewModelTest {
   @Test
   fun clearChat_then_add_messages_via_refresh() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.clearChat()
         val stateAfterClear = viewModel.uiState.value
@@ -714,7 +850,7 @@ class HomeViewModelTest {
   @Test
   fun toggleDrawer_then_close() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.toggleDrawer()
         assertTrue(viewModel.uiState.value.isDrawerOpen)
@@ -726,7 +862,7 @@ class HomeViewModelTest {
   @Test
   fun setTopRightOpen_toggle_behavior() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.setTopRightOpen(true)
         assertTrue(viewModel.uiState.value.isTopRightOpen)
@@ -741,7 +877,7 @@ class HomeViewModelTest {
   @Test
   fun showDeleteConfirmation_then_hide_multiple_times() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.showDeleteConfirmation()
         assertTrue(viewModel.uiState.value.showDeleteConfirmation)
@@ -756,7 +892,7 @@ class HomeViewModelTest {
   @Test
   fun updateMessageDraft_clear_sequence() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.updateMessageDraft("First message")
         assertEquals("First message", viewModel.uiState.value.messageDraft)
@@ -771,7 +907,7 @@ class HomeViewModelTest {
   @Test
   fun toggleSystemConnection_all_systems() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val systems = viewModel.uiState.value.systems
         systems.forEach { system ->
@@ -785,7 +921,7 @@ class HomeViewModelTest {
   @Test
   fun setLoading_multiple_fluctuations() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.setLoading(true)
         assertTrue(viewModel.uiState.value.isLoading)
@@ -803,7 +939,7 @@ class HomeViewModelTest {
   @Test
   fun state_immutability_after_operations() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val state1 = viewModel.uiState.value
         viewModel.toggleDrawer()
@@ -815,7 +951,7 @@ class HomeViewModelTest {
   @Test
   fun multiple_drawer_toggles() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         for (i in 1..5) {
           viewModel.toggleDrawer()
@@ -827,7 +963,7 @@ class HomeViewModelTest {
   @Test
   fun toggleSystemConnection_with_unicode_id() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val initialState = viewModel.uiState.value
         val initialSystems = initialState.systems.toList()
@@ -841,7 +977,7 @@ class HomeViewModelTest {
   @Test
   fun updateMessageDraft_with_tab_characters() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.updateMessageDraft("Tab\tCharacter")
         assertEquals("Tab\tCharacter", viewModel.uiState.value.messageDraft)
@@ -850,7 +986,7 @@ class HomeViewModelTest {
   @Test
   fun initialState_systems_names_are_correct() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val state = viewModel.uiState.value
         val isa = state.systems.find { it.id == "isa" }
@@ -863,7 +999,7 @@ class HomeViewModelTest {
   @Test
   fun initialState_messages_are_empty() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val state = viewModel.uiState.value
         assertTrue(state.messages.isEmpty())
@@ -872,7 +1008,7 @@ class HomeViewModelTest {
   @Test
   fun showDeleteConfirmation_and_then_hide_preserves_chat() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val initialState = viewModel.uiState.value
         val initialMessagesCount = initialState.messages.size
@@ -889,7 +1025,7 @@ class HomeViewModelTest {
   @Test
   fun showDeleteConfirmation_does_not_affect_other_flags() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val before = viewModel.uiState.value
         viewModel.showDeleteConfirmation()
@@ -903,7 +1039,7 @@ class HomeViewModelTest {
 
   @Test
   fun hideDeleteConfirmation_does_not_affect_other_flags() {
-    val viewModel = HomeViewModel()
+    val viewModel = HomeViewModel(FakeLlmClient())
 
     viewModel.showDeleteConfirmation()
     val before = viewModel.uiState.value
@@ -920,7 +1056,7 @@ class HomeViewModelTest {
   @Test
   fun setLoading_to_true_and_then_false() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.setLoading(true)
         assertTrue(viewModel.uiState.value.isLoading)
@@ -932,7 +1068,7 @@ class HomeViewModelTest {
   @Test
   fun setLoading_does_not_affect_delete_confirmation() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.showDeleteConfirmation()
         val showDeleteState = viewModel.uiState.value.showDeleteConfirmation
@@ -947,7 +1083,7 @@ class HomeViewModelTest {
   @Test
   fun delete_confirmation_workflow_with_multiple_toggles() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         for (i in 1..3) {
           viewModel.showDeleteConfirmation()
@@ -961,7 +1097,7 @@ class HomeViewModelTest {
   @Test
   fun loading_state_with_delete_confirmation_simultaneously() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.setLoading(true)
         viewModel.showDeleteConfirmation()
@@ -974,7 +1110,7 @@ class HomeViewModelTest {
   @Test
   fun loading_and_delete_confirmation_independently() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.setLoading(true)
         val stateWithLoading = viewModel.uiState.value
@@ -1000,7 +1136,7 @@ class HomeViewModelTest {
   @Test
   fun hideDeleteConfirmation_when_not_shown() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val stateBefore = viewModel.uiState.value
         assertFalse(stateBefore.showDeleteConfirmation)
@@ -1013,7 +1149,7 @@ class HomeViewModelTest {
   @Test
   fun showDeleteConfirmation_when_already_shown() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.showDeleteConfirmation()
         assertTrue(viewModel.uiState.value.showDeleteConfirmation)
@@ -1025,7 +1161,7 @@ class HomeViewModelTest {
   @Test
   fun setLoading_multiple_times() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.setLoading(true)
         viewModel.setLoading(true)
@@ -1039,7 +1175,7 @@ class HomeViewModelTest {
   @Test
   fun delete_confirmation_preserves_messages_list() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         val initialState = viewModel.uiState.value
         val initialMessages = initialState.messages.toList()
@@ -1054,7 +1190,7 @@ class HomeViewModelTest {
   @Test
   fun complete_delete_workflow() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.replaceMessages("Test message")
 
@@ -1077,7 +1213,7 @@ class HomeViewModelTest {
   @Test
   fun loading_state_does_not_affect_drawer() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.toggleDrawer()
         val drawerOpen = viewModel.uiState.value.isDrawerOpen
@@ -1092,7 +1228,7 @@ class HomeViewModelTest {
   @Test
   fun delete_confirmation_does_not_affect_top_right() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.setTopRightOpen(true)
         val topRightOpen = viewModel.uiState.value.isTopRightOpen
@@ -1107,7 +1243,7 @@ class HomeViewModelTest {
   @Test
   fun all_flags_can_be_true_simultaneously() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.toggleDrawer()
         viewModel.setTopRightOpen(true)
@@ -1124,7 +1260,7 @@ class HomeViewModelTest {
   @Test
   fun all_flags_can_be_false_simultaneously() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
 
         viewModel.setTopRightOpen(false)
         viewModel.setLoading(false)
