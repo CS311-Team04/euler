@@ -57,7 +57,7 @@ class ConversationRepository(private val auth: FirebaseAuth, private val db: Fir
    * @throws AuthNotReadyException if no user is signed in.
    */
   suspend fun startNewConversation(title: String = "New conversation"): String {
-    val uid = requireNotNull(auth.currentUser?.uid)
+    val uid = auth.currentUser?.uid ?: throw AuthNotReadyException()
     val ref = convCol().document()
     val now = FieldValue.serverTimestamp()
     ref.set(
@@ -82,15 +82,18 @@ class ConversationRepository(private val auth: FirebaseAuth, private val db: Fir
    * @throws AuthNotReadyException when collected if user is signed out.
    */
   fun conversationsFlow(): Flow<List<Conversation>> = callbackFlow {
-    val reg =
-        convCol().orderBy("updatedAt", Query.Direction.DESCENDING).addSnapshotListener { s, e ->
-          if (e != null) {
-            close(e)
-          } else {
-            val list = s!!.documents.map { d -> d.toObject<Conversation>()!!.copy(id = d.id) }
-            trySend(list)
+      val reg = convCol()
+          .orderBy("updatedAt", Query.Direction.DESCENDING)
+          .addSnapshotListener { s, e ->
+              if (e != null) {
+                  close(e)
+              } else {
+                  val list = s?.documents
+                      ?.mapNotNull { d -> d.toObject<Conversation>()?.copy(id = d.id) }
+                      ?: emptyList()
+                  trySend(list)
+              }
           }
-        }
     awaitClose { reg.remove() }
   }
 
@@ -105,15 +108,18 @@ class ConversationRepository(private val auth: FirebaseAuth, private val db: Fir
    * @throws AuthNotReadyException when collected if user is signed out.
    */
   fun messagesFlow(conversationId: String): Flow<List<MessageDTO>> = callbackFlow {
-    val reg =
-        msgCol(conversationId)
-            .orderBy("createdAt", Query.Direction.ASCENDING)
-            .addSnapshotListener { s, e ->
-              if (e != null) close(e)
-              else {
-                trySend(s!!.documents.map { it.toObject<MessageDTO>()!! })
+      val reg = msgCol(conversationId)
+          .orderBy("createdAt", Query.Direction.ASCENDING)
+          .addSnapshotListener { s, e ->
+              if (e != null) {
+                  close(e)
+              } else {
+                  val items = s?.documents
+                      ?.mapNotNull { it.toObject<MessageDTO>() }
+                      ?: emptyList()
+                  trySend(items)
               }
-            }
+          }
     awaitClose { reg.remove() }
   }
 
