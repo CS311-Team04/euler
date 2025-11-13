@@ -20,6 +20,7 @@ import com.google.firebase.functions.HttpsCallableResult
 import java.util.UUID
 import kotlin.lazyOf
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -175,6 +176,46 @@ class HomeViewModelTest {
 
         viewModel.toggleDrawer()
         assertFalse(viewModel.uiState.value.isDrawerOpen)
+      }
+
+  @Test
+  fun clearChat_cancels_active_stream_and_resets_state() =
+      runTest(dispatcher) {
+        val viewModel = HomeViewModel()
+        val stateField = HomeViewModel::class.java.getDeclaredField("_uiState")
+        stateField.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        val stateFlow = stateField.get(viewModel) as MutableStateFlow<HomeUiState>
+        stateFlow.value =
+            stateFlow.value.copy(
+                messages =
+                    listOf(
+                        ChatUIModel(
+                            id = "ai-1",
+                            text = "partial",
+                            timestamp = 0L,
+                            type = ChatType.AI,
+                            isThinking = true)),
+                streamingMessageId = "ai-1",
+                streamingSequence = 4,
+                isSending = true)
+
+        val job = Job()
+        viewModel.setPrivateField("activeStreamJob", job)
+        viewModel.setPrivateField("userCancelledStream", false)
+
+        viewModel.clearChat()
+
+        assertTrue(job.isCancelled)
+        val state = viewModel.uiState.value
+        assertTrue(state.messages.isEmpty())
+        assertNull(state.streamingMessageId)
+        assertFalse(state.isSending)
+        assertEquals(5, state.streamingSequence)
+
+        val cancelledField = HomeViewModel::class.java.getDeclaredField("userCancelledStream")
+        cancelledField.isAccessible = true
+        assertFalse(cancelledField.getBoolean(viewModel))
       }
 
   @Test

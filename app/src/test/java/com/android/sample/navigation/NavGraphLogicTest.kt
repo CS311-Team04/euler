@@ -5,6 +5,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -448,6 +450,99 @@ class NavGraphComposeTest {
       composeRule.waitForIdle()
 
       composeRule.onNodeWithText("Settings").assertIsDisplayed()
+    }
+  }
+
+  @Test
+  fun appNav_voice_button_navigates_to_voice_screen_and_back() {
+    val speechHelper = mock<SpeechToTextHelper>()
+    val stateFlow = MutableStateFlow<AuthUiState>(AuthUiState.SignedIn)
+
+    val construction =
+        mockConstruction(AuthViewModel::class.java) { mock, _ ->
+          whenever(mock.state).thenReturn(stateFlow)
+          doAnswer {}.whenever(mock).onMicrosoftLoginClick()
+          doAnswer {}.whenever(mock).onSwitchEduLoginClick()
+          doAnswer { stateFlow.value = AuthUiState.SignedIn }
+              .whenever(mock)
+              .onAuthenticationSuccess()
+          doAnswer {}.whenever(mock).onAuthenticationError(org.mockito.kotlin.any())
+          doAnswer { stateFlow.value = AuthUiState.Idle }.whenever(mock).signOut()
+        }
+
+    construction.use {
+      composeRule.setContent {
+        MaterialTheme {
+          AppNav(startOnSignedIn = false, activity = activity, speechHelper = speechHelper)
+        }
+      }
+
+      composeRule.waitUntil(timeoutMillis = TimeUnit.SECONDS.toMillis(6)) {
+        composeRule.onAllNodesWithTag(HomeTags.VoiceBtn).fetchSemanticsNodes().isNotEmpty()
+      }
+
+      composeRule.onNodeWithTag(HomeTags.VoiceBtn).assertIsDisplayed().performClick()
+
+      composeRule.waitUntil(timeoutMillis = TimeUnit.SECONDS.toMillis(6)) {
+        composeRule.onAllNodesWithText("Powered by APERTUS Swiss LLM").fetchSemanticsNodes().isNotEmpty()
+      }
+      composeRule.onNodeWithText("Powered by APERTUS Swiss LLM").assertIsDisplayed()
+
+      composeRule.onNodeWithContentDescription("Close voice screen").performClick()
+
+      composeRule.waitUntil(timeoutMillis = TimeUnit.SECONDS.toMillis(6)) {
+        composeRule.onAllNodesWithTag(HomeTags.Root).fetchSemanticsNodes().isNotEmpty()
+      }
+      composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
+    }
+  }
+
+  @Test
+  fun appNav_settings_log_out_returns_to_sign_in() {
+    val speechHelper = mock<SpeechToTextHelper>()
+    val stateFlow = MutableStateFlow<AuthUiState>(AuthUiState.SignedIn)
+
+    val construction =
+        mockConstruction(AuthViewModel::class.java) { mock, _ ->
+          whenever(mock.state).thenReturn(stateFlow)
+          doAnswer {}.whenever(mock).onMicrosoftLoginClick()
+          doAnswer {}.whenever(mock).onSwitchEduLoginClick()
+          doAnswer { stateFlow.value = AuthUiState.SignedIn }
+              .whenever(mock)
+              .onAuthenticationSuccess()
+          doAnswer {}.whenever(mock).onAuthenticationError(org.mockito.kotlin.any())
+          doAnswer { stateFlow.value = AuthUiState.Idle }.whenever(mock).signOut()
+        }
+
+    construction.use {
+      composeRule.setContent {
+        MaterialTheme {
+          AppNav(startOnSignedIn = false, activity = activity, speechHelper = speechHelper)
+        }
+      }
+
+      composeRule.waitUntil(timeoutMillis = TimeUnit.SECONDS.toMillis(6)) {
+        composeRule.onAllNodesWithTag(HomeTags.MenuBtn).fetchSemanticsNodes().isNotEmpty()
+      }
+
+      composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
+      composeRule.waitForIdle()
+      composeRule.onNodeWithTag(DrawerTags.ConnectorsRow).performClick()
+
+      composeRule.waitUntil(timeoutMillis = TimeUnit.SECONDS.toMillis(6)) {
+        composeRule.onAllNodesWithText("Log out").fetchSemanticsNodes().isNotEmpty()
+      }
+      composeRule.onNodeWithText("Log out").assertIsDisplayed().performClick()
+
+      composeRule.waitUntil(timeoutMillis = TimeUnit.SECONDS.toMillis(6)) {
+        composeRule
+            .onAllNodesWithText("Continue with Microsoft Entra ID")
+            .fetchSemanticsNodes()
+            .isNotEmpty()
+      }
+      composeRule
+          .onNodeWithText("Continue with Microsoft Entra ID")
+          .assertIsDisplayed()
     }
   }
 }

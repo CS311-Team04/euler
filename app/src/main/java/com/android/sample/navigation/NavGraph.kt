@@ -125,6 +125,7 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
                   }
                 },
                 onSettingsClick = { nav.navigate(Routes.Settings) },
+                onVoiceChatClick = { nav.navigate(Routes.VoiceChat) },
                 forceNewChatOnFirstOpen = false)
           }
 
@@ -150,6 +151,7 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
                   }
                 },
                 onSettingsClick = { nav.navigate(Routes.Settings) },
+                onVoiceChatClick = { nav.navigate(Routes.VoiceChat) },
                 openDrawerOnStart = true)
           }
 

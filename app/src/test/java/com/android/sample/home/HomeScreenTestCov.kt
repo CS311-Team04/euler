@@ -13,6 +13,10 @@ import androidx.test.core.app.ApplicationProvider
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
 import com.android.sample.conversations.Conversation
+import com.android.sample.speech.SpeechToTextHelper
+import org.mockito.kotlin.any
+import org.mockito.kotlin.doAnswer
+import org.mockito.kotlin.mock
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
@@ -310,6 +314,89 @@ class HomeScreenTestCov {
     composeRule.onNodeWithText("Delete").performClick()
     composeRule.waitForIdle()
     composeRule.runOnIdle { assertFalse(viewModel.uiState.value.showDeleteConfirmation) }
+  }
+
+  @Test
+  fun openDrawerOnStart_opens_drawer_and_updates_state() {
+    val viewModel = HomeViewModel()
+
+    composeRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = viewModel, openDrawerOnStart = true) }
+    }
+
+    composeRule.waitUntil {
+      composeRule.onAllNodesWithText("New chat").fetchSemanticsNodes().isNotEmpty()
+    }
+
+    composeRule.runOnIdle { assertTrue(viewModel.uiState.value.isDrawerOpen) }
+  }
+
+  @Test
+  fun forceNewChatOnFirstOpen_resets_conversation_once() {
+    val viewModel = HomeViewModel()
+    updateUiState(viewModel) {
+      it.copy(currentConversationId = "conv-99", messageDraft = "draft", isDrawerOpen = true)
+    }
+    injectMessages(viewModel, listOf(sampleMessage("Keep me")))
+
+    composeRule.setContent {
+      MaterialTheme {
+        HomeScreen(
+            viewModel = viewModel,
+            forceNewChatOnFirstOpen = true,
+            openDrawerOnStart = false)
+      }
+    }
+
+    composeRule.waitForIdle()
+
+    composeRule.runOnIdle {
+      val state = viewModel.uiState.value
+      assertNull(state.currentConversationId)
+      assertEquals("", state.messageDraft)
+      assertTrue(state.messages.isEmpty())
+    }
+  }
+
+  @Test
+  fun voice_button_triggers_callback_when_message_blank() {
+    var voiceCalled = false
+    val viewModel = HomeViewModel()
+
+    composeRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = viewModel, onVoiceChatClick = { voiceCalled = true }) }
+    }
+
+    composeRule.onNodeWithTag(HomeTags.VoiceBtn).performClick()
+    composeRule.waitForIdle()
+
+    assertTrue(voiceCalled)
+  }
+
+  @Test
+  fun mic_button_uses_speech_helper_and_updates_draft() {
+    val recognized = "Recognized speech"
+    var started = false
+    val helper =
+        mock<SpeechToTextHelper> {
+          on { startListening(any()) }
+              .doAnswer { invocation ->
+                started = true
+                invocation.getArgument<(String) -> Unit>(0).invoke(recognized)
+                null
+              }
+        }
+    val viewModel = HomeViewModel()
+
+    composeRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = viewModel, speechHelper = helper) }
+    }
+
+    composeRule.onNodeWithTag(HomeTags.MicBtn).performClick()
+    composeRule.waitForIdle()
+
+    assertTrue(started)
+    assertEquals(recognized, viewModel.uiState.value.messageDraft)
   }
 
   private fun initFirebase() {
