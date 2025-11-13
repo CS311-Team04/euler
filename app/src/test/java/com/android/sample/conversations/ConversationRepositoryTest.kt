@@ -75,10 +75,11 @@ class ConversationRepositoryTest {
     assertNotNull(payload["updatedAt"])
   }
 
-  @Test(expected = IllegalArgumentException::class)
+  @Test
   fun startNewConversation_throws_when_user_missing() = runTest {
     whenever(auth.currentUser).thenReturn(null)
-    repository.startNewConversation()
+    val failure = runCatching { repository.startNewConversation() }.exceptionOrNull()
+    assertTrue(failure is AuthNotReadyException)
   }
 
   @Test
