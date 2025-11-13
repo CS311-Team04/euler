@@ -38,7 +38,8 @@ import kotlinx.coroutines.withContext
  * - Call the backend Cloud Function for chat responses
  */
 class HomeViewModel(
-    private val profileRepository: UserProfileRepository = UserProfileRepository()
+    private val profileRepository: com.android.sample.profile.ProfileDataSource =
+        UserProfileRepository()
 ) : ViewModel() {
 
   private val _uiState =

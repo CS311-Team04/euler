@@ -19,6 +19,8 @@ class HomeViewModelTest {
   private val testDispatcher
     get() = mainDispatcherRule.dispatcher
 
+  private fun createHomeViewModel(): HomeViewModel = HomeViewModel(FakeProfileRepository())
+
   private fun HomeViewModel.replaceMessages(vararg texts: String) {
     val field = HomeViewModel::class.java.getDeclaredField("_uiState")
     field.isAccessible = true
@@ -903,7 +905,7 @@ class HomeViewModelTest {
 
   @Test
   fun hideDeleteConfirmation_does_not_affect_other_flags() {
-    val viewModel = HomeViewModel()
+    val viewModel = createHomeViewModel()
 
     viewModel.showDeleteConfirmation()
     val before = viewModel.uiState.value
@@ -920,7 +922,7 @@ class HomeViewModelTest {
   @Test
   fun setLoading_to_true_and_then_false() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = createHomeViewModel()
 
         viewModel.setLoading(true)
         assertTrue(viewModel.uiState.value.isLoading)

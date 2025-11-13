@@ -6,6 +6,12 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
 
+interface ProfileDataSource {
+  suspend fun saveProfile(profile: UserProfile)
+
+  suspend fun loadProfile(): UserProfile?
+}
+
 /**
  * Firestore access layer for reading and writing the authenticated user's profile information.
  *
@@ -28,38 +34,39 @@ import kotlinx.coroutines.tasks.await
  * All operations assume the user is already authenticated with Firebase Auth.
  */
 class UserProfileRepository(
-    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
-) {
-  private val usersCollection = firestore.collection(COLLECTION_USERS)
+    private val firestoreProvider: () -> FirebaseFirestore = { FirebaseFirestore.getInstance() },
+    private val authProvider: () -> FirebaseAuth = { FirebaseAuth.getInstance() }
+) : ProfileDataSource {
 
   /**
    * Persist the supplied [profile] for the currently signed-in user. The profile map is merged into
    * the existing `users/{uid}` document so no other fields (like the `logged` flag) are lost.
    */
-  suspend fun saveProfile(profile: UserProfile) {
-    val uid =
-        auth.currentUser?.uid
-            ?: throw IllegalStateException("Cannot save profile without an authenticated user.")
+  override suspend fun saveProfile(profile: UserProfile) {
+    val auth = runCatching { authProvider() }.getOrNull() ?: return
+    val uid = auth.currentUser?.uid ?: return
 
     val payload =
         mapOf(
             PROFILE_FIELD to profile.toFirestoreMap(),
             PROFILE_UPDATED_AT_FIELD to FieldValue.serverTimestamp())
 
-    usersCollection.document(uid).set(payload, SetOptions.merge()).await()
+    val firestore = runCatching { firestoreProvider() }.getOrNull() ?: return
+    firestore.collection(COLLECTION_USERS).document(uid).set(payload, SetOptions.merge()).await()
   }
 
   /**
    * Retrieve the stored profile for the currently signed-in user. Returns `null` when no profile
    * has been saved yet.
    */
-  suspend fun loadProfile(): UserProfile? {
-    val uid =
-        auth.currentUser?.uid
-            ?: throw IllegalStateException("Cannot load profile without an authenticated user.")
+  override suspend fun loadProfile(): UserProfile? {
+    val auth = runCatching { authProvider() }.getOrNull() ?: return null
+    val uid = auth.currentUser?.uid ?: return null
 
-    val snapshot = usersCollection.document(uid).get().await()
+    val firestore = runCatching { firestoreProvider() }.getOrNull() ?: return null
+    val snapshot =
+        runCatching { firestore.collection(COLLECTION_USERS).document(uid).get().await() }
+            .getOrNull() ?: return null
     if (!snapshot.exists()) return null
 
     val rawProfile = snapshot.get(PROFILE_FIELD) as? Map<*, *> ?: return null

@@ -26,6 +26,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+private fun createHomeViewModel() = HomeViewModel(FakeProfileRepository())
+
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -49,7 +51,7 @@ class HomeScreenTestCov {
 
   @Test
   fun viewModel_initial_state_has_correct_values() {
-    val viewModel = HomeViewModel()
+    val viewModel = createHomeViewModel()
     val state = viewModel.uiState.value
     assertEquals("Student", state.userName)
     assertFalse(state.isDrawerOpen)
@@ -64,7 +66,7 @@ class HomeScreenTestCov {
 
   @Test
   fun viewModel_toggleDrawer_changes_drawer_state() {
-    val viewModel = HomeViewModel()
+    val viewModel = createHomeViewModel()
     assertFalse(viewModel.uiState.value.isDrawerOpen)
     viewModel.toggleDrawer()
     assertTrue(viewModel.uiState.value.isDrawerOpen)
@@ -74,7 +76,7 @@ class HomeScreenTestCov {
 
   @Test
   fun viewModel_setTopRightOpen_changes_topRight_state() {
-    val viewModel = HomeViewModel()
+    val viewModel = createHomeViewModel()
     assertFalse(viewModel.uiState.value.isTopRightOpen)
     viewModel.setTopRightOpen(true)
     assertTrue(viewModel.uiState.value.isTopRightOpen)
@@ -84,14 +86,14 @@ class HomeScreenTestCov {
 
   @Test
   fun viewModel_updateMessageDraft_updates_text() {
-    val viewModel = HomeViewModel()
+    val viewModel = HomeViewModel(FakeProfileRepository())
     viewModel.updateMessageDraft("Test message")
     assertEquals("Test message", viewModel.uiState.value.messageDraft)
   }
 
   @Test
   fun viewModel_sendMessage_with_empty_text_does_nothing() {
-    val viewModel = HomeViewModel()
+    val viewModel = HomeViewModel(FakeProfileRepository())
     val initialMessagesCount = viewModel.uiState.value.messages.size
     viewModel.sendMessage()
     assertEquals(initialMessagesCount, viewModel.uiState.value.messages.size)
@@ -101,7 +103,7 @@ class HomeScreenTestCov {
   @Test
   fun viewModel_sendMessage_adds_user_message_to_messages() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = createHomeViewModel()
         val initialCount = viewModel.uiState.value.messages.size
         viewModel.updateMessageDraft("Hello, world!")
         viewModel.sendMessage()
@@ -113,7 +115,7 @@ class HomeScreenTestCov {
 
   @Test
   fun viewModel_toggleSystemConnection_changes_system_state() {
-    val viewModel = HomeViewModel()
+    val viewModel = HomeViewModel(FakeProfileRepository())
     val system = viewModel.uiState.value.systems.first()
     val initialConnected = system.isConnected
     viewModel.toggleSystemConnection(system.id)
@@ -123,7 +125,7 @@ class HomeScreenTestCov {
 
   @Test
   fun viewModel_toggleSystemConnection_with_invalid_id_does_nothing() {
-    val viewModel = HomeViewModel()
+    val viewModel = HomeViewModel(FakeProfileRepository())
     val initialSystems = viewModel.uiState.value.systems
     viewModel.toggleSystemConnection("invalid-id")
     assertEquals(initialSystems, viewModel.uiState.value.systems)
@@ -131,7 +133,7 @@ class HomeScreenTestCov {
 
   @Test
   fun viewModel_multiple_system_toggles_work() {
-    val viewModel = HomeViewModel()
+    val viewModel = HomeViewModel(FakeProfileRepository())
     val systems = viewModel.uiState.value.systems
     val first = systems.first()
     val second = systems.getOrNull(1)
@@ -147,7 +149,7 @@ class HomeScreenTestCov {
   @Test
   fun viewModel_sendMessage_handles_response_and_finally_block() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = createHomeViewModel()
         viewModel.updateMessageDraft("Test query")
         viewModel.sendMessage()
         advanceUntilIdle()
@@ -159,7 +161,7 @@ class HomeScreenTestCov {
   @Test
   fun viewModel_sendMessage_adds_ai_message_when_callAnswerWithRag_succeeds() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = createHomeViewModel()
         val initialCount = viewModel.uiState.value.messages.size
 
         viewModel.updateMessageDraft("What is EPFL?")
@@ -217,13 +219,15 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_displays_root_element() {
-    composeTestRule.setContent { MaterialTheme { HomeScreen() } }
+    val viewModel = HomeViewModel(FakeProfileRepository())
+    composeTestRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
     composeTestRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
   }
 
   @Test
   fun screen_displays_core_buttons() {
-    composeTestRule.setContent { MaterialTheme { HomeScreen() } }
+    val viewModel = HomeViewModel(FakeProfileRepository())
+    composeTestRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
     composeTestRule.onNodeWithTag(HomeTags.MenuBtn).assertIsDisplayed()
     composeTestRule.onNodeWithTag(HomeTags.TopRightBtn).assertIsDisplayed()
     composeTestRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed()
@@ -232,7 +236,8 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_displays_message_field() {
-    composeTestRule.setContent { MaterialTheme { HomeScreen() } }
+    val viewModel = HomeViewModel(FakeProfileRepository())
+    composeTestRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
     composeTestRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
   }
 
@@ -240,7 +245,7 @@ class HomeScreenTestCov {
   fun screen_action_buttons_trigger_callbacks() {
     var action1Clicked = false
     var action2Clicked = false
-    val viewModel = HomeViewModel()
+    val viewModel = HomeViewModel(FakeProfileRepository())
     composeTestRule.setContent {
       MaterialTheme {
         HomeScreen(
@@ -268,7 +273,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_message_field_updates_viewModel() {
-    val viewModel = HomeViewModel()
+    val viewModel = HomeViewModel(FakeProfileRepository())
     composeTestRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
     composeTestRule.onNodeWithTag(HomeTags.MessageField).performTextInput("New message")
     assertEquals("New message", viewModel.uiState.value.messageDraft)
@@ -279,7 +284,7 @@ class HomeScreenTestCov {
   @Test
   fun screen_displays_thinking_indicator_when_sending() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = createHomeViewModel()
         composeTestRule.setContent {
           MaterialTheme { HomeScreen(viewModel = viewModel, onSendMessage = {}) }
         }
@@ -305,7 +310,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_topRight_menu_displays_when_opened() {
-    val viewModel = HomeViewModel()
+    val viewModel = createHomeViewModel()
     composeTestRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
     composeTestRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
     viewModel.setTopRightOpen(true)
@@ -322,7 +327,7 @@ class HomeScreenTestCov {
   @Test
   fun viewModel_messages_displayed_when_sending() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = createHomeViewModel()
         composeTestRule.setContent {
           MaterialTheme { HomeScreen(viewModel = viewModel, onSendMessage = {}) }
         }
@@ -335,7 +340,7 @@ class HomeScreenTestCov {
 
   @Test
   fun viewModel_drawer_sync_with_viewModel() {
-    val viewModel = HomeViewModel()
+    val viewModel = createHomeViewModel()
     composeTestRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
     assertFalse(viewModel.uiState.value.isDrawerOpen)
     viewModel.toggleDrawer()
@@ -344,7 +349,7 @@ class HomeScreenTestCov {
 
   @Test
   fun viewModel_topRight_and_drawer_independent() {
-    val viewModel = HomeViewModel()
+    val viewModel = createHomeViewModel()
     composeTestRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
     viewModel.setTopRightOpen(true)
     assertTrue(viewModel.uiState.value.isTopRightOpen)
@@ -359,8 +364,9 @@ class HomeScreenTestCov {
   @Test
   fun screen_onSignOut_callback_sets_up_correctly() {
     var signOutCalled = false
+    val viewModel = createHomeViewModel()
     composeTestRule.setContent {
-      MaterialTheme { HomeScreen(onSignOut = { signOutCalled = true }) }
+      MaterialTheme { HomeScreen(viewModel = viewModel, onSignOut = { signOutCalled = true }) }
     }
     composeTestRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
     // Verify callback is set up (will be called when drawer sign out is triggered)
@@ -370,8 +376,11 @@ class HomeScreenTestCov {
   @Test
   fun screen_onSettingsClick_callback_sets_up_correctly() {
     var settingsCalled = false
+    val viewModel = createHomeViewModel()
     composeTestRule.setContent {
-      MaterialTheme { HomeScreen(onSettingsClick = { settingsCalled = true }) }
+      MaterialTheme {
+        HomeScreen(viewModel = viewModel, onSettingsClick = { settingsCalled = true })
+      }
     }
     composeTestRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
     // Verify callback is set up (will be called when drawer settings is triggered)
@@ -380,7 +389,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_drawer_state_changes_trigger_ui_update() {
-    val viewModel = HomeViewModel()
+    val viewModel = createHomeViewModel()
     composeTestRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
     composeTestRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
     // Toggle drawer state
@@ -396,7 +405,7 @@ class HomeScreenTestCov {
   @Test
   fun screen_thinking_indicator_appears_during_sending() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = createHomeViewModel()
         composeTestRule.setContent {
           MaterialTheme { HomeScreen(viewModel = viewModel, onSendMessage = {}) }
         }
@@ -421,7 +430,7 @@ class HomeScreenTestCov {
   @Test
   fun screen_message_field_disabled_during_sending() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = createHomeViewModel()
         composeTestRule.setContent {
           MaterialTheme { HomeScreen(viewModel = viewModel, onSendMessage = {}) }
         }
@@ -446,7 +455,10 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_openDrawerOnStart_parameter_works() {
-    composeTestRule.setContent { MaterialTheme { HomeScreen(openDrawerOnStart = true) } }
+    val viewModel = createHomeViewModel()
+    composeTestRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = viewModel, openDrawerOnStart = true) }
+    }
     composeTestRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
   }
 
@@ -493,7 +505,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_suggestions_are_displayed_initially() {
-    val viewModel = HomeViewModel()
+    val viewModel = createHomeViewModel()
     composeTestRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
     // Verify that Action1Btn and Action2Btn are visible (suggestions are shown)
@@ -507,7 +519,7 @@ class HomeScreenTestCov {
   @Test
   fun screen_suggestions_hide_after_ai_response() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = createHomeViewModel()
         composeTestRule.setContent {
           MaterialTheme { HomeScreen(viewModel = viewModel, onSendMessage = {}) }
         }
@@ -546,7 +558,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_suggestions_hide_when_ai_message_exists() {
-    val viewModel = HomeViewModel()
+    val viewModel = createHomeViewModel()
     // Create initial state with an AI message
     val aiMessage =
         ChatUIModel(
@@ -582,7 +594,7 @@ class HomeScreenTestCov {
         var sendMessageCalled = false
         var sendMessageText = ""
 
-        val viewModel = HomeViewModel()
+        val viewModel = createHomeViewModel()
         composeTestRule.setContent {
           MaterialTheme {
             HomeScreen(
@@ -619,7 +631,7 @@ class HomeScreenTestCov {
         var sendMessageCalled = false
         var sendMessageText = ""
 
-        val viewModel = HomeViewModel()
+        val viewModel = createHomeViewModel()
         composeTestRule.setContent {
           MaterialTheme {
             HomeScreen(
@@ -652,7 +664,7 @@ class HomeScreenTestCov {
   @Test
   fun screen_suggestion_click_triggers_viewModel_sendMessage() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = createHomeViewModel()
         var sendMessageCalled = false
 
         composeTestRule.setContent {
@@ -685,7 +697,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_all_suggestion_texts_are_displayed() {
-    val viewModel = HomeViewModel()
+    val viewModel = createHomeViewModel()
     composeTestRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
     // Verify all suggestion texts exist in the composition
@@ -725,7 +737,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_suggestions_only_visible_when_no_ai_messages() {
-    val viewModel = HomeViewModel()
+    val viewModel = createHomeViewModel()
     composeTestRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
     // Initially, no AI messages, so suggestions should be visible
@@ -740,7 +752,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_suggestion_chips_have_correct_test_tags() {
-    val viewModel = HomeViewModel()
+    val viewModel = createHomeViewModel()
     composeTestRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
     // First two suggestions (index 0 and 1) should have testTags
@@ -757,7 +769,7 @@ class HomeScreenTestCov {
   fun screen_suggestion_click_updates_draft_before_sending() =
       runTest(testDispatcher) {
         var sendMessageText = ""
-        val viewModel = HomeViewModel()
+        val viewModel = createHomeViewModel()
         composeTestRule.setContent {
           MaterialTheme {
             HomeScreen(
@@ -785,7 +797,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_suggestions_row_is_horizontally_scrollable() {
-    val viewModel = HomeViewModel()
+    val viewModel = createHomeViewModel()
     composeTestRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
     // Verify suggestions are displayed in a scrollable row
@@ -820,7 +832,7 @@ class HomeScreenTestCov {
   @Test
   fun screen_animated_visibility_hides_suggestions_after_ai_response() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = createHomeViewModel()
         composeTestRule.setContent {
           MaterialTheme { HomeScreen(viewModel = viewModel, onSendMessage = {}) }
         }
@@ -860,7 +872,7 @@ class HomeScreenTestCov {
         var action1Called = false
         var action2Called = false
 
-        val viewModel = HomeViewModel()
+        val viewModel = createHomeViewModel()
         composeTestRule.setContent {
           MaterialTheme {
             HomeScreen(
@@ -888,7 +900,7 @@ class HomeScreenTestCov {
         var action1Called = false
         var action2Called = false
 
-        val viewModel = HomeViewModel()
+        val viewModel = createHomeViewModel()
         composeTestRule.setContent {
           MaterialTheme {
             HomeScreen(
@@ -918,7 +930,7 @@ class HomeScreenTestCov {
         var sendMessageCalled = false
         var sendMessageText = ""
 
-        val viewModel = HomeViewModel()
+        val viewModel = createHomeViewModel()
         composeTestRule.setContent {
           MaterialTheme {
             HomeScreen(
@@ -957,7 +969,7 @@ class HomeScreenTestCov {
         var firstSendMessageText = ""
         var secondSendMessageText = ""
 
-        val viewModel = HomeViewModel()
+        val viewModel = createHomeViewModel()
         composeTestRule.setContent {
           MaterialTheme {
             HomeScreen(
@@ -1022,7 +1034,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_hasAiResponded_logic_checks_message_type() {
-    val viewModel = HomeViewModel()
+    val viewModel = createHomeViewModel()
     composeTestRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
     // Initially, no messages
