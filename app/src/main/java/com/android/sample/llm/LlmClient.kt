@@ -71,7 +71,7 @@ class FirebaseFunctionsLlmClient(
 
   companion object {
     private const val FUNCTION_NAME = "answerWithRagFn"
-    private const val DEFAULT_TIMEOUT_MS = 5_000L
+    private const val DEFAULT_TIMEOUT_MS = 33_000L
 
     /**
      * Creates a region-scoped [FirebaseFunctions] instance and wires the local emulator when
