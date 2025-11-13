@@ -20,6 +20,7 @@ import com.android.sample.home.HomeTags
 import com.android.sample.home.HomeViewModel
 import com.android.sample.llm.FakeLlmClient
 import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -34,7 +35,13 @@ class HomeScreenTest {
   private fun ensureFirebaseInitialized() {
     val context = ApplicationProvider.getApplicationContext<Context>()
     if (FirebaseApp.getApps(context).isEmpty()) {
-      FirebaseApp.initializeApp(context)
+      val options =
+          FirebaseOptions.Builder()
+              .setApplicationId("1:1234567890:android:integration-test")
+              .setProjectId("integration-test")
+              .setApiKey("fake-api-key")
+              .build()
+      FirebaseApp.initializeApp(context, options)
     }
   }
 
