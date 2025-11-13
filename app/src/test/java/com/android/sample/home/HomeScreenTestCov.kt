@@ -14,9 +14,6 @@ import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
 import com.android.sample.conversations.Conversation
 import com.android.sample.speech.SpeechToTextHelper
-import org.mockito.kotlin.any
-import org.mockito.kotlin.doAnswer
-import org.mockito.kotlin.mock
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
@@ -36,6 +33,9 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.kotlin.any
+import org.mockito.kotlin.doAnswer
+import org.mockito.kotlin.mock
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
@@ -341,10 +341,7 @@ class HomeScreenTestCov {
 
     composeRule.setContent {
       MaterialTheme {
-        HomeScreen(
-            viewModel = viewModel,
-            forceNewChatOnFirstOpen = true,
-            openDrawerOnStart = false)
+        HomeScreen(viewModel = viewModel, forceNewChatOnFirstOpen = true, openDrawerOnStart = false)
       }
     }
 

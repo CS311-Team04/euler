@@ -484,7 +484,10 @@ class NavGraphComposeTest {
       composeRule.onNodeWithTag(HomeTags.VoiceBtn).assertIsDisplayed().performClick()
 
       composeRule.waitUntil(timeoutMillis = TimeUnit.SECONDS.toMillis(6)) {
-        composeRule.onAllNodesWithText("Powered by APERTUS Swiss LLM").fetchSemanticsNodes().isNotEmpty()
+        composeRule
+            .onAllNodesWithText("Powered by APERTUS Swiss LLM")
+            .fetchSemanticsNodes()
+            .isNotEmpty()
       }
       composeRule.onNodeWithText("Powered by APERTUS Swiss LLM").assertIsDisplayed()
 
@@ -540,9 +543,7 @@ class NavGraphComposeTest {
             .fetchSemanticsNodes()
             .isNotEmpty()
       }
-      composeRule
-          .onNodeWithText("Continue with Microsoft Entra ID")
-          .assertIsDisplayed()
+      composeRule.onNodeWithText("Continue with Microsoft Entra ID").assertIsDisplayed()
     }
   }
 }
