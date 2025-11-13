@@ -82,18 +82,17 @@ class ConversationRepository(private val auth: FirebaseAuth, private val db: Fir
    * @throws AuthNotReadyException when collected if user is signed out.
    */
   fun conversationsFlow(): Flow<List<Conversation>> = callbackFlow {
-      val reg = convCol()
-          .orderBy("updatedAt", Query.Direction.DESCENDING)
-          .addSnapshotListener { s, e ->
-              if (e != null) {
-                  close(e)
-              } else {
-                  val list = s?.documents
-                      ?.mapNotNull { d -> d.toObject<Conversation>()?.copy(id = d.id) }
-                      ?: emptyList()
-                  trySend(list)
-              }
+    val reg =
+        convCol().orderBy("updatedAt", Query.Direction.DESCENDING).addSnapshotListener { s, e ->
+          if (e != null) {
+            close(e)
+          } else {
+            val list =
+                s?.documents?.mapNotNull { d -> d.toObject<Conversation>()?.copy(id = d.id) }
+                    ?: emptyList()
+            trySend(list)
           }
+        }
     awaitClose { reg.remove() }
   }
 
@@ -108,18 +107,17 @@ class ConversationRepository(private val auth: FirebaseAuth, private val db: Fir
    * @throws AuthNotReadyException when collected if user is signed out.
    */
   fun messagesFlow(conversationId: String): Flow<List<MessageDTO>> = callbackFlow {
-      val reg = msgCol(conversationId)
-          .orderBy("createdAt", Query.Direction.ASCENDING)
-          .addSnapshotListener { s, e ->
+    val reg =
+        msgCol(conversationId)
+            .orderBy("createdAt", Query.Direction.ASCENDING)
+            .addSnapshotListener { s, e ->
               if (e != null) {
-                  close(e)
+                close(e)
               } else {
-                  val items = s?.documents
-                      ?.mapNotNull { it.toObject<MessageDTO>() }
-                      ?: emptyList()
-                  trySend(items)
+                val items = s?.documents?.mapNotNull { it.toObject<MessageDTO>() } ?: emptyList()
+                trySend(items)
               }
-          }
+            }
     awaitClose { reg.remove() }
   }
 
