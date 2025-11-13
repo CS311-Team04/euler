@@ -93,7 +93,7 @@ jobs:
         run: |
           # To run the CI with debug information, add --info
           # Set max workers to prevent resource exhaustion
-          ./gradlew check --max-workers=2 --build-cache
+          ./gradlew check
 
       # Run connected tests on the emulator
       - name: run tests
