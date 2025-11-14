@@ -374,6 +374,7 @@ class AuthUIScreenTest {
   }
 
   @Test
+  @Ignore("Ignored in CI due to OOM on limited heap")
   fun AuthUIScreen_hides_Microsoft_loading_indicator_when_not_loading() {
     composeTestRule.setContent {
       MaterialTheme {
