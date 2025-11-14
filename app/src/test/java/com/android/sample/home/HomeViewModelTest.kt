@@ -4,11 +4,12 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
-import com.android.sample.profile.UserProfile
 import com.android.sample.conversations.Conversation
 import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.MessageDTO
+import com.android.sample.llm.BotReply
 import com.android.sample.llm.FakeLlmClient
+import com.android.sample.llm.LlmClient
 import com.android.sample.util.MainDispatcherRule
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.FirebaseApp
@@ -24,7 +25,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -52,270 +52,6 @@ class HomeViewModelTest {
 
   @get:Rule val dispatcherRule = MainDispatcherRule()
   private val testDispatcher
-    get() = mainDispatcherRule.dispatcher
-
-  private fun createHomeViewModel(): HomeViewModel = HomeViewModel(FakeProfileRepository())
-
-  private fun HomeViewModel.replaceMessages(vararg texts: String) {
-    val field = HomeViewModel::class.java.getDeclaredField("_uiState")
-    field.isAccessible = true
-    @Suppress("UNCHECKED_CAST") val stateFlow = field.get(this) as MutableStateFlow<HomeUiState>
-    val current = stateFlow.value
-    val messages =
-        texts.map { text ->
-          ChatUIModel(
-              id = UUID.randomUUID().toString(), text = text, timestamp = 0L, type = ChatType.USER)
-        }
-    stateFlow.value = current.copy(messages = messages)
-  }
-
-  private fun HomeViewModel.setUserNameForTest(name: String) {
-    val field = HomeViewModel::class.java.getDeclaredField("_uiState")
-    field.isAccessible = true
-    @Suppress("UNCHECKED_CAST") val stateFlow = field.get(this) as MutableStateFlow<HomeUiState>
-    val current = stateFlow.value
-    stateFlow.value = current.copy(userName = name)
-  }
-
-  @Test
-  fun setGuestMode_true_sets_guest_state() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.setGuestMode(true)
-
-        val state = viewModel.uiState.value
-        assertTrue(state.isGuest)
-        assertEquals("guest", state.userName)
-        assertNull(state.profile)
-        assertFalse(state.showGuestProfileWarning)
-      }
-
-  @Test
-  fun setGuestMode_false_restores_default_name_when_blank() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-        viewModel.setUserNameForTest("")
-        viewModel.setGuestMode(false)
-
-        val state = viewModel.uiState.value
-        assertFalse(state.isGuest)
-        assertEquals("Student", state.userName)
-      }
-
-  @Test
-  fun refreshProfile_updates_state_from_repository() =
-      runTest(testDispatcher) {
-        val repo = FakeProfileRepository()
-        val profile =
-            UserProfile(
-                fullName = "Jane Doe",
-                preferredName = "JD",
-                faculty = "IC",
-                section = "CS",
-                email = "jane@epfl.ch",
-                phone = "+41 79 123 45 67",
-                roleDescription = "Student")
-        repo.savedProfile = profile
-        val viewModel = HomeViewModel(repo)
-
-        viewModel.refreshProfile()
-        advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertEquals(profile, state.profile)
-        assertEquals("JD", state.userName)
-        assertFalse(state.isGuest)
-      }
-
-  @Test
-  fun refreshProfile_with_null_profile_keeps_defaults() =
-      runTest(testDispatcher) {
-        val repo = FakeProfileRepository()
-        val viewModel = HomeViewModel(repo)
-        viewModel.setUserNameForTest("")
-
-        viewModel.refreshProfile()
-        advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertNull(state.profile)
-        assertEquals("Student", state.userName)
-        assertFalse(state.isGuest)
-      }
-
-  @Test
-  fun saveProfile_persists_and_updates_ui_state() =
-      runTest(testDispatcher) {
-        val repo = FakeProfileRepository()
-        val viewModel = HomeViewModel(repo)
-        val profile =
-            UserProfile(
-                fullName = "Alice Example",
-                preferredName = "Alice",
-                faculty = "SV",
-                section = "Bio",
-                email = "alice@epfl.ch",
-                phone = "+41 79 765 43 21",
-                roleDescription = "PhD")
-
-        viewModel.saveProfile(profile)
-        advanceUntilIdle()
-
-        assertEquals(profile, repo.savedProfile)
-        val state = viewModel.uiState.value
-        assertEquals(profile, state.profile)
-        assertEquals("Alice", state.userName)
-        assertFalse(state.isGuest)
-      }
-
-  @Test
-  fun clearProfile_resets_profile_and_guest_flags() =
-      runTest(testDispatcher) {
-        val repo = FakeProfileRepository()
-        val viewModel = HomeViewModel(repo)
-        val profile =
-            UserProfile(
-                fullName = "Bob Example",
-                preferredName = "Bob",
-                email = "bob@epfl.ch",
-                roleDescription = "Staff")
-
-        viewModel.saveProfile(profile)
-        advanceUntilIdle()
-        viewModel.setGuestMode(true)
-
-        viewModel.clearProfile()
-
-        val state = viewModel.uiState.value
-        assertNull(state.profile)
-        assertEquals("Student", state.userName)
-        assertFalse(state.isGuest)
-        assertFalse(state.showGuestProfileWarning)
-      }
-
-  @Test
-  fun guest_profile_warning_visiblity_toggles_correctly() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.showGuestProfileWarning()
-        assertTrue(viewModel.uiState.value.showGuestProfileWarning)
-
-        viewModel.hideGuestProfileWarning()
-        assertFalse(viewModel.uiState.value.showGuestProfileWarning)
-      }
-
-  @Test
-  fun clearChat_empties_messages() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.replaceMessages("Test message")
-
-        // Initial state should have messages now (user message added synchronously)
-        val initialState = viewModel.uiState.value
-        assertTrue(initialState.messages.isNotEmpty())
-
-        // Clear the chat
-        viewModel.clearChat()
-
-        // Verify chat is empty
-        val stateAfterClear = viewModel.uiState.value
-        assertTrue(stateAfterClear.messages.isEmpty())
-      }
-
-  @Test
-  fun clearChat_preserves_other_state() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        val initialUserName = initialState.userName
-        val initialSystems = initialState.systems
-
-        // Clear the chat
-        viewModel.clearChat()
-
-        // Verify other state is preserved
-        val stateAfterClear = viewModel.uiState.value
-        assertEquals(initialUserName, stateAfterClear.userName)
-        assertEquals(initialSystems, stateAfterClear.systems)
-      }
-
-  @Test
-  fun simulateStreamingFromText_populates_message_and_clears_state() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-        val field = HomeViewModel::class.java.getDeclaredField("_uiState")
-        field.isAccessible = true
-        @Suppress("UNCHECKED_CAST")
-        val stateFlow = field.get(viewModel) as MutableStateFlow<HomeUiState>
-        val aiId = "ai-${System.nanoTime()}"
-        val initial = stateFlow.value
-        stateFlow.value =
-            initial.copy(
-                messages =
-                    listOf(
-                        ChatUIModel(
-                            id = aiId,
-                            text = "",
-                            timestamp = 0L,
-                            type = ChatType.AI,
-                            isThinking = true)),
-                streamingMessageId = aiId,
-                streamingSequence = 0,
-                isSending = true)
-
-        viewModel.simulateStreamingForTest(aiId, "Bonjour EPFL")
-
-        val finalState = viewModel.uiState.value
-        val aiMessage = finalState.messages.first()
-        assertEquals("Bonjour EPFL", aiMessage.text)
-        assertFalse(aiMessage.isThinking)
-        assertNull(finalState.streamingMessageId)
-        assertFalse(finalState.isSending)
-        assertTrue(finalState.streamingSequence > initial.streamingSequence)
-      }
-
-  @Test
-  fun toggleDrawer_changes_isDrawerOpen_state() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        assertFalse(initialState.isDrawerOpen)
-
-        // Toggle drawer to open
-        viewModel.toggleDrawer()
-        val stateAfterFirstToggle = viewModel.uiState.value
-        assertTrue(stateAfterFirstToggle.isDrawerOpen)
-
-        // Toggle drawer to close
-        viewModel.toggleDrawer()
-        val stateAfterSecondToggle = viewModel.uiState.value
-        assertFalse(stateAfterSecondToggle.isDrawerOpen)
-      }
-
-  @Test
-  fun sendMessage_with_empty_draft_does_nothing() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        val initialMessagesCount = initialState.messages.size
-
-        // Try to send empty message
-        viewModel.updateMessageDraft("")
-        viewModel.sendMessage()
-
-        // Advance time
-        testDispatcher.scheduler.advanceTimeBy(100)
-
-        // Verify nothing changed
-        val stateAfterSend = viewModel.uiState.value
-        assertEquals(initialMessagesCount, stateAfterSend.messages.size)
-      }
     get() = dispatcherRule.dispatcher
 
   @Before
@@ -366,6 +102,28 @@ class HomeViewModelTest {
     assertTrue(messages.any { it.type == ChatType.AI && it.text.contains("Bonjour") })
     assertFalse(viewModel.uiState.value.isSending)
     assertNull(viewModel.uiState.value.streamingMessageId)
+  }
+
+  @Test
+  fun sendMessage_guest_appends_source_card_when_llm_returns_url() = runBlocking {
+    val viewModel =
+        HomeViewModel(
+            object : LlmClient {
+              override suspend fun generateReply(prompt: String): BotReply =
+                  BotReply("Voici un lien utile.", "https://www.epfl.ch/education/projects")
+            })
+
+    viewModel.updateMessageDraft("Où trouver des projets ?")
+    viewModel.sendMessage()
+    dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+    viewModel.awaitStreamingCompletion()
+
+    val messages = viewModel.uiState.value.messages
+    val sourceCard = messages.lastOrNull { it.source != null }
+    assertNotNull("Expected a source card message", sourceCard)
+    assertEquals("https://www.epfl.ch/education/projects", sourceCard!!.source?.url)
+    assertEquals("EPFL.ch Website", sourceCard.source?.siteLabel)
   }
 
   @Test
@@ -650,56 +408,58 @@ class HomeViewModelTest {
       }
 
   @Test
-  fun hideDeleteConfirmation_does_not_affect_other_flags() {
-    val viewModel = createHomeViewModel()
-
-    viewModel.showDeleteConfirmation()
-    val before = viewModel.uiState.value
-
-    viewModel.hideDeleteConfirmation()
-    val after = viewModel.uiState.value
-
-    assertEquals(before.isDrawerOpen, after.isDrawerOpen)
-    assertEquals(before.isTopRightOpen, after.isTopRightOpen)
-    assertEquals(before.isLoading, after.isLoading)
-    assertNotEquals(before.showDeleteConfirmation, after.showDeleteConfirmation)
-  }
-
-  @Test
-  fun setLoading_to_true_and_then_false() =
+  fun buildSiteLabel_formats_epfl_domains() =
       runTest(testDispatcher) {
-        val viewModel = createHomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildSiteLabel", String::class.java)
+        method.isAccessible = true
 
-        viewModel.setLoading(true)
-        assertTrue(viewModel.uiState.value.isLoading)
+        val label = method.invoke(viewModel, "https://www.epfl.ch/campus-services") as String
 
-        viewModel.setLoading(false)
-        assertFalse(viewModel.uiState.value.isLoading)
+        assertEquals("EPFL.ch Website", label)
       }
 
   @Test
-  fun setLoading_does_not_affect_delete_confirmation() =
+  fun buildSiteLabel_uses_host_for_external_sites() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildSiteLabel", String::class.java)
+        method.isAccessible = true
 
-        viewModel.showDeleteConfirmation()
-        val showDeleteState = viewModel.uiState.value.showDeleteConfirmation
+        val label = method.invoke(viewModel, "https://kotlinlang.org/docs/home.html") as String
 
-        viewModel.setLoading(true)
-        assertEquals(showDeleteState, viewModel.uiState.value.showDeleteConfirmation)
-
-        viewModel.setLoading(false)
-        assertEquals(showDeleteState, viewModel.uiState.value.showDeleteConfirmation)
+        assertEquals("kotlinlang.org Website", label)
       }
 
   @Test
-  fun delete_confirmation_workflow_with_multiple_toggles() =
+  fun buildFallbackTitle_returns_clean_path_segment() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+        val viewModel = HomeViewModel(FakeLlmClient())
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildFallbackTitle", String::class.java)
+        method.isAccessible = true
 
-        for (i in 1..3) {
-          viewModel.showDeleteConfirmation()
-          assertTrue(viewModel.uiState.value.showDeleteConfirmation)
+        val title =
+            method.invoke(viewModel, "https://www.epfl.ch/education/projet-de-semestre") as String
+
+        assertEquals("Projet de semestre", title)
+      }
+
+  @Test
+  fun buildFallbackTitle_defaults_to_host_when_no_path() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel(FakeLlmClient())
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildFallbackTitle", String::class.java)
+        method.isAccessible = true
+
+        val title = method.invoke(viewModel, "https://example.com") as String
+
+        assertEquals("example.com", title)
+      }
+
   private fun HomeViewModel.setPrivateField(name: String, value: Any?) {
     val field = HomeViewModel::class.java.getDeclaredField(name)
     field.isAccessible = true

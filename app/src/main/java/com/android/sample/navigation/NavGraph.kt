@@ -119,9 +119,9 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
           composable(Routes.Home) {
             HomeScreen(
                 viewModel = homeViewModel,
-                onAction1Click = { /* TODO hook */ },
-                onAction2Click = { /* TODO hook */ },
-                onSendMessage = { /* TODO hook */ },
+                onAction1Click = { /* TODO hook */},
+                onAction2Click = { /* TODO hook */},
+                onSendMessage = { /* TODO hook */},
                 speechHelper = speechHelper,
                 onSignOut = {
                   homeViewModel.clearProfile()
@@ -142,9 +142,9 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
           composable(Routes.HomeWithDrawer) {
             HomeScreen(
                 viewModel = homeViewModel,
-                onAction1Click = { /* TODO hook */ },
-                onAction2Click = { /* TODO hook */ },
-                onSendMessage = { /* TODO hook */ },
+                onAction1Click = { /* TODO hook */},
+                onAction2Click = { /* TODO hook */},
+                onSendMessage = { /* TODO hook */},
                 speechHelper = speechHelper,
                 onSignOut = {
                   homeViewModel.clearProfile()

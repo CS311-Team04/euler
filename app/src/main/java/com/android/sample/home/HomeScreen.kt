@@ -334,8 +334,7 @@ fun HomeScreen(
                                       IconButton(
                                           onClick = onVoiceChatClick,
                                           modifier =
-                                              Modifier.fillMaxSize()
-                                                  .testTag(HomeTags.VoiceBtn)) {
+                                              Modifier.fillMaxSize().testTag(HomeTags.VoiceBtn)) {
                                             Icon(
                                                 Icons.Default.GraphicEq,
                                                 contentDescription = "Voice mode",

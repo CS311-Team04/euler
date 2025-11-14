@@ -7,13 +7,13 @@ import androidx.lifecycle.viewModelScope
 import com.android.sample.BuildConfig
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
-import com.android.sample.profile.UserProfile
-import com.android.sample.profile.UserProfileRepository
 import com.android.sample.conversations.AuthNotReadyException
 import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.MessageDTO
 import com.android.sample.llm.FirebaseFunctionsLlmClient
 import com.android.sample.llm.LlmClient
+import com.android.sample.profile.UserProfile
+import com.android.sample.profile.UserProfileRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
@@ -52,9 +52,9 @@ import kotlinx.coroutines.withContext
  */
 class HomeViewModel(
     private val profileRepository: com.android.sample.profile.ProfileDataSource =
-        UserProfileRepository()
+        UserProfileRepository(),
+    private val llmClient: LlmClient = FirebaseFunctionsLlmClient()
 ) : ViewModel() {
-  private val llmClient: LlmClient = FirebaseFunctionsLlmClient()
 
   companion object {
     private const val TAG = "HomeViewModel"
@@ -329,7 +329,6 @@ class HomeViewModel(
   }
 
   /** Control the top-right overflow menu visibility. */
-
   fun setTopRightOpen(open: Boolean) {
     _uiState.update { it.copy(isTopRightOpen = open) }
   }
@@ -620,8 +619,7 @@ class HomeViewModel(
                 .getHttpsCallable("generateTitleFn")
                 .call(mapOf("question" to question))
                 .await()
-        @Suppress("UNCHECKED_CAST")
-        val payload = res.getData() as? Map<*, *>
+        @Suppress("UNCHECKED_CAST") val payload = res.getData() as? Map<*, *>
         val t = payload?.get("title") as? String
         (t?.takeIf { it.isNotBlank() } ?: localTitleFrom(question)).also {
           Log.d(TAG, "fetchTitle(): generated='$it'")
