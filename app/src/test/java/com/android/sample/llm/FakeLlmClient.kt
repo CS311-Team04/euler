@@ -6,9 +6,9 @@ class FakeLlmClient : LlmClient {
   var nextReply: String = "test-reply"
   var failure: Throwable? = null
 
-  override suspend fun generateReply(prompt: String): String {
+  override suspend fun generateReply(prompt: String): BotReply {
     prompts += prompt
     failure?.let { throw it }
-    return nextReply
+    return BotReply(nextReply, null)
   }
 }

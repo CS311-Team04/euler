@@ -1,6 +1,7 @@
 package com.android.sample.llm
 
 import com.android.sample.BuildConfig
+import java.util.regex.Pattern
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -25,7 +26,7 @@ class HttpLlmClient(
   private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
   /** Performs a blocking HTTP call on [Dispatchers.IO] and returns the non-empty `reply` field. */
-  override suspend fun generateReply(prompt: String): String =
+  override suspend fun generateReply(prompt: String): BotReply =
       withContext(Dispatchers.IO) {
         if (endpoint.isBlank()) {
           throw IllegalStateException("LLM HTTP endpoint not configured")
@@ -48,37 +49,61 @@ class HttpLlmClient(
         val payloadString = """{"question":"$escapedPrompt"}"""
         val payload = payloadString.toRequestBody(jsonMediaType)
 
-        val request =
+        val builder =
             Request.Builder()
                 .url(endpoint)
                 .post(payload)
-                .apply {
-                  if (apiKey.isNotBlank()) {
-                    addHeader("x-api-key", apiKey)
-                  }
-                  addHeader("Content-Type", "application/json")
-                }
-                .build()
+                .addHeader("Content-Type", "application/json")
+
+        if (apiKey.isNotBlank()) {
+          // adapt header if your backend expects a different header (e.g. "x-api-key")
+          builder.addHeader("Authorization", "Bearer $apiKey")
+        }
+
+        val request = builder.build()
 
         client.newCall(request).execute().use { response ->
           if (!response.isSuccessful) {
-            throw IllegalStateException("LLM HTTP call failed with ${response.code}")
+            throw IllegalStateException("LLM HTTP error ${response.code}: ${response.message}")
           }
           val body =
-              response.body?.string()?.trim()?.takeIf { it.isNotEmpty() }
-                  ?: throw IllegalStateException("LLM HTTP response empty body")
-
-          // Parse JSON reply field using regex - simple approach for "reply":"value"
-          val replyPattern = """"reply"\s*:\s*"([^"]*)"""".toRegex()
-          val match = replyPattern.find(body)
-          val reply =
-              match?.groupValues?.getOrNull(1)
-                  ?: throw IllegalStateException("LLM HTTP reply empty")
-
-          if (reply.isBlank()) {
-            throw IllegalStateException("LLM HTTP reply empty")
-          }
-          reply
+              response.body?.string() ?: throw IllegalStateException("Empty LLM HTTP response")
+          return@withContext parseBotReply(body)
         }
       }
 }
+
+internal fun parseBotReply(body: String): BotReply {
+  if (body.isBlank()) {
+    throw IllegalStateException("Empty LLM HTTP response")
+  }
+  val replyText =
+      REPLY_REGEX.find(body)?.groupValues?.getOrNull(1)?.let(::unescapeJsonString)?.trim()?.takeIf {
+        it.isNotEmpty()
+      } ?: throw IllegalStateException("Empty LLM reply")
+
+  val url =
+      PRIMARY_URL_REGEX.find(body)
+          ?.groupValues
+          ?.getOrNull(1)
+          ?.let(::unescapeJsonString)
+          ?.trim()
+          ?.takeIf { it.isNotEmpty() }
+  return BotReply(replyText, url)
+}
+
+private fun unescapeJsonString(raw: String): String =
+    raw.replace("\\\"", "\"")
+        .replace("\\\\", "\\")
+        .replace("\\n", "\n")
+        .replace("\\r", "\r")
+        .replace("\\t", "\t")
+
+private val REPLY_REGEX =
+    Pattern.compile("\"reply\"\\s*:\\s*\"([^\"]*)\"", Pattern.DOTALL or Pattern.CASE_INSENSITIVE)
+        .toRegex()
+
+private val PRIMARY_URL_REGEX =
+    Pattern.compile(
+            "\"primary_url\"\\s*:\\s*\"([^\"]*)\"", Pattern.DOTALL or Pattern.CASE_INSENSITIVE)
+        .toRegex()

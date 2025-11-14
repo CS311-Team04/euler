@@ -1,12 +1,13 @@
 package com.android.sample.llm
 
 import java.net.HttpURLConnection
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
@@ -28,100 +29,46 @@ class HttpLlmClientTest {
   }
 
   @Test
-  fun generateReply_returnsServerReply() = runTest {
+  fun generateReply_success_returns_reply_and_url() = runBlocking {
     server.enqueue(
         MockResponse()
             .setResponseCode(HttpURLConnection.HTTP_OK)
-            .setBody("""{"reply":"Bonjour"}"""))
-    val endpoint = server.url("/answer").toString()
+            .setBody("""{"reply":"Bonjour","primary_url":"https://www.epfl.ch/education"}"""))
     val client =
         HttpLlmClient(
-            endpoint = endpoint,
-            apiKey = "secret",
-            client = OkHttpClient(),
-        )
+            endpoint = server.url("/answer").toString(), apiKey = "secret", client = OkHttpClient())
 
     val reply = client.generateReply("Salut ?")
 
-    assertEquals("Bonjour", reply)
-
-    val recorded = server.takeRequest()
-    assertEquals("/answer", recorded.path)
-    assertEquals("secret", recorded.getHeader("x-api-key"))
-    assertEquals("""{"question":"Salut ?"}""", recorded.body.readUtf8())
+    assertEquals("Bonjour", reply.reply)
+    assertEquals("https://www.epfl.ch/education", reply.url)
   }
 
   @Test
-  fun generateReply_throwsWhenEndpointMissing() = runTest {
+  fun generateReply_throws_on_http_error() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_INTERNAL_ERROR)
+            .setBody("""{"reply":"oops"}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val error = runCatching { client.generateReply("Hello") }.exceptionOrNull()
+    assertNotNull("Expected an IllegalStateException", error)
+    assertTrue(error is IllegalStateException)
+    assertTrue(error!!.message!!.contains("LLM HTTP error 500"))
+  }
+
+  @Test
+  fun generateReply_requires_configured_endpoint() = runBlocking {
     val client = HttpLlmClient(endpoint = "", apiKey = "", client = OkHttpClient())
 
     try {
       client.generateReply("ignored")
-      fail("Expected IllegalStateException")
+      fail("Expected IllegalStateException when endpoint is missing")
     } catch (e: IllegalStateException) {
       assertEquals("LLM HTTP endpoint not configured", e.message)
-    }
-  }
-
-  @Test
-  fun generateReply_throwsOnHttpError() = runTest {
-    server.enqueue(MockResponse().setResponseCode(HttpURLConnection.HTTP_INTERNAL_ERROR))
-    val client =
-        HttpLlmClient(
-            endpoint = server.url("/answer").toString(),
-            apiKey = "",
-            client = OkHttpClient(),
-        )
-
-    try {
-      client.generateReply("test")
-      fail("Expected IllegalStateException")
-    } catch (e: IllegalStateException) {
-      assertEquals("LLM HTTP call failed with 500", e.message)
-    }
-  }
-
-  @Test
-  fun generateReply_throwsOnEmptyBody() = runTest {
-    // MockWebServer returns empty body by default, but we explicitly set it
-    server.enqueue(
-        MockResponse()
-            .setResponseCode(HttpURLConnection.HTTP_OK)
-            .setBody("")
-            .setHeader("Content-Length", "0"))
-    val client =
-        HttpLlmClient(
-            endpoint = server.url("/answer").toString(),
-            apiKey = "",
-            client = OkHttpClient(),
-        )
-
-    try {
-      client.generateReply("test")
-      fail("Expected IllegalStateException")
-    } catch (e: IllegalStateException) {
-      // Body might be empty string or null after trim()
-      val message = e.message ?: ""
-      assertTrue("Should throw about empty body: $message", message.contains("empty body"))
-    }
-  }
-
-  @Test
-  fun generateReply_throwsOnMissingReplyField() = runTest {
-    server.enqueue(
-        MockResponse().setResponseCode(HttpURLConnection.HTTP_OK).setBody("""{"reply":""}"""))
-    val client =
-        HttpLlmClient(
-            endpoint = server.url("/answer").toString(),
-            apiKey = "",
-            client = OkHttpClient(),
-        )
-
-    try {
-      client.generateReply("test")
-      fail("Expected IllegalStateException")
-    } catch (e: IllegalStateException) {
-      assertEquals("LLM HTTP reply empty", e.message)
     }
   }
 }

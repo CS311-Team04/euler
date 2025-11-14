@@ -1,5 +1,7 @@
 package com.android.sample.home
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -17,22 +19,27 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -413,6 +420,24 @@ fun HomeScreen(
                             items(items = ui.messages, key = { it.id }) { item ->
                               val showLeadingDot =
                                   item.id == ui.streamingMessageId && item.text.isEmpty()
+
+                              // If this message carries a source, draw the card first
+                              if (item.source != null && !item.isThinking) {
+                                val context = androidx.compose.ui.platform.LocalContext.current
+                                SourceCard(
+                                    siteLabel = item.source.siteLabel,
+                                    title = item.source.title,
+                                    url = item.source.url,
+                                    retrievedAt = item.source.retrievedAt,
+                                    onVisit = {
+                                      val intent =
+                                          Intent(Intent.ACTION_VIEW, Uri.parse(item.source.url))
+                                      context.startActivity(intent)
+                                    })
+                                Spacer(Modifier.height(8.dp))
+                              }
+
+                              // Then render the usual chat bubble (for USER/AI text)
                               ChatMessage(
                                   message = item,
                                   modifier = Modifier.fillMaxWidth(),
@@ -694,6 +719,81 @@ internal fun AnimatedIntroTitle(modifier: Modifier = Modifier) {
                     textAlign = TextAlign.Center)
               }
         }
+      }
+}
+
+@Composable
+private fun SourceCard(
+    siteLabel: String,
+    title: String,
+    url: String,
+    retrievedAt: Long,
+    onVisit: () -> Unit
+) {
+  Column(
+      modifier =
+          Modifier.fillMaxWidth()
+              .clip(RoundedCornerShape(10.dp))
+              .background(Color(0xFF1C1C1E))
+              .padding(horizontal = 12.dp, vertical = 6.dp)) {
+        // Top line: “Retrieved from EPFL.ch Website”
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Icon(
+              imageVector = Icons.Default.CheckCircle,
+              contentDescription = null,
+              tint = Color(0xFF4CAF50), // green tick
+              modifier = Modifier.size(14.dp))
+          Spacer(Modifier.width(4.dp))
+          Text(
+              text = "Retrieved from  $siteLabel",
+              color = Color(0xFFBDBDBD),
+              style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp))
+        }
+
+        Spacer(Modifier.height(4.dp))
+
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+          // Title (ellipsized to one line)
+          Text(
+              text = url,
+              color = Color.White,
+              style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+              modifier = Modifier.weight(1f))
+
+          Spacer(Modifier.width(6.dp))
+
+          Button(
+              onClick = onVisit,
+              shape = RoundedCornerShape(6.dp),
+              contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+              colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))) {
+                Text("Visit")
+                Spacer(Modifier.width(6.dp))
+                Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Outlined.OpenInNew,
+                    contentDescription = null,
+                    modifier = Modifier.size(10.dp),
+                    tint = Color.White)
+              }
+        }
+
+        Spacer(Modifier.height(2.dp))
+
+        // Retrieved date
+        val dateStr =
+            remember(retrievedAt) {
+              val d =
+                  java.time.Instant.ofEpochMilli(retrievedAt)
+                      .atZone(java.time.ZoneId.systemDefault())
+                      .toLocalDate()
+              "%02d/%02d/%02d".format(d.dayOfMonth, d.monthValue, d.year % 100)
+            }
+        Text(
+            text = "Retrieved on $dateStr",
+            color = Color.Gray,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp))
       }
 }
 

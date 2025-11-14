@@ -21,7 +21,8 @@ class FirebaseFunctionsLlmClientTest {
 
     val result = client.generateReply("Question")
 
-    assertEquals(reply, result)
+    assertEquals(reply, result.reply)
+    assertNull(result.url)
   }
 
   @Test
@@ -31,7 +32,7 @@ class FirebaseFunctionsLlmClientTest {
 
     val result = client.generateReply("Hello")
 
-    assertEquals("fallback-response", result)
+    assertEquals("fallback-response", result.reply)
     assertEquals(listOf("Hello"), fallback.prompts)
   }
 
@@ -42,7 +43,7 @@ class FirebaseFunctionsLlmClientTest {
 
     val result = client.generateReply("Hi")
 
-    assertEquals("fallback-invalid", result)
+    assertEquals("fallback-invalid", result.reply)
     assertEquals(listOf("Hi"), fallback.prompts)
   }
 
@@ -53,7 +54,7 @@ class FirebaseFunctionsLlmClientTest {
 
     val result = client.generateReply("Ping")
 
-    assertEquals("fallback-empty", result)
+    assertEquals("fallback-empty", result.reply)
   }
 
   @Test(expected = IllegalStateException::class)
@@ -66,6 +67,18 @@ class FirebaseFunctionsLlmClientTest {
   fun generateReply_no_fallback_throws_on_empty_reply() = runTest {
     val client = clientWithResult(mapOf("reply" to ""), fallback = null)
     client.generateReply("Ping")
+  }
+
+  @Test
+  fun generateReply_success_includes_primary_url_when_present() = runTest {
+    val reply = "Answer with link"
+    val url = "https://www.epfl.ch/education/projects"
+    val client = clientWithResult(mapOf("reply" to reply, "primary_url" to url))
+
+    val result = client.generateReply("Question")
+
+    assertEquals(reply, result.reply)
+    assertEquals(url, result.url)
   }
 
   private fun clientWithResult(
@@ -95,9 +108,9 @@ class FirebaseFunctionsLlmClientTest {
   private class RecordingFallback(private val reply: String) : LlmClient {
     val prompts = mutableListOf<String>()
 
-    override suspend fun generateReply(prompt: String): String {
+    override suspend fun generateReply(prompt: String): BotReply {
       prompts += prompt
-      return reply
+      return BotReply(reply, null)
     }
   }
 }
