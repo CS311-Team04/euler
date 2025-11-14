@@ -77,11 +77,13 @@ class VoiceChatViewModel(
 
           try {
             val reply = withContext(ioDispatcher) { llmClient.generateReply(cleaned) }
-            val spokenText = sanitizeForSpeech(reply)
+            val spokenText = sanitizeForSpeech(reply.reply)
             val request =
                 SpeechRequest(text = spokenText, utteranceId = UUID.randomUUID().toString())
 
-            _uiState.update { it.copy(lastAiReply = reply, isGenerating = false, lastError = null) }
+            _uiState.update {
+              it.copy(lastAiReply = reply.reply, isGenerating = false, lastError = null)
+            }
 
             if (!_speechRequests.tryEmit(request)) {
               _speechRequests.emit(request)

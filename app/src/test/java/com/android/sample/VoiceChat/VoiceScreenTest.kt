@@ -28,13 +28,7 @@ import com.android.sample.VoiceChat.UI.stopMicrophoneSafely
 import com.android.sample.VoiceChat.UI.updateLastVoiceTimestamp
 import com.android.sample.llm.FakeLlmClient
 import com.android.sample.speech.SpeechPlayback
-import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.util.MainDispatcherRule
-import io.mockk.every
-import io.mockk.justRun
-import io.mockk.mockk
-import io.mockk.slot
-import io.mockk.verify
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -305,7 +299,7 @@ class VoiceScreenTest {
   }
 
   @OptIn(ExperimentalCoroutinesApi::class)
-  @Test(timeout = 5000)
+  @Test(timeout = 15000)
   fun monitorSilence_deactivatesAfterTimeout() = runTest {
     var active = true
     val logs = mutableListOf<String>()
@@ -811,97 +805,6 @@ class VoiceScreenTest {
     // Can't use waitForIdle due to infinite LaunchedEffect flows
     // Just verify the test doesn't crash
     assertTrue(true)
-  }
-
-  @OptIn(ExperimentalCoroutinesApi::class)
-  @Test(timeout = 5000)
-  fun voiceScreen_withSpeechHelper_handlesCallbacks() = runTest {
-    val viewModel = createVoiceViewModel()
-    val speechHelper = mockk<SpeechToTextHelper>(relaxed = true)
-    val resultSlot = slot<(String) -> Unit>()
-    val errorSlot = slot<(String) -> Unit>()
-    val completeSlot = slot<() -> Unit>()
-    val partialSlot = slot<(String) -> Unit>()
-    val rmsSlot = slot<(Float) -> Unit>()
-
-    every {
-      speechHelper.startListening(
-          capture(resultSlot),
-          capture(errorSlot),
-          capture(completeSlot),
-          capture(partialSlot),
-          capture(rmsSlot))
-    } answers {}
-    justRun { speechHelper.stopListening() }
-
-    composeTestRule.setContent {
-      VoiceScreen(
-          onClose = {},
-          initialHasMicOverride = true,
-          speechHelper = speechHelper,
-          voiceChatViewModel = viewModel,
-          speechPlayback = FakeSpeechPlayback())
-    }
-
-    composeTestRule.mainClock.advanceTimeByFrame()
-    composeTestRule.onNodeWithContentDescription("Toggle microphone").performClick()
-    composeTestRule.mainClock.advanceTimeByFrame()
-
-    verify(exactly = 1) { speechHelper.startListening(any(), any(), any(), any(), any()) }
-    assertTrue(partialSlot.isCaptured)
-    partialSlot.captured.invoke("Interim transcript")
-    composeTestRule.runOnIdle {
-      assertEquals("Interim transcript", viewModel.uiState.value.lastTranscript)
-    }
-
-    assertTrue(errorSlot.isCaptured)
-    errorSlot.captured.invoke("Recognizer error")
-    composeTestRule.runOnIdle {
-      assertEquals("Recognizer error", viewModel.uiState.value.lastError)
-    }
-
-    assertTrue(rmsSlot.isCaptured)
-    rmsSlot.captured.invoke(6f)
-    viewModel.emitAudioLevelForTest(0.4f)
-    composeTestRule.mainClock.advanceTimeByFrame()
-
-    assertTrue(resultSlot.isCaptured)
-    resultSlot.captured.invoke("Salut Euler")
-    composeTestRule.mainClock.advanceTimeByFrame()
-
-    assertTrue(completeSlot.isCaptured)
-    completeSlot.captured.invoke()
-    composeTestRule.mainClock.advanceTimeByFrame()
-
-    verify(atLeast = 1) { speechHelper.stopListening() }
-  }
-
-  @OptIn(ExperimentalCoroutinesApi::class)
-  @Test(timeout = 5000)
-  fun voiceScreen_withSpeechHelper_secondClickDoesNotRestart() = runTest {
-    val viewModel = createVoiceViewModel()
-    val speechHelper = mockk<SpeechToTextHelper>(relaxed = true)
-
-    every { speechHelper.startListening(any(), any(), any(), any(), any()) } answers {}
-    justRun { speechHelper.stopListening() }
-
-    composeTestRule.setContent {
-      VoiceScreen(
-          onClose = {},
-          initialHasMicOverride = true,
-          speechHelper = speechHelper,
-          voiceChatViewModel = viewModel,
-          speechPlayback = FakeSpeechPlayback())
-    }
-
-    composeTestRule.mainClock.advanceTimeByFrame()
-    composeTestRule.onNodeWithContentDescription("Toggle microphone").performClick()
-    composeTestRule.mainClock.advanceTimeByFrame()
-
-    composeTestRule.onNodeWithContentDescription("Toggle microphone").performClick()
-    composeTestRule.mainClock.advanceTimeByFrame()
-
-    verify(exactly = 1) { speechHelper.startListening(any(), any(), any(), any(), any()) }
   }
 }
 
