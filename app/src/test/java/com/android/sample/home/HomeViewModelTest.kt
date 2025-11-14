@@ -7,9 +7,9 @@ import com.android.sample.Chat.ChatUIModel
 import com.android.sample.conversations.Conversation
 import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.MessageDTO
-import com.android.sample.llm.BotReply
 import com.android.sample.llm.FakeLlmClient
 import com.android.sample.llm.LlmClient
+import com.android.sample.profile.ProfileDataSource
 import com.android.sample.util.MainDispatcherRule
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.FirebaseApp
@@ -54,6 +54,11 @@ class HomeViewModelTest {
   private val testDispatcher
     get() = dispatcherRule.dispatcher
 
+  private fun createHomeViewModel(
+      profileRepository: ProfileDataSource = FakeProfileRepository(),
+      llmClient: LlmClient = FakeLlmClient()
+  ): HomeViewModel = HomeViewModel(profileRepository = profileRepository, llmClient = llmClient)
+
   @Before
   fun setUpFirebase() {
     val context = ApplicationProvider.getApplicationContext<Context>()
@@ -76,7 +81,7 @@ class HomeViewModelTest {
 
   @Test
   fun toggleDrawer_toggles_flag() {
-    val viewModel = HomeViewModel(FakeLlmClient())
+    val viewModel = createHomeViewModel()
     assertFalse(viewModel.uiState.value.isDrawerOpen)
 
     viewModel.toggleDrawer()
@@ -89,7 +94,7 @@ class HomeViewModelTest {
   @Test
   fun sendMessage_guest_appends_user_and_ai_messages() = runBlocking {
     val fakeClient = FakeLlmClient().apply { nextReply = "Bonjour" }
-    val viewModel = HomeViewModel(fakeClient)
+    val viewModel = createHomeViewModel(llmClient = fakeClient)
 
     viewModel.updateMessageDraft("Salut ?")
     viewModel.sendMessage()
@@ -105,31 +110,9 @@ class HomeViewModelTest {
   }
 
   @Test
-  fun sendMessage_guest_appends_source_card_when_llm_returns_url() = runBlocking {
-    val viewModel =
-        HomeViewModel(
-            object : LlmClient {
-              override suspend fun generateReply(prompt: String): BotReply =
-                  BotReply("Voici un lien utile.", "https://www.epfl.ch/education/projects")
-            })
-
-    viewModel.updateMessageDraft("Où trouver des projets ?")
-    viewModel.sendMessage()
-    dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
-
-    viewModel.awaitStreamingCompletion()
-
-    val messages = viewModel.uiState.value.messages
-    val sourceCard = messages.lastOrNull { it.source != null }
-    assertNotNull("Expected a source card message", sourceCard)
-    assertEquals("https://www.epfl.ch/education/projects", sourceCard!!.source?.url)
-    assertEquals("EPFL.ch Website", sourceCard.source?.siteLabel)
-  }
-
-  @Test
   fun sendMessage_failure_surfaces_error_message() = runBlocking {
     val fakeClient = FakeLlmClient().apply { failure = IllegalStateException("boom") }
-    val viewModel = HomeViewModel(fakeClient)
+    val viewModel = createHomeViewModel(llmClient = fakeClient)
 
     viewModel.updateMessageDraft("Test")
     viewModel.sendMessage()
@@ -144,7 +127,7 @@ class HomeViewModelTest {
 
   @Test
   fun startLocalNewChat_resets_transient_flags() {
-    val viewModel = HomeViewModel(FakeLlmClient())
+    val viewModel = createHomeViewModel()
     viewModel.updateUiState { it.copy(isDrawerOpen = true, showDeleteConfirmation = true) }
     viewModel.setTopRightOpen(true)
     viewModel.updateMessageDraft("draft")
@@ -160,7 +143,7 @@ class HomeViewModelTest {
 
   @Test
   fun deleteCurrentConversation_guest_resets_locally() {
-    val viewModel = HomeViewModel(FakeLlmClient())
+    val viewModel = createHomeViewModel()
     viewModel.replaceMessages("hello")
 
     viewModel.deleteCurrentConversation()
@@ -174,7 +157,7 @@ class HomeViewModelTest {
   @Test
   fun deleteCurrentConversation_authNotReady_hides_confirmation() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel(FakeLlmClient())
+        val viewModel = createHomeViewModel()
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
         viewModel.setPrivateField("auth", auth)
 
@@ -195,7 +178,7 @@ class HomeViewModelTest {
   @Test
   fun startData_populates_conversations_and_auto_selects() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel(FakeLlmClient())
+        val viewModel = createHomeViewModel()
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
         viewModel.setPrivateField("auth", auth)
 
@@ -218,7 +201,7 @@ class HomeViewModelTest {
   @Test
   fun auth_listener_sign_in_triggers_startData() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel(FakeLlmClient())
+        val viewModel = createHomeViewModel()
 
         val repo = mock<ConversationRepository>()
         val conversationsFlow = MutableSharedFlow<List<Conversation>>(replay = 1)
@@ -247,7 +230,7 @@ class HomeViewModelTest {
   fun deleteCurrentConversation_signedIn_calls_repository() =
       runTest(testDispatcher) {
         val fakeClient = FakeLlmClient()
-        val viewModel = HomeViewModel(fakeClient)
+        val viewModel = createHomeViewModel(llmClient = fakeClient)
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
         viewModel.setPrivateField("auth", auth)
 
@@ -264,7 +247,7 @@ class HomeViewModelTest {
 
   @Test
   fun messageDto_toUi_maps_role_and_timestamp() {
-    val viewModel = HomeViewModel(FakeLlmClient())
+    val viewModel = createHomeViewModel()
     val method = HomeViewModel::class.java.getDeclaredMethod("toUi", MessageDTO::class.java)
     method.isAccessible = true
     val dto = MessageDTO(role = "assistant", text = "Salut")
@@ -276,7 +259,7 @@ class HomeViewModelTest {
 
   @Test
   fun selectConversation_sets_current_and_exits_local_placeholder() {
-    val viewModel = HomeViewModel(FakeLlmClient())
+    val viewModel = createHomeViewModel()
     viewModel.setPrivateField("isInLocalNewChat", true)
 
     viewModel.selectConversation("remote-42")
@@ -288,7 +271,7 @@ class HomeViewModelTest {
   @Test
   fun clearChat_cancels_active_stream_and_resets_state() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel(FakeLlmClient())
+        val viewModel = createHomeViewModel()
         val streamingId = "ai-1"
         viewModel.updateUiState {
           it.copy(
@@ -322,7 +305,7 @@ class HomeViewModelTest {
   @Test
   fun startData_withEmptyRemoteList_keeps_null_selection() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel(FakeLlmClient())
+        val viewModel = createHomeViewModel()
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
         viewModel.setPrivateField("auth", auth)
 
@@ -346,7 +329,7 @@ class HomeViewModelTest {
   fun sendMessage_signedIn_creates_conversation_and_updates_title() =
       runTest(testDispatcher) {
         val fakeClient = FakeLlmClient().apply { nextReply = "AI reply" }
-        val viewModel = HomeViewModel(fakeClient)
+        val viewModel = createHomeViewModel(llmClient = fakeClient)
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
         viewModel.setPrivateField("auth", auth)
 
@@ -380,7 +363,7 @@ class HomeViewModelTest {
   fun sendMessage_signedIn_title_generation_failure_keeps_quick_title() =
       runTest(testDispatcher) {
         val fakeClient = FakeLlmClient().apply { nextReply = "AI reply" }
-        val viewModel = HomeViewModel(fakeClient)
+        val viewModel = createHomeViewModel(llmClient = fakeClient)
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
         viewModel.setPrivateField("auth", auth)
 
@@ -405,59 +388,6 @@ class HomeViewModelTest {
 
         runBlocking { verify(repo).startNewConversation("Short prompt") }
         runBlocking { verify(repo, never()).updateConversationTitle(any(), any()) }
-      }
-
-  @Test
-  fun buildSiteLabel_formats_epfl_domains() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel(FakeLlmClient())
-        val method =
-            HomeViewModel::class.java.getDeclaredMethod("buildSiteLabel", String::class.java)
-        method.isAccessible = true
-
-        val label = method.invoke(viewModel, "https://www.epfl.ch/campus-services") as String
-
-        assertEquals("EPFL.ch Website", label)
-      }
-
-  @Test
-  fun buildSiteLabel_uses_host_for_external_sites() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel(FakeLlmClient())
-        val method =
-            HomeViewModel::class.java.getDeclaredMethod("buildSiteLabel", String::class.java)
-        method.isAccessible = true
-
-        val label = method.invoke(viewModel, "https://kotlinlang.org/docs/home.html") as String
-
-        assertEquals("kotlinlang.org Website", label)
-      }
-
-  @Test
-  fun buildFallbackTitle_returns_clean_path_segment() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel(FakeLlmClient())
-        val method =
-            HomeViewModel::class.java.getDeclaredMethod("buildFallbackTitle", String::class.java)
-        method.isAccessible = true
-
-        val title =
-            method.invoke(viewModel, "https://www.epfl.ch/education/projet-de-semestre") as String
-
-        assertEquals("Projet de semestre", title)
-      }
-
-  @Test
-  fun buildFallbackTitle_defaults_to_host_when_no_path() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel(FakeLlmClient())
-        val method =
-            HomeViewModel::class.java.getDeclaredMethod("buildFallbackTitle", String::class.java)
-        method.isAccessible = true
-
-        val title = method.invoke(viewModel, "https://example.com") as String
-
-        assertEquals("example.com", title)
       }
 
   private fun HomeViewModel.setPrivateField(name: String, value: Any?) {

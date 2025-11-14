@@ -58,7 +58,7 @@ class HomeScreenTestCov {
 
   @Test
   fun suggestions_are_displayed_initially() {
-    val viewModel = HomeViewModel(FakeLlmClient())
+    val viewModel = HomeViewModel(llmClient = FakeLlmClient())
 
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
@@ -69,7 +69,7 @@ class HomeScreenTestCov {
 
   @Test
   fun menu_button_opens_and_closes_drawer() {
-    val viewModel = HomeViewModel(FakeLlmClient())
+    val viewModel = HomeViewModel(llmClient = FakeLlmClient())
 
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
@@ -80,7 +80,7 @@ class HomeScreenTestCov {
 
   @Test
   fun new_chat_from_drawer_resets_state_and_closes() {
-    val viewModel = HomeViewModel(FakeLlmClient())
+    val viewModel = HomeViewModel(llmClient = FakeLlmClient())
     updateUiState(viewModel) {
       it.copy(currentConversationId = "conv-1", messageDraft = "draft", isDrawerOpen = true)
     }
@@ -103,7 +103,7 @@ class HomeScreenTestCov {
   @Test
   fun settings_from_drawer_invokes_callback() {
     var settingsCalled = false
-    val viewModel = HomeViewModel(FakeLlmClient())
+    val viewModel = HomeViewModel(llmClient = FakeLlmClient())
     updateUiState(viewModel) { it.copy(isDrawerOpen = true) }
 
     composeRule.setContent {
@@ -124,7 +124,7 @@ class HomeScreenTestCov {
   @Test
   fun voice_button_triggers_callback_when_visible() {
     var voiceCalled = false
-    val viewModel = HomeViewModel(FakeLlmClient())
+    val viewModel = HomeViewModel(llmClient = FakeLlmClient())
 
     composeRule.setContent {
       MaterialTheme { HomeScreen(viewModel = viewModel, onVoiceChatClick = { voiceCalled = true }) }
@@ -139,7 +139,7 @@ class HomeScreenTestCov {
   @Test
   fun send_message_updates_ui_state() {
     val fakeClient = FakeLlmClient().apply { nextReply = "Reply" }
-    val viewModel = HomeViewModel(fakeClient)
+    val viewModel = HomeViewModel(llmClient = fakeClient)
 
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
@@ -153,7 +153,7 @@ class HomeScreenTestCov {
 
   @Test
   fun openDrawerOnStart_opens_drawer_and_updates_state() {
-    val viewModel = HomeViewModel(FakeLlmClient())
+    val viewModel = HomeViewModel(llmClient = FakeLlmClient())
 
     composeRule.setContent {
       MaterialTheme { HomeScreen(viewModel = viewModel, openDrawerOnStart = true) }
@@ -172,7 +172,7 @@ class HomeScreenTestCov {
     var action1Called = false
     val sentMessages = mutableListOf<String>()
     val fakeClient = FakeLlmClient().apply { nextReply = "Sure" }
-    val viewModel = HomeViewModel(fakeClient)
+    val viewModel = HomeViewModel(llmClient = fakeClient)
 
     composeRule.setContent {
       MaterialTheme {
@@ -196,7 +196,7 @@ class HomeScreenTestCov {
 
   @Test
   fun pick_conversation_from_drawer_selects_and_closes() {
-    val viewModel = HomeViewModel(FakeLlmClient())
+    val viewModel = HomeViewModel(llmClient = FakeLlmClient())
     updateUiState(viewModel) {
       it.copy(
           conversations = listOf(Conversation(id = "remote-1", title = "Linear Algebra")),

@@ -632,7 +632,7 @@ class HomeScreenComposeInteractionsTest {
     FirebaseAuth.getInstance().signOut()
   }
 
-  private fun createViewModel(): HomeViewModel = HomeViewModel(FakeLlmClient())
+  private fun createViewModel(): HomeViewModel = HomeViewModel(llmClient = FakeLlmClient())
 
   @After
   fun tearDownMocks() {
