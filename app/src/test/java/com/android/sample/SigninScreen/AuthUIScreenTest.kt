@@ -1,29 +1,29 @@
-//package com.android.sample.signinscreen
+// package com.android.sample.signinscreen
 //
-//import androidx.compose.material3.MaterialTheme
-//import androidx.compose.ui.test.assertIsDisplayed
-//import androidx.compose.ui.test.assertIsEnabled
-//import androidx.compose.ui.test.hasContentDescription
-//import androidx.compose.ui.test.hasText
-//import androidx.compose.ui.test.junit4.createComposeRule
-//import androidx.compose.ui.test.onNodeWithTag
-//import androidx.compose.ui.test.onNodeWithText
-//import androidx.compose.ui.test.performClick
-//import com.android.sample.authentification.AuthProvider
-//import com.android.sample.authentification.AuthTags
-//import com.android.sample.authentification.AuthUIScreen
-//import com.android.sample.authentification.AuthUiState
-//import org.junit.Assert.*
-//import org.junit.Ignore
-//import org.junit.Rule
-//import org.junit.Test
-//import org.junit.runner.RunWith
-//import org.robolectric.RobolectricTestRunner
-//import org.robolectric.annotation.Config
+// import androidx.compose.material3.MaterialTheme
+// import androidx.compose.ui.test.assertIsDisplayed
+// import androidx.compose.ui.test.assertIsEnabled
+// import androidx.compose.ui.test.hasContentDescription
+// import androidx.compose.ui.test.hasText
+// import androidx.compose.ui.test.junit4.createComposeRule
+// import androidx.compose.ui.test.onNodeWithTag
+// import androidx.compose.ui.test.onNodeWithText
+// import androidx.compose.ui.test.performClick
+// import com.android.sample.authentification.AuthProvider
+// import com.android.sample.authentification.AuthTags
+// import com.android.sample.authentification.AuthUIScreen
+// import com.android.sample.authentification.AuthUiState
+// import org.junit.Assert.*
+// import org.junit.Ignore
+// import org.junit.Rule
+// import org.junit.Test
+// import org.junit.runner.RunWith
+// import org.robolectric.RobolectricTestRunner
+// import org.robolectric.annotation.Config
 //
-//@RunWith(RobolectricTestRunner::class)
-//@Config(sdk = [28])
-//class AuthUIScreenTest {
+// @RunWith(RobolectricTestRunner::class)
+// @Config(sdk = [28])
+// class AuthUIScreenTest {
 //
 //  @get:Rule val composeTestRule = createComposeRule()
 //
@@ -212,7 +212,8 @@
 //    composeTestRule.setContent {
 //      MaterialTheme {
 //        AuthUIScreen(
-//            state = AuthUiState.Idle, onMicrosoftLogin = { clicked = true }, onSwitchEduLogin = {})
+//            state = AuthUiState.Idle, onMicrosoftLogin = { clicked = true }, onSwitchEduLogin =
+// {})
 //      }
 //    }
 //    composeTestRule.waitForIdle()
@@ -226,7 +227,8 @@
 //    composeTestRule.setContent {
 //      MaterialTheme {
 //        AuthUIScreen(
-//            state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = { clicked = true })
+//            state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = { clicked = true
+// })
 //      }
 //    }
 //    composeTestRule.waitForIdle()
@@ -382,7 +384,8 @@
 //    }
 //    composeTestRule.waitForIdle()
 //    try {
-//      composeTestRule.onNodeWithTag(AuthTags.MsProgress, useUnmergedTree = true).assertIsDisplayed()
+//      composeTestRule.onNodeWithTag(AuthTags.MsProgress, useUnmergedTree =
+// true).assertIsDisplayed()
 //      fail("MsProgress should not exist when not loading")
 //    } catch (e: AssertionError) {
 //      // Expected - node does not exist
@@ -595,7 +598,8 @@
 //
 //  @Test
 //  @Ignore(
-//      "Skipped in CI: heavy Compose + Robolectric combination causes OOM when simulating multiple Microsoft clicks")
+//      "Skipped in CI: heavy Compose + Robolectric combination causes OOM when simulating multiple
+// Microsoft clicks")
 //  fun AuthUIScreen_handles_multiple_Microsoft_clicks() {
 //    var clickCount = 0
 //    composeTestRule.setContent {
@@ -735,4 +739,4 @@
 //        "Provider should be SWITCH_EDU",
 //        (state as AuthUiState.Loading).provider == AuthProvider.SWITCH_EDU)
 //  }
-//}
+// }
