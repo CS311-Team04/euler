@@ -39,7 +39,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
@@ -81,102 +80,110 @@ fun AuthUIScreen(
     onSwitchEduLogin: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-  Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).testTag(AuthTags.Root)) {
-    AnimatedVisibility(
-        visible = true,
-        enter =
-            fadeIn(animationSpec = tween(800)) +
-                slideInVertically(
-                    initialOffsetY = { it / 8 },
-                    animationSpec = tween(800, easing = FastOutSlowInEasing))) {
-          Box(
-              modifier =
-                  Modifier.fillMaxSize().padding(horizontal = 24.dp).testTag(AuthTags.Card)) {
+  Box(
+      modifier =
+          modifier
+              .fillMaxSize()
+              .background(MaterialTheme.colorScheme.background)
+              .testTag(AuthTags.Root)) {
+        AnimatedVisibility(
+            visible = true,
+            enter =
+                fadeIn(animationSpec = tween(800)) +
+                    slideInVertically(
+                        initialOffsetY = { it / 8 },
+                        animationSpec = tween(800, easing = FastOutSlowInEasing))) {
+              Box(
+                  modifier =
+                      Modifier.fillMaxSize().padding(horizontal = 24.dp).testTag(AuthTags.Card)) {
 
-                // Central content pinned to true center
-                Column(
-                    modifier = Modifier.align(Alignment.Center).fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally) {
-                      // Title split on two lines
-                      val screenHeight = LocalConfiguration.current.screenHeightDp.dp
-                      val titleUpOffset = (25).dp
-                      Text(
-                          text = "Ask anything,\ndo everything",
-                          style =
-                              MaterialTheme.typography.headlineLarge.copy(
-                                  fontFamily = FontFamily.Serif,
-                                  fontWeight = FontWeight.Normal,
-                                  fontSize = 40.sp,
-                                  lineHeight = 44.sp,
-                                  color = MaterialTheme.colorScheme.onBackground),
-                          textAlign = TextAlign.Center,
-                          modifier =
-                              Modifier.fillMaxWidth()
-                                  .offset(y = -titleUpOffset)
-                                  .testTag(AuthTags.Title))
+                    // Central content pinned to true center
+                    Column(
+                        modifier = Modifier.align(Alignment.Center).fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally) {
+                          // Title split on two lines
+                          val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+                          val titleUpOffset = (25).dp
+                          Text(
+                              text = "Ask anything,\ndo everything",
+                              style =
+                                  MaterialTheme.typography.headlineLarge.copy(
+                                      fontFamily = FontFamily.Serif,
+                                      fontWeight = FontWeight.Normal,
+                                      fontSize = 40.sp,
+                                      lineHeight = 44.sp,
+                                      color = MaterialTheme.colorScheme.onBackground),
+                              textAlign = TextAlign.Center,
+                              modifier =
+                                  Modifier.fillMaxWidth()
+                                      .offset(y = -titleUpOffset)
+                                      .testTag(AuthTags.Title))
 
-                      Spacer(modifier = Modifier.height(12.dp))
+                          Spacer(modifier = Modifier.height(12.dp))
 
-                      // Subtitle
-                      Text(
-                          text = "Welcome to EULER",
-                          style =
-                              MaterialTheme.typography.bodyLarge.copy(
-                                  fontFamily = FontFamily.SansSerif,
-                                  fontWeight = FontWeight.Normal,
-                                  fontSize = 16.sp,
-                                  color = MaterialTheme.colorScheme.onSurfaceVariant),
-                          textAlign = TextAlign.Center,
-                          modifier = Modifier.fillMaxWidth().testTag(AuthTags.Subtitle))
+                          // Subtitle
+                          Text(
+                              text = "Welcome to EULER",
+                              style =
+                                  MaterialTheme.typography.bodyLarge.copy(
+                                      fontFamily = FontFamily.SansSerif,
+                                      fontWeight = FontWeight.Normal,
+                                      fontSize = 16.sp,
+                                      color = MaterialTheme.colorScheme.onSurfaceVariant),
+                              textAlign = TextAlign.Center,
+                              modifier = Modifier.fillMaxWidth().testTag(AuthTags.Subtitle))
 
-                      Spacer(modifier = Modifier.height(40.dp))
+                          Spacer(modifier = Modifier.height(40.dp))
 
-                      // Buttons section
-                      val isMicrosoftLoading =
-                          state is AuthUiState.Loading && state.provider == AuthProvider.MICROSOFT
-                      val isGuestLoading =
-                          state is AuthUiState.Loading && state.provider == AuthProvider.SWITCH_EDU
+                          // Buttons section
+                          val isMicrosoftLoading =
+                              state is AuthUiState.Loading &&
+                                  state.provider == AuthProvider.MICROSOFT
+                          val isGuestLoading =
+                              state is AuthUiState.Loading &&
+                                  state.provider == AuthProvider.SWITCH_EDU
 
-                      // Microsoft Entra ID button
-                      MicrosoftEntraButton(
-                          enabled = !isMicrosoftLoading,
-                          isLoading = isMicrosoftLoading,
-                          onClick = onMicrosoftLogin,
-                          modifier = Modifier.testTag(AuthTags.BtnMicrosoft))
+                          // Microsoft Entra ID button
+                          MicrosoftEntraButton(
+                              enabled = !isMicrosoftLoading,
+                              isLoading = isMicrosoftLoading,
+                              onClick = onMicrosoftLogin,
+                              modifier = Modifier.testTag(AuthTags.BtnMicrosoft))
 
-                      Spacer(modifier = Modifier.height(16.dp))
+                          Spacer(modifier = Modifier.height(16.dp))
 
-                      // OR separator
-                      OrSeparator()
+                          // OR separator
+                          OrSeparator()
 
-                      Spacer(modifier = Modifier.height(16.dp))
+                          Spacer(modifier = Modifier.height(16.dp))
 
-                      // Guest button
-                      GuestButton(
-                          enabled = !isGuestLoading,
-                          isLoading = isGuestLoading,
-                          onClick = onSwitchEduLogin,
-                          modifier = Modifier.testTag(AuthTags.BtnSwitchEdu))
+                          // Guest button
+                          GuestButton(
+                              enabled = !isGuestLoading,
+                              isLoading = isGuestLoading,
+                              onClick = onSwitchEduLogin,
+                              modifier = Modifier.testTag(AuthTags.BtnSwitchEdu))
 
-                      // Space below buttons; show terms just below the guest button
-                      Spacer(modifier = Modifier.height(12.dp))
-                      PrivacyPolicyText(modifier = Modifier.testTag(AuthTags.TermsText))
-                    }
+                          // Space below buttons; show terms just below the guest button
+                          Spacer(modifier = Modifier.height(12.dp))
+                          PrivacyPolicyText(modifier = Modifier.testTag(AuthTags.TermsText))
+                        }
 
-                // Footer pinned to bottom-center: BY EPFL only
-                Column(
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally) {
-                      Text(
-                          text = "BY EPFL",
-                          style =
-                              MaterialTheme.typography.bodySmall.copy(
-                                  fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant),
-                          modifier = Modifier.testTag(AuthTags.ByEpflText))
-                    }
-              }
-        }
-  }
+                    // Footer pinned to bottom-center: BY EPFL only
+                    Column(
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally) {
+                          Text(
+                              text = "BY EPFL",
+                              style =
+                                  MaterialTheme.typography.bodySmall.copy(
+                                      fontSize = 12.sp,
+                                      color = MaterialTheme.colorScheme.onSurfaceVariant),
+                              modifier = Modifier.testTag(AuthTags.ByEpflText))
+                        }
+                  }
+            }
+      }
 }
 
 @Composable
@@ -270,17 +277,27 @@ private fun OrSeparator() {
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.Center) {
         // Left line
-        Box(modifier = Modifier.width(48.dp).height(1.dp).background(MaterialTheme.colorScheme.onSurfaceVariant))
+        Box(
+            modifier =
+                Modifier.width(48.dp)
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant))
         Spacer(modifier = Modifier.width(16.dp))
         // OR text
         Text(
             text = "OR",
             style =
                 MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.SansSerif))
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontFamily = FontFamily.SansSerif))
         Spacer(modifier = Modifier.width(16.dp))
         // Right line
-        Box(modifier = Modifier.width(48.dp).height(1.dp).background(MaterialTheme.colorScheme.onSurfaceVariant))
+        Box(
+            modifier =
+                Modifier.width(48.dp)
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant))
       }
 }
 
@@ -346,7 +363,9 @@ private fun PrivacyPolicyText(modifier: Modifier = Modifier) {
     withStyle(
         style =
             SpanStyle(
-                color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.SansSerif, fontSize = 11.sp)) {
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontFamily = FontFamily.SansSerif,
+                fontSize = 11.sp)) {
           append("By continuing, you acknowledge EPFL's ")
         }
     pushStringAnnotation(
