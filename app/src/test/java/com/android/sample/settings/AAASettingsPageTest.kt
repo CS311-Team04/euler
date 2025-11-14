@@ -1,7 +1,8 @@
 package com.android.sample.settings
 
+// import android.os.Looper // <-- FIX: No longer needed
+// import org.robolectric.Shadows.shadowOf // <-- FIX: No longer needed
 import android.content.Context
-import android.os.Looper
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -21,7 +22,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
 
@@ -29,7 +29,7 @@ import org.robolectric.annotation.LooperMode
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 @LooperMode(LooperMode.Mode.PAUSED)
-class SettingsPageTest {
+class AAASettingsPageTest {
   @get:Rule val composeTestRule = createComposeRule()
 
   private lateinit var context: Context
@@ -43,8 +43,6 @@ class SettingsPageTest {
     AppSettings.initialize(context)
     // Reset to English for consistent tests
     AppSettings.setLanguage(Language.EN)
-    // Flush any pending looper tasks from initialization
-    shadowOf(Looper.getMainLooper()).idle()
   }
 
   @After
@@ -53,16 +51,10 @@ class SettingsPageTest {
     Dispatchers.resetMain()
   }
 
-  // Helper to idle the main looper in PAUSED mode
-  private fun idleLooper() {
-    shadowOf(Looper.getMainLooper()).idle()
-  }
-
   @Test
   fun renders_all_core_elements() {
     composeTestRule.setContent { MaterialTheme { SettingsPage() } }
-    idleLooper()
-    composeTestRule.waitForIdle()
+    composeTestRule.waitForIdle() // This is the only line we need to wait.
 
     // Title
     composeTestRule.onNodeWithText(Localization.t("settings_title")).assertIsDisplayed()
@@ -86,15 +78,13 @@ class SettingsPageTest {
         SettingsPage(onBackClick = { backClicked = true }, onInfoClick = { infoClicked = true })
       }
     }
-    idleLooper()
     composeTestRule.waitForIdle()
 
     composeTestRule.onNodeWithContentDescription(Localization.t("close")).performClick()
-    idleLooper()
-    composeTestRule.waitForIdle()
+    composeTestRule.waitForIdle() // Let the click event finish
+
     composeTestRule.onNodeWithContentDescription(Localization.t("info")).performClick()
-    idleLooper()
-    composeTestRule.waitForIdle()
+    composeTestRule.waitForIdle() // Let the click event finish
 
     assertTrue(backClicked)
     assertTrue(infoClicked)
@@ -104,10 +94,13 @@ class SettingsPageTest {
   fun language_dropdown_allows_selection() {
     composeTestRule.setContent { MaterialTheme { SettingsPage() } }
     composeTestRule.waitForIdle()
+
     composeTestRule.onNodeWithText(Localization.t("speech_language")).performClick()
     composeTestRule.waitForIdle()
+
     composeTestRule.onNodeWithText("FR").performClick()
     composeTestRule.waitForIdle()
+
     composeTestRule.onNodeWithText("FR").assertIsDisplayed()
   }
 
@@ -118,11 +111,9 @@ class SettingsPageTest {
     composeTestRule.setContent {
       MaterialTheme { SettingsPage(onSignOut = { signOutClicked = true }) }
     }
-    idleLooper()
     composeTestRule.waitForIdle()
 
     composeTestRule.onNodeWithText(Localization.t("log_out")).performClick()
-    idleLooper()
     composeTestRule.waitForIdle()
 
     assertTrue(signOutClicked)

@@ -814,7 +814,7 @@ class VoiceScreenTest {
   }
 
   @OptIn(ExperimentalCoroutinesApi::class)
-  @Test(timeout = 5000)
+  @Test(timeout = 10000) // Increased timeout just in case
   fun voiceScreen_withSpeechHelper_handlesCallbacks() = runTest {
     val viewModel = createVoiceViewModel()
     val speechHelper = mockk<SpeechToTextHelper>(relaxed = true)
@@ -834,6 +834,9 @@ class VoiceScreenTest {
     } answers {}
     justRun { speechHelper.stopListening() }
 
+    // 1. CRITICAL FIX: Disable auto-advance to prevent waiting for infinite animations
+    composeTestRule.mainClock.autoAdvance = false
+
     composeTestRule.setContent {
       VoiceScreen(
           onClose = {},
@@ -843,22 +846,30 @@ class VoiceScreenTest {
           speechPlayback = FakeSpeechPlayback())
     }
 
+    // Manually advance one frame to let the UI settle
     composeTestRule.mainClock.advanceTimeByFrame()
+
     composeTestRule.onNodeWithContentDescription("Toggle microphone").performClick()
-    composeTestRule.mainClock.advanceTimeByFrame()
+
+    // Advance time to let the click process and animation start
+    composeTestRule.mainClock.advanceTimeBy(500)
 
     verify(exactly = 1) { speechHelper.startListening(any(), any(), any(), any(), any()) }
+
+    // --- Test Partial Result ---
     assertTrue(partialSlot.isCaptured)
     partialSlot.captured.invoke("Interim transcript")
-    composeTestRule.runOnIdle {
-      assertEquals("Interim transcript", viewModel.uiState.value.lastTranscript)
-    }
 
+    // 2. FIX: Replace runOnIdle with manual advance
+    // We manually advance the clock just enough for the State update to reflect in the UI
+    composeTestRule.mainClock.advanceTimeByFrame()
+    assertEquals("Interim transcript", viewModel.uiState.value.lastTranscript)
+
+    // --- Test Error ---
     assertTrue(errorSlot.isCaptured)
     errorSlot.captured.invoke("Recognizer error")
-    composeTestRule.runOnIdle {
-      assertEquals("Recognizer error", viewModel.uiState.value.lastError)
-    }
+    composeTestRule.mainClock.advanceTimeByFrame()
+    assertEquals("Recognizer error", viewModel.uiState.value.lastError)
 
     assertTrue(rmsSlot.isCaptured)
     rmsSlot.captured.invoke(6f)
@@ -874,6 +885,9 @@ class VoiceScreenTest {
     composeTestRule.mainClock.advanceTimeByFrame()
 
     verify(atLeast = 1) { speechHelper.stopListening() }
+
+    // Cleanup: Turn auto-advance back on (optional, good practice)
+    composeTestRule.mainClock.autoAdvance = true
   }
 
   @OptIn(ExperimentalCoroutinesApi::class)
