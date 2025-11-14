@@ -17,7 +17,6 @@ import androidx.test.core.app.ApplicationProvider
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
 import com.android.sample.conversations.Conversation
-import com.android.sample.home.SourceMeta
 import com.android.sample.llm.FakeLlmClient
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
@@ -261,10 +260,11 @@ class HomeScreenTestCov {
         listOf(
             aiMessage(
                 text = "Here is a link",
-                source = SourceMeta(
-                    siteLabel = "EPFL.ch Website",
-                    title = "Projet de Semestre",
-                    url = "https://www.epfl.ch/project"))))
+                source =
+                    SourceMeta(
+                        siteLabel = "EPFL.ch Website",
+                        title = "Projet de Semestre",
+                        url = "https://www.epfl.ch/project"))))
 
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
@@ -277,9 +277,7 @@ class HomeScreenTestCov {
     val viewModel = HomeViewModel(FakeLlmClient())
     updateUiState(viewModel) {
       it.copy(
-          messages = listOf(sampleMessage("Waiting")),
-          isSending = true,
-          streamingMessageId = null)
+          messages = listOf(sampleMessage("Waiting")), isSending = true, streamingMessageId = null)
     }
 
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
