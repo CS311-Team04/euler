@@ -943,11 +943,19 @@ class HomeScreenTest {
   }
 
   private fun waitAndClickMenuDelete(timeoutMillis: Long = 5_000) {
+    // First wait for the menu to be displayed
+    composeRule.waitUntilAtLeastOneExists(
+        hasTestTag(HomeTags.TopRightMenu), timeoutMillis = timeoutMillis)
+    // Then wait for the Delete item to appear
     composeRule.waitUntilAtLeastOneExists(hasText("Delete"), timeoutMillis = timeoutMillis)
     composeRule.onNodeWithText("Delete").performClick()
   }
 
   private fun waitAndClickMenuShare(timeoutMillis: Long = 5_000) {
+    // First wait for the menu to be displayed
+    composeRule.waitUntilAtLeastOneExists(
+        hasTestTag(HomeTags.TopRightMenu), timeoutMillis = timeoutMillis)
+    // Then wait for the Share item to appear
     composeRule.waitUntilAtLeastOneExists(hasText("Share"), timeoutMillis = timeoutMillis)
     composeRule.onNodeWithText("Share").performClick()
   }
