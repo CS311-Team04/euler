@@ -29,8 +29,7 @@ class AuthRepositoryTest {
     val methods = authRepositoryClass.declaredMethods
     val hasAuthStateMethod = methods.any { it.name == "getAuthState" }
 
-    // Since it's a property, it should be accessible through the interface
-    assertTrue("AuthRepository should have authState property", true)
+    assertTrue("AuthRepository should expose authState property", hasAuthStateMethod)
   }
 
   @Test
@@ -41,8 +40,7 @@ class AuthRepositoryTest {
     val methods = authRepositoryClass.declaredMethods
     val hasCurrentUserMethod = methods.any { it.name == "getCurrentUser" }
 
-    // Since it's a property, it should be accessible through the interface
-    assertTrue("AuthRepository should have currentUser property", true)
+    assertTrue("AuthRepository should have currentUser property", hasCurrentUserMethod)
   }
 
   @Test
@@ -53,8 +51,7 @@ class AuthRepositoryTest {
     val methods = authRepositoryClass.declaredMethods
     val hasConnectedUsersMethod = methods.any { it.name == "getConnectedUsers" }
 
-    // Since it's a property, it should be accessible through the interface
-    assertTrue("AuthRepository should have connectedUsers property", true)
+    assertTrue("AuthRepository should have connectedUsers property", hasConnectedUsersMethod)
   }
 
   @Test

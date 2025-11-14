@@ -27,7 +27,7 @@ object TestConstants {
 
   // Screen texts
   object ScreenTexts {
-    const val TITLE = "Ask anything, do everything"
+    const val TITLE = "Ask anything,\ndo everything"
     const val SUBTITLE = "Welcome to EULER"
     const val OR_SEPARATOR = "OR"
     const val BY_EPFL = "BY EPFL"

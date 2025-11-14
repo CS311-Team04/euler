@@ -102,7 +102,7 @@ class FirebaseFunctionsLlmClient(
                 return@withContext fallback?.generateReply(prompt)
                     ?: throw IllegalStateException("LLM service unavailable: timeout or cancelled")
             }
-            
+
             Log.d("FirebaseFunctionsLlmClient", "Received response from $FUNCTION_NAME, data type: ${result.getData()?.javaClass?.simpleName}")
 
             @Suppress("UNCHECKED_CAST")
@@ -136,15 +136,15 @@ class FirebaseFunctionsLlmClient(
         private const val FUNCTION_NAME = "answerWithRagFn"
         private const val DEFAULT_TIMEOUT_MS = 33_000L
 
-        /**
-         * Creates a region-scoped [FirebaseFunctions] instance and wires the local emulator when
-         * requested via build config flags.
-         */
-        private fun defaultFunctions(): FirebaseFunctions =
-            FirebaseFunctions.getInstance("us-central1").apply {
-                if (BuildConfig.USE_FUNCTIONS_EMULATOR) {
-                    useEmulator(BuildConfig.FUNCTIONS_HOST, BuildConfig.FUNCTIONS_PORT)
-                }
-            }
-    }
+    /**
+     * Creates a region-scoped [FirebaseFunctions] instance and wires the local emulator when
+     * requested via build config flags.
+     */
+    private fun defaultFunctions(): FirebaseFunctions =
+        FirebaseFunctions.getInstance(BuildConfig.FUNCTIONS_REGION).apply {
+          if (BuildConfig.USE_FUNCTIONS_EMULATOR) {
+            useEmulator(BuildConfig.FUNCTIONS_HOST, BuildConfig.FUNCTIONS_PORT)
+          }
+        }
+  }
 }

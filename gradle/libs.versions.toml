@@ -30,6 +30,7 @@ mockito = "5.8.0"
 mockk = "1.13.8"
 securityCrypto = "1.1.0-alpha06"
 msal = "4.3.0"
+datastore = "1.0.0"
 okhttp = "4.12.0"
 
 [libraries]
@@ -107,6 +108,9 @@ security-crypto = { group = "androidx.security", name = "security-crypto", versi
 
 msal = { group = "com.microsoft.identity.client", name = "msal", version.ref = "msal" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+
+datastore-core = { group = "androidx.datastore", name = "datastore-core", version.ref = "datastore" }
+datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
