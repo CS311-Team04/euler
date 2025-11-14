@@ -53,10 +53,11 @@ class HomeScreenTest {
       HomeViewModel(profileRepository = TestProfileRepository(), llmClient = llmClient)
 
   private fun setContentWithViewModel(
-      viewModel: HomeViewModel = createHomeViewModel(),
+      llmClient: LlmClient = FakeLlmClient(),
       content: @Composable (HomeViewModel) -> Unit
   ) {
     ensureFirebaseInitialized()
+    val viewModel = createHomeViewModel(llmClient)
     composeRule.setContent { MaterialTheme { content(viewModel) } }
   }
 
