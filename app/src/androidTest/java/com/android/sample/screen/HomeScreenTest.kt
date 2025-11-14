@@ -56,6 +56,7 @@ class HomeScreenTest {
       viewModel: HomeViewModel = createHomeViewModel(),
       content: @Composable (HomeViewModel) -> Unit
   ) {
+    ensureFirebaseInitialized()
     composeRule.setContent { MaterialTheme { content(viewModel) } }
   }
 
