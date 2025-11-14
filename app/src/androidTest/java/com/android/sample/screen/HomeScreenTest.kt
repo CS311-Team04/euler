@@ -11,6 +11,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -240,7 +241,7 @@ class HomeScreenTest {
     composeRule.onNodeWithTag(HomeTags.TopRightMenu).assertIsDisplayed()
 
     // Click "Delete" and expect confirmation modal
-    composeRule.onNodeWithText("Delete").performClick()
+    waitAndClickMenuDelete()
     composeRule.onNodeWithText("Clear Chat?").assertIsDisplayed()
 
     // Cancel should hide the modal
@@ -255,7 +256,7 @@ class HomeScreenTest {
 
     // Open menu -> Delete -> confirm Delete
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-    composeRule.onNodeWithText("Delete").performClick()
+    waitAndClickMenuDelete()
     composeRule.onNodeWithText("Clear Chat?").assertIsDisplayed()
     composeRule.onNodeWithText("Delete").performClick()
     composeRule.waitForIdle()
@@ -270,7 +271,7 @@ class HomeScreenTest {
 
     // Open menu and click Share, which calls onDismiss
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-    composeRule.onNodeWithText("Share").performClick()
+    waitAndClickMenuShare()
 
     // Menu should be dismissed (its items disappear)
     assertNodeDoesNotExist("Share")
@@ -380,7 +381,7 @@ class HomeScreenTest {
 
     // Open menu and click Delete
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-    composeRule.onNodeWithText("Delete").performClick()
+    waitAndClickMenuDelete()
 
     // The modal should be displayed
     composeRule.onNodeWithText("Clear Chat?").assertIsDisplayed()
@@ -396,7 +397,7 @@ class HomeScreenTest {
     setContentWithViewModel { vm -> HomeScreen(viewModel = vm) }
 
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-    composeRule.onNodeWithText("Delete").performClick()
+    waitAndClickMenuDelete()
 
     // Verify all modal texts
     composeRule.onNodeWithText("Clear Chat?").assertIsDisplayed()
@@ -508,7 +509,7 @@ class HomeScreenTest {
     setContentWithViewModel { vm -> HomeScreen(viewModel = vm) }
 
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-    composeRule.onNodeWithText("Delete").performClick()
+    waitAndClickMenuDelete()
 
     // Both callbacks should be called: onDeleteClick (shows modal) and onDismiss (closes menu)
     composeRule.onNodeWithText("Clear Chat?").assertIsDisplayed()
@@ -522,7 +523,7 @@ class HomeScreenTest {
 
     // Open menu -> Delete -> Confirm
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-    composeRule.onNodeWithText("Delete").performClick()
+    waitAndClickMenuDelete()
     composeRule.onNodeWithText("Clear Chat?").assertIsDisplayed()
     composeRule.onNodeWithText("Delete").performClick() // Confirm in the modal
     composeRule.waitForIdle()
@@ -538,7 +539,7 @@ class HomeScreenTest {
 
     // Open menu -> Delete -> Cancel
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-    composeRule.onNodeWithText("Delete").performClick()
+    waitAndClickMenuDelete()
     composeRule.onNodeWithText("Clear Chat?").assertIsDisplayed()
     composeRule.onNodeWithText("Cancel").performClick()
     composeRule.waitForIdle()
@@ -571,7 +572,7 @@ class HomeScreenTest {
     // Multiple open/close modal cycles
     for (i in 1..3) {
       composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-      composeRule.onNodeWithText("Delete").performClick()
+      waitAndClickMenuDelete()
       composeRule.onNodeWithText("Clear Chat?").assertIsDisplayed()
       composeRule.onNodeWithText("Cancel").performClick()
       assertNodeDoesNotExist("Clear Chat?")
@@ -604,11 +605,11 @@ class HomeScreenTest {
     composeRule.onNodeWithText("Delete").assertIsDisplayed()
 
     // Both items should be clickable
-    composeRule.onNodeWithText("Share").performClick()
+    waitAndClickMenuShare()
     composeRule.waitForIdle()
 
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-    composeRule.onNodeWithText("Delete").performClick()
+    waitAndClickMenuDelete()
     composeRule.waitForIdle()
   }
 
@@ -673,7 +674,7 @@ class HomeScreenTest {
     setContentWithViewModel { vm -> HomeScreen(viewModel = vm) }
 
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-    composeRule.onNodeWithText("Delete").performClick()
+    waitAndClickMenuDelete()
 
     composeRule.onNodeWithText("Clear Chat?").assertIsDisplayed()
 
@@ -692,7 +693,7 @@ class HomeScreenTest {
 
     // Open via the menu
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-    composeRule.onNodeWithText("Delete").performClick()
+    waitAndClickMenuDelete()
 
     // Now it should be visible
     composeRule.onNodeWithText("Clear Chat?").assertIsDisplayed()
@@ -742,7 +743,7 @@ class HomeScreenTest {
       composeRule.onNodeWithTag(HomeTags.TopRightMenu).assertIsDisplayed()
 
       // Close by clicking Share
-      composeRule.onNodeWithText("Share").performClick()
+      waitAndClickMenuShare()
       composeRule.waitForIdle()
     }
   }
@@ -754,7 +755,7 @@ class HomeScreenTest {
 
     // Complete workflow: open menu -> delete -> confirm
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-    composeRule.onNodeWithText("Delete").performClick()
+    waitAndClickMenuDelete()
     composeRule.onNodeWithText("Clear Chat?").assertIsDisplayed()
     composeRule.onNodeWithText("Delete").performClick()
     composeRule.waitForIdle()
@@ -939,5 +940,15 @@ class HomeScreenTest {
     composeRule.waitUntilAtLeastOneExists(
         hasTestTag(HomeTags.SendBtn), timeoutMillis = timeoutMillis)
     composeRule.onNodeWithTag(HomeTags.SendBtn).performClick()
+  }
+
+  private fun waitAndClickMenuDelete(timeoutMillis: Long = 5_000) {
+    composeRule.waitUntilAtLeastOneExists(hasText("Delete"), timeoutMillis = timeoutMillis)
+    composeRule.onNodeWithText("Delete").performClick()
+  }
+
+  private fun waitAndClickMenuShare(timeoutMillis: Long = 5_000) {
+    composeRule.waitUntilAtLeastOneExists(hasText("Share"), timeoutMillis = timeoutMillis)
+    composeRule.onNodeWithText("Share").performClick()
   }
 }
