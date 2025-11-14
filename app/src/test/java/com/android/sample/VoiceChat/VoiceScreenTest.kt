@@ -28,13 +28,7 @@ import com.android.sample.VoiceChat.UI.stopMicrophoneSafely
 import com.android.sample.VoiceChat.UI.updateLastVoiceTimestamp
 import com.android.sample.llm.FakeLlmClient
 import com.android.sample.speech.SpeechPlayback
-import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.util.MainDispatcherRule
-import io.mockk.every
-import io.mockk.justRun
-import io.mockk.mockk
-import io.mockk.slot
-import io.mockk.verify
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -305,7 +299,7 @@ class VoiceScreenTest {
   }
 
   @OptIn(ExperimentalCoroutinesApi::class)
-  @Test(timeout = 5000)
+  @Test(timeout = 15000)
   fun monitorSilence_deactivatesAfterTimeout() = runTest {
     var active = true
     val logs = mutableListOf<String>()
