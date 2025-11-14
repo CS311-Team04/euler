@@ -63,9 +63,9 @@ android {
 
         if (
             releaseStoreFile != null &&
-                releaseStorePassword != null &&
-                releaseKeyAlias != null &&
-                releaseKeyPassword != null
+            releaseStorePassword != null &&
+            releaseKeyAlias != null &&
+            releaseKeyPassword != null
         ) {
             create("release") {
                 storeFile = rootProject.file(releaseStoreFile)
@@ -274,6 +274,10 @@ dependencies {
     // Networking for HTTP clients (LLM access, etc.)
     implementation(libs.okhttp)
 
+    // DataStore for preferences
+    implementation(libs.datastore.core)
+    implementation(libs.datastore.preferences)
+
 }
 
 // JaCoCo configuration with Java 17 compatibility
@@ -357,7 +361,7 @@ sonar {
 
         // Basic source configuration - relative to project root
         property("sonar.sources", "src/main/java")
-        
+
         // Only add tests if directory exists and has content
         val testDir = file("src/test/java")
         if (testDir.exists() && testDir.listFiles()?.isNotEmpty() == true) {
@@ -366,13 +370,13 @@ sonar {
 
         // Basic exclusions
         property("sonar.exclusions", "**/build/**,**/R.java,**/R.kt,**/BuildConfig.*,**/*.xml,**/res/**")
-        
+
         // Coverage - only if report exists
         val coverageReport = file("${project.layout.buildDirectory.get()}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml")
         if (coverageReport.exists()) {
             property("sonar.coverage.jacoco.xmlReportPaths", coverageReport.absolutePath)
         }
-        
+
         // Test results - only if exists
         val testResults = file("${project.layout.buildDirectory.get()}/test-results/testDebugUnitTest")
         if (testResults.exists()) {
