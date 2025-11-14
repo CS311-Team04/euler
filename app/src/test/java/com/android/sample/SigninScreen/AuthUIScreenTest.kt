@@ -359,7 +359,6 @@ class AuthUIScreenTest {
     composeTestRule.onNode(hasText("Privacy Policy", substring = true)).assertIsDisplayed()
   }
 
-  @Ignore("Flaky under Robolectric limited heap on CI")
   @Test
   fun AuthUIScreen_privacy_policy_text_contains_acknowledge_text() {
     setContentWithAnimation {
