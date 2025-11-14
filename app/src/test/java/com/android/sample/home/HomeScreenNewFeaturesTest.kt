@@ -1,11 +1,17 @@
 package com.android.sample.home
 
+import android.content.Context
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.android.sample.settings.AppSettings
+import com.android.sample.settings.Language
+import com.android.sample.settings.Localization
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -23,27 +29,43 @@ class HomeScreenNewFeaturesTest {
 
   @get:Rule val composeTestRule = createComposeRule()
 
-  // Expected suggestions in the exact order they should appear
-  private val expectedSuggestions =
+  private lateinit var context: Context
+
+  @Before
+  fun setup() {
+    context = ApplicationProvider.getApplicationContext()
+    AppSettings.initialize(context)
+    Thread.sleep(100)
+    // Reset to English for consistent tests
+    AppSettings.setLanguage(Language.EN)
+    Thread.sleep(100)
+  }
+
+  // Expected suggestions in the exact order they should appear (using localization)
+  private fun getExpectedSuggestions() =
       listOf(
-          "Find CS220 past exams",
-          "Check my Moodle assignments",
-          "What's on Ed Discussion?",
-          "Show my IS-Academia schedule",
-          "Search EPFL Drive files")
+          Localization.t("intro_suggestion_1"),
+          Localization.t("intro_suggestion_2"),
+          Localization.t("intro_suggestion_3"),
+          Localization.t("intro_suggestion_4"),
+          Localization.t("intro_suggestion_5"))
 
   /** Test that AnimatedIntroTitle displays the correct title text. */
   @Test
   fun animatedIntroTitle_displaysCorrectTitle() {
     composeTestRule.setContent { AnimatedIntroTitle() }
 
-    composeTestRule.onNodeWithText("Ask Euler Anything").assertExists().assertIsDisplayed()
+    composeTestRule
+        .onNodeWithText(Localization.t("ask_euler_anything"))
+        .assertExists()
+        .assertIsDisplayed()
   }
 
   /** Test that AnimatedIntroTitle displays the first suggestion initially. */
   @Test
   fun animatedIntroTitle_displaysFirstSuggestionInitially() {
     composeTestRule.setContent { AnimatedIntroTitle() }
+    val expectedSuggestions = getExpectedSuggestions()
 
     composeTestRule.onNodeWithText(expectedSuggestions[0]).assertExists().assertIsDisplayed()
   }
@@ -52,6 +74,7 @@ class HomeScreenNewFeaturesTest {
   @Test
   fun animatedIntroTitle_containsAllExpectedSuggestions() {
     composeTestRule.setContent { AnimatedIntroTitle() }
+    val expectedSuggestions = getExpectedSuggestions()
 
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithText(expectedSuggestions[0]).assertExists()
@@ -60,6 +83,7 @@ class HomeScreenNewFeaturesTest {
   /** Test that AnimatedIntroTitle has correct number of suggestions. */
   @Test
   fun animatedIntroTitle_hasCorrectNumberOfSuggestions() {
+    val expectedSuggestions = getExpectedSuggestions()
     assertEquals(5, expectedSuggestions.size)
     assertEquals(5, expectedSuggestions.distinct().size)
   }
@@ -67,16 +91,18 @@ class HomeScreenNewFeaturesTest {
   /** Test that suggestions list contains expected content. */
   @Test
   fun suggestionsList_containsExpectedContent() {
-    assertEquals("Find CS220 past exams", expectedSuggestions[0])
-    assertEquals("Check my Moodle assignments", expectedSuggestions[1])
-    assertEquals("What's on Ed Discussion?", expectedSuggestions[2])
-    assertEquals("Show my IS-Academia schedule", expectedSuggestions[3])
-    assertEquals("Search EPFL Drive files", expectedSuggestions[4])
+    val expectedSuggestions = getExpectedSuggestions()
+    assertEquals(Localization.t("intro_suggestion_1"), expectedSuggestions[0])
+    assertEquals(Localization.t("intro_suggestion_2"), expectedSuggestions[1])
+    assertEquals(Localization.t("intro_suggestion_3"), expectedSuggestions[2])
+    assertEquals(Localization.t("intro_suggestion_4"), expectedSuggestions[3])
+    assertEquals(Localization.t("intro_suggestion_5"), expectedSuggestions[4])
   }
 
   /** Test that suggestions are unique. */
   @Test
   fun suggestionsList_allSuggestionsAreUnique() {
+    val expectedSuggestions = getExpectedSuggestions()
     val uniqueSuggestions = expectedSuggestions.distinct()
     assertEquals(
         "All suggestions should be unique", expectedSuggestions.size, uniqueSuggestions.size)
@@ -85,6 +111,7 @@ class HomeScreenNewFeaturesTest {
   /** Test that suggestions are non-empty strings. */
   @Test
   fun suggestionsList_allSuggestionsAreNonEmpty() {
+    val expectedSuggestions = getExpectedSuggestions()
     expectedSuggestions.forEach { suggestion ->
       assertTrue("Suggestion should not be empty: $suggestion", suggestion.isNotBlank())
     }
@@ -93,7 +120,7 @@ class HomeScreenNewFeaturesTest {
   /** Test index rotation logic: should wrap around when reaching the end. */
   @Test
   fun indexRotation_logic_wrapsAroundCorrectly() {
-    val size = expectedSuggestions.size
+    val size = getExpectedSuggestions().size
     var currentIndex = 0
 
     for (i in 0 until size * 2) {
@@ -117,7 +144,7 @@ class HomeScreenNewFeaturesTest {
   /** Test index rotation logic: handles starting at non-zero index. */
   @Test
   fun indexRotation_logic_handlesNonZeroStart() {
-    val size = expectedSuggestions.size
+    val size = getExpectedSuggestions().size
     var currentIndex = 3
 
     currentIndex = (currentIndex + 1) % size
@@ -329,7 +356,7 @@ class HomeScreenNewFeaturesTest {
   /** Test that suggestions index wraps correctly using modulo. */
   @Test
   fun suggestionsIndexModulo_wrapsCorrectly() {
-    val size = expectedSuggestions.size
+    val size = getExpectedSuggestions().size
     assertEquals(1, (0 + 1) % size)
     assertEquals(2, (1 + 1) % size)
     assertEquals(3, (2 + 1) % size)
@@ -360,10 +387,10 @@ class HomeScreenNewFeaturesTest {
     assertEquals(10, calculateLastIndex(10, true))
   }
 
-  /** Test that title text is exactly "Ask Euler Anything". */
+  /** Test that title text is exactly localized "ask_euler_anything". */
   @Test
   fun animatedIntroTitle_titleTextIsExact() {
-    val expectedTitle = "Ask Euler Anything"
+    val expectedTitle = Localization.t("ask_euler_anything")
     composeTestRule.setContent { AnimatedIntroTitle() }
 
     composeTestRule.onNodeWithText(expectedTitle, substring = false).assertExists()
@@ -372,6 +399,7 @@ class HomeScreenNewFeaturesTest {
   /** Test that suggestions contain expected keywords. */
   @Test
   fun suggestionsList_containExpectedKeywords() {
+    val expectedSuggestions = getExpectedSuggestions()
     assertTrue(expectedSuggestions[0].contains("CS220"))
     assertTrue(expectedSuggestions[1].contains("Moodle"))
     assertTrue(expectedSuggestions[2].contains("Ed Discussion"))
@@ -382,6 +410,7 @@ class HomeScreenNewFeaturesTest {
   /** Test that all suggestions are properly formatted. */
   @Test
   fun suggestionsList_allProperlyFormatted() {
+    val expectedSuggestions = getExpectedSuggestions()
     expectedSuggestions.forEach { suggestion ->
       assertNotNull(suggestion)
       assertEquals(suggestion, suggestion.trim())
@@ -392,7 +421,7 @@ class HomeScreenNewFeaturesTest {
   /** Test that index rotation handles boundary conditions. */
   @Test
   fun indexRotation_boundaryConditions() {
-    val size = expectedSuggestions.size
+    val size = getExpectedSuggestions().size
     assertEquals(0, (size - 1 + 1) % size)
     assertEquals(1, (0 + 1) % size)
     assertEquals(size - 1, (size - 2 + 1) % size)
