@@ -170,19 +170,6 @@ class HomeScreenTest {
   }
 
   @Test
-  fun HomeTags_all_constants_return_strings() {
-    assertTrue(HomeTags.Root is String)
-    assertTrue(HomeTags.MenuBtn is String)
-    assertTrue(HomeTags.TopRightBtn is String)
-    assertTrue(HomeTags.Action1Btn is String)
-    assertTrue(HomeTags.Action2Btn is String)
-    assertTrue(HomeTags.MessageField is String)
-    assertTrue(HomeTags.SendBtn is String)
-    assertTrue(HomeTags.Drawer is String)
-    assertTrue(HomeTags.TopRightMenu is String)
-  }
-
-  @Test
   fun HomeTags_constants_have_expected_prefix() {
     val expectedPrefix = "home_"
     assertTrue(HomeTags.Root.startsWith(expectedPrefix))
