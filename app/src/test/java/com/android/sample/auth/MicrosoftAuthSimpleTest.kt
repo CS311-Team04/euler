@@ -80,12 +80,14 @@ class MicrosoftAuthSimpleTest {
 
   @Test
   fun `MicrosoftAuth should handle environment variables`() {
-    // Test that environment variables can be accessed
-    val tenantId = System.getenv("MICROSOFT_TENANT_ID")
-    val domainHint = System.getenv("MICROSOFT_DOMAIN_HINT")
+    val accessSucceeded =
+        runCatching {
+              System.getenv("MICROSOFT_TENANT_ID")
+              System.getenv("MICROSOFT_DOMAIN_HINT")
+            }
+            .isSuccess
 
-    // These might be null in test environment, which is fine
-    assertTrue("Environment variables should be accessible", true)
+    assertTrue("Environment variables should be accessible", accessSucceeded)
   }
 
   @Test
