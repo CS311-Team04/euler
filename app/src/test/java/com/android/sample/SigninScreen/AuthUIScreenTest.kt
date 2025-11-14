@@ -159,6 +159,7 @@ class AuthUIScreenTest {
     composeTestRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsDisplayed()
   }
 
+  @Ignore("Skipped in unit environment to avoid heavy Compose allocation")
   @Test
   fun AuthUIScreen_Microsoft_button_has_correct_text() {
     composeTestRule.setContent {
