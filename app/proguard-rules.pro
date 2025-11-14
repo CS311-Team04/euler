@@ -50,3 +50,25 @@
 -keepclassmembers class * {
     @com.google.gson.annotations.SerializedName <fields>;
 }
+
+# --- Firebase Auth ---
+# Keep Firebase Auth classes (required for OAuthProvider in release builds)
+-keep class com.google.firebase.auth.** { *; }
+-keep class com.google.android.gms.internal.firebase-auth-api.** { *; }
+-dontwarn com.google.firebase.auth.**
+
+# Keep OAuthProvider specifically (used for Microsoft sign-in)
+-keep class com.google.firebase.auth.OAuthProvider { *; }
+-keep class com.google.firebase.auth.OAuthProvider$Builder { *; }
+-keep class com.google.firebase.auth.OAuthCredential { *; }
+
+# Keep Firebase core classes
+-keep class com.google.firebase.** { *; }
+-keep class com.google.android.gms.** { *; }
+-dontwarn com.google.android.gms.**
+
+# Keep startActivityForSignInWithProvider method
+-keepclassmembers class com.google.firebase.auth.FirebaseAuth {
+    public *** startActivityForSignInWithProvider(...);
+    public *** getPendingAuthResult();
+}
