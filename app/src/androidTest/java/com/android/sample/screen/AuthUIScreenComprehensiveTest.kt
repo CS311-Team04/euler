@@ -64,12 +64,13 @@ class AuthUIScreenComprehensiveTest {
 
   @Test
   fun renders_logos_row_in_idle_state() {
+    // Logos were removed by design. Keep test to ensure absence if needed:
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
-    composeRule.onNodeWithTag(AuthTags.LogosRow).assertIsDisplayed()
+    // No assertion here since the logos row no longer exists.
   }
 
   @Test
@@ -161,18 +162,12 @@ class AuthUIScreenComprehensiveTest {
 
   @Test
   fun logos_have_correct_content_descriptions() {
+    // Logos removed by design; skip content description checks.
     composeRule.setContent {
       MaterialTheme {
         AuthUIScreen(state = AuthUiState.Idle, onMicrosoftLogin = {}, onSwitchEduLogin = {})
       }
     }
-
-    composeRule
-        .onNode(hasContentDescription(TestConstants.ContentDescriptions.EPFL_LOGO))
-        .assertIsDisplayed()
-    composeRule
-        .onNode(hasContentDescription(TestConstants.ContentDescriptions.EULER_LOGO))
-        .assertIsDisplayed()
   }
 
   @Test
