@@ -204,59 +204,55 @@ class HomeViewModel(
                 if (cid == null) flowOf(emptyList()) else repo.messagesFlow(cid)
               }
               .collect { msgs ->
-                // IMPORTANT: si on est en train de streamer (placeholder + chunks),
-                // on NE REMPLACE PAS la liste par Firestore, sinon on perd le streaming visuel.
+
                 val streamingId = _uiState.value.streamingMessageId
                 if (streamingId != null) {
-                  // On ignore cette emission Firestore pendant le streaming
+
                   return@collect
                 }
 
-                // Pas de streaming en cours → on peut refléter Firestore tel quel
-                // MAIS on préserve TOUS les source cards existants (ils ne sont pas dans Firestore)
+
                 _uiState.update { currentState ->
                   val firestoreMessages = msgs.map { it.toUi() }
 
-                  // Collecter TOUS les source cards existants de l'UI (messages avec source mais
-                  // sans text)
+
                   val existingSourceCards =
                       currentState.messages.filter { it.source != null && it.text.isBlank() }
 
-                  // Construire la liste finale: messages Firestore + source cards préservés
+
                   val finalMessages = mutableListOf<ChatUIModel>()
 
-                  // D'abord, ajouter tous les messages Firestore
+
                   finalMessages.addAll(firestoreMessages)
 
-                  // Ensuite, préserver TOUS les source cards existants
-                  // On les ajoute après leur message assistant correspondant (si possible)
+
                   existingSourceCards.forEach { sourceCard ->
-                    // Chercher le message assistant qui précède ce source card dans l'UI originale
+
                     val originalIndex =
                         currentState.messages.indexOfFirst { it.id == sourceCard.id }
                     if (originalIndex > 0) {
-                      // Trouver le message assistant qui précède dans l'UI originale
+
                       val precedingAssistant = currentState.messages[originalIndex - 1]
                       if (precedingAssistant.type == ChatType.AI &&
                           precedingAssistant.text.isNotBlank()) {
-                        // Chercher ce message dans la nouvelle liste Firestore
+
                         val firestoreIndex =
                             finalMessages.indexOfFirst {
                               it.type == ChatType.AI && it.text == precedingAssistant.text
                             }
                         if (firestoreIndex >= 0) {
-                          // Insérer le source card après ce message assistant
+
                           finalMessages.add(firestoreIndex + 1, sourceCard)
                         } else {
-                          // Le message assistant n'est pas encore dans Firestore, ajouter à la fin
+
                           finalMessages.add(sourceCard)
                         }
                       } else {
-                        // Pas de message assistant précédent, ajouter à la fin
+
                         finalMessages.add(sourceCard)
                       }
                     } else {
-                      // Pas d'index valide, ajouter à la fin
+
                       finalMessages.add(sourceCard)
                     }
                   }
