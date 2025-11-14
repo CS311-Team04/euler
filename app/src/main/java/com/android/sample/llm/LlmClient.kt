@@ -83,7 +83,7 @@ class FirebaseFunctionsLlmClient(
      * requested via build config flags.
      */
     private fun defaultFunctions(): FirebaseFunctions =
-        FirebaseFunctions.getInstance("us-central1").apply {
+        FirebaseFunctions.getInstance(BuildConfig.FUNCTIONS_REGION).apply {
           if (BuildConfig.USE_FUNCTIONS_EMULATOR) {
             useEmulator(BuildConfig.FUNCTIONS_HOST, BuildConfig.FUNCTIONS_PORT)
           }
