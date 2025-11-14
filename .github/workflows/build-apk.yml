@@ -1,0 +1,124 @@
+name: Build Release APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Assemble Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Prepare local.properties
+        env:
+          LOCAL_PROPERTIES: ${{ secrets.LOCAL_PROPERTIES }}
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+          if [ -n "${LOCAL_PROPERTIES}" ]; then
+            echo "${LOCAL_PROPERTIES}" | base64 --decode > local.properties
+          else
+            : > local.properties
+          fi
+          if ! grep -q '^sdk.dir=' local.properties; then
+            echo "sdk.dir=$sdk_root" >> local.properties
+          fi
+
+      - name: Append release configuration
+        env:
+          RELEASE_STORE_FILE: ${{ secrets.RELEASE_STORE_FILE }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          LLM_HTTP_ENDPOINT: ${{ secrets.LLM_HTTP_ENDPOINT }}
+          LLM_HTTP_API_KEY: ${{ secrets.LLM_HTTP_API_KEY }}
+        run: |
+          set -euo pipefail
+          required_vars=(RELEASE_STORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD)
+          for var in "${required_vars[@]}"; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Missing required secret: ${var}" >&2
+              exit 1
+            fi
+          done
+          store_file="${RELEASE_STORE_FILE:-app/release-key.jks}"
+          {
+            echo "RELEASE_STORE_FILE=$store_file"
+            echo "RELEASE_STORE_PASSWORD=$RELEASE_STORE_PASSWORD"
+            echo "RELEASE_KEY_ALIAS=$RELEASE_KEY_ALIAS"
+            echo "RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD"
+          } >> local.properties
+          if [ -n "${GOOGLE_AI_API_KEY}" ]; then
+            echo "GOOGLE_AI_API_KEY=$GOOGLE_AI_API_KEY" >> local.properties
+          fi
+          if [ -n "${OPENAI_API_KEY}" ]; then
+            echo "OPENAI_API_KEY=$OPENAI_API_KEY" >> local.properties
+          fi
+          if [ -n "${LLM_HTTP_ENDPOINT}" ]; then
+            echo "LLM_HTTP_ENDPOINT=$LLM_HTTP_ENDPOINT" >> local.properties
+          fi
+          if [ -n "${LLM_HTTP_API_KEY}" ]; then
+            echo "LLM_HTTP_API_KEY=$LLM_HTTP_API_KEY" >> local.properties
+          fi
+
+      - name: Decode google-services.json
+        env:
+          GOOGLE_SERVICES: ${{ secrets.GOOGLE_SERVICES }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GOOGLE_SERVICES}" ]; then
+            echo "::error::Missing required secret: GOOGLE_SERVICES" >&2
+            exit 1
+          fi
+          echo "${GOOGLE_SERVICES}" | base64 --decode > app/google-services.json
+
+      - name: Decode release keystore
+        env:
+          RELEASE_KEYSTORE: ${{ secrets.RELEASE_KEYSTORE }}
+          RELEASE_STORE_FILE: ${{ secrets.RELEASE_STORE_FILE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RELEASE_KEYSTORE}" ]; then
+            echo "::error::Missing required secret: RELEASE_KEYSTORE" >&2
+            exit 1
+          fi
+          store_file="${RELEASE_STORE_FILE:-app/release-key.jks}"
+          mkdir -p "$(dirname "$store_file")"
+          echo "${RELEASE_KEYSTORE}" | base64 --decode > "$store_file"
+
+      - name: Make Gradle executable
+        run: chmod +x ./gradlew
+
+      - name: Assemble release APK
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+

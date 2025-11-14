@@ -11,6 +11,16 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
+import com.android.sample.VoiceChat.UI.LevelSource
+import com.android.sample.VoiceChat.UI.VisualPreset
+import com.android.sample.VoiceChat.UI.VoiceVisualizer
+import com.android.sample.VoiceChat.UI.buildBloomPath
+import com.android.sample.VoiceChat.UI.calculateBloomParameters
+import com.android.sample.VoiceChat.UI.calculateCanvasMetrics
+import com.android.sample.VoiceChat.UI.calculateLegacyPulseMetrics
+import com.android.sample.VoiceChat.UI.calculateRippleParameters
+import com.android.sample.VoiceChat.UI.createBloomDrawInstructions
+import com.android.sample.VoiceChat.UI.createRippleCircles
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.*
@@ -29,7 +39,14 @@ class VoiceVisualizerTest {
   @Test
   fun voiceVisualizer_withDefaultPreset_displays() {
     val testSource = TestLevelSource(flowOf(0.4f))
-    composeTestRule.setContent { VoiceVisualizer(levelSource = testSource, size = 100.dp) }
+    composeTestRule.setContent {
+      VoiceVisualizer(
+          levelSource = testSource,
+          preset = VisualPreset.Bloom,
+          color = Color(0xFFB61919),
+          petals = 10,
+          size = 100.dp)
+    }
     composeTestRule.onRoot().assertIsDisplayed()
   }
 
@@ -37,7 +54,12 @@ class VoiceVisualizerTest {
   fun voiceVisualizer_pre33_ripplePresetFallsBack() {
     val testSource = TestLevelSource(flowOf(0.2f))
     composeTestRule.setContent {
-      VoiceVisualizer(levelSource = testSource, preset = VisualPreset.Ripple, size = 96.dp)
+      VoiceVisualizer(
+          levelSource = testSource,
+          preset = VisualPreset.Ripple,
+          color = Color(0xFFB61919),
+          petals = 10,
+          size = 96.dp)
     }
     composeTestRule.onRoot().assertIsDisplayed()
   }
@@ -50,7 +72,13 @@ class VoiceVisualizerTest {
 
     try {
       composeTestRule.setContent {
-        VoiceVisualizer(levelSource = source, size = 160.dp, onLevelUpdate = { observed.add(it) })
+        VoiceVisualizer(
+            levelSource = source,
+            preset = VisualPreset.Bloom,
+            color = Color(0xFFB61919),
+            petals = 10,
+            size = 160.dp,
+            onLevelUpdate = { observed.add(it) })
       }
       composeTestRule.waitForIdle()
 
@@ -80,7 +108,13 @@ class VoiceVisualizerTest {
 
     try {
       composeTestRule.setContent {
-        VoiceVisualizer(levelSource = source, size = 120.dp, onLevelUpdate = { observed.add(it) })
+        VoiceVisualizer(
+            levelSource = source,
+            preset = VisualPreset.Bloom,
+            color = Color(0xFFB61919),
+            petals = 10,
+            size = 120.dp,
+            onLevelUpdate = { observed.add(it) })
       }
       composeTestRule.waitForIdle()
 
@@ -107,6 +141,7 @@ class VoiceVisualizerTest {
         VoiceVisualizer(
             levelSource = source,
             preset = VisualPreset.Ripple,
+            petals = 10,
             color = Color.Magenta,
             size = 180.dp,
             onLevelUpdate = { observed.add(it) })
@@ -173,7 +208,12 @@ class VoiceVisualizerTest {
     composeTestRule.setContent {
       showVisualizer = remember { mutableStateOf(true) }
       if (showVisualizer.value) {
-        VoiceVisualizer(levelSource = source, size = 120.dp)
+        VoiceVisualizer(
+            levelSource = source,
+            preset = VisualPreset.Bloom,
+            color = Color(0xFFB61919),
+            petals = 10,
+            size = 120.dp)
       }
     }
     composeTestRule.waitForIdle()
@@ -199,7 +239,12 @@ class VoiceVisualizerTest {
       showVisualizer = remember { mutableStateOf(true) }
       levelSourceState = remember { mutableStateOf<LevelSource>(first) }
       if (showVisualizer.value) {
-        VoiceVisualizer(levelSource = levelSourceState.value, size = 140.dp)
+        VoiceVisualizer(
+            levelSource = levelSourceState.value,
+            preset = VisualPreset.Bloom,
+            color = Color(0xFFB61919),
+            petals = 10,
+            size = 140.dp)
       }
     }
 

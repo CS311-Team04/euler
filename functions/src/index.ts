@@ -1,5 +1,4 @@
 // functions/src/index.ts
-
 import path from "node:path";
 import dotenv from "dotenv";
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
@@ -62,12 +61,40 @@ export async function apertusChatFnCore({
 }
 
 /* =========================================================
+ *            GENERATE CONVERSATION TITLE (Apertus)
+ * ======================================================= */
+type GenerateTitleInput = { question: string; model?: string };
+
+export async function generateTitleCore({ question, model }: GenerateTitleInput) {
+  const prompt = [
+    "Generate a concise conversation title (4-5 words max, no trailing punctuation).",
+    `User's first question: "${question.trim()}"`,
+    "Return ONLY the title.",
+  ].join("\n");
+
+  // reuse the same Apertus client
+  const { reply } = await apertusChatFnCore({
+    messages: [{ role: "user", content: prompt }],
+    model,
+    temperature: 0.2,
+  });
+
+  const title = (reply || "")
+    .replace(/\s+/g, " ")
+    .replace(/^["'“”]+|["'“”]+$/g, "")
+    .trim()
+    .slice(0, 60);
+
+  return { title: title || "New conversation" };
+}
+
+/* =========================================================
  *                   QDRANT HELPERS
  * ======================================================= */
 // named dense vector to match hybrid collection schema
 type QdrantPoint = { id: string | number; vector: { dense: number[] }; payload?: any };
 
-// collection is already created with hybrid schema; only verify existence
+// collection already created with hybrid schema; only verify existence
 async function qdrantEnsureCollection(_: number) {
   const base = process.env.QDRANT_URL!;
   const key = process.env.QDRANT_API_KEY!;
@@ -75,7 +102,7 @@ async function qdrantEnsureCollection(_: number) {
   const res = await fetch(`${base}/collections/${coll}`, { headers: { "api-key": key } });
   if (!res.ok) {
     const t = await res.text().catch(() => "");
-    throw new Error(`Qdrant collection "${coll}" not found or not accessible: ${res.status} ${t}`);
+    throw new Error(`Qdrant collection "${coll}" not found: ${res.status} ${t}`);
   }
 }
 
@@ -95,13 +122,17 @@ async function qdrantUpsert(points: QdrantPoint[]) {
 }
 
 // retrieval knobs
-const MAX_CANDIDATES = 24;        // wider pool for better recall
-const MAX_DOCS       = 3;         // distinct sources to include
-const MAX_PER_DOC    = 2;         // chunks per source
-const CONTEXT_BUDGET = 1600;      // total chars across all chunks
-const SNIPPET_LIMIT  = 600;       // per-chunk truncate
+const MAX_CANDIDATES = 24;
+const MAX_DOCS       = 3;
+const MAX_PER_DOC    = 2;
+const CONTEXT_BUDGET = 1600;
+const SNIPPET_LIMIT  = 600;
 
-// --- RRF fusion helper ---
+// gates
+const SCORE_GATE = 0.35; // top score must be >= to use context
+const SMALL_TALK = /^(hi|hello|salut|yo|coucou|hey|who are you|ça va|tu vas bien|bonjour|bonsoir)\b/i;
+
+// --- RRF fusion ---
 function rrfFuse<T extends { id: any }>(
   dense: Array<T & { _rank: number }>,
   sparse: Array<T & { _rank: number }>,
@@ -122,7 +153,7 @@ function rrfFuse<T extends { id: any }>(
     .map(v => ({ ...v.item, score: v.score }));
 }
 
-// --- dense-only search for NAMED vector schema ---
+// dense-only search for NAMED vector schema
 async function qdrantSearchDenseNamed(
   denseVec: number[],
   topK = 24,
@@ -133,6 +164,7 @@ async function qdrantSearchDenseNamed(
     limit: topK,
     with_payload: true,
     with_vector: false,
+    score_threshold: 0.25,
   };
   if (filter) body.filter = filter;
 
@@ -146,11 +178,10 @@ async function qdrantSearchDenseNamed(
   );
   if (!r.ok) throw new Error(`dense search failed: ${r.status} ${await r.text()}`);
   const j = await r.json();
-  // annotate rank so RRF is stable
   return (j.result ?? []).map((h: any, i: number) => ({ ...h, _rank: i })) as Array<any>;
 }
 
-// --- sparse-only search using query text (needs sparse_vectors in collection) ---
+// sparse-only search using query text
 async function qdrantSearchSparseText(
   queryText: string,
   topK = 24,
@@ -161,6 +192,7 @@ async function qdrantSearchSparseText(
     limit: topK,
     with_payload: true,
     with_vector: false,
+    score_threshold: 0.25,
   };
   if (filter) body.filter = filter;
 
@@ -177,24 +209,20 @@ async function qdrantSearchSparseText(
   return (j.result ?? []).map((h: any, i: number) => ({ ...h, _rank: i })) as Array<any>;
 }
 
-// --- hybrid with safe fallback (NO /points/query) ---
+// hybrid with safe fallback
 async function qdrantSearchHybrid(
   denseVec: number[],
   queryText: string,
   topK = 24,
   filter?: any
 ) {
-  // run dense always
   const dense = await qdrantSearchDenseNamed(denseVec, topK, filter);
-
-  // try sparse; if it fails (older Qdrant or missing sparse_vectors), fall back to dense-only
   let sparse: Array<any> = [];
   try {
     sparse = await qdrantSearchSparseText(queryText, topK, filter);
   } catch {
-    return dense; // dense-only fallback
+    return dense; // fallback
   }
-
   const fused = rrfFuse(dense, sparse, 60);
   return fused.slice(0, topK);
 }
@@ -276,7 +304,7 @@ export async function indexChunksCore({ chunks }: IndexChunksInput) {
   await qdrantEnsureCollection(dim);
   const points = vectors.map((v, i) => ({
     id: normalizePointId(chunks[i].id),
-    vector: { dense: v }, // named dense vector
+    vector: { dense: v },
     payload: {
       original_id: chunks[i].id,
       text: chunks[i].text,
@@ -296,52 +324,68 @@ export async function indexChunksCore({ chunks }: IndexChunksInput) {
 type AnswerWithRagInput = { question: string; topK?: number; model?: string };
 
 export async function answerWithRagCore({ question, topK, model }: AnswerWithRagInput) {
-  const [queryVec] = await embedInBatches([question], 1, 0);
+  const q = question.trim();
 
-  // server-side hybrid search
-  const raw = await qdrantSearchHybrid(queryVec, question, Math.max(topK ?? 0, MAX_CANDIDATES));
+  // Gate 1: skip retrieval on small talk
+  const isSmallTalk = SMALL_TALK.test(q) && q.length <= 30;
 
-  // group by source (url first, fallback title)
-  const groups = new Map<string, Array<typeof raw[number]>>();
-  for (const h of raw) {
-    const key = (h.payload?.url || h.payload?.title || String(h.id)).toString();
-    if (!groups.has(key)) groups.set(key, []);
-    const arr = groups.get(key)!;
-    if (arr.length < MAX_PER_DOC) arr.push(h);
-  }
+  let chosen: Array<{ title?: string; url?: string; text: string; score: number }> = [];
+  let bestScore = 0;
 
-  // assemble diversified context under a strict budget
-  const orderedGroups = Array.from(groups.values())
-    .sort((a, b) => (b[0].score ?? 0) - (a[0].score ?? 0))
-    .slice(0, MAX_DOCS);
+  if (!isSmallTalk) {
+    const [queryVec] = await embedInBatches([q], 1, 0);
+    const raw = await qdrantSearchHybrid(queryVec, q, Math.max(topK ?? 0, MAX_CANDIDATES));
 
-  let budget = CONTEXT_BUDGET;
-  const chosen: Array<{ title?: string; url?: string; text: string; score: number }> = [];
+    bestScore = raw[0]?.score ?? 0;
 
-  for (const g of orderedGroups) {
-    for (const h of g) {
-      const title = h.payload?.title as string | undefined;
-      const url   = h.payload?.url as string | undefined;
-      const txt   = String(h.payload?.text ?? "").slice(0, SNIPPET_LIMIT);
-      const snippet = txt;
-      if (snippet.length + 50 > budget) continue;
-      chosen.push({ title, url, text: snippet, score: h.score ?? 0 });
-      budget -= (snippet.length + 50);
+    // Gate 2: drop weak matches
+    if (bestScore >= SCORE_GATE) {
+      // group by source (url first, fallback title)
+      const groups = new Map<string, Array<typeof raw[number]>>();
+      for (const h of raw) {
+        const key = (h.payload?.url || h.payload?.title || String(h.id)).toString();
+        if (!groups.has(key)) groups.set(key, []);
+        const arr = groups.get(key)!;
+        if (arr.length < MAX_PER_DOC) arr.push(h);
+      }
+
+      // assemble diversified context under a budget
+      const orderedGroups = Array.from(groups.values())
+        .sort((a, b) => (b[0].score ?? 0) - (a[0].score ?? 0))
+        .slice(0, MAX_DOCS);
+
+      let budget = CONTEXT_BUDGET;
+      for (const g of orderedGroups) {
+        for (const h of g) {
+          const title = h.payload?.title as string | undefined;
+          const url   = h.payload?.url as string | undefined;
+          const txt   = String(h.payload?.text ?? "").slice(0, SNIPPET_LIMIT);
+          if (txt.length + 50 > budget) continue;
+          chosen.push({ title, url, text: txt, score: h.score ?? 0 });
+          budget -= (txt.length + 50);
+        }
+      }
     }
   }
 
-  // numbered context
-  const context = chosen.map((c, i) => {
-    const head = c.title ? `[${i+1}] ${c.title}` : `[${i+1}]`;
-    const src  = c.url ? `\nSource: ${c.url}` : "";
-    return `${head}\n${c.text}${src}`;
-  }).join("\n\n");
+  // build context only if we kept chunks
+  const context =
+    chosen.length === 0
+      ? ""
+      : chosen
+          .map((c, i) => {
+            const head = c.title ? `[${i + 1}] ${c.title}` : `[${i + 1}]`;
+            const src  = c.url ? `\nSource: ${c.url}` : "";
+            return `${head}\n${c.text}${src}`;
+          })
+          .join("\n\n");
 
   const prompt = [
     "Tu es un assistant concis. Utilise le contexte fourni (plusieurs extraits) et cite les indices [1], [2], etc.",
     context ? `\nContexte:\n${context}\n` : "\n(Contexte vide)\n",
-    `Question: ${question}`,
+    `Question: ${q}`,
     "Si l'information n'est pas dans le contexte, dis que tu ne sais pas.",
+    "À la fin, écris EXACTEMENT: USED_CONTEXT=YES si tu as utilisé un extrait du contexte, sinon USED_CONTEXT=NO."
   ].join("\n");
 
   const chat = await chatClient.chat.completions.create({
@@ -351,9 +395,19 @@ export async function answerWithRagCore({ question, topK, model }: AnswerWithRag
     max_tokens: 400,
   });
 
+  const rawReply = chat.choices?.[0]?.message?.content ?? "";
+  const marker = rawReply.match(/USED_CONTEXT=(YES|NO)\s*$/i);
+  const usedContextByModel = marker ? marker[1].toUpperCase() === "YES" : false;
+  const reply = rawReply.replace(/\s*USED_CONTEXT=(YES|NO)\s*$/i, "").trim();
+
+  // Only expose a URL when BOTH gates pass: we have chosen context and the model says it used it
+  const primary_url = (chosen.length > 0 && usedContextByModel) ? (chosen[0]?.url ?? null) : null;
+
   return {
-    reply: chat.choices?.[0]?.message?.content ?? "",
-    sources: chosen.map((c, i) => ({ idx: i+1, title: c.title, url: c.url, score: c.score })),
+    reply,
+    primary_url,
+    best_score: bestScore,
+    sources: chosen.map((c, i) => ({ idx: i + 1, title: c.title, url: c.url, score: c.score })),
   };
 }
 
@@ -384,10 +438,10 @@ export const answerWithRagFn = functions.https.onCall(async (data: AnswerWithRag
 });
 
 // HTTP endpoints (for Python)
-const INDEX_API_KEY = process.env.INDEX_API_KEY || ""; // set in functions/.env
+const INDEX_API_KEY = process.env.INDEX_API_KEY || "";
 
 function checkKey(req: functions.https.Request) {
-  if (!INDEX_API_KEY) return; // no key configured -> open (dev only)
+  if (!INDEX_API_KEY) return;
   if (req.get("x-api-key") !== INDEX_API_KEY) {
     const e = new Error("unauthorized");
     (e as any).code = 401;
@@ -397,32 +451,29 @@ function checkKey(req: functions.https.Request) {
 
 export const indexChunksHttp = functions.https.onRequest(async (req, res) => {
   try {
-    if (req.method !== "POST") {
-      res.status(405).end();
-      return;
-    }
+    if (req.method !== "POST") { res.status(405).end(); return; }
     checkKey(req);
     const out = await indexChunksCore(req.body as IndexChunksInput);
     res.status(200).json(out);
-    return;
   } catch (e: any) {
     res.status(e.code === 401 ? 401 : 400).json({ error: String(e) });
-    return;
   }
 });
 
 export const answerWithRagHttp = functions.https.onRequest(async (req, res) => {
   try {
-    if (req.method !== "POST") {
-      res.status(405).end();
-      return;
-    }
+    if (req.method !== "POST") { res.status(405).end(); return; }
     checkKey(req);
     const out = await answerWithRagCore(req.body as AnswerWithRagInput);
     res.status(200).json(out);
-    return;
   } catch (e: any) {
     res.status(e.code === 401 ? 401 : 400).json({ error: String(e) });
-    return;
   }
+});
+
+export const generateTitleFn = functions.https.onCall(async (data: GenerateTitleInput) => {
+  const q = String(data?.question || "").trim();
+  const model = data?.model;
+  if (!q) throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
+  return await generateTitleCore({ question: q, model });
 });

@@ -11,11 +11,15 @@ data class HomeUiState(
     val systems: List<SystemItem> = emptyList(),
     val messages: List<ChatUIModel> = emptyList(),
     val messageDraft: String = "",
+    val streamingMessageId: String? = null,
+    val streamingSequence: Int = 0,
     val isDrawerOpen: Boolean = false,
     val isTopRightOpen: Boolean = false,
     val isLoading: Boolean = false,
     val showDeleteConfirmation: Boolean = false,
-    val isSending: Boolean = false
+    val isSending: Boolean = false,
+    val conversations: List<com.android.sample.conversations.Conversation> = emptyList(),
+    val currentConversationId: String? = null
 )
 
 /** Represents an EPFL system (e.g., IS-Academia, Moodle, Drive) and its connection state. */

@@ -1,1104 +1,515 @@
 package com.android.sample.home
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
+import com.android.sample.conversations.Conversation
+import com.android.sample.conversations.ConversationRepository
+import com.android.sample.conversations.MessageDTO
+import com.android.sample.llm.BotReply
+import com.android.sample.llm.FakeLlmClient
+import com.android.sample.llm.LlmClient
 import com.android.sample.util.MainDispatcherRule
+import com.google.android.gms.tasks.Tasks
+import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.functions.FirebaseFunctions
+import com.google.firebase.functions.HttpsCallableReference
+import com.google.firebase.functions.HttpsCallableResult
 import java.util.UUID
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.mockito.kotlin.any
+import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.timeout
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [31])
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
 
-  @get:Rule val mainDispatcherRule = MainDispatcherRule()
+  @get:Rule val dispatcherRule = MainDispatcherRule()
   private val testDispatcher
-    get() = mainDispatcherRule.dispatcher
+    get() = dispatcherRule.dispatcher
+
+  @Before
+  fun setUpFirebase() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    if (FirebaseApp.getApps(context).isEmpty()) {
+      FirebaseApp.initializeApp(
+          context,
+          FirebaseOptions.Builder()
+              .setApplicationId("1:1234567890:android:test")
+              .setProjectId("test-project")
+              .setApiKey("fake-api-key")
+              .build())
+    }
+    FirebaseAuth.getInstance().signOut()
+  }
+
+  @After
+  fun tearDownFirebase() {
+    FirebaseAuth.getInstance().signOut()
+  }
+
+  @Test
+  fun toggleDrawer_toggles_flag() {
+    val viewModel = HomeViewModel(FakeLlmClient())
+    assertFalse(viewModel.uiState.value.isDrawerOpen)
+
+    viewModel.toggleDrawer()
+    assertTrue(viewModel.uiState.value.isDrawerOpen)
+
+    viewModel.toggleDrawer()
+    assertFalse(viewModel.uiState.value.isDrawerOpen)
+  }
+
+  @Test
+  fun sendMessage_guest_appends_user_and_ai_messages() = runBlocking {
+    val fakeClient = FakeLlmClient().apply { nextReply = "Bonjour" }
+    val viewModel = HomeViewModel(fakeClient)
+
+    viewModel.updateMessageDraft("Salut ?")
+    viewModel.sendMessage()
+    dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+    viewModel.awaitStreamingCompletion()
+
+    val messages = viewModel.uiState.value.messages
+    assertTrue(messages.any { it.type == ChatType.USER && it.text == "Salut ?" })
+    assertTrue(messages.any { it.type == ChatType.AI && it.text.contains("Bonjour") })
+    assertFalse(viewModel.uiState.value.isSending)
+    assertNull(viewModel.uiState.value.streamingMessageId)
+  }
+
+  @Test
+  fun sendMessage_guest_appends_source_card_when_llm_returns_url() = runBlocking {
+    val viewModel =
+        HomeViewModel(
+            object : LlmClient {
+              override suspend fun generateReply(prompt: String): BotReply =
+                  BotReply("Voici un lien utile.", "https://www.epfl.ch/education/projects")
+            })
+
+    viewModel.updateMessageDraft("Où trouver des projets ?")
+    viewModel.sendMessage()
+    dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+    viewModel.awaitStreamingCompletion()
+
+    val messages = viewModel.uiState.value.messages
+    val sourceCard = messages.lastOrNull { it.source != null }
+    assertNotNull("Expected a source card message", sourceCard)
+    assertEquals("https://www.epfl.ch/education/projects", sourceCard!!.source?.url)
+    assertEquals("EPFL.ch Website", sourceCard.source?.siteLabel)
+  }
+
+  @Test
+  fun sendMessage_failure_surfaces_error_message() = runBlocking {
+    val fakeClient = FakeLlmClient().apply { failure = IllegalStateException("boom") }
+    val viewModel = HomeViewModel(fakeClient)
+
+    viewModel.updateMessageDraft("Test")
+    viewModel.sendMessage()
+    dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+    viewModel.awaitStreamingCompletion()
+
+    val aiMessage = viewModel.uiState.value.messages.firstOrNull { it.type == ChatType.AI }
+    assertNotNull(aiMessage)
+    assertTrue(aiMessage!!.text.contains("Erreur") || aiMessage.text.contains("error", true))
+  }
+
+  @Test
+  fun startLocalNewChat_resets_transient_flags() {
+    val viewModel = HomeViewModel(FakeLlmClient())
+    viewModel.updateUiState { it.copy(isDrawerOpen = true, showDeleteConfirmation = true) }
+    viewModel.setTopRightOpen(true)
+    viewModel.updateMessageDraft("draft")
+
+    viewModel.startLocalNewChat()
+
+    val state = viewModel.uiState.value
+    assertTrue(state.isDrawerOpen) // drawer state unchanged by startLocalNewChat()
+    assertFalse(state.showDeleteConfirmation)
+    assertEquals("", state.messageDraft)
+    assertTrue(state.messages.isEmpty())
+  }
+
+  @Test
+  fun deleteCurrentConversation_guest_resets_locally() {
+    val viewModel = HomeViewModel(FakeLlmClient())
+    viewModel.replaceMessages("hello")
+
+    viewModel.deleteCurrentConversation()
+    dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+    val state = viewModel.uiState.value
+    assertTrue(state.messages.isEmpty())
+    assertNull(state.currentConversationId)
+  }
+
+  @Test
+  fun deleteCurrentConversation_authNotReady_hides_confirmation() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel(FakeLlmClient())
+        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+        viewModel.setPrivateField("auth", auth)
+
+        val repo = mock<ConversationRepository>()
+        runBlocking { whenever(repo.deleteConversation("conv-1")).thenAnswer {} }
+        viewModel.setPrivateField("repo", repo)
+
+        viewModel.updateUiState {
+          it.copy(currentConversationId = "conv-1", showDeleteConfirmation = true)
+        }
+
+        viewModel.deleteCurrentConversation()
+        dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.showDeleteConfirmation)
+      }
+
+  @Test
+  fun startData_populates_conversations_and_auto_selects() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel(FakeLlmClient())
+        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+        viewModel.setPrivateField("auth", auth)
+
+        val repo = mock<ConversationRepository>()
+        val conversationsFlow = MutableSharedFlow<List<Conversation>>(replay = 1)
+        whenever(repo.conversationsFlow()).thenReturn(conversationsFlow)
+        whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
+        viewModel.setPrivateField("repo", repo)
+        viewModel.setPrivateField("isInLocalNewChat", false)
+
+        viewModel.invokeStartData()
+        advanceUntilIdle()
+
+        conversationsFlow.emit(listOf(Conversation(id = "conv-1", title = "First")))
+        advanceUntilIdle()
+
+        assertEquals("conv-1", viewModel.uiState.value.currentConversationId)
+      }
+
+  @Test
+  fun auth_listener_sign_in_triggers_startData() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel(FakeLlmClient())
+
+        val repo = mock<ConversationRepository>()
+        val conversationsFlow = MutableSharedFlow<List<Conversation>>(replay = 1)
+        whenever(repo.conversationsFlow()).thenReturn(conversationsFlow)
+        whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
+        viewModel.setPrivateField("repo", repo)
+        viewModel.setPrivateField("lastUid", null)
+
+        val listenerField = HomeViewModel::class.java.getDeclaredField("authListener")
+        listenerField.isAccessible = true
+        val listener = listenerField.get(viewModel) as FirebaseAuth.AuthStateListener
+
+        val signedInAuth = mock<FirebaseAuth>()
+        val user = mock<FirebaseUser>()
+        whenever(signedInAuth.currentUser).thenReturn(user)
+        whenever(user.uid).thenReturn("user-123")
+        viewModel.setPrivateField("auth", signedInAuth)
+
+        listener.onAuthStateChanged(signedInAuth)
+        advanceUntilIdle()
+
+        runBlocking { verify(repo, timeout(1_000)).conversationsFlow() }
+      }
+
+  @Test
+  fun deleteCurrentConversation_signedIn_calls_repository() =
+      runTest(testDispatcher) {
+        val fakeClient = FakeLlmClient()
+        val viewModel = HomeViewModel(fakeClient)
+        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+        viewModel.setPrivateField("auth", auth)
+
+        val repo = mock<ConversationRepository>()
+        viewModel.setPrivateField("repo", repo)
+
+        viewModel.updateUiState { it.copy(currentConversationId = "conv-1") }
+
+        viewModel.deleteCurrentConversation()
+        dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+        runBlocking { verify(repo).deleteConversation("conv-1") }
+      }
+
+  @Test
+  fun messageDto_toUi_maps_role_and_timestamp() {
+    val viewModel = HomeViewModel(FakeLlmClient())
+    val method = HomeViewModel::class.java.getDeclaredMethod("toUi", MessageDTO::class.java)
+    method.isAccessible = true
+    val dto = MessageDTO(role = "assistant", text = "Salut")
+
+    val chat = method.invoke(viewModel, dto) as ChatUIModel
+    assertEquals(ChatType.AI, chat.type)
+    assertEquals("Salut", chat.text)
+  }
+
+  @Test
+  fun selectConversation_sets_current_and_exits_local_placeholder() {
+    val viewModel = HomeViewModel(FakeLlmClient())
+    viewModel.setPrivateField("isInLocalNewChat", true)
+
+    viewModel.selectConversation("remote-42")
+
+    assertEquals("remote-42", viewModel.uiState.value.currentConversationId)
+    assertFalse(viewModel.getBooleanField("isInLocalNewChat"))
+  }
+
+  @Test
+  fun clearChat_cancels_active_stream_and_resets_state() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel(FakeLlmClient())
+        val streamingId = "ai-1"
+        viewModel.updateUiState {
+          it.copy(
+              messages =
+                  listOf(
+                      ChatUIModel(
+                          id = "user-1", text = "Hello", timestamp = 0L, type = ChatType.USER),
+                      ChatUIModel(
+                          id = streamingId,
+                          text = "thinking",
+                          timestamp = 0L,
+                          type = ChatType.AI,
+                          isThinking = true)),
+              streamingMessageId = streamingId,
+              isSending = true,
+              streamingSequence = 3)
+        }
+        val job = Job()
+        viewModel.setPrivateField("activeStreamJob", job)
+
+        viewModel.clearChat()
+
+        assertTrue(job.isCancelled)
+        val state = viewModel.uiState.value
+        assertTrue(state.messages.isEmpty())
+        assertNull(state.streamingMessageId)
+        assertFalse(state.isSending)
+        assertEquals(4, state.streamingSequence)
+      }
+
+  @Test
+  fun startData_withEmptyRemoteList_keeps_null_selection() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel(FakeLlmClient())
+        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+        viewModel.setPrivateField("auth", auth)
+
+        val repo = mock<ConversationRepository>()
+        val conversationsFlow = MutableSharedFlow<List<Conversation>>(replay = 1)
+        whenever(repo.conversationsFlow()).thenReturn(conversationsFlow)
+        whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
+        viewModel.setPrivateField("repo", repo)
+        viewModel.setPrivateField("isInLocalNewChat", false)
+
+        viewModel.invokeStartData()
+        advanceUntilIdle()
+
+        conversationsFlow.emit(emptyList())
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.currentConversationId)
+      }
+
+  @Test
+  fun sendMessage_signedIn_creates_conversation_and_updates_title() =
+      runTest(testDispatcher) {
+        val fakeClient = FakeLlmClient().apply { nextReply = "AI reply" }
+        val viewModel = HomeViewModel(fakeClient)
+        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+        viewModel.setPrivateField("auth", auth)
+
+        val repo = mock<ConversationRepository>()
+        runBlocking { whenever(repo.startNewConversation(any())).thenReturn("conv-123") }
+        runBlocking { whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit) }
+        runBlocking { whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit) }
+        viewModel.setPrivateField("repo", repo)
+
+        val functions = mock<FirebaseFunctions>()
+        val callable = mock<HttpsCallableReference>()
+        val result = mock<HttpsCallableResult>()
+        whenever(functions.getHttpsCallable("generateTitleFn")).thenReturn(callable)
+        whenever(callable.call(any<Map<String, String>>())).thenReturn(Tasks.forResult(result))
+        whenever(result.getData()).thenReturn(mapOf("title" to "Generated title"))
+        viewModel.setFunctions(functions)
+
+        viewModel.updateMessageDraft("Hello from EPFL student")
+        viewModel.sendMessage()
+        advanceUntilIdle()
+        viewModel.awaitStreamingCompletion()
+        advanceUntilIdle()
+
+        assertEquals("conv-123", viewModel.uiState.value.currentConversationId)
+        runBlocking { verify(repo).startNewConversation("Hello from EPFL student") }
+        runBlocking { verify(repo).appendMessage("conv-123", "user", "Hello from EPFL student") }
+        runBlocking { verify(repo).updateConversationTitle("conv-123", "Generated title") }
+      }
+
+  @Test
+  fun sendMessage_signedIn_title_generation_failure_keeps_quick_title() =
+      runTest(testDispatcher) {
+        val fakeClient = FakeLlmClient().apply { nextReply = "AI reply" }
+        val viewModel = HomeViewModel(fakeClient)
+        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+        viewModel.setPrivateField("auth", auth)
+
+        val repo = mock<ConversationRepository>()
+        runBlocking { whenever(repo.startNewConversation(any())).thenReturn("conv-999") }
+        runBlocking { whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit) }
+        runBlocking { whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit) }
+        viewModel.setPrivateField("repo", repo)
+
+        val functions = mock<FirebaseFunctions>()
+        val callable = mock<HttpsCallableReference>()
+        whenever(functions.getHttpsCallable("generateTitleFn")).thenReturn(callable)
+        whenever(callable.call(any<Map<String, String>>()))
+            .thenReturn(Tasks.forException(Exception("boom")))
+        viewModel.setFunctions(functions)
+
+        viewModel.updateMessageDraft("Short prompt")
+        viewModel.sendMessage()
+        advanceUntilIdle()
+        viewModel.awaitStreamingCompletion()
+        advanceUntilIdle()
+
+        runBlocking { verify(repo).startNewConversation("Short prompt") }
+        runBlocking { verify(repo, never()).updateConversationTitle(any(), any()) }
+      }
+
+  @Test
+  fun buildSiteLabel_formats_epfl_domains() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel(FakeLlmClient())
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildSiteLabel", String::class.java)
+        method.isAccessible = true
+
+        val label = method.invoke(viewModel, "https://www.epfl.ch/campus-services") as String
+
+        assertEquals("EPFL.ch Website", label)
+      }
+
+  @Test
+  fun buildSiteLabel_uses_host_for_external_sites() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel(FakeLlmClient())
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildSiteLabel", String::class.java)
+        method.isAccessible = true
+
+        val label = method.invoke(viewModel, "https://kotlinlang.org/docs/home.html") as String
+
+        assertEquals("kotlinlang.org Website", label)
+      }
+
+  @Test
+  fun buildFallbackTitle_returns_clean_path_segment() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel(FakeLlmClient())
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildFallbackTitle", String::class.java)
+        method.isAccessible = true
+
+        val title =
+            method.invoke(viewModel, "https://www.epfl.ch/education/projet-de-semestre") as String
+
+        assertEquals("Projet de semestre", title)
+      }
+
+  @Test
+  fun buildFallbackTitle_defaults_to_host_when_no_path() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel(FakeLlmClient())
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildFallbackTitle", String::class.java)
+        method.isAccessible = true
+
+        val title = method.invoke(viewModel, "https://example.com") as String
+
+        assertEquals("example.com", title)
+      }
+
+  private fun HomeViewModel.setPrivateField(name: String, value: Any?) {
+    val field = HomeViewModel::class.java.getDeclaredField(name)
+    field.isAccessible = true
+    field.set(this, value)
+  }
+
+  private fun HomeViewModel.invokeStartData() {
+    val method = HomeViewModel::class.java.getDeclaredMethod("startData")
+    method.isAccessible = true
+    method.invoke(this)
+  }
 
   private fun HomeViewModel.replaceMessages(vararg texts: String) {
     val field = HomeViewModel::class.java.getDeclaredField("_uiState")
     field.isAccessible = true
     @Suppress("UNCHECKED_CAST") val stateFlow = field.get(this) as MutableStateFlow<HomeUiState>
-    val current = stateFlow.value
-    val messages =
-        texts.map { text ->
+    val newMessages =
+        texts.map {
           ChatUIModel(
-              id = UUID.randomUUID().toString(), text = text, timestamp = 0L, type = ChatType.USER)
+              id = UUID.randomUUID().toString(), text = it, timestamp = 0L, type = ChatType.USER)
         }
-    stateFlow.value = current.copy(messages = messages)
+    stateFlow.value = stateFlow.value.copy(messages = newMessages)
   }
 
-  @Test
-  fun clearChat_empties_messages() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.replaceMessages("Test message")
-
-        // Initial state should have messages now (user message added synchronously)
-        val initialState = viewModel.uiState.value
-        assertTrue(initialState.messages.isNotEmpty())
-
-        // Clear the chat
-        viewModel.clearChat()
-
-        // Verify chat is empty
-        val stateAfterClear = viewModel.uiState.value
-        assertTrue(stateAfterClear.messages.isEmpty())
-      }
-
-  @Test
-  fun clearChat_preserves_other_state() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        val initialUserName = initialState.userName
-        val initialSystems = initialState.systems
-
-        // Clear the chat
-        viewModel.clearChat()
-
-        // Verify other state is preserved
-        val stateAfterClear = viewModel.uiState.value
-        assertEquals(initialUserName, stateAfterClear.userName)
-        assertEquals(initialSystems, stateAfterClear.systems)
-      }
-
-  @Test
-  fun toggleDrawer_changes_isDrawerOpen_state() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        assertFalse(initialState.isDrawerOpen)
-
-        // Toggle drawer to open
-        viewModel.toggleDrawer()
-        val stateAfterFirstToggle = viewModel.uiState.value
-        assertTrue(stateAfterFirstToggle.isDrawerOpen)
-
-        // Toggle drawer to close
-        viewModel.toggleDrawer()
-        val stateAfterSecondToggle = viewModel.uiState.value
-        assertFalse(stateAfterSecondToggle.isDrawerOpen)
-      }
-
-  @Test
-  fun sendMessage_with_empty_draft_does_nothing() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        val initialMessagesCount = initialState.messages.size
-
-        // Try to send empty message
-        viewModel.updateMessageDraft("")
-        viewModel.sendMessage()
-
-        // Advance time
-        testDispatcher.scheduler.advanceTimeBy(100)
-
-        // Verify nothing changed
-        val stateAfterSend = viewModel.uiState.value
-        assertEquals(initialMessagesCount, stateAfterSend.messages.size)
-      }
-
-  @Test
-  fun updateMessageDraft_updates_draft_text() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.updateMessageDraft("Hello")
-        val state1 = viewModel.uiState.value
-        assertEquals("Hello", state1.messageDraft)
-
-        viewModel.updateMessageDraft("World")
-        val state2 = viewModel.uiState.value
-        assertEquals("World", state2.messageDraft)
-      }
-
-  @Test
-  fun toggleSystemConnection_flips_connection_state() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        val moodleSystem = initialState.systems.find { it.id == "moodle" }
-        assertNotNull(moodleSystem)
-        assertTrue(moodleSystem!!.isConnected)
-
-        // Toggle connection
-        viewModel.toggleSystemConnection("moodle")
-
-        val stateAfterToggle = viewModel.uiState.value
-        val updatedSystem = stateAfterToggle.systems.find { it.id == "moodle" }
-        assertNotNull(updatedSystem)
-        assertFalse(updatedSystem!!.isConnected)
-      }
-
-  @Test
-  fun setTopRightOpen_changes_top_right_open_state() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        assertFalse(initialState.isTopRightOpen)
-
-        // Set to open
-        viewModel.setTopRightOpen(true)
-        val stateAfterOpen = viewModel.uiState.value
-        assertTrue(stateAfterOpen.isTopRightOpen)
-
-        // Set to close
-        viewModel.setTopRightOpen(false)
-        val stateAfterClose = viewModel.uiState.value
-        assertFalse(stateAfterClose.isTopRightOpen)
-      }
-
-  @Test
-  fun setLoading_changes_loading_state() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        assertFalse(initialState.isLoading)
-
-        viewModel.setLoading(true)
-        val stateAfterSetTrue = viewModel.uiState.value
-        assertTrue(stateAfterSetTrue.isLoading)
-
-        viewModel.setLoading(false)
-        val stateAfterSetFalse = viewModel.uiState.value
-        assertFalse(stateAfterSetFalse.isLoading)
-      }
-
-  @Test
-  fun showDeleteConfirmation_sets_showDeleteConfirmation_to_true() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        assertFalse(initialState.showDeleteConfirmation)
-
-        viewModel.showDeleteConfirmation()
-        val stateAfterShow = viewModel.uiState.value
-        assertTrue(stateAfterShow.showDeleteConfirmation)
-      }
-
-  @Test
-  fun hideDeleteConfirmation_sets_showDeleteConfirmation_to_false() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.showDeleteConfirmation()
-        val stateAfterShow = viewModel.uiState.value
-        assertTrue(stateAfterShow.showDeleteConfirmation)
-
-        viewModel.hideDeleteConfirmation()
-        val stateAfterHide = viewModel.uiState.value
-        assertFalse(stateAfterHide.showDeleteConfirmation)
-      }
-
-  @Test
-  fun clearChat_with_confirmation_workflow() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.replaceMessages("Test message")
-
-        val initialState = viewModel.uiState.value
-        assertTrue(initialState.messages.isNotEmpty())
-
-        // Show confirmation
-        viewModel.showDeleteConfirmation()
-        val stateAfterShow = viewModel.uiState.value
-        assertTrue(stateAfterShow.showDeleteConfirmation)
-
-        // Clear chat
-        viewModel.clearChat()
-        val stateAfterClear = viewModel.uiState.value
-        assertTrue(stateAfterClear.messages.isEmpty())
-
-        // Hide confirmation
-        viewModel.hideDeleteConfirmation()
-        val stateAfterHide = viewModel.uiState.value
-        assertFalse(stateAfterHide.showDeleteConfirmation)
-        assertTrue(stateAfterHide.messages.isEmpty())
-      }
-
-  @Test
-  fun initial_state_has_default_values() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val state = viewModel.uiState.value
-        assertEquals("Student", state.userName)
-        assertFalse(state.isDrawerOpen)
-        assertFalse(state.isTopRightOpen)
-        assertFalse(state.isLoading)
-        assertFalse(state.showDeleteConfirmation)
-        assertEquals("", state.messageDraft)
-        assertFalse(state.systems.isEmpty())
-        assertTrue(state.messages.isEmpty())
-      }
-
-  @Test
-  fun updateMessageDraft_with_whitespace() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.updateMessageDraft("  Test with spaces  ")
-        val state = viewModel.uiState.value
-        assertEquals("  Test with spaces  ", state.messageDraft)
-      }
-
-  @Test
-  fun sendMessage_with_whitespace_only_does_nothing() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialCount = viewModel.uiState.value.messages.size
-
-        viewModel.updateMessageDraft("    ")
-        viewModel.sendMessage()
-
-        testDispatcher.scheduler.advanceTimeBy(100)
-
-        val stateAfterSend = viewModel.uiState.value
-        assertEquals(initialCount, stateAfterSend.messages.size)
-      }
-
-  @Test
-  fun toggleSystemConnection_for_isa_system() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        val isaSystem = initialState.systems.find { it.id == "isa" }
-        assertNotNull(isaSystem)
-        assertTrue(isaSystem!!.isConnected)
-
-        viewModel.toggleSystemConnection("isa")
-
-        val stateAfterToggle = viewModel.uiState.value
-        val updatedSystem = stateAfterToggle.systems.find { it.id == "isa" }
-        assertNotNull(updatedSystem)
-        assertFalse(updatedSystem!!.isConnected)
-      }
-
-  @Test
-  fun toggleSystemConnection_for_camipro_system() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        val camiproSystem = initialState.systems.find { it.id == "camipro" }
-        assertNotNull(camiproSystem)
-        assertFalse(camiproSystem!!.isConnected)
-
-        viewModel.toggleSystemConnection("camipro")
-
-        val stateAfterToggle = viewModel.uiState.value
-        val updatedSystem = stateAfterToggle.systems.find { it.id == "camipro" }
-        assertNotNull(updatedSystem)
-        assertTrue(updatedSystem!!.isConnected)
-      }
-
-  @Test
-  fun toggleSystemConnection_for_nonexistent_system() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        val initialSystems = initialState.systems.toList()
-
-        viewModel.toggleSystemConnection("nonexistent")
-
-        val stateAfterToggle = viewModel.uiState.value
-        assertEquals(initialSystems, stateAfterToggle.systems)
-      }
-
-  @Test
-  fun setLoading_preserves_other_state() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        val initialUserName = initialState.userName
-        val initialSystems = initialState.systems
-
-        viewModel.setLoading(true)
-        val stateAfterLoading = viewModel.uiState.value
-
-        assertEquals(initialUserName, stateAfterLoading.userName)
-        assertEquals(initialSystems, stateAfterLoading.systems)
-        assertTrue(stateAfterLoading.isLoading)
-      }
-
-  @Test
-  fun toggleDrawer_preserves_other_state() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        val initialUserName = initialState.userName
-        val initialSystems = initialState.systems
-
-        viewModel.toggleDrawer()
-        val stateAfterToggle = viewModel.uiState.value
-
-        assertEquals(initialUserName, stateAfterToggle.userName)
-        assertEquals(initialSystems, stateAfterToggle.systems)
-        assertTrue(stateAfterToggle.isDrawerOpen)
-      }
-
-  @Test
-  fun setTopRightOpen_preserves_other_state() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        val initialUserName = initialState.userName
-        val initialSystems = initialState.systems
-
-        viewModel.setTopRightOpen(true)
-        val stateAfterOpen = viewModel.uiState.value
-
-        assertEquals(initialUserName, stateAfterOpen.userName)
-        assertEquals(initialSystems, stateAfterOpen.systems)
-        assertTrue(stateAfterOpen.isTopRightOpen)
-      }
-
-  @Test
-  fun clearChat_does_not_affect_flags() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        // Put some flags to true
-        viewModel.setTopRightOpen(true)
-        viewModel.setLoading(true)
-        viewModel.showDeleteConfirmation()
-
-        // Then clear chat
-        viewModel.clearChat()
-
-        val state = viewModel.uiState.value
-        assertTrue(state.messages.isEmpty())
-        assertTrue(state.isTopRightOpen)
-        assertTrue(state.isLoading)
-        assertTrue(state.showDeleteConfirmation)
-      }
-
-  @Test
-  fun top_right_and_delete_confirmation_are_independent() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.setTopRightOpen(true)
-        val openState = viewModel.uiState.value
-        assertTrue(openState.isTopRightOpen)
-        assertFalse(openState.showDeleteConfirmation)
-
-        viewModel.showDeleteConfirmation()
-        val bothState = viewModel.uiState.value
-        assertTrue(bothState.isTopRightOpen)
-        assertTrue(bothState.showDeleteConfirmation)
-
-        viewModel.setTopRightOpen(false)
-        val finalState = viewModel.uiState.value
-        assertFalse(finalState.isTopRightOpen)
-        assertTrue(finalState.showDeleteConfirmation)
-      }
-
-  @Test
-  fun ui_state_copy_keeps_immutability_contract() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-        val s1 = viewModel.uiState.value
-        val s2 = s1.copy()
-        assertEquals(s1, s2)
-        assertNotSame(s1, s2)
-      }
-
-  @Test
-  fun updateMessageDraft_can_be_updated() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.updateMessageDraft("Test message")
-        val stateAfterUpdate = viewModel.uiState.value
-        assertEquals("Test message", stateAfterUpdate.messageDraft)
-
-        // Update again
-        viewModel.updateMessageDraft("New message")
-        val stateAfterSecondUpdate = viewModel.uiState.value
-        assertEquals("New message", stateAfterSecondUpdate.messageDraft)
-      }
-
-  @Test
-  fun sendMessage_sets_loading_state() =
-      runTest(testDispatcher) {
-        // Note: Cannot test sendMessage directly as it uses viewModelScope.launch which requires
-        // the main dispatcher that is not available in unit tests without Robolectric
-        // This is tested in integration tests instead
-        assertTrue(true)
-      }
-
-  @Test
-  fun showDeleteConfirmation_preserves_other_state() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        val initialUserName = initialState.userName
-        val initialSystems = initialState.systems
-        val initialMessages = initialState.messages
-
-        viewModel.showDeleteConfirmation()
-        val stateAfterShow = viewModel.uiState.value
-
-        assertEquals(initialUserName, stateAfterShow.userName)
-        assertEquals(initialSystems, stateAfterShow.systems)
-        assertEquals(initialMessages, stateAfterShow.messages)
-        assertTrue(stateAfterShow.showDeleteConfirmation)
-      }
-
-  @Test
-  fun hideDeleteConfirmation_preserves_other_state() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.showDeleteConfirmation()
-        val stateWithShow = viewModel.uiState.value
-
-        viewModel.hideDeleteConfirmation()
-        val stateAfterHide = viewModel.uiState.value
-
-        assertEquals(stateWithShow.userName, stateAfterHide.userName)
-        assertEquals(stateWithShow.systems, stateAfterHide.systems)
-        assertEquals(stateWithShow.messages, stateAfterHide.messages)
-        assertFalse(stateAfterHide.showDeleteConfirmation)
-      }
-
-  @Test
-  fun toggleSystemConnection_multiple_times() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.toggleSystemConnection("moodle")
-        val state1 = viewModel.uiState.value
-        val moodle1 = state1.systems.find { it.id == "moodle" }
-        assertFalse(moodle1!!.isConnected)
-
-        viewModel.toggleSystemConnection("moodle")
-        val state2 = viewModel.uiState.value
-        val moodle2 = state2.systems.find { it.id == "moodle" }
-        assertTrue(moodle2!!.isConnected)
-
-        viewModel.toggleSystemConnection("moodle")
-        val state3 = viewModel.uiState.value
-        val moodle3 = state3.systems.find { it.id == "moodle" }
-        assertFalse(moodle3!!.isConnected)
-      }
-
-  @Test
-  fun toggleSystemConnection_for_drive_system() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        val driveSystem = initialState.systems.find { it.id == "drive" }
-        assertNotNull(driveSystem)
-        assertTrue(driveSystem!!.isConnected)
-
-        viewModel.toggleSystemConnection("drive")
-
-        val stateAfterToggle = viewModel.uiState.value
-        val updatedSystem = stateAfterToggle.systems.find { it.id == "drive" }
-        assertNotNull(updatedSystem)
-        assertFalse(updatedSystem!!.isConnected)
-      }
-
-  @Test
-  fun toggleSystemConnection_for_empty_string() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        val initialSystems = initialState.systems.toList()
-
-        viewModel.toggleSystemConnection("")
-
-        val stateAfterToggle = viewModel.uiState.value
-        assertEquals(initialSystems, stateAfterToggle.systems)
-      }
-
-  @Test
-  fun uiState_maintains_reference_stability() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val stateRef1 = viewModel.uiState
-        val stateRef2 = viewModel.uiState
-
-        assertSame(stateRef1, stateRef2)
-      }
-
-  @Test
-  fun clearChat_when_already_empty() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.clearChat()
-        val state1 = viewModel.uiState.value
-        assertTrue(state1.messages.isEmpty())
-
-        viewModel.clearChat()
-        val state2 = viewModel.uiState.value
-        assertTrue(state2.messages.isEmpty())
-      }
-
-  @Test
-  fun initialState_systems_count() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val state = viewModel.uiState.value
-        assertEquals(6, state.systems.size)
-      }
-
-  @Test
-  fun initialState_messages_count() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val state = viewModel.uiState.value
-        assertEquals(0, state.messages.size)
-      }
-
-  @Test
-  fun initialState_systems_have_correct_states() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val state = viewModel.uiState.value
-        val isa = state.systems.find { it.id == "isa" }
-        val moodle = state.systems.find { it.id == "moodle" }
-        val ed = state.systems.find { it.id == "ed" }
-        val camipro = state.systems.find { it.id == "camipro" }
-        val mail = state.systems.find { it.id == "mail" }
-        val drive = state.systems.find { it.id == "drive" }
-
-        assertNotNull(isa)
-        assertTrue(isa!!.isConnected)
-        assertNotNull(moodle)
-        assertTrue(moodle!!.isConnected)
-        assertNotNull(ed)
-        assertTrue(ed!!.isConnected)
-        assertNotNull(camipro)
-        assertFalse(camipro!!.isConnected)
-        assertNotNull(mail)
-        assertFalse(mail!!.isConnected)
-        assertNotNull(drive)
-        assertTrue(drive!!.isConnected)
-      }
-
-  @Test
-  fun updateMessageDraft_with_newline_characters() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.updateMessageDraft("Line1\nLine2\r\nLine3")
-        val state = viewModel.uiState.value
-        assertEquals("Line1\nLine2\r\nLine3", state.messageDraft)
-      }
-
-  @Test
-  fun updateMessageDraft_with_special_unicode() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.updateMessageDraft("Hello 世界 🌍")
-        val state = viewModel.uiState.value
-        assertEquals("Hello 世界 🌍", state.messageDraft)
-      }
-
-  @Test
-  fun toggleSystemConnection_affects_only_target_system() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        val moodleBefore = initialState.systems.find { it.id == "moodle" }!!.isConnected
-        val isaBefore = initialState.systems.find { it.id == "isa" }!!.isConnected
-
-        viewModel.toggleSystemConnection("moodle")
-
-        val stateAfter = viewModel.uiState.value
-        val moodleAfter = stateAfter.systems.find { it.id == "moodle" }!!.isConnected
-        val isaAfter = stateAfter.systems.find { it.id == "isa" }!!.isConnected
-
-        assertNotEquals(moodleBefore, moodleAfter)
-        assertEquals(isaBefore, isaAfter)
-      }
-
-  @Test
-  fun multiple_state_changes_in_sequence() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.toggleDrawer()
-        viewModel.setTopRightOpen(true)
-        viewModel.updateMessageDraft("Test")
-
-        val state = viewModel.uiState.value
-        assertTrue(state.isDrawerOpen)
-        assertTrue(state.isTopRightOpen)
-        assertEquals("Test", state.messageDraft)
-      }
-
-  @Test
-  fun clearChat_then_add_messages_via_refresh() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.clearChat()
-        val stateAfterClear = viewModel.uiState.value
-        assertTrue(stateAfterClear.messages.isEmpty())
-
-        viewModel.clearChat()
-        val stateAfterSecondClear = viewModel.uiState.value
-        assertTrue(stateAfterSecondClear.messages.isEmpty())
-      }
-
-  @Test
-  fun toggleDrawer_then_close() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.toggleDrawer()
-        assertTrue(viewModel.uiState.value.isDrawerOpen)
-
-        viewModel.toggleDrawer()
-        assertFalse(viewModel.uiState.value.isDrawerOpen)
-      }
-
-  @Test
-  fun setTopRightOpen_toggle_behavior() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.setTopRightOpen(true)
-        assertTrue(viewModel.uiState.value.isTopRightOpen)
-
-        viewModel.setTopRightOpen(false)
-        assertFalse(viewModel.uiState.value.isTopRightOpen)
-
-        viewModel.setTopRightOpen(true)
-        assertTrue(viewModel.uiState.value.isTopRightOpen)
-      }
-
-  @Test
-  fun showDeleteConfirmation_then_hide_multiple_times() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.showDeleteConfirmation()
-        assertTrue(viewModel.uiState.value.showDeleteConfirmation)
-
-        viewModel.hideDeleteConfirmation()
-        assertFalse(viewModel.uiState.value.showDeleteConfirmation)
-
-        viewModel.showDeleteConfirmation()
-        assertTrue(viewModel.uiState.value.showDeleteConfirmation)
-      }
-
-  @Test
-  fun updateMessageDraft_clear_sequence() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.updateMessageDraft("First message")
-        assertEquals("First message", viewModel.uiState.value.messageDraft)
-
-        viewModel.updateMessageDraft("Second message")
-        assertEquals("Second message", viewModel.uiState.value.messageDraft)
-
-        viewModel.updateMessageDraft("")
-        assertEquals("", viewModel.uiState.value.messageDraft)
-      }
-
-  @Test
-  fun toggleSystemConnection_all_systems() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val systems = viewModel.uiState.value.systems
-        systems.forEach { system ->
-          val initialState = system.isConnected
-          viewModel.toggleSystemConnection(system.id)
-          val newState = viewModel.uiState.value.systems.find { it.id == system.id }!!.isConnected
-          assertNotEquals(initialState, newState)
-        }
-      }
-
-  @Test
-  fun setLoading_multiple_fluctuations() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.setLoading(true)
-        assertTrue(viewModel.uiState.value.isLoading)
-
-        viewModel.setLoading(false)
-        assertFalse(viewModel.uiState.value.isLoading)
-
-        viewModel.setLoading(true)
-        assertTrue(viewModel.uiState.value.isLoading)
-
-        viewModel.setLoading(false)
-        assertFalse(viewModel.uiState.value.isLoading)
-      }
-
-  @Test
-  fun state_immutability_after_operations() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val state1 = viewModel.uiState.value
-        viewModel.toggleDrawer()
-        val state2 = viewModel.uiState.value
-
-        assertNotEquals(state1.isDrawerOpen, state2.isDrawerOpen)
-      }
-
-  @Test
-  fun multiple_drawer_toggles() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        for (i in 1..5) {
-          viewModel.toggleDrawer()
-          val expectedOpen = i % 2 == 1
-          assertEquals(expectedOpen, viewModel.uiState.value.isDrawerOpen)
-        }
-      }
-
-  @Test
-  fun toggleSystemConnection_with_unicode_id() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        val initialSystems = initialState.systems.toList()
-
-        viewModel.toggleSystemConnection("非ASCII")
-
-        val finalState = viewModel.uiState.value
-        assertEquals(initialSystems, finalState.systems)
-      }
-
-  @Test
-  fun updateMessageDraft_with_tab_characters() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.updateMessageDraft("Tab\tCharacter")
-        assertEquals("Tab\tCharacter", viewModel.uiState.value.messageDraft)
-      }
-
-  @Test
-  fun initialState_systems_names_are_correct() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val state = viewModel.uiState.value
-        val isa = state.systems.find { it.id == "isa" }
-        assertEquals("IS-Academia", isa?.name)
-
-        val moodle = state.systems.find { it.id == "moodle" }
-        assertEquals("Moodle", moodle?.name)
-      }
-
-  @Test
-  fun initialState_messages_are_empty() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val state = viewModel.uiState.value
-        assertTrue(state.messages.isEmpty())
-      }
-
-  @Test
-  fun showDeleteConfirmation_and_then_hide_preserves_chat() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        val initialMessagesCount = initialState.messages.size
-
-        viewModel.showDeleteConfirmation()
-        assertTrue(viewModel.uiState.value.showDeleteConfirmation)
-        assertEquals(initialMessagesCount, viewModel.uiState.value.messages.size)
-
-        viewModel.hideDeleteConfirmation()
-        assertFalse(viewModel.uiState.value.showDeleteConfirmation)
-        assertEquals(initialMessagesCount, viewModel.uiState.value.messages.size)
-      }
-
-  @Test
-  fun showDeleteConfirmation_does_not_affect_other_flags() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val before = viewModel.uiState.value
-        viewModel.showDeleteConfirmation()
-        val after = viewModel.uiState.value
-
-        assertEquals(before.isDrawerOpen, after.isDrawerOpen)
-        assertEquals(before.isTopRightOpen, after.isTopRightOpen)
-        assertEquals(before.isLoading, after.isLoading)
-        assertNotEquals(before.showDeleteConfirmation, after.showDeleteConfirmation)
-      }
-
-  @Test
-  fun hideDeleteConfirmation_does_not_affect_other_flags() {
-    val viewModel = HomeViewModel()
-
-    viewModel.showDeleteConfirmation()
-    val before = viewModel.uiState.value
-
-    viewModel.hideDeleteConfirmation()
-    val after = viewModel.uiState.value
-
-    assertEquals(before.isDrawerOpen, after.isDrawerOpen)
-    assertEquals(before.isTopRightOpen, after.isTopRightOpen)
-    assertEquals(before.isLoading, after.isLoading)
-    assertNotEquals(before.showDeleteConfirmation, after.showDeleteConfirmation)
+  private fun HomeViewModel.updateUiState(transform: (HomeUiState) -> HomeUiState) {
+    val field = HomeViewModel::class.java.getDeclaredField("_uiState")
+    field.isAccessible = true
+    @Suppress("UNCHECKED_CAST") val stateFlow = field.get(this) as MutableStateFlow<HomeUiState>
+    stateFlow.value = transform(stateFlow.value)
   }
 
-  @Test
-  fun setLoading_to_true_and_then_false() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
+  private fun HomeViewModel.getBooleanField(name: String): Boolean {
+    val field = HomeViewModel::class.java.getDeclaredField(name)
+    field.isAccessible = true
+    return field.getBoolean(this)
+  }
 
-        viewModel.setLoading(true)
-        assertTrue(viewModel.uiState.value.isLoading)
+  private fun HomeViewModel.setFunctions(fake: FirebaseFunctions) {
+    val delegateField = HomeViewModel::class.java.getDeclaredField("functions\$delegate")
+    delegateField.isAccessible = true
+    delegateField.set(this, lazyOf(fake))
+  }
 
-        viewModel.setLoading(false)
-        assertFalse(viewModel.uiState.value.isLoading)
-      }
-
-  @Test
-  fun setLoading_does_not_affect_delete_confirmation() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.showDeleteConfirmation()
-        val showDeleteState = viewModel.uiState.value.showDeleteConfirmation
-
-        viewModel.setLoading(true)
-        assertEquals(showDeleteState, viewModel.uiState.value.showDeleteConfirmation)
-
-        viewModel.setLoading(false)
-        assertEquals(showDeleteState, viewModel.uiState.value.showDeleteConfirmation)
-      }
-
-  @Test
-  fun delete_confirmation_workflow_with_multiple_toggles() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        for (i in 1..3) {
-          viewModel.showDeleteConfirmation()
-          assertTrue(viewModel.uiState.value.showDeleteConfirmation)
-
-          viewModel.hideDeleteConfirmation()
-          assertFalse(viewModel.uiState.value.showDeleteConfirmation)
-        }
-      }
-
-  @Test
-  fun loading_state_with_delete_confirmation_simultaneously() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.setLoading(true)
-        viewModel.showDeleteConfirmation()
-
-        val state = viewModel.uiState.value
-        assertTrue(state.isLoading)
-        assertTrue(state.showDeleteConfirmation)
-      }
-
-  @Test
-  fun loading_and_delete_confirmation_independently() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.setLoading(true)
-        val stateWithLoading = viewModel.uiState.value
-        assertTrue(stateWithLoading.isLoading)
-        assertFalse(stateWithLoading.showDeleteConfirmation)
-
-        viewModel.showDeleteConfirmation()
-        val stateWithBoth = viewModel.uiState.value
-        assertTrue(stateWithBoth.isLoading)
-        assertTrue(stateWithBoth.showDeleteConfirmation)
-
-        viewModel.setLoading(false)
-        val stateWithOnlyDelete = viewModel.uiState.value
-        assertFalse(stateWithOnlyDelete.isLoading)
-        assertTrue(stateWithOnlyDelete.showDeleteConfirmation)
-
-        viewModel.hideDeleteConfirmation()
-        val stateClear = viewModel.uiState.value
-        assertFalse(stateClear.isLoading)
-        assertFalse(stateClear.showDeleteConfirmation)
-      }
-
-  @Test
-  fun hideDeleteConfirmation_when_not_shown() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val stateBefore = viewModel.uiState.value
-        assertFalse(stateBefore.showDeleteConfirmation)
-
-        viewModel.hideDeleteConfirmation()
-        val stateAfter = viewModel.uiState.value
-        assertFalse(stateAfter.showDeleteConfirmation)
-      }
-
-  @Test
-  fun showDeleteConfirmation_when_already_shown() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.showDeleteConfirmation()
-        assertTrue(viewModel.uiState.value.showDeleteConfirmation)
-
-        viewModel.showDeleteConfirmation()
-        assertTrue(viewModel.uiState.value.showDeleteConfirmation)
-      }
-
-  @Test
-  fun setLoading_multiple_times() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.setLoading(true)
-        viewModel.setLoading(true)
-        assertTrue(viewModel.uiState.value.isLoading)
-
-        viewModel.setLoading(false)
-        viewModel.setLoading(false)
-        assertFalse(viewModel.uiState.value.isLoading)
-      }
-
-  @Test
-  fun delete_confirmation_preserves_messages_list() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        val initialState = viewModel.uiState.value
-        val initialMessages = initialState.messages.toList()
-
-        viewModel.showDeleteConfirmation()
-        assertEquals(initialMessages, viewModel.uiState.value.messages)
-
-        viewModel.hideDeleteConfirmation()
-        assertEquals(initialMessages, viewModel.uiState.value.messages)
-      }
-
-  @Test
-  fun complete_delete_workflow() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.replaceMessages("Test message")
-
-        val initialState = viewModel.uiState.value
-        assertTrue(initialState.messages.isNotEmpty())
-        assertFalse(initialState.showDeleteConfirmation)
-
-        viewModel.showDeleteConfirmation()
-        val stateShown = viewModel.uiState.value
-        assertTrue(stateShown.showDeleteConfirmation)
-        assertTrue(stateShown.messages.isNotEmpty())
-
-        viewModel.clearChat()
-        viewModel.hideDeleteConfirmation()
-        val finalState = viewModel.uiState.value
-        assertTrue(finalState.messages.isEmpty())
-        assertFalse(finalState.showDeleteConfirmation)
-      }
-
-  @Test
-  fun loading_state_does_not_affect_drawer() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.toggleDrawer()
-        val drawerOpen = viewModel.uiState.value.isDrawerOpen
-
-        viewModel.setLoading(true)
-        assertEquals(drawerOpen, viewModel.uiState.value.isDrawerOpen)
-
-        viewModel.setLoading(false)
-        assertEquals(drawerOpen, viewModel.uiState.value.isDrawerOpen)
-      }
-
-  @Test
-  fun delete_confirmation_does_not_affect_top_right() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.setTopRightOpen(true)
-        val topRightOpen = viewModel.uiState.value.isTopRightOpen
-
-        viewModel.showDeleteConfirmation()
-        assertEquals(topRightOpen, viewModel.uiState.value.isTopRightOpen)
-
-        viewModel.hideDeleteConfirmation()
-        assertEquals(topRightOpen, viewModel.uiState.value.isTopRightOpen)
-      }
-
-  @Test
-  fun all_flags_can_be_true_simultaneously() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.toggleDrawer()
-        viewModel.setTopRightOpen(true)
-        viewModel.setLoading(true)
-        viewModel.showDeleteConfirmation()
-
-        val state = viewModel.uiState.value
-        assertTrue(state.isDrawerOpen)
-        assertTrue(state.isTopRightOpen)
-        assertTrue(state.isLoading)
-        assertTrue(state.showDeleteConfirmation)
-      }
-
-  @Test
-  fun all_flags_can_be_false_simultaneously() =
-      runTest(testDispatcher) {
-        val viewModel = HomeViewModel()
-
-        viewModel.setTopRightOpen(false)
-        viewModel.setLoading(false)
-        viewModel.hideDeleteConfirmation()
-
-        val state = viewModel.uiState.value
-        assertFalse(state.isDrawerOpen)
-        assertFalse(state.isTopRightOpen)
-        assertFalse(state.isLoading)
-        assertFalse(state.showDeleteConfirmation)
-      }
+  private suspend fun HomeViewModel.awaitStreamingCompletion(timeoutMs: Long = 2_000L) {
+    var remaining = timeoutMs
+    while ((uiState.value.streamingMessageId != null || uiState.value.isSending) && remaining > 0) {
+      dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+      delay(20)
+      remaining -= 20
+    }
+    dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+  }
 }
