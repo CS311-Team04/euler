@@ -305,7 +305,7 @@ fun HomeScreen(
                         enabled = !ui.isSending,
                         singleLine = true,
                         trailingIcon = {
-                          Row(horizontalArrangement = Arrangement.spacedBy(0.2.dp)) {
+                          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             // Voice chat button - opens voice visualizer
                             IconButton(
                                 onClick = {
@@ -315,71 +315,49 @@ fun HomeScreen(
                                       })
                                 },
                                 enabled = speechHelper != null,
-                                modifier = Modifier.testTag(HomeTags.MicBtn)) {
+                                modifier = Modifier.size(36.dp).testTag(HomeTags.MicBtn)) {
                                   Icon(
                                       Icons.Default.Mic,
                                       contentDescription = "Dictate",
-                                      tint = Color.Gray)
+                                      tint = Color.Gray,
+                                      modifier = Modifier.size(18.dp))
                                 }
 
                             val canSend = ui.messageDraft.isNotBlank() && !ui.isSending
 
-                            // Voice mode button (equalizer icon) - shown when there's no text
-                            AnimatedVisibility(
-                                visible = !canSend,
-                                enter = fadeIn() + scaleIn(),
-                                exit = fadeOut() + scaleOut()) {
-                                  IconButton(
-                                      onClick = { onVoiceChatClick() },
-                                      modifier = Modifier.testTag(HomeTags.VoiceBtn)) {
-                                        Icon(
-                                            Icons.Default.GraphicEq,
-                                            contentDescription = "Voice mode",
-                                            tint = Color.Gray)
-                                      }
-                                    },
-                                    enabled = speechHelper != null,
-                                    modifier = Modifier.size(36.dp).testTag(HomeTags.MicBtn)) {
-                                      Icon(
-                                          Icons.Default.Mic,
-                                          contentDescription = "Dictate",
-                                          tint = Color.Gray,
-                                          modifier = Modifier.size(18.dp))
+                            Box(
+                                modifier = Modifier.size(36.dp),
+                                contentAlignment = Alignment.Center) {
+                                  Crossfade(targetState = canSend, label = "voice-button") {
+                                      readyToSend ->
+                                    if (!readyToSend) {
+                                      IconButton(
+                                          onClick = onVoiceChatClick,
+                                          modifier =
+                                              Modifier.fillMaxSize()
+                                                  .testTag(HomeTags.VoiceBtn)) {
+                                            Icon(
+                                                Icons.Default.GraphicEq,
+                                                contentDescription = "Voice mode",
+                                                tint = Color.Gray,
+                                                modifier = Modifier.size(18.dp))
+                                          }
+                                    } else {
+                                      Spacer(modifier = Modifier.size(18.dp))
                                     }
+                                  }
+                                }
 
-                                Box(
-                                    modifier = Modifier.size(36.dp),
-                                    contentAlignment = Alignment.Center) {
-                                      Crossfade(targetState = canSend, label = "voice-button") {
-                                          readyToSend ->
-                                        if (!readyToSend) {
-                                          IconButton(
-                                              onClick = onVoiceChatClick,
-                                              modifier =
-                                                  Modifier.fillMaxSize()
-                                                      .testTag(HomeTags.VoiceBtn)) {
-                                                Icon(
-                                                    Icons.Default.GraphicEq,
-                                                    contentDescription = "Voice mode",
-                                                    tint = Color.Gray,
-                                                    modifier = Modifier.size(18.dp))
-                                              }
-                                        } else {
-                                          Spacer(modifier = Modifier.size(18.dp))
-                                        }
-                                      }
-                                    }
-
-                                BubbleSendButton(
-                                    enabled = canSend,
-                                    isSending = ui.isSending,
-                                    onClick = {
-                                      if (canSend) {
-                                        onSendMessage(ui.messageDraft)
-                                        viewModel.sendMessage()
-                                      }
-                                    })
-                              }
+                            BubbleSendButton(
+                                enabled = canSend,
+                                isSending = ui.isSending,
+                                onClick = {
+                                  if (canSend) {
+                                    onSendMessage(ui.messageDraft)
+                                    viewModel.sendMessage()
+                                  }
+                                })
+                          }
                         },
                         shape = RoundedCornerShape(50),
                         colors =

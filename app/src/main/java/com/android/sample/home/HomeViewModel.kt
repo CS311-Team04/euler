@@ -54,11 +54,11 @@ class HomeViewModel(
     private val profileRepository: com.android.sample.profile.ProfileDataSource =
         UserProfileRepository()
 ) : ViewModel() {
-    private val llmClient: LlmClient = FirebaseFunctionsLlmClient(),
-) : ViewModel() {
+  private val llmClient: LlmClient = FirebaseFunctionsLlmClient()
 
   companion object {
     private const val TAG = "HomeViewModel"
+    private const val DEFAULT_USER_NAME = "Student"
   }
 
   private val auth: FirebaseAuth = FirebaseAuth.getInstance()
@@ -613,21 +613,23 @@ class HomeViewModel(
   }
 
   /** Ask `generateTitleFn` for a better title; fallback to [localTitleFrom] on errors. */
-  private suspend fun fetchTitle(question: String): String {
-    return try {
-      val res =
-          functions.getHttpsCallable("generateTitleFn").call(mapOf("question" to question)).await()
-      val t = (res.getData() as? Map<*, *>)?.get("title") as? String
-      (t?.takeIf { it.isNotBlank() } ?: localTitleFrom(question)).also {
-        Log.d(TAG, "fetchTitle(): generated='$it'")
+  private suspend fun fetchTitle(question: String): String =
+      try {
+        val res =
+            functions
+                .getHttpsCallable("generateTitleFn")
+                .call(mapOf("question" to question))
+                .await()
+        @Suppress("UNCHECKED_CAST")
+        val payload = res.getData() as? Map<*, *>
+        val t = payload?.get("title") as? String
+        (t?.takeIf { it.isNotBlank() } ?: localTitleFrom(question)).also {
+          Log.d(TAG, "fetchTitle(): generated='$it'")
+        }
+      } catch (_: Exception) {
+        Log.d(TAG, "fetchTitle(): fallback to local extraction")
+        localTitleFrom(question)
       }
-
-  
-    } catch (_: Exception) {
-      Log.d(TAG, "fetchTitle(): fallback to local extraction")
-      localTitleFrom(question)
-    }
-  }
 
   override fun onCleared() {
     super.onCleared()
@@ -640,6 +642,4 @@ class HomeViewModel(
     activeStreamJob?.cancel()
     activeStreamJob = null
   }
-  companion object {
-    private const val DEFAULT_USER_NAME = "Student"
 }

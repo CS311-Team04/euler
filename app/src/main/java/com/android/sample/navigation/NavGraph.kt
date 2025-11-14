@@ -54,6 +54,7 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
       rememberNavController().also { controller -> appNavControllerObserver?.invoke(controller) }
   val authViewModel = remember { authViewModelFactory?.invoke() ?: AuthViewModel() }
   val authState by authViewModel.state.collectAsState()
+  val homeViewModel: HomeViewModel = viewModel()
   val homeUiState by homeViewModel.uiState.collectAsState()
 
   // Get current back stack entry
@@ -96,7 +97,6 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
   NavHost(
       navController = nav,
       startDestination = if (startOnSignedIn) Routes.Home else Routes.Opening) {
-        // Opening Screen (new flow)
         composable(Routes.Opening) {
           OpeningScreen(
               authState = authState,
@@ -108,123 +108,101 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
               })
         }
 
-        // SignIn Screen
         composable(Routes.SignIn) {
           AuthUIScreen(
               state = authState,
               onMicrosoftLogin = { authViewModel.onMicrosoftLoginClick() },
               onSwitchEduLogin = { authViewModel.onSwitchEduLoginClick() })
         }
+
         navigation(startDestination = Routes.Home, route = "home_root") {
           composable(Routes.Home) {
-            val parentEntry = remember { nav.getBackStackEntry("home_root") }
-            val vm: HomeViewModel = viewModel(parentEntry)
             HomeScreen(
-                viewModel = vm,
-                onAction1Click = { /* ... */},
-                onAction2Click = { /* ... */},
-                onSendMessage = { /* ... */},
+                viewModel = homeViewModel,
+                onAction1Click = { /* TODO hook */ },
+                onAction2Click = { /* TODO hook */ },
+                onSendMessage = { /* TODO hook */ },
                 speechHelper = speechHelper,
                 onSignOut = {
+                  homeViewModel.clearProfile()
                   authViewModel.signOut()
                   navigateHomeToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
                 },
                 onSettingsClick = { nav.navigate(Routes.Settings) },
+                onProfileClick = {
+                  if (homeUiState.isGuest) {
+                    homeViewModel.showGuestProfileWarning()
+                  } else {
+                    nav.navigate(Routes.Profile)
+                  }
+                },
+                onVoiceChatClick = { nav.navigate(Routes.VoiceChat) })
+          }
+
+          composable(Routes.HomeWithDrawer) {
+            HomeScreen(
+                viewModel = homeViewModel,
+                onAction1Click = { /* TODO hook */ },
+                onAction2Click = { /* TODO hook */ },
+                onSendMessage = { /* TODO hook */ },
+                speechHelper = speechHelper,
+                onSignOut = {
+                  homeViewModel.clearProfile()
+                  authViewModel.signOut()
+                  navigateHomeToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
+                },
+                onSettingsClick = { nav.navigate(Routes.Settings) },
+                onProfileClick = {
+                  if (homeUiState.isGuest) {
+                    homeViewModel.showGuestProfileWarning()
+                  } else {
+                    nav.navigate(Routes.Profile)
+                  }
+                },
                 onVoiceChatClick = { nav.navigate(Routes.VoiceChat) },
-                forceNewChatOnFirstOpen = false)
+                openDrawerOnStart = true)
           }
 
-// HOME
-composable(Routes.Home) {
-    HomeScreen(
-        viewModel = homeViewModel,
-        onAction1Click = { /* ... */},
-        onAction2Click = { /* ... */},
-        onSendMessage = { /* ... */},
-        speechHelper = speechHelper,
-        onSignOut = {
-            homeViewModel.clearProfile()
-            authViewModel.signOut()
-            navigateHomeToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
-        },
-        onSettingsClick = { nav.navigate(Routes.Settings) },
-        onProfileClick = {
-            if (homeUiState.isGuest) homeViewModel.showGuestProfileWarning()
-            else nav.navigate(Routes.Profile)
-        },
-        onVoiceChatClick = { nav.navigate(Routes.VoiceChat) }
-    )
-}
+          composable(Routes.Settings) {
+            SettingsPage(
+                onBackClick = {
+                  navigateSettingsBack { route, builder -> nav.navigate(route) { builder(this) } }
+                },
+                onSignOut = {
+                  homeViewModel.clearProfile()
+                  authViewModel.signOut()
+                  navigateHomeToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
+                },
+                onProfileClick = {
+                  if (homeUiState.isGuest) {
+                    homeViewModel.showGuestProfileWarning()
+                  } else {
+                    nav.navigate(Routes.Profile)
+                  }
+                },
+                onProfileDisabledClick = { homeViewModel.showGuestProfileWarning() },
+                isProfileEnabled = !homeUiState.isGuest,
+                showProfileWarning = homeUiState.showGuestProfileWarning,
+                onDismissProfileWarning = { homeViewModel.hideGuestProfileWarning() },
+                onConnectorsClick = { nav.navigate(Routes.Settings) })
+          }
 
-// HOME WITH DRAWER (refactored by main)
-composable(Routes.HomeWithDrawer) {
-    val parentEntry = remember { nav.getBackStackEntry("home_root") }
-    val vm: HomeViewModel = viewModel(parentEntry)
-
-    HomeScreen(
-        viewModel = vm,
-        onAction1Click = { /* ... */},
-        onAction2Click = { /* ... */},
-        onSendMessage = { /* ... */},
-        speechHelper = speechHelper,
-        onSignOut = {
-            vm.clearProfile()
-            authViewModel.signOut()
-            navigateHomeToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
-        },
-        onSettingsClick = { nav.navigate(Routes.Settings) },
-        onProfileClick = {
-            if (vm.uiState.value.isGuest) vm.showGuestProfileWarning()
-            else nav.navigate(Routes.Profile)
-        },
-        onVoiceChatClick = { nav.navigate(Routes.VoiceChat) },
-        openDrawerOnStart = true
-    )
-}
-
-// SETTINGS
-composable(Routes.Settings) {
-    SettingsPage(
-        onBackClick = {
-            navigateSettingsBack { route, builder -> nav.navigate(route) { builder(this) } }
-        },
-        onSignOut = {
-            homeViewModel.clearProfile()
-            authViewModel.signOut()
-            navigateHomeToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
-        },
-        onProfileClick = {
-            if (homeUiState.isGuest) homeViewModel.showGuestProfileWarning()
-            else nav.navigate(Routes.Profile)
-        },
-        onProfileDisabledClick = { homeViewModel.showGuestProfileWarning() },
-        isProfileEnabled = !homeUiState.isGuest,
-        showProfileWarning = homeUiState.showGuestProfileWarning,
-        onDismissProfileWarning = { homeViewModel.hideGuestProfileWarning() },
-        onConnectorsClick = { nav.navigate(Routes.Settings) }
-    )
-}
-
-// PROFILE
-composable(Routes.Profile) {
-    if (homeUiState.isGuest) {
-        LaunchedEffect(Unit) {
-            homeViewModel.showGuestProfileWarning()
-            nav.popBackStack()
-        }
-    } else {
-        LaunchedEffect(Unit) { homeViewModel.refreshProfile() }
-        ProfilePage(
-            onBackClick = { nav.popBackStack() },
-            onSaveProfile = { profile -> homeViewModel.saveProfile(profile) },
-            initialProfile = homeUiState.profile
-        )
-    }
-}
-
+          composable(Routes.Profile) {
+            if (homeUiState.isGuest) {
+              LaunchedEffect(Unit) {
+                homeViewModel.showGuestProfileWarning()
+                nav.popBackStack()
+              }
+            } else {
+              LaunchedEffect(Unit) { homeViewModel.refreshProfile() }
+              ProfilePage(
+                  onBackClick = { nav.popBackStack() },
+                  onSaveProfile = { profile -> homeViewModel.saveProfile(profile) },
+                  initialProfile = homeUiState.profile)
+            }
           }
         }
-        // Voice Chat Screen
+
         composable(Routes.VoiceChat) {
           VoiceScreen(
               onClose = { nav.popBackStack() },
