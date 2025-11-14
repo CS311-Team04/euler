@@ -1,5 +1,7 @@
 package com.android.sample.home
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -18,22 +20,27 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -84,11 +91,20 @@ fun HomeScreen(
     onSettingsClick: () -> Unit = {},
     onVoiceChatClick: () -> Unit = {},
     openDrawerOnStart: Boolean = false,
-    speechHelper: com.android.sample.speech.SpeechToTextHelper? = null
+    speechHelper: com.android.sample.speech.SpeechToTextHelper? = null,
+    forceNewChatOnFirstOpen: Boolean = false
 ) {
   val ui by viewModel.uiState.collectAsState()
   val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
   val scope = rememberCoroutineScope()
+
+  val ranNewChatOnce = remember { mutableStateOf(false) }
+  LaunchedEffect(forceNewChatOnFirstOpen) {
+    if (forceNewChatOnFirstOpen && !ranNewChatOnce.value) {
+      ranNewChatOnce.value = true
+      viewModel.startLocalNewChat()
+    }
+  }
 
   // Synchronize ViewModel state <-> Drawer component
   LaunchedEffect(ui.isDrawerOpen) {
@@ -114,11 +130,11 @@ fun HomeScreen(
             ui = ui,
             onToggleSystem = { id -> viewModel.toggleSystemConnection(id) },
             onSignOut = {
-              // TODO: connect your actual sign-out
-              // Close drawer visually + sync VM
-              scope.launch { drawerState.close() }
-              if (ui.isDrawerOpen) viewModel.toggleDrawer()
-              onSignOut()
+              scope.launch {
+                drawerState.close()
+                if (ui.isDrawerOpen) viewModel.toggleDrawer()
+                onSignOut()
+              }
             },
             onSettingsClick = {
               scope.launch { drawerState.close() }
@@ -128,6 +144,20 @@ fun HomeScreen(
             onClose = {
               scope.launch { drawerState.close() }
               if (ui.isDrawerOpen) viewModel.toggleDrawer()
+            },
+            onNewChat = {
+              scope.launch {
+                drawerState.close()
+                if (ui.isDrawerOpen) viewModel.toggleDrawer()
+                viewModel.startLocalNewChat()
+              }
+            },
+            onPickConversation = { cid ->
+              scope.launch {
+                viewModel.selectConversation(cid)
+                drawerState.close()
+                if (ui.isDrawerOpen) viewModel.toggleDrawer()
+              }
             })
       }) {
         Scaffold(
@@ -174,9 +204,12 @@ fun HomeScreen(
                         expanded = ui.isTopRightOpen,
                         onDismissRequest = { viewModel.setTopRightOpen(false) },
                         modifier = Modifier.testTag(HomeTags.TopRightMenu)) {
-                          TopRightPanelPlaceholder(
-                              onDismiss = { viewModel.setTopRightOpen(false) },
-                              onDeleteClick = { viewModel.showDeleteConfirmation() })
+                          DropdownMenuItem(
+                              text = { Text("Delete current chat") },
+                              onClick = {
+                                viewModel.setTopRightOpen(false)
+                                viewModel.showDeleteConfirmation()
+                              })
                         }
                   },
                   colors =
@@ -268,9 +301,10 @@ fun HomeScreen(
                             // Voice chat button - opens voice visualizer
                             IconButton(
                                 onClick = {
-                                  speechHelper?.startListening { recognized ->
-                                    viewModel.updateMessageDraft(recognized)
-                                  }
+                                  speechHelper?.startListening(
+                                      onResult = { recognized ->
+                                        viewModel.updateMessageDraft(recognized)
+                                      })
                                 },
                                 enabled = speechHelper != null,
                                 modifier = Modifier.testTag(HomeTags.MicBtn)) {
@@ -329,7 +363,7 @@ fun HomeScreen(
                                 unfocusedContainerColor = Color(0xFF121212),
                                 disabledContainerColor = Color(0xFF121212)))
 
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(16.dp))
                     Text(
                         text = "Powered by APERTUS",
                         color = Color.Gray,
@@ -350,7 +384,7 @@ fun HomeScreen(
                       val listState = rememberLazyListState()
 
                       // Auto-scroll to bottom when messages change or sending state changes
-                      LaunchedEffect(ui.messages.size, ui.isSending) {
+                      LaunchedEffect(ui.messages.size, ui.isSending, ui.streamingSequence) {
                         val lastIndex =
                             if (ui.messages.isEmpty()) {
                               0
@@ -367,11 +401,34 @@ fun HomeScreen(
                           modifier = Modifier.fillMaxSize().padding(16.dp),
                           verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             items(items = ui.messages, key = { it.id }) { item ->
-                              ChatMessage(message = item, modifier = Modifier.fillMaxWidth())
+                              val showLeadingDot =
+                                  item.id == ui.streamingMessageId && item.text.isEmpty()
+
+                              // If this message carries a source, draw the card first
+                              if (item.source != null && !item.isThinking) {
+                                val context = androidx.compose.ui.platform.LocalContext.current
+                                SourceCard(
+                                    siteLabel = item.source.siteLabel,
+                                    title = item.source.title,
+                                    url = item.source.url,
+                                    retrievedAt = item.source.retrievedAt,
+                                    onVisit = {
+                                      val intent =
+                                          Intent(Intent.ACTION_VIEW, Uri.parse(item.source.url))
+                                      context.startActivity(intent)
+                                    })
+                                Spacer(Modifier.height(8.dp))
+                              }
+
+                              // Then render the usual chat bubble (for USER/AI text)
+                              ChatMessage(
+                                  message = item,
+                                  modifier = Modifier.fillMaxWidth(),
+                                  isStreaming = showLeadingDot)
                             }
 
                             // Global thinking indicator shown AFTER the last user message.
-                            if (ui.isSending) {
+                            if (ui.isSending && ui.streamingMessageId == null) {
                               item {
                                 Spacer(Modifier.height(6.dp))
                                 ThinkingIndicator(
@@ -394,10 +451,7 @@ fun HomeScreen(
       exit = fadeOut(tween(200)),
       modifier = Modifier.fillMaxSize()) {
         DeleteConfirmationModal(
-            onConfirm = {
-              viewModel.clearChat()
-              viewModel.hideDeleteConfirmation()
-            },
+            onConfirm = { viewModel.deleteCurrentConversation() },
             onCancel = { viewModel.hideDeleteConfirmation() })
       }
 }
@@ -416,19 +470,6 @@ private fun SuggestionChip(text: String, modifier: Modifier = Modifier, onClick:
               Text(text = text, color = Color.White, fontSize = 14.sp)
             }
       }
-}
-
-/* ----- Placeholders for external components (drawer + top-right panel) ----- */
-
-@Composable
-private fun TopRightPanelPlaceholder(onDismiss: () -> Unit, onDeleteClick: () -> Unit) {
-  DropdownMenuItem(text = { Text("Share") }, onClick = onDismiss)
-  DropdownMenuItem(
-      text = { Text("Delete") },
-      onClick = {
-        onDeleteClick()
-        onDismiss()
-      })
 }
 
 /**
@@ -662,6 +703,81 @@ internal fun AnimatedIntroTitle(modifier: Modifier = Modifier) {
                     textAlign = TextAlign.Center)
               }
         }
+      }
+}
+
+@Composable
+private fun SourceCard(
+    siteLabel: String,
+    title: String,
+    url: String,
+    retrievedAt: Long,
+    onVisit: () -> Unit
+) {
+  Column(
+      modifier =
+          Modifier.fillMaxWidth()
+              .clip(RoundedCornerShape(10.dp))
+              .background(Color(0xFF1C1C1E))
+              .padding(horizontal = 12.dp, vertical = 6.dp)) {
+        // Top line: “Retrieved from EPFL.ch Website”
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Icon(
+              imageVector = Icons.Default.CheckCircle,
+              contentDescription = null,
+              tint = Color(0xFF4CAF50), // green tick
+              modifier = Modifier.size(14.dp))
+          Spacer(Modifier.width(4.dp))
+          Text(
+              text = "Retrieved from  $siteLabel",
+              color = Color(0xFFBDBDBD),
+              style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp))
+        }
+
+        Spacer(Modifier.height(4.dp))
+
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+          // Title (ellipsized to one line)
+          Text(
+              text = url,
+              color = Color.White,
+              style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+              modifier = Modifier.weight(1f))
+
+          Spacer(Modifier.width(6.dp))
+
+          Button(
+              onClick = onVisit,
+              shape = RoundedCornerShape(6.dp),
+              contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+              colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))) {
+                Text("Visit")
+                Spacer(Modifier.width(6.dp))
+                Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Outlined.OpenInNew,
+                    contentDescription = null,
+                    modifier = Modifier.size(10.dp),
+                    tint = Color.White)
+              }
+        }
+
+        Spacer(Modifier.height(2.dp))
+
+        // Retrieved date
+        val dateStr =
+            remember(retrievedAt) {
+              val d =
+                  java.time.Instant.ofEpochMilli(retrievedAt)
+                      .atZone(java.time.ZoneId.systemDefault())
+                      .toLocalDate()
+              "%02d/%02d/%02d".format(d.dayOfMonth, d.monthValue, d.year % 100)
+            }
+        Text(
+            text = "Retrieved on $dateStr",
+            color = Color.Gray,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp))
       }
 }
 

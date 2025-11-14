@@ -1,4 +1,4 @@
-package com.android.sample.VoiceChat
+package com.android.sample.VoiceChat.UI
 
 import android.os.Build
 import androidx.annotation.RequiresApi
@@ -13,7 +13,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.max
@@ -36,10 +35,10 @@ enum class VisualPreset {
 fun VoiceVisualizer(
     levelSource: LevelSource,
     modifier: Modifier = Modifier,
-    preset: VisualPreset = VisualPreset.Bloom,
-    color: Color = Color(0xFFB61919),
-    petals: Int = 10, // for Bloom preset
-    size: Dp = 500.dp,
+    preset: VisualPreset,
+    color: Color,
+    petals: Int, // for Bloom preset
+    size: Dp,
     onLevelUpdate: (Float) -> Unit = {}
 ) {
   val smoother = remember { LevelSmoother() }
@@ -110,7 +109,7 @@ private fun AgslBloom(
     drawPath(instructions.path, color.copy(alpha = instructions.pathAlpha), style = Fill)
 
     drawCircle(
-        color = Color(0xFFF44336),
+        color = Color(0xFF000000),
         radius = instructions.innerCircleRadius,
         center = instructions.pathCenter)
   }
