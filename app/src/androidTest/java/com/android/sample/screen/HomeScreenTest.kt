@@ -265,17 +265,7 @@ class HomeScreenTest {
     assertNodeDoesNotExist("Clear Chat?")
   }
 
-  @Test
-  fun share_item_dismisses_menu() {
-    setContentWithViewModel { vm -> HomeScreen(viewModel = vm) }
-
-    // Open menu and click Share, which calls onDismiss
-    composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-    waitAndClickMenuShare()
-
-    // Menu should be dismissed (its items disappear)
-    assertNodeDoesNotExist("Share")
-  }
+  // Note: Share menu item does not exist in the current implementation
 
   @Test
   fun homeScreen_with_default_parameters_renders() {
@@ -601,16 +591,14 @@ class HomeScreenTest {
     setContentWithViewModel { vm -> HomeScreen(viewModel = vm) }
 
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
-    composeRule.onNodeWithText("Share").assertIsDisplayed()
-    composeRule.onNodeWithText("Delete").assertIsDisplayed()
+    composeRule.onNodeWithText("Delete current chat").assertIsDisplayed()
 
-    // Both items should be clickable
-    waitAndClickMenuShare()
-    composeRule.waitForIdle()
-
-    composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
+    // The Delete item should be clickable
     waitAndClickMenuDelete()
     composeRule.waitForIdle()
+
+    // Menu should be dismissed and confirmation modal should appear
+    composeRule.onNodeWithText("Clear Chat?").assertIsDisplayed()
   }
 
   @Test
@@ -742,8 +730,8 @@ class HomeScreenTest {
       composeRule.onNodeWithTag(HomeTags.TopRightBtn).performClick()
       composeRule.onNodeWithTag(HomeTags.TopRightMenu).assertIsDisplayed()
 
-      // Close by clicking Share
-      waitAndClickMenuShare()
+      // Close by clicking outside (on Root) - this triggers onDismissRequest
+      composeRule.onNodeWithTag(HomeTags.Root).performClick()
       composeRule.waitForIdle()
     }
   }
@@ -946,17 +934,9 @@ class HomeScreenTest {
     // First wait for the menu to be displayed
     composeRule.waitUntilAtLeastOneExists(
         hasTestTag(HomeTags.TopRightMenu), timeoutMillis = timeoutMillis)
-    // Then wait for the Delete item to appear
-    composeRule.waitUntilAtLeastOneExists(hasText("Delete"), timeoutMillis = timeoutMillis)
-    composeRule.onNodeWithText("Delete").performClick()
-  }
-
-  private fun waitAndClickMenuShare(timeoutMillis: Long = 5_000) {
-    // First wait for the menu to be displayed
+    // Then wait for the "Delete current chat" menu item to appear
     composeRule.waitUntilAtLeastOneExists(
-        hasTestTag(HomeTags.TopRightMenu), timeoutMillis = timeoutMillis)
-    // Then wait for the Share item to appear
-    composeRule.waitUntilAtLeastOneExists(hasText("Share"), timeoutMillis = timeoutMillis)
-    composeRule.onNodeWithText("Share").performClick()
+        hasText("Delete current chat"), timeoutMillis = timeoutMillis)
+    composeRule.onNodeWithText("Delete current chat").performClick()
   }
 }
