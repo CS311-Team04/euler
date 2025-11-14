@@ -291,6 +291,7 @@ configurations.all {
 }
 
 tasks.withType<Test> {
+    maxHeapSize = "2g"
     // Configure Jacoco for each tests
     configure<JacocoTaskExtension> {
         isIncludeNoLocationClasses = true
