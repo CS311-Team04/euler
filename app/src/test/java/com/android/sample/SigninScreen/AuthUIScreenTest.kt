@@ -194,8 +194,6 @@ class AuthUIScreenTest {
     assert(!switchEduLoginInvoked) { "Switch Edu login should not be invoked when loading" }
   }
 
-  @Ignore(
-      "Skipped in CI: heavy Compose + Robolectric combination causes OOM when simulating disabled button clicks")
   @Test
   fun authScreen_displaysCorrectTexts() {
     composeRule.mainClock.autoAdvance = false
