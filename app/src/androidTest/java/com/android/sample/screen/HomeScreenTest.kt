@@ -503,7 +503,8 @@ class HomeScreenTest {
 
     // Both callbacks should be called: onDeleteClick (shows modal) and onDismiss (closes menu)
     composeRule.onNodeWithText("Clear Chat?").assertIsDisplayed()
-    assertNodeDoesNotExist("Delete") // The menu should be closed
+    // The menu should be closed (menu item "Delete current chat" should not exist)
+    composeRule.onAllNodesWithText("Delete current chat").assertCountEquals(0)
   }
 
   @Test
