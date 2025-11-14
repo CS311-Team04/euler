@@ -49,15 +49,12 @@ class AuthUIScreenTest {
     Dispatchers.resetMain()
   }
 
-  // --- HELPER FUNCTION (CORRIGÉ) ---
+  // --- HELPER FUNCTION (Corrected) ---
   private fun setContentWithAnimation(content: @androidx.compose.runtime.Composable () -> Unit) {
     composeTestRule.setContent(content)
-    // Avance l'horloge pour passer l'animation d'entrée de 800ms
+    // Advance clock to skip the 800ms entry animation
     composeTestRule.mainClock.advanceTimeBy(1000L)
-
-    // **LA CORRECTION CRUCIALE :**
-    // Attendre que l'animation soit VRAIMENT terminée avant de continuer.
-    composeTestRule.waitForIdle()
+    // DO NOT CALL waitForIdle()
   }
 
   // ==================== ROOT ELEMENT TESTS ====================
@@ -233,7 +230,7 @@ class AuthUIScreenTest {
       }
     }
     composeTestRule.onNodeWithTag(AuthTags.BtnMicrosoft).performClick()
-    composeTestRule.waitForIdle() // CORRECTION : Attendre la fin de l'animation de clic
+    composeTestRule.mainClock.advanceTimeBy(200L) // Advance for click animation (120ms)
     assertTrue("Microsoft button should trigger callback", clicked)
   }
 
@@ -247,7 +244,7 @@ class AuthUIScreenTest {
       }
     }
     composeTestRule.onNodeWithTag(AuthTags.BtnSwitchEdu).performClick()
-    composeTestRule.waitForIdle() // CORRECTION : Attendre la fin de l'animation de clic
+    composeTestRule.mainClock.advanceTimeBy(200L) // Advance for click animation (120ms)
     assertTrue("Guest button should trigger callback", clicked)
   }
 
@@ -287,8 +284,7 @@ class AuthUIScreenTest {
     composeTestRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsEnabled()
   }
 
-  // ==================== LOADING TESTS (Tous supprimés) ====================
-  // (Tous les tests "toxiques" avec AuthUiState.Loading sont supprimés)
+  // ==================== LOADING TESTS (Restored and Fixed) ====================
 
   @Test
   fun AuthUIScreen_hides_Guest_loading_indicator_when_not_loading() {
@@ -313,6 +309,33 @@ class AuthUIScreenTest {
       }
     }
     composeTestRule.onNode(hasContentDescription("Continue")).assertIsDisplayed()
+  }
+
+  // You can restore your other "Loading" tests here, but make sure they follow this pattern:
+  @Test
+  fun AuthUIScreen_hides_arrow_icon_when_Guest_loading() {
+    // 1. Disable auto-advance for infinite spinners
+    composeTestRule.mainClock.autoAdvance = false
+
+    composeTestRule.setContent {
+      MaterialTheme {
+        AuthUIScreen(
+            state = AuthUiState.Loading(AuthProvider.SWITCH_EDU),
+            onMicrosoftLogin = {},
+            onSwitchEduLogin = {})
+      }
+    }
+    // 2. Advance time manually for entry animation
+    composeTestRule.mainClock.advanceTimeBy(1000L)
+
+    // 3. Perform assertions
+    try {
+      composeTestRule.onNode(hasContentDescription("Continue")).assertIsDisplayed()
+      fail("Arrow icon should not exist when loading")
+    } catch (e: AssertionError) {
+      // Expected
+    }
+    // 4. Do NOT call waitForIdle()
   }
 
   // ==================== OR SEPARATOR TESTS ====================
@@ -438,7 +461,7 @@ class AuthUIScreenTest {
     }
     repeat(3) {
       composeTestRule.onNodeWithTag(AuthTags.BtnMicrosoft).performClick()
-      composeTestRule.waitForIdle() // CORRECTION : Attendre l'animation de clic
+      composeTestRule.mainClock.advanceTimeBy(200L) // Advance for click animation
     }
     assertEquals("All clicks should register", 3, clickCount)
   }
@@ -454,7 +477,7 @@ class AuthUIScreenTest {
     }
     repeat(3) {
       composeTestRule.onNodeWithTag(AuthTags.BtnSwitchEdu).performClick()
-      composeTestRule.waitForIdle() // CORRECTION : Attendre l'animation de clic
+      composeTestRule.mainClock.advanceTimeBy(200L) // Advance for click animation
     }
     assertEquals("All clicks should register", 3, clickCount)
   }
