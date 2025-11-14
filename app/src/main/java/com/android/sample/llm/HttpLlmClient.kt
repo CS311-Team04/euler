@@ -1,13 +1,13 @@
 package com.android.sample.llm
 
 import com.android.sample.BuildConfig
+import java.util.regex.Pattern
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 
 /**
  * LLM client backed by a plain HTTP endpoint (e.g. Cloud Functions HTTPS trigger).
@@ -68,20 +68,42 @@ class HttpLlmClient(
           }
           val body =
               response.body?.string() ?: throw IllegalStateException("Empty LLM HTTP response")
-          if (body.isBlank()) {
-            throw IllegalStateException("Empty LLM HTTP response")
-          }
-          val obj =
-              try {
-                JSONObject(body)
-              } catch (t: Throwable) {
-                throw IllegalStateException("Invalid LLM HTTP response", t)
-              }
-          val replyText =
-              obj.optString("reply", null)?.takeIf { it.isNotBlank() }
-                  ?: throw IllegalStateException("Empty LLM reply")
-          val url = obj.optString("primary_url", "").takeIf { it.isNotBlank() }
-          BotReply(replyText, url)
+          return@withContext parseBotReply(body)
         }
       }
 }
+
+internal fun parseBotReply(body: String): BotReply {
+  if (body.isBlank()) {
+    throw IllegalStateException("Empty LLM HTTP response")
+  }
+  val replyText =
+      REPLY_REGEX.find(body)?.groupValues?.getOrNull(1)?.let(::unescapeJsonString)?.trim()?.takeIf {
+        it.isNotEmpty()
+      } ?: throw IllegalStateException("Empty LLM reply")
+
+  val url =
+      PRIMARY_URL_REGEX.find(body)
+          ?.groupValues
+          ?.getOrNull(1)
+          ?.let(::unescapeJsonString)
+          ?.trim()
+          ?.takeIf { it.isNotEmpty() }
+  return BotReply(replyText, url)
+}
+
+private fun unescapeJsonString(raw: String): String =
+    raw.replace("\\\"", "\"")
+        .replace("\\\\", "\\")
+        .replace("\\n", "\n")
+        .replace("\\r", "\r")
+        .replace("\\t", "\t")
+
+private val REPLY_REGEX =
+    Pattern.compile("\"reply\"\\s*:\\s*\"([^\"]*)\"", Pattern.DOTALL or Pattern.CASE_INSENSITIVE)
+        .toRegex()
+
+private val PRIMARY_URL_REGEX =
+    Pattern.compile(
+            "\"primary_url\"\\s*:\\s*\"([^\"]*)\"", Pattern.DOTALL or Pattern.CASE_INSENSITIVE)
+        .toRegex()

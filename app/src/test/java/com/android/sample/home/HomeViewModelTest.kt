@@ -407,6 +407,59 @@ class HomeViewModelTest {
         runBlocking { verify(repo, never()).updateConversationTitle(any(), any()) }
       }
 
+  @Test
+  fun buildSiteLabel_formats_epfl_domains() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel(FakeLlmClient())
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildSiteLabel", String::class.java)
+        method.isAccessible = true
+
+        val label = method.invoke(viewModel, "https://www.epfl.ch/campus-services") as String
+
+        assertEquals("EPFL.ch Website", label)
+      }
+
+  @Test
+  fun buildSiteLabel_uses_host_for_external_sites() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel(FakeLlmClient())
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildSiteLabel", String::class.java)
+        method.isAccessible = true
+
+        val label = method.invoke(viewModel, "https://kotlinlang.org/docs/home.html") as String
+
+        assertEquals("kotlinlang.org Website", label)
+      }
+
+  @Test
+  fun buildFallbackTitle_returns_clean_path_segment() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel(FakeLlmClient())
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildFallbackTitle", String::class.java)
+        method.isAccessible = true
+
+        val title =
+            method.invoke(viewModel, "https://www.epfl.ch/education/projet-de-semestre") as String
+
+        assertEquals("Projet de semestre", title)
+      }
+
+  @Test
+  fun buildFallbackTitle_defaults_to_host_when_no_path() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel(FakeLlmClient())
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildFallbackTitle", String::class.java)
+        method.isAccessible = true
+
+        val title = method.invoke(viewModel, "https://example.com") as String
+
+        assertEquals("example.com", title)
+      }
+
   private fun HomeViewModel.setPrivateField(name: String, value: Any?) {
     val field = HomeViewModel::class.java.getDeclaredField(name)
     field.isAccessible = true
