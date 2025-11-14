@@ -13,9 +13,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -106,20 +106,22 @@ fun ChatMessage(
       if (isStreaming && message.text.isEmpty()) {
         LeadingThinkingDot()
       } else {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
           Text(
               text = message.text,
               color = aiText,
               style = MaterialTheme.typography.bodyMedium,
               lineHeight = 20.sp,
-              modifier = Modifier.weight(1f).testTag("chat_ai_text"))
+              modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
 
           if (audioState != null) {
-            Spacer(modifier = Modifier.width(8.dp))
-            AudioPlaybackButton(state = audioState)
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically) {
+                  AudioPlaybackButton(state = audioState, tint = Color.White.copy(alpha = 0.75f))
+                }
           }
         }
       }
@@ -157,33 +159,35 @@ data class MessageAudioState(
 )
 
 @Composable
-private fun AudioPlaybackButton(state: MessageAudioState) {
+private fun AudioPlaybackButton(
+    state: MessageAudioState,
+    modifier: Modifier = Modifier.size(24.dp),
+    tint: Color = Color.White
+) {
   when {
     state.isLoading -> {
       CircularProgressIndicator(
-          modifier = Modifier.size(20.dp).testTag("chat_audio_btn_loading"),
+          modifier = Modifier.size(14.dp).testTag("chat_audio_btn_loading"),
           strokeWidth = 2.dp,
           color = Color.LightGray)
     }
     state.isPlaying -> {
-      IconButton(
-          modifier = Modifier.size(32.dp).testTag("chat_audio_btn_stop"), onClick = state.onStop) {
-            Icon(
-                imageVector = Icons.Filled.Stop,
-                contentDescription = "Stop audio",
-                tint = Color.White,
-                modifier = Modifier.size(20.dp))
-          }
+      IconButton(modifier = modifier.testTag("chat_audio_btn_stop"), onClick = state.onStop) {
+        Icon(
+            imageVector = Icons.Filled.Stop,
+            contentDescription = "Stop audio",
+            tint = tint,
+            modifier = Modifier.size(14.dp))
+      }
     }
     else -> {
-      IconButton(
-          modifier = Modifier.size(32.dp).testTag("chat_audio_btn_play"), onClick = state.onPlay) {
-            Icon(
-                imageVector = Icons.Filled.VolumeUp,
-                contentDescription = "Play audio",
-                tint = Color.White,
-                modifier = Modifier.size(22.dp))
-          }
+      IconButton(modifier = modifier.testTag("chat_audio_btn_play"), onClick = state.onPlay) {
+        Icon(
+            imageVector = Icons.Filled.VolumeUp,
+            contentDescription = "Play audio",
+            tint = tint,
+            modifier = Modifier.size(16.dp))
+      }
     }
   }
 }
