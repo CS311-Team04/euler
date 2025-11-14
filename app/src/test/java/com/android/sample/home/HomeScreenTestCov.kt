@@ -18,6 +18,7 @@ import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
 import com.android.sample.conversations.Conversation
 import com.android.sample.llm.FakeLlmClient
+import com.android.sample.llm.LlmClient
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
@@ -46,6 +47,9 @@ class HomeScreenTestCov {
   @get:Rule val composeRule = createComposeRule()
   private val dispatcher = UnconfinedTestDispatcher()
 
+  private fun createHomeViewModel(llmClient: LlmClient = FakeLlmClient()): HomeViewModel =
+      HomeViewModel(profileRepository = FakeProfileRepository(), llmClient = llmClient)
+
   @Before
   fun setup() {
     Dispatchers.setMain(dispatcher)
@@ -61,7 +65,7 @@ class HomeScreenTestCov {
 
   @Test
   fun suggestions_are_displayed_initially() {
-    val viewModel = HomeViewModel(llmClient = FakeLlmClient())
+    val viewModel = createHomeViewModel()
 
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
@@ -72,7 +76,7 @@ class HomeScreenTestCov {
 
   @Test
   fun menu_button_opens_and_closes_drawer() {
-    val viewModel = HomeViewModel(llmClient = FakeLlmClient())
+    val viewModel = createHomeViewModel()
 
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
@@ -83,7 +87,7 @@ class HomeScreenTestCov {
 
   @Test
   fun new_chat_from_drawer_resets_state_and_closes() {
-    val viewModel = HomeViewModel(llmClient = FakeLlmClient())
+    val viewModel = createHomeViewModel()
     updateUiState(viewModel) {
       it.copy(currentConversationId = "conv-1", messageDraft = "draft", isDrawerOpen = true)
     }
@@ -106,7 +110,7 @@ class HomeScreenTestCov {
   @Test
   fun settings_from_drawer_invokes_callback() {
     var settingsCalled = false
-    val viewModel = HomeViewModel(llmClient = FakeLlmClient())
+    val viewModel = createHomeViewModel()
     updateUiState(viewModel) { it.copy(isDrawerOpen = true) }
 
     composeRule.setContent {
@@ -127,7 +131,7 @@ class HomeScreenTestCov {
   @Test
   fun voice_button_triggers_callback_when_visible() {
     var voiceCalled = false
-    val viewModel = HomeViewModel(llmClient = FakeLlmClient())
+    val viewModel = createHomeViewModel()
 
     composeRule.setContent {
       MaterialTheme { HomeScreen(viewModel = viewModel, onVoiceChatClick = { voiceCalled = true }) }
@@ -142,7 +146,7 @@ class HomeScreenTestCov {
   @Test
   fun send_message_updates_ui_state() {
     val fakeClient = FakeLlmClient().apply { nextReply = "Reply" }
-    val viewModel = HomeViewModel(llmClient = fakeClient)
+    val viewModel = createHomeViewModel(llmClient = fakeClient)
 
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
@@ -156,7 +160,7 @@ class HomeScreenTestCov {
 
   @Test
   fun openDrawerOnStart_opens_drawer_and_updates_state() {
-    val viewModel = HomeViewModel(llmClient = FakeLlmClient())
+    val viewModel = createHomeViewModel()
 
     composeRule.setContent {
       MaterialTheme { HomeScreen(viewModel = viewModel, openDrawerOnStart = true) }
@@ -175,7 +179,7 @@ class HomeScreenTestCov {
     var action1Called = false
     val sentMessages = mutableListOf<String>()
     val fakeClient = FakeLlmClient().apply { nextReply = "Sure" }
-    val viewModel = HomeViewModel(llmClient = fakeClient)
+    val viewModel = createHomeViewModel(llmClient = fakeClient)
 
     composeRule.setContent {
       MaterialTheme {
@@ -199,7 +203,7 @@ class HomeScreenTestCov {
 
   @Test
   fun suggestions_disappear_after_ai_response() {
-    val viewModel = HomeViewModel(FakeLlmClient())
+    val viewModel = createHomeViewModel()
     injectMessages(viewModel, listOf(aiMessage(text = "Bonjour", source = null)))
 
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
@@ -209,7 +213,7 @@ class HomeScreenTestCov {
 
   @Test
   fun voice_and_send_buttons_toggle_with_input() {
-    val viewModel = HomeViewModel(FakeLlmClient())
+    val viewModel = createHomeViewModel()
 
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
@@ -225,7 +229,7 @@ class HomeScreenTestCov {
 
   @Test
   fun top_right_menu_shows_delete_confirmation_and_cancel_hides_it() {
-    val viewModel = HomeViewModel(FakeLlmClient())
+    val viewModel = createHomeViewModel()
     updateUiState(viewModel) { it.copy(showDeleteConfirmation = true) }
 
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
@@ -239,7 +243,7 @@ class HomeScreenTestCov {
 
   @Test
   fun delete_confirmation_confirm_clears_chat() {
-    val viewModel = HomeViewModel(FakeLlmClient())
+    val viewModel = createHomeViewModel()
     injectMessages(viewModel, listOf(sampleMessage("User message")))
     updateUiState(viewModel) { it.copy(showDeleteConfirmation = true) }
 
@@ -254,7 +258,7 @@ class HomeScreenTestCov {
 
   @Test
   fun source_card_is_rendered_for_ai_message_with_source() {
-    val viewModel = HomeViewModel(FakeLlmClient())
+    val viewModel = createHomeViewModel()
     injectMessages(
         viewModel,
         listOf(
@@ -274,7 +278,7 @@ class HomeScreenTestCov {
 
   @Test
   fun thinking_indicator_visible_when_global_streaming() {
-    val viewModel = HomeViewModel(FakeLlmClient())
+    val viewModel = createHomeViewModel()
     updateUiState(viewModel) {
       it.copy(
           messages = listOf(sampleMessage("Waiting")), isSending = true, streamingMessageId = null)
@@ -287,7 +291,7 @@ class HomeScreenTestCov {
 
   @Test
   fun pick_conversation_from_drawer_selects_and_closes() {
-    val viewModel = HomeViewModel(llmClient = FakeLlmClient())
+    val viewModel = createHomeViewModel()
     updateUiState(viewModel) {
       it.copy(
           conversations = listOf(Conversation(id = "remote-1", title = "Linear Algebra")),

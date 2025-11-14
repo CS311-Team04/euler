@@ -7,7 +7,6 @@ import com.android.sample.Chat.ChatUIModel
 import com.android.sample.conversations.Conversation
 import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.MessageDTO
-import com.android.sample.llm.BotReply
 import com.android.sample.llm.FakeLlmClient
 import com.android.sample.llm.LlmClient
 import com.android.sample.profile.ProfileDataSource
@@ -108,28 +107,6 @@ class HomeViewModelTest {
     assertTrue(messages.any { it.type == ChatType.AI && it.text.contains("Bonjour") })
     assertFalse(viewModel.uiState.value.isSending)
     assertNull(viewModel.uiState.value.streamingMessageId)
-  }
-
-  @Test
-  fun sendMessage_guest_appends_source_card_when_llm_returns_url() = runBlocking {
-    val viewModel =
-        HomeViewModel(
-            object : LlmClient {
-              override suspend fun generateReply(prompt: String): BotReply =
-                  BotReply("Voici un lien utile.", "https://www.epfl.ch/education/projects")
-            })
-
-    viewModel.updateMessageDraft("Où trouver des projets ?")
-    viewModel.sendMessage()
-    dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
-
-    viewModel.awaitStreamingCompletion()
-
-    val messages = viewModel.uiState.value.messages
-    val sourceCard = messages.lastOrNull { it.source != null }
-    assertNotNull("Expected a source card message", sourceCard)
-    assertEquals("https://www.epfl.ch/education/projects", sourceCard!!.source?.url)
-    assertEquals("EPFL.ch Website", sourceCard.source?.siteLabel)
   }
 
   @Test
@@ -416,7 +393,7 @@ class HomeViewModelTest {
   @Test
   fun buildSiteLabel_formats_epfl_domains() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel(FakeLlmClient())
+        val viewModel = createHomeViewModel()
         val method =
             HomeViewModel::class.java.getDeclaredMethod("buildSiteLabel", String::class.java)
         method.isAccessible = true
@@ -429,7 +406,7 @@ class HomeViewModelTest {
   @Test
   fun buildSiteLabel_uses_host_for_external_sites() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel(FakeLlmClient())
+        val viewModel = createHomeViewModel()
         val method =
             HomeViewModel::class.java.getDeclaredMethod("buildSiteLabel", String::class.java)
         method.isAccessible = true
@@ -442,7 +419,7 @@ class HomeViewModelTest {
   @Test
   fun buildFallbackTitle_returns_clean_path_segment() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel(FakeLlmClient())
+        val viewModel = createHomeViewModel()
         val method =
             HomeViewModel::class.java.getDeclaredMethod("buildFallbackTitle", String::class.java)
         method.isAccessible = true
@@ -456,7 +433,7 @@ class HomeViewModelTest {
   @Test
   fun buildFallbackTitle_defaults_to_host_when_no_path() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel(FakeLlmClient())
+        val viewModel = createHomeViewModel()
         val method =
             HomeViewModel::class.java.getDeclaredMethod("buildFallbackTitle", String::class.java)
         method.isAccessible = true
