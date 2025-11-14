@@ -5,12 +5,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import com.android.sample.navigation.AppNav
 import com.android.sample.speech.SpeechToTextHelper
+import com.android.sample.speech.TextToSpeechHelper
 import com.android.sample.ui.theme.SampleAppTheme
 import com.google.firebase.FirebaseApp
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
   private val speechHelper by lazy { SpeechToTextHelper(this, this, Locale("fr", "FR")) }
+  private val ttsHelper by lazy { TextToSpeechHelper(this) }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -24,9 +26,14 @@ class MainActivity : ComponentActivity() {
     // Initialize the helper here (lazy initialization happens on first access, but before
     // setContent)
     speechHelper
+    ttsHelper
     setContent {
       SampleAppTheme {
-        AppNav(startOnSignedIn = false, activity = this@MainActivity, speechHelper = speechHelper)
+        AppNav(
+            startOnSignedIn = false,
+            activity = this@MainActivity,
+            speechHelper = speechHelper,
+            ttsHelper = ttsHelper)
       }
     }
   }
@@ -34,5 +41,6 @@ class MainActivity : ComponentActivity() {
   override fun onDestroy() {
     super.onDestroy()
     speechHelper.destroy()
+    ttsHelper.shutdown()
   }
 }

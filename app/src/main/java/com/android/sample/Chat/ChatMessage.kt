@@ -11,16 +11,25 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +65,7 @@ fun ChatMessage(
     message: ChatUIModel,
     modifier: Modifier = Modifier,
     isStreaming: Boolean = false,
+    audioState: MessageAudioState? = null,
     userBubbleBg: Color = Color(0xFF2B2B2B),
     userBubbleText: Color = Color.White,
     aiText: Color = Color(0xFFEDEDED),
@@ -96,12 +106,22 @@ fun ChatMessage(
       if (isStreaming && message.text.isEmpty()) {
         LeadingThinkingDot()
       } else {
-        Text(
-            text = message.text,
-            color = aiText,
-            style = MaterialTheme.typography.bodyMedium,
-            lineHeight = 20.sp,
-            modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Text(
+              text = message.text,
+              color = aiText,
+              style = MaterialTheme.typography.bodyMedium,
+              lineHeight = 20.sp,
+              modifier = Modifier.weight(1f).testTag("chat_ai_text"))
+
+          if (audioState != null) {
+            Spacer(modifier = Modifier.width(8.dp))
+            AudioPlaybackButton(state = audioState)
+          }
+        }
       }
     }
   }
@@ -126,4 +146,44 @@ private fun LeadingThinkingDot() {
       shape = CircleShape,
       tonalElevation = 0.dp,
       shadowElevation = 0.dp) {}
+}
+
+@Immutable
+data class MessageAudioState(
+    val isLoading: Boolean,
+    val isPlaying: Boolean,
+    val onPlay: () -> Unit,
+    val onStop: () -> Unit
+)
+
+@Composable
+private fun AudioPlaybackButton(state: MessageAudioState) {
+  when {
+    state.isLoading -> {
+      CircularProgressIndicator(
+          modifier = Modifier.size(20.dp).testTag("chat_audio_btn_loading"),
+          strokeWidth = 2.dp,
+          color = Color.LightGray)
+    }
+    state.isPlaying -> {
+      IconButton(
+          modifier = Modifier.size(32.dp).testTag("chat_audio_btn_stop"), onClick = state.onStop) {
+            Icon(
+                imageVector = Icons.Filled.Stop,
+                contentDescription = "Stop audio",
+                tint = Color.White,
+                modifier = Modifier.size(20.dp))
+          }
+    }
+    else -> {
+      IconButton(
+          modifier = Modifier.size(32.dp).testTag("chat_audio_btn_play"), onClick = state.onPlay) {
+            Icon(
+                imageVector = Icons.Filled.VolumeUp,
+                contentDescription = "Play audio",
+                tint = Color.White,
+                modifier = Modifier.size(22.dp))
+          }
+    }
+  }
 }
