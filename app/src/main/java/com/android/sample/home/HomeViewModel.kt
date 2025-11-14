@@ -204,30 +204,23 @@ class HomeViewModel(
                 if (cid == null) flowOf(emptyList()) else repo.messagesFlow(cid)
               }
               .collect { msgs ->
-
                 val streamingId = _uiState.value.streamingMessageId
                 if (streamingId != null) {
 
                   return@collect
                 }
 
-
                 _uiState.update { currentState ->
                   val firestoreMessages = msgs.map { it.toUi() }
-
 
                   val existingSourceCards =
                       currentState.messages.filter { it.source != null && it.text.isBlank() }
 
-
                   val finalMessages = mutableListOf<ChatUIModel>()
-
 
                   finalMessages.addAll(firestoreMessages)
 
-
                   existingSourceCards.forEach { sourceCard ->
-
                     val originalIndex =
                         currentState.messages.indexOfFirst { it.id == sourceCard.id }
                     if (originalIndex > 0) {
