@@ -81,7 +81,7 @@ fun AuthUIScreen(
     onSwitchEduLogin: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-  Box(modifier = modifier.fillMaxSize().background(Color(0xFF000000)).testTag(AuthTags.Root)) {
+  Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).testTag(AuthTags.Root)) {
     AnimatedVisibility(
         visible = true,
         enter =
@@ -108,7 +108,7 @@ fun AuthUIScreen(
                                   fontWeight = FontWeight.Normal,
                                   fontSize = 40.sp,
                                   lineHeight = 44.sp,
-                                  color = Color.White),
+                                  color = MaterialTheme.colorScheme.onBackground),
                           textAlign = TextAlign.Center,
                           modifier =
                               Modifier.fillMaxWidth()
@@ -125,7 +125,7 @@ fun AuthUIScreen(
                                   fontFamily = FontFamily.SansSerif,
                                   fontWeight = FontWeight.Normal,
                                   fontSize = 16.sp,
-                                  color = Color(0xFF9CA3AF)),
+                                  color = MaterialTheme.colorScheme.onSurfaceVariant),
                           textAlign = TextAlign.Center,
                           modifier = Modifier.fillMaxWidth().testTag(AuthTags.Subtitle))
 
@@ -171,7 +171,7 @@ fun AuthUIScreen(
                           text = "BY EPFL",
                           style =
                               MaterialTheme.typography.bodySmall.copy(
-                                  fontSize = 12.sp, color = Color(0xFF9CA3AF)),
+                                  fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant),
                           modifier = Modifier.testTag(AuthTags.ByEpflText))
                     }
               }
@@ -196,7 +196,7 @@ private fun LogosRow() {
             modifier =
                 Modifier.width(1.dp)
                     .height(14.dp)
-                    .background(Color(0xFF9CA3AF))
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant)
                     .testTag(AuthTags.LogoPoint))
         Spacer(modifier = Modifier.width(12.dp))
 
@@ -222,7 +222,7 @@ private fun MicrosoftEntraButton(
           targetValue = if (pressed) 0.98f else 1.0f, animationSpec = tween(120), label = "scale")
 
   Surface(
-      color = Color.White,
+      color = MaterialTheme.colorScheme.surface,
       shape = RoundedCornerShape(12.dp),
       modifier = modifier.fillMaxWidth().scale(scale).clip(RoundedCornerShape(12.dp))) {
         TextButton(
@@ -244,7 +244,7 @@ private fun MicrosoftEntraButton(
 
                     Text(
                         text = "Continue with Microsoft Entra ID",
-                        color = Color.Black,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style =
                             MaterialTheme.typography.bodyLarge.copy(
                                 fontFamily = FontFamily.SansSerif,
@@ -255,7 +255,7 @@ private fun MicrosoftEntraButton(
                       Spacer(modifier = Modifier.width(12.dp))
                       CircularProgressIndicator(
                           modifier = Modifier.size(18.dp).testTag(AuthTags.MsProgress),
-                          color = Color.Black,
+                          color = MaterialTheme.colorScheme.onSurface,
                           strokeWidth = 2.dp)
                     }
                   }
@@ -270,17 +270,17 @@ private fun OrSeparator() {
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.Center) {
         // Left line
-        Box(modifier = Modifier.width(48.dp).height(1.dp).background(Color(0xFF9CA3AF)))
+        Box(modifier = Modifier.width(48.dp).height(1.dp).background(MaterialTheme.colorScheme.onSurfaceVariant))
         Spacer(modifier = Modifier.width(16.dp))
         // OR text
         Text(
             text = "OR",
             style =
                 MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = 14.sp, color = Color(0xFF9CA3AF), fontFamily = FontFamily.SansSerif))
+                    fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.SansSerif))
         Spacer(modifier = Modifier.width(16.dp))
         // Right line
-        Box(modifier = Modifier.width(48.dp).height(1.dp).background(Color(0xFF9CA3AF)))
+        Box(modifier = Modifier.width(48.dp).height(1.dp).background(MaterialTheme.colorScheme.onSurfaceVariant))
       }
 }
 
@@ -297,7 +297,7 @@ private fun GuestButton(
       animateFloatAsState(
           targetValue = if (pressed) 0.98f else 1.0f, animationSpec = tween(120), label = "scale2")
 
-  val epflRed = Color(0xFFFF0000)
+  val epflRed = MaterialTheme.colorScheme.primary
 
   Surface(
       color = epflRed,
@@ -314,7 +314,7 @@ private fun GuestButton(
                   horizontalArrangement = Arrangement.Center) {
                     Text(
                         text = "Continue as a guest",
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimary,
                         style =
                             MaterialTheme.typography.bodyLarge.copy(
                                 fontFamily = FontFamily.SansSerif,
@@ -325,14 +325,14 @@ private fun GuestButton(
                       Spacer(modifier = Modifier.width(12.dp))
                       CircularProgressIndicator(
                           modifier = Modifier.size(18.dp).testTag(AuthTags.SwitchProgress),
-                          color = Color.White,
+                          color = MaterialTheme.colorScheme.onPrimary,
                           strokeWidth = 2.dp)
                     } else {
                       Spacer(modifier = Modifier.width(8.dp))
                       Icon(
                           imageVector = Icons.Outlined.ArrowForward,
                           contentDescription = "Continue",
-                          tint = Color.White,
+                          tint = MaterialTheme.colorScheme.onPrimary,
                           modifier = Modifier.size(20.dp))
                     }
                   }
@@ -346,7 +346,7 @@ private fun PrivacyPolicyText(modifier: Modifier = Modifier) {
     withStyle(
         style =
             SpanStyle(
-                color = Color(0xFF9CA3AF), fontFamily = FontFamily.SansSerif, fontSize = 11.sp)) {
+                color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.SansSerif, fontSize = 11.sp)) {
           append("By continuing, you acknowledge EPFL's ")
         }
     pushStringAnnotation(
@@ -356,7 +356,7 @@ private fun PrivacyPolicyText(modifier: Modifier = Modifier) {
     withStyle(
         style =
             SpanStyle(
-                color = Color(0xFF9CA3AF),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontFamily = FontFamily.SansSerif,
                 fontSize = 11.sp,
                 textDecoration = TextDecoration.Underline)) {
