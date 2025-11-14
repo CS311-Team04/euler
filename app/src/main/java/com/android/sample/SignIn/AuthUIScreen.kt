@@ -97,7 +97,7 @@ fun AuthUIScreen(
                   modifier =
                       Modifier.fillMaxSize().padding(horizontal = 24.dp).testTag(AuthTags.Card)) {
 
-                    // Central content pinned to true center
+                    // Central content pinned to center
                     Column(
                         modifier = Modifier.align(Alignment.Center).fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally) {
