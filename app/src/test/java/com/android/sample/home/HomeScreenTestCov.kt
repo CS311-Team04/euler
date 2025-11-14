@@ -2,7 +2,10 @@ package com.android.sample.home
 
 import android.content.Context
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -14,6 +17,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
 import com.android.sample.conversations.Conversation
+import com.android.sample.home.SourceMeta
 import com.android.sample.llm.FakeLlmClient
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
@@ -195,6 +199,95 @@ class HomeScreenTestCov {
   }
 
   @Test
+  fun suggestions_disappear_after_ai_response() {
+    val viewModel = HomeViewModel(FakeLlmClient())
+    injectMessages(viewModel, listOf(aiMessage(text = "Bonjour", source = null)))
+
+    composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
+
+    composeRule.onAllNodesWithText("What is EPFL").assertCountEquals(0)
+  }
+
+  @Test
+  fun voice_and_send_buttons_toggle_with_input() {
+    val viewModel = HomeViewModel(FakeLlmClient())
+
+    composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
+
+    composeRule.onNodeWithTag(HomeTags.VoiceBtn).assertIsDisplayed()
+    composeRule.onAllNodesWithTag(HomeTags.SendBtn).assertCountEquals(0)
+
+    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Ping")
+    composeRule.waitForIdle()
+
+    composeRule.onNodeWithTag(HomeTags.SendBtn).assertIsDisplayed()
+    composeRule.onAllNodesWithTag(HomeTags.VoiceBtn).assertCountEquals(0)
+  }
+
+  @Test
+  fun top_right_menu_shows_delete_confirmation_and_cancel_hides_it() {
+    val viewModel = HomeViewModel(FakeLlmClient())
+    updateUiState(viewModel) { it.copy(showDeleteConfirmation = true) }
+
+    composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
+
+    composeRule.onNodeWithText("Clear Chat?").assertIsDisplayed()
+    composeRule.runOnIdle { viewModel.hideDeleteConfirmation() }
+    composeRule.waitUntil(timeoutMillis = 2_000) { !viewModel.uiState.value.showDeleteConfirmation }
+
+    assertFalse(viewModel.uiState.value.showDeleteConfirmation)
+  }
+
+  @Test
+  fun delete_confirmation_confirm_clears_chat() {
+    val viewModel = HomeViewModel(FakeLlmClient())
+    injectMessages(viewModel, listOf(sampleMessage("User message")))
+    updateUiState(viewModel) { it.copy(showDeleteConfirmation = true) }
+
+    composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
+
+    composeRule.onNode(hasText("Delete") and hasClickAction()).performClick()
+    composeRule.waitUntil(timeoutMillis = 2_000) { viewModel.uiState.value.messages.isEmpty() }
+
+    assertTrue(viewModel.uiState.value.messages.isEmpty())
+    assertFalse(viewModel.uiState.value.showDeleteConfirmation)
+  }
+
+  @Test
+  fun source_card_is_rendered_for_ai_message_with_source() {
+    val viewModel = HomeViewModel(FakeLlmClient())
+    injectMessages(
+        viewModel,
+        listOf(
+            aiMessage(
+                text = "Here is a link",
+                source = SourceMeta(
+                    siteLabel = "EPFL.ch Website",
+                    title = "Projet de Semestre",
+                    url = "https://www.epfl.ch/project"))))
+
+    composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
+
+    composeRule.onNode(hasText("Retrieved from", substring = true)).assertIsDisplayed()
+    composeRule.onNodeWithText("Visit").assertIsDisplayed()
+  }
+
+  @Test
+  fun thinking_indicator_visible_when_global_streaming() {
+    val viewModel = HomeViewModel(FakeLlmClient())
+    updateUiState(viewModel) {
+      it.copy(
+          messages = listOf(sampleMessage("Waiting")),
+          isSending = true,
+          streamingMessageId = null)
+    }
+
+    composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
+
+    composeRule.onNodeWithTag("home_thinking_indicator").assertIsDisplayed()
+  }
+
+  @Test
   fun pick_conversation_from_drawer_selects_and_closes() {
     val viewModel = HomeViewModel(FakeLlmClient())
     updateUiState(viewModel) {
@@ -253,4 +346,12 @@ class HomeScreenTestCov {
           text = text,
           timestamp = System.currentTimeMillis(),
           type = ChatType.USER)
+
+  private fun aiMessage(text: String, source: SourceMeta?) =
+      ChatUIModel(
+          id = "ai-${text.hashCode()}",
+          text = text,
+          timestamp = System.currentTimeMillis(),
+          type = ChatType.AI,
+          source = source)
 }
