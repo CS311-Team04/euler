@@ -87,6 +87,8 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        // Default region for Firebase Functions (prod)
+        buildConfigField ("String", "FUNCTIONS_REGION", "\"europe-west6\"")
         buildConfigField ("String", "FUNCTIONS_HOST", "\"10.0.2.2\"")
         buildConfigField ("int",    "FUNCTIONS_PORT", "5002")
         buildConfigField ("boolean","USE_FUNCTIONS_EMULATOR", "true")
@@ -103,11 +105,17 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Ensure release APK talks to production Functions, not local emulator
+            buildConfigField ("boolean","USE_FUNCTIONS_EMULATOR", "false")
+            // Disable local HTTP fallback in release by default
+            buildConfigField("String", "LLM_HTTP_ENDPOINT", "\"\"")
         }
 
         debug {
             enableUnitTestCoverage = true
             enableAndroidTestCoverage = false
+            // Keep emulator defaults for local development
+            buildConfigField ("boolean","USE_FUNCTIONS_EMULATOR", "true")
         }
     }
 

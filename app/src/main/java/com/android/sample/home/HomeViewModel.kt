@@ -92,7 +92,7 @@ class HomeViewModel(
    * BuildConfig flags.
    */
   private val functions: FirebaseFunctions by lazy {
-    FirebaseFunctions.getInstance("europe-west6").apply {
+    FirebaseFunctions.getInstance(BuildConfig.FUNCTIONS_REGION).apply {
       if (BuildConfig.USE_FUNCTIONS_EMULATOR) {
         useEmulator(BuildConfig.FUNCTIONS_HOST, BuildConfig.FUNCTIONS_PORT)
       }
