@@ -1,7 +1,5 @@
 package com.android.sample.logic
 
-import java.util.Locale
-
 /**
  * Pure Kotlin logic for DrawerContent business logic. Extracted from DrawerContent for testability.
  */
@@ -17,9 +15,8 @@ object DrawerContentLogic {
     val trimmed = raw.trim()
     if (trimmed.isEmpty()) return "Student"
     return trimmed.split("\\s+".toRegex()).joinToString(" ") { word ->
-      word.replaceFirstChar { ch ->
-        if (ch.isLowerCase()) ch.titlecase(Locale.getDefault()) else ch.toString()
-      }
+      // Properly titlecase: capitalize first letter, lowercase the rest
+      if (word.isEmpty()) word else word.lowercase().replaceFirstChar { it.uppercaseChar() }
     }
   }
 

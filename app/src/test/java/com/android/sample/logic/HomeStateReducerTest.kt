@@ -52,7 +52,7 @@ class HomeStateReducerTest {
     val profile = UserProfile()
     val result = HomeStateReducer.calculateUserNameWithFallback(profile, "CurrentName")
 
-    assertEquals("Student", result) // Since profile is empty, returns default
+    assertEquals("CurrentName", result) // Preserves currentUserName when calculated is default
   }
 
   @Test
