@@ -74,20 +74,20 @@ fun ProfilePage(
 
   val formManager = remember { ProfileFormManager(authEmail, initialProfile) }
   var showSavedConfirmation by remember { mutableStateOf(false) }
-
-  // MUST be inside composable, outside LaunchedEffect
-  val testing = LocalInspectionMode.current
+  val isTesting = LocalInspectionMode.current
 
   LaunchedEffect(initialProfile, authEmail) { formManager.reset(initialProfile, authEmail) }
 
   LaunchedEffect(showSavedConfirmation) {
-    if (showSavedConfirmation && !testing) {
-      // Normal behavior in real app
-      delay(2500)
-      showSavedConfirmation = false
-    } else if (testing) {
-      // Instantly reset in tests → prevents AppNotIdleException
-      showSavedConfirmation = false
+    if (showSavedConfirmation) {
+      if (isTesting) {
+        // Robolectric → instant reset (prevents AppNotIdleException)
+        showSavedConfirmation = false
+      } else {
+        // Real device
+        delay(2500)
+        showSavedConfirmation = false
+      }
     }
   }
 
@@ -362,8 +362,11 @@ private fun EditableInfoRow(
               expanded = expanded,
               onDismissRequest = { expanded = false },
               containerColor = backgroundColor,
-              // Disable focus/animation during Robolectric tests to avoid idle-loop
-              properties = PopupProperties(focusable = !LocalInspectionMode.current)) {
+              properties =
+                  PopupProperties(
+                      focusable = !LocalInspectionMode.current,
+                      dismissOnBackPress = !LocalInspectionMode.current,
+                      dismissOnClickOutside = true)) {
                 field.options.forEach { option ->
                   DropdownMenuItem(
                       text = { Text(option, color = textPrimary) },
