@@ -42,8 +42,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.sample.R
-import java.util.Locale
 import com.android.sample.settings.Localization
+import java.util.Locale
 
 object DrawerTags {
   const val Root = "drawer_root"
