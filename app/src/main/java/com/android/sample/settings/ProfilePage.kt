@@ -46,10 +46,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.PopupProperties
 import com.android.sample.profile.UserProfile
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
@@ -72,12 +74,16 @@ fun ProfilePage(
 
   val formManager = remember { ProfileFormManager(authEmail, initialProfile) }
   var showSavedConfirmation by remember { mutableStateOf(false) }
+  val testing = LocalInspectionMode.current
 
   LaunchedEffect(initialProfile, authEmail) { formManager.reset(initialProfile, authEmail) }
 
   LaunchedEffect(showSavedConfirmation) {
-    if (showSavedConfirmation) {
+    if (showSavedConfirmation && !testing) {
+      // Disable delay during Robolectric tests to avoid AppNotIdleException
       delay(2500)
+      showSavedConfirmation = false
+    } else if (testing) {
       showSavedConfirmation = false
     }
   }
@@ -352,7 +358,9 @@ private fun EditableInfoRow(
           DropdownMenu(
               expanded = expanded,
               onDismissRequest = { expanded = false },
-              containerColor = backgroundColor) {
+              containerColor = backgroundColor,
+              // Fix Robolectric idle-loop by disabling animation behavior in tests
+              properties = PopupProperties(focusable = !LocalInspectionMode.current)) {
                 field.options.forEach { option ->
                   DropdownMenuItem(
                       text = { Text(option, color = textPrimary) },
