@@ -142,12 +142,18 @@ object ProfileFieldConfiguration {
   }
 
   /** Checks if any field has changed from initial profile */
-  fun hasAnyFieldChanged(formManager: ProfileFormManager, initialProfile: UserProfile?): Boolean {
+  fun hasAnyFieldChanged(
+      formManager: ProfileFormManager,
+      initialProfile: UserProfile?,
+      authEmail: String = ""
+  ): Boolean {
     if (initialProfile == null) {
       return getAllFieldValues(formManager).values.any { it.isNotBlank() }
     }
 
     val currentValues = getAllFieldValues(formManager)
+    // Resolve email the same way ProfileFormManager does
+    val resolvedInitialEmail = ProfilePageLogic.resolveEmail(initialProfile.email, authEmail)
     val initialValues =
         mapOf(
             "fullName" to initialProfile.fullName,
@@ -155,7 +161,7 @@ object ProfileFieldConfiguration {
             "role" to initialProfile.roleDescription,
             "faculty" to initialProfile.faculty,
             "section" to initialProfile.section,
-            "email" to initialProfile.email,
+            "email" to resolvedInitialEmail,
             "phone" to initialProfile.phone)
 
     return currentValues.any { (key, value) -> value != initialValues[key].orEmpty() }

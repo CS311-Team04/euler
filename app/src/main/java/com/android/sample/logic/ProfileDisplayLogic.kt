@@ -11,9 +11,11 @@ object ProfileDisplayLogic {
   /** Determines if save button should be enabled based on form state */
   fun shouldEnableSaveButton(
       formManager: ProfileFormManager,
-      initialProfile: UserProfile?
+      initialProfile: UserProfile?,
+      authEmail: String = ""
   ): Boolean {
-    val hasChanges = ProfileFieldConfiguration.hasAnyFieldChanged(formManager, initialProfile)
+    val hasChanges =
+        ProfileFieldConfiguration.hasAnyFieldChanged(formManager, initialProfile, authEmail)
     val isValid = ProfilePageLogic.canSaveProfile(formManager.buildSanitizedProfile())
     return hasChanges && isValid
   }
@@ -76,7 +78,10 @@ object ProfileDisplayLogic {
   /** Validates email format (basic validation) */
   fun isValidEmailFormat(email: String): Boolean {
     if (email.isBlank()) return true // Empty is valid (will use placeholder)
-    return email.contains("@") && email.contains(".")
+    // Must have at least one character before @, @ must exist, and must have at least one character
+    // after @
+    val atIndex = email.indexOf("@")
+    return atIndex > 0 && atIndex < email.length - 1 && email.contains(".")
   }
 
   /** Validates phone format (basic validation) */

@@ -171,12 +171,13 @@ class ProfileFieldConfigurationTest {
   fun `getAllFieldValues returns all field values`() {
     val formManager = ProfileFormManager("test@epfl.ch", null)
     formManager.updateFullName("John")
-    formManager.updateEmail("john@epfl.ch")
+    // Note: email is locked when initialized with authEmail, so updateEmail won't work
+    // The email will remain "test@epfl.ch"
 
     val values = ProfileFieldConfiguration.getAllFieldValues(formManager)
 
     assertEquals("John", values["fullName"])
-    assertEquals("john@epfl.ch", values["email"])
+    assertEquals("test@epfl.ch", values["email"]) // email is locked, so it's authEmail
     assertTrue(values.containsKey("username"))
     assertTrue(values.containsKey("role"))
     assertTrue(values.containsKey("faculty"))
@@ -187,19 +188,21 @@ class ProfileFieldConfigurationTest {
   @Test
   fun `hasAnyFieldChanged returns true when field changed`() {
     val initial = UserProfile(fullName = "John", email = "john@epfl.ch")
-    val formManager = ProfileFormManager("john@epfl.ch", initial)
+    val authEmail = "john@epfl.ch"
+    val formManager = ProfileFormManager(authEmail, initial)
     formManager.updateFullName("Jane") // Changed
 
-    assertTrue(ProfileFieldConfiguration.hasAnyFieldChanged(formManager, initial))
+    assertTrue(ProfileFieldConfiguration.hasAnyFieldChanged(formManager, initial, authEmail))
   }
 
   @Test
   fun `hasAnyFieldChanged returns false when no fields changed`() {
     val initial = UserProfile(fullName = "John")
-    val formManager = ProfileFormManager("test@epfl.ch", initial)
-    // No changes made
+    val authEmail = "test@epfl.ch"
+    val formManager = ProfileFormManager(authEmail, initial)
+    // No changes made - email will be resolved to authEmail, but that matches what formManager has
 
-    assertFalse(ProfileFieldConfiguration.hasAnyFieldChanged(formManager, initial))
+    assertFalse(ProfileFieldConfiguration.hasAnyFieldChanged(formManager, initial, authEmail))
   }
 
   @Test

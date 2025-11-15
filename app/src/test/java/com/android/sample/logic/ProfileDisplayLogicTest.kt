@@ -24,10 +24,11 @@ class ProfileDisplayLogicTest {
   @Test
   fun `shouldEnableSaveButton returns false when form has no changes`() {
     val initial = UserProfile(fullName = "John")
-    val formManager = ProfileFormManager("test@epfl.ch", initial)
+    val authEmail = "test@epfl.ch"
+    val formManager = ProfileFormManager(authEmail, initial)
     // No changes made
 
-    val result = ProfileDisplayLogic.shouldEnableSaveButton(formManager, initial)
+    val result = ProfileDisplayLogic.shouldEnableSaveButton(formManager, initial, authEmail)
 
     assertFalse(result)
   }
@@ -194,20 +195,22 @@ class ProfileDisplayLogicTest {
   @Test
   fun `shouldEnableSaveButton returns true when field changed from initial`() {
     val initial = UserProfile(fullName = "John")
-    val formManager = ProfileFormManager("test@epfl.ch", initial)
+    val authEmail = "test@epfl.ch"
+    val formManager = ProfileFormManager(authEmail, initial)
     formManager.updateFullName("Jane") // Changed
 
-    assertTrue(ProfileDisplayLogic.shouldEnableSaveButton(formManager, initial))
+    assertTrue(ProfileDisplayLogic.shouldEnableSaveButton(formManager, initial, authEmail))
   }
 
   @Test
   fun `shouldEnableSaveButton returns false when only whitespace changed`() {
     val initial = UserProfile(fullName = "John")
-    val formManager = ProfileFormManager("test@epfl.ch", initial)
+    val authEmail = "test@epfl.ch"
+    val formManager = ProfileFormManager(authEmail, initial)
     formManager.updateFullName("John  ") // Only whitespace, might be trimmed
 
     // This depends on formManager trimming, but we test the logic here
-    val result = ProfileDisplayLogic.shouldEnableSaveButton(formManager, initial)
+    val result = ProfileDisplayLogic.shouldEnableSaveButton(formManager, initial, authEmail)
     // Result depends on whether formManager trims or not
     assertNotNull(result) // Just ensure it doesn't crash
   }

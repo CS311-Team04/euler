@@ -125,7 +125,8 @@ fun ProfilePage(
             TextButton(
                 onClick = {
                   val formState = formManager.buildSanitizedProfile()
-                  if (ProfileDisplayLogic.shouldEnableSaveButton(formManager, initialProfile)) {
+                  if (ProfileDisplayLogic.shouldEnableSaveButton(
+                      formManager, initialProfile, authEmail)) {
                     onSaveProfile(formState)
                     showSavedConfirmation = ProfilePageLogic.shouldShowSavedConfirmation(true)
                   }
