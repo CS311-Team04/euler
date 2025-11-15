@@ -49,7 +49,12 @@ internal typealias NavigateAction = (String, NavOptionsBuilder.() -> Unit) -> Un
 
 @SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
-fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: SpeechToTextHelper) {
+fun AppNav(
+    startOnSignedIn: Boolean = false,
+    activity: Activity,
+    speechHelper: SpeechToTextHelper,
+    disableSideEffectsForTests: Boolean = false
+) {
   val nav =
       rememberNavController().also { controller -> appNavControllerObserver?.invoke(controller) }
   val authViewModel = remember { authViewModelFactory?.invoke() ?: AuthViewModel() }
@@ -62,35 +67,39 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
   val currentDestination = navBackStackEntry?.destination?.route
 
   // Handle Microsoft authentication when loading
-  LaunchedEffect(authState) {
-    val currentState = authState
-    val command = resolveAuthCommand(currentState, currentDestination)
-    executeAuthCommand(
-        command,
-        startMicrosoftSignIn = {
-          MicrosoftAuth.signIn(
-              activity = activity,
-              onSuccess = { authViewModel.onAuthenticationSuccess() },
-              onError = { exception ->
-                val errorMessage =
-                    buildAuthenticationErrorMessage(
-                        currentState, exception.message ?: "Authentication failed")
-                authViewModel.onAuthenticationError(errorMessage)
-              })
-        },
-        navigateHome = {
-          navigateHomeFromSignIn { route, builder -> nav.navigate(route) { builder(this) } }
-        })
+  if (!disableSideEffectsForTests) {
+    LaunchedEffect(authState) {
+      val currentState = authState
+      val command = resolveAuthCommand(currentState, currentDestination)
+      executeAuthCommand(
+          command,
+          startMicrosoftSignIn = {
+            MicrosoftAuth.signIn(
+                activity = activity,
+                onSuccess = { authViewModel.onAuthenticationSuccess() },
+                onError = { exception ->
+                  val errorMessage =
+                      buildAuthenticationErrorMessage(
+                          currentState, exception.message ?: "Authentication failed")
+                  authViewModel.onAuthenticationError(errorMessage)
+                })
+          },
+          navigateHome = {
+            navigateHomeFromSignIn { route, builder -> nav.navigate(route) { builder(this) } }
+          })
+    }
   }
 
-  LaunchedEffect(authState) {
-    when (authState) {
-      is AuthUiState.Guest -> homeViewModel.setGuestMode(true)
-      is AuthUiState.SignedIn -> {
-        homeViewModel.setGuestMode(false)
-        homeViewModel.refreshProfile()
+  if (!disableSideEffectsForTests) {
+    LaunchedEffect(authState) {
+      when (authState) {
+        is AuthUiState.Guest -> homeViewModel.setGuestMode(true)
+        is AuthUiState.SignedIn -> {
+          homeViewModel.setGuestMode(false)
+          homeViewModel.refreshProfile()
+        }
+        else -> {}
       }
-      else -> {}
     }
   }
 
@@ -136,7 +145,8 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
                     nav.navigate(Routes.Profile)
                   }
                 },
-                onVoiceChatClick = { nav.navigate(Routes.VoiceChat) })
+                onVoiceChatClick = { nav.navigate(Routes.VoiceChat) },
+                disableSideEffectsForTests = disableSideEffectsForTests)
           }
 
           composable(Routes.HomeWithDrawer) {
@@ -160,7 +170,8 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
                   }
                 },
                 onVoiceChatClick = { nav.navigate(Routes.VoiceChat) },
-                openDrawerOnStart = true)
+                openDrawerOnStart = true,
+                disableSideEffectsForTests = disableSideEffectsForTests)
           }
 
           composable(Routes.Settings) {
@@ -189,16 +200,22 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
 
           composable(Routes.Profile) {
             if (homeUiState.isGuest) {
-              LaunchedEffect(Unit) {
-                homeViewModel.showGuestProfileWarning()
-                nav.popBackStack()
+              if (!disableSideEffectsForTests) {
+                LaunchedEffect(Unit) {
+                  homeViewModel.showGuestProfileWarning()
+                  nav.popBackStack()
+                }
               }
             } else {
-              LaunchedEffect(Unit) { homeViewModel.refreshProfile() }
+              if (!disableSideEffectsForTests) {
+                LaunchedEffect(Unit) { homeViewModel.refreshProfile() }
+              }
               ProfilePage(
                   onBackClick = { nav.popBackStack() },
                   onSaveProfile = { profile -> homeViewModel.saveProfile(profile) },
-                  initialProfile = homeUiState.profile)
+                  initialProfile = homeUiState.profile,
+                  disableSideEffectsForTests = disableSideEffectsForTests,
+                  skipDelayForTests = disableSideEffectsForTests)
             }
           }
         }

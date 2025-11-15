@@ -64,7 +64,8 @@ fun ProfilePage(
     onBackClick: () -> Unit = {},
     onSaveProfile: (UserProfile) -> Unit = {},
     initialProfile: UserProfile? = null,
-    skipDelayForTests: Boolean = false
+    skipDelayForTests: Boolean = false,
+    disableSideEffectsForTests: Boolean = false
 ) {
   val background = Color(0xFF121212)
   val cardColor = Color(0xFF1E1E1E)
@@ -73,8 +74,12 @@ fun ProfilePage(
   val accent = Color(0xFFEB5757)
 
   val authEmail = remember {
-    val firebaseEmail = runCatching { FirebaseAuth.getInstance().currentUser?.email }.getOrNull()
-    ProfilePageLogic.extractAuthEmail(firebaseEmail)
+    if (disableSideEffectsForTests) {
+      ""
+    } else {
+      val firebaseEmail = runCatching { FirebaseAuth.getInstance().currentUser?.email }.getOrNull()
+      ProfilePageLogic.extractAuthEmail(firebaseEmail)
+    }
   }
 
   val resolvedEmail =
@@ -86,18 +91,24 @@ fun ProfilePage(
   var showSavedConfirmation by remember { mutableStateOf(false) }
   val isTesting = LocalInspectionMode.current
 
-  LaunchedEffect(initialProfile, resolvedEmail) { formManager.reset(initialProfile, resolvedEmail) }
+  if (!disableSideEffectsForTests) {
+    LaunchedEffect(initialProfile, resolvedEmail) {
+      formManager.reset(initialProfile, resolvedEmail)
+    }
+  }
 
-  LaunchedEffect(showSavedConfirmation) {
-    if (ProfilePageLogic.shouldShowSavedConfirmation(showSavedConfirmation)) {
-      val delayMs =
-          ProfilePageLogic.getConfirmationDelay(
-              isTesting = isTesting, skipDelayForTests = skipDelayForTests)
-      if (ProfilePageLogic.shouldResetConfirmationImmediately(isTesting, skipDelayForTests)) {
-        showSavedConfirmation = false
-      } else {
-        delay(delayMs)
-        showSavedConfirmation = false
+  if (!disableSideEffectsForTests) {
+    LaunchedEffect(showSavedConfirmation) {
+      if (ProfilePageLogic.shouldShowSavedConfirmation(showSavedConfirmation)) {
+        val delayMs =
+            ProfilePageLogic.getConfirmationDelay(
+                isTesting = isTesting, skipDelayForTests = skipDelayForTests)
+        if (ProfilePageLogic.shouldResetConfirmationImmediately(isTesting, skipDelayForTests)) {
+          showSavedConfirmation = false
+        } else {
+          delay(delayMs)
+          showSavedConfirmation = false
+        }
       }
     }
   }

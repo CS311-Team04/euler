@@ -19,7 +19,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Menu
@@ -94,34 +93,41 @@ fun HomeScreen(
     onVoiceChatClick: () -> Unit = {},
     openDrawerOnStart: Boolean = false,
     speechHelper: com.android.sample.speech.SpeechToTextHelper? = null,
-    forceNewChatOnFirstOpen: Boolean = false
+    forceNewChatOnFirstOpen: Boolean = false,
+    disableSideEffectsForTests: Boolean = false
 ) {
   val ui by viewModel.uiState.collectAsState()
   val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
   val scope = rememberCoroutineScope()
 
   val ranNewChatOnce = remember { mutableStateOf(false) }
-  LaunchedEffect(forceNewChatOnFirstOpen) {
-    if (forceNewChatOnFirstOpen && !ranNewChatOnce.value) {
-      ranNewChatOnce.value = true
-      viewModel.startLocalNewChat()
+  if (!disableSideEffectsForTests) {
+    LaunchedEffect(forceNewChatOnFirstOpen) {
+      if (forceNewChatOnFirstOpen && !ranNewChatOnce.value) {
+        ranNewChatOnce.value = true
+        viewModel.startLocalNewChat()
+      }
     }
   }
 
   // Synchronize ViewModel state <-> Drawer component
-  LaunchedEffect(ui.isDrawerOpen) {
-    if (ui.isDrawerOpen && !drawerState.isOpen) {
-      drawerState.open()
-    } else if (!ui.isDrawerOpen && drawerState.isOpen) {
-      drawerState.close()
+  if (!disableSideEffectsForTests) {
+    LaunchedEffect(ui.isDrawerOpen) {
+      if (ui.isDrawerOpen && !drawerState.isOpen) {
+        drawerState.open()
+      } else if (!ui.isDrawerOpen && drawerState.isOpen) {
+        drawerState.close()
+      }
     }
   }
 
   // Open drawer when returning from settings
-  LaunchedEffect(openDrawerOnStart) {
-    if (openDrawerOnStart) {
-      drawerState.open()
-      viewModel.toggleDrawer()
+  if (!disableSideEffectsForTests) {
+    LaunchedEffect(openDrawerOnStart) {
+      if (openDrawerOnStart) {
+        drawerState.open()
+        viewModel.toggleDrawer()
+      }
     }
   }
 
@@ -391,21 +397,24 @@ fun HomeScreen(
                     if (ui.messages.isEmpty() && !ui.isSending) {
                       // Show animated intro title when list is empty
                       AnimatedIntroTitle(
-                          modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp))
+                          modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp),
+                          disableSideEffectsForTests = disableSideEffectsForTests)
                     } else {
                       val listState = rememberLazyListState()
 
                       // Auto-scroll to bottom when messages change or sending state changes
-                      LaunchedEffect(ui.messages.size, ui.isSending, ui.streamingSequence) {
-                        val lastIndex =
-                            if (ui.messages.isEmpty()) {
-                              0
-                            } else {
-                              // Scroll to last message index, or one more if showing thinking
-                              // indicator
-                              ui.messages.size - 1 + if (ui.isSending) 1 else 0
-                            }
-                        listState.animateScrollToItem(lastIndex)
+                      if (!disableSideEffectsForTests) {
+                        LaunchedEffect(ui.messages.size, ui.isSending, ui.streamingSequence) {
+                          val lastIndex =
+                              if (ui.messages.isEmpty()) {
+                                0
+                              } else {
+                                // Scroll to last message index, or one more if showing thinking
+                                // indicator
+                                ui.messages.size - 1 + if (ui.isSending) 1 else 0
+                              }
+                          listState.animateScrollToItem(lastIndex)
+                        }
                       }
 
                       LazyColumn(
@@ -447,7 +456,8 @@ fun HomeScreen(
                                     modifier =
                                         Modifier.fillMaxWidth()
                                             .padding(vertical = 8.dp)
-                                            .testTag("home_thinking_indicator"))
+                                            .testTag("home_thinking_indicator"),
+                                    disableSideEffectsForTests = disableSideEffectsForTests)
                               }
                             }
                           }
@@ -578,12 +588,17 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
  * rendered after the last message in the list.
  */
 @Composable
-private fun ThinkingIndicator(modifier: Modifier = Modifier) {
+private fun ThinkingIndicator(
+    modifier: Modifier = Modifier,
+    disableSideEffectsForTests: Boolean = false
+) {
   var dots by remember { mutableStateOf(0) }
-  LaunchedEffect(Unit) {
-    while (true) {
-      kotlinx.coroutines.delay(450)
-      dots = (dots + 1) % 4
+  if (!disableSideEffectsForTests) {
+    LaunchedEffect(Unit) {
+      while (true) {
+        kotlinx.coroutines.delay(450)
+        dots = (dots + 1) % 4
+      }
     }
   }
   val text = Localization.t("euler_thinking") + ".".repeat(dots)
@@ -671,7 +686,10 @@ private fun BubbleSendButton(
  * suggestions that fade in/out every 3 seconds.
  */
 @Composable
-internal fun AnimatedIntroTitle(modifier: Modifier = Modifier) {
+internal fun AnimatedIntroTitle(
+    modifier: Modifier = Modifier,
+    disableSideEffectsForTests: Boolean = false
+) {
   val suggestions = remember {
     listOf(
         Localization.t("intro_suggestion_1"),
@@ -684,10 +702,12 @@ internal fun AnimatedIntroTitle(modifier: Modifier = Modifier) {
   var currentIndex by remember { mutableStateOf(0) }
 
   // Rotate suggestions every 3 seconds
-  LaunchedEffect(Unit) {
-    while (true) {
-      delay(3000)
-      currentIndex = (currentIndex + 1) % suggestions.size
+  if (!disableSideEffectsForTests) {
+    LaunchedEffect(Unit) {
+      while (true) {
+        delay(3000)
+        currentIndex = (currentIndex + 1) % suggestions.size
+      }
     }
   }
 
