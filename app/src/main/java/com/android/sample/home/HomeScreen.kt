@@ -47,8 +47,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.android.sample.Chat.ChatMessage
 import com.android.sample.Chat.ChatType
 import com.android.sample.R
-import com.android.sample.ui.components.GuestProfileWarningModal
 import com.android.sample.settings.Localization
+import com.android.sample.ui.components.GuestProfileWarningModal
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -326,12 +326,10 @@ fun HomeScreen(
                                 modifier = Modifier.size(36.dp).testTag(HomeTags.MicBtn)) {
                                   Icon(
                                       Icons.Default.Mic,
-
-                                       contentDescription = Localization.t("dictate"),
+                                      contentDescription = Localization.t("dictate"),
                                       tint = Color.Gray,
                                       modifier = Modifier.size(18.dp))
-                                      
-                   }
+                                }
 
                             val canSend = ui.messageDraft.isNotBlank() && !ui.isSending
 
@@ -339,22 +337,16 @@ fun HomeScreen(
                             AnimatedVisibility(
                                 visible = !canSend,
                                 enter = fadeIn() + scaleIn(),
-                                exit = fadeOut() + scaleOut()
-                            ) {
-                                IconButton(
-                                    onClick = onVoiceChatClick,
-                                    modifier = Modifier.testTag(HomeTags.VoiceBtn)
-                                ) {
-                                    Icon(
-                                        Icons.Default.GraphicEq,
-                                        contentDescription = Localization.t("voice_mode"),
-                                        tint = Color.Gray,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                            }
-                            }
-
+                                exit = fadeOut() + scaleOut()) {
+                                  IconButton(
+                                      onClick = onVoiceChatClick,
+                                      modifier = Modifier.testTag(HomeTags.VoiceBtn)) {
+                                        Icon(
+                                            Icons.Default.GraphicEq,
+                                            contentDescription = Localization.t("voice_mode"),
+                                            tint = Color.Gray,
+                                            modifier = Modifier.size(18.dp))
+                                      }
                                 }
 
                             BubbleSendButton(
