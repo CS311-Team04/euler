@@ -197,10 +197,12 @@ class ProfileFieldConfigurationTest {
 
   @Test
   fun `hasAnyFieldChanged returns false when no fields changed`() {
-    val initial = UserProfile(fullName = "John")
+    val initial = UserProfile(fullName = "John", email = "test@epfl.ch")
     val authEmail = "test@epfl.ch"
     val formManager = ProfileFormManager(authEmail, initial)
-    // No changes made - email will be resolved to authEmail, but that matches what formManager has
+    // No changes made - formManager initialized with same values as initial profile
+    // Email resolution: initial.email is not blank, so resolvedInitialEmail = "test@epfl.ch"
+    // formManager.email = "test@epfl.ch" (same), so no change detected
 
     assertFalse(ProfileFieldConfiguration.hasAnyFieldChanged(formManager, initial, authEmail))
   }

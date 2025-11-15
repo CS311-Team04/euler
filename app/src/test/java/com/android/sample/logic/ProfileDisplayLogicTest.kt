@@ -23,10 +23,10 @@ class ProfileDisplayLogicTest {
 
   @Test
   fun `shouldEnableSaveButton returns false when form has no changes`() {
-    val initial = UserProfile(fullName = "John")
+    val initial = UserProfile(fullName = "John", email = "test@epfl.ch")
     val authEmail = "test@epfl.ch"
     val formManager = ProfileFormManager(authEmail, initial)
-    // No changes made
+    // No changes made - formManager initialized with same values as initial profile
 
     val result = ProfileDisplayLogic.shouldEnableSaveButton(formManager, initial, authEmail)
 
