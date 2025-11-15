@@ -129,7 +129,7 @@ class AuthStateTest {
     assertTrue("AuthState should be a sealed class", authStateClass.isSealed)
 
     // Verify all expected subclasses exist
-    val subclasses = authStateClass.permittedSubclasses
+    val subclasses = authStateClass.permittedSubclasses ?: emptyArray()
     assertTrue(
         "Should have NotInitialized subclass", subclasses.any { it.simpleName == "NotInitialized" })
     assertTrue("Should have Ready subclass", subclasses.any { it.simpleName == "Ready" })

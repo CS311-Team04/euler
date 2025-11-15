@@ -1,5 +1,7 @@
 package com.android.sample.home
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -17,22 +19,27 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,6 +48,7 @@ import com.android.sample.Chat.ChatMessage
 import com.android.sample.Chat.ChatType
 import com.android.sample.R
 import com.android.sample.ui.components.GuestProfileWarningModal
+import com.android.sample.settings.Localization
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -85,11 +93,20 @@ fun HomeScreen(
     onProfileClick: () -> Unit = {},
     onVoiceChatClick: () -> Unit = {},
     openDrawerOnStart: Boolean = false,
-    speechHelper: com.android.sample.speech.SpeechToTextHelper? = null
+    speechHelper: com.android.sample.speech.SpeechToTextHelper? = null,
+    forceNewChatOnFirstOpen: Boolean = false
 ) {
   val ui by viewModel.uiState.collectAsState()
   val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
   val scope = rememberCoroutineScope()
+
+  val ranNewChatOnce = remember { mutableStateOf(false) }
+  LaunchedEffect(forceNewChatOnFirstOpen) {
+    if (forceNewChatOnFirstOpen && !ranNewChatOnce.value) {
+      ranNewChatOnce.value = true
+      viewModel.startLocalNewChat()
+    }
+  }
 
   // Synchronize ViewModel state <-> Drawer component
   LaunchedEffect(ui.isDrawerOpen) {
@@ -115,11 +132,11 @@ fun HomeScreen(
             ui = ui,
             onToggleSystem = { id -> viewModel.toggleSystemConnection(id) },
             onSignOut = {
-              // TODO: connect your actual sign-out
-              // Close drawer visually + sync VM
-              scope.launch { drawerState.close() }
-              if (ui.isDrawerOpen) viewModel.toggleDrawer()
-              onSignOut()
+              scope.launch {
+                drawerState.close()
+                if (ui.isDrawerOpen) viewModel.toggleDrawer()
+                onSignOut()
+              }
             },
             onSettingsClick = {
               scope.launch { drawerState.close() }
@@ -143,6 +160,20 @@ fun HomeScreen(
             onClose = {
               scope.launch { drawerState.close() }
               if (ui.isDrawerOpen) viewModel.toggleDrawer()
+            },
+            onNewChat = {
+              scope.launch {
+                drawerState.close()
+                if (ui.isDrawerOpen) viewModel.toggleDrawer()
+                viewModel.startLocalNewChat()
+              }
+            },
+            onPickConversation = { cid ->
+              scope.launch {
+                viewModel.selectConversation(cid)
+                drawerState.close()
+                if (ui.isDrawerOpen) viewModel.toggleDrawer()
+              }
             })
       }) {
         Scaffold(
@@ -161,7 +192,7 @@ fun HomeScreen(
                         modifier = Modifier.size(48.dp).testTag(HomeTags.MenuBtn)) {
                           Icon(
                               Icons.Default.Menu,
-                              contentDescription = "Menu",
+                              contentDescription = Localization.t("menu"),
                               tint = Color.White,
                               modifier = Modifier.size(24.dp))
                         }
@@ -169,7 +200,7 @@ fun HomeScreen(
                   title = {
                     Image(
                         painter = painterResource(R.drawable.euler_logo),
-                        contentDescription = "Euler",
+                        contentDescription = Localization.t("euler"),
                         modifier = Modifier.height(25.dp),
                         contentScale = ContentScale.Fit)
                   },
@@ -179,7 +210,7 @@ fun HomeScreen(
                         modifier = Modifier.size(48.dp).testTag(HomeTags.TopRightBtn)) {
                           Icon(
                               Icons.Default.MoreVert,
-                              contentDescription = "More",
+                              contentDescription = Localization.t("more"),
                               tint = Color.White,
                               modifier = Modifier.size(24.dp))
                         }
@@ -189,9 +220,12 @@ fun HomeScreen(
                         expanded = ui.isTopRightOpen,
                         onDismissRequest = { viewModel.setTopRightOpen(false) },
                         modifier = Modifier.testTag(HomeTags.TopRightMenu)) {
-                          TopRightPanelPlaceholder(
-                              onDismiss = { viewModel.setTopRightOpen(false) },
-                              onDeleteClick = { viewModel.showDeleteConfirmation() })
+                          DropdownMenuItem(
+                              text = { Text("Delete current chat") },
+                              onClick = {
+                                viewModel.setTopRightOpen(false)
+                                viewModel.showDeleteConfirmation()
+                              })
                         }
                   },
                   colors =
@@ -208,14 +242,14 @@ fun HomeScreen(
                     // Horizontal scrollable row of suggestion chips
                     val suggestions =
                         listOf(
-                            "What is EPFL",
-                            "Check Ed Discussion",
-                            "Show my schedule",
-                            "Find library resources",
-                            "Check grades on IS-Academia",
-                            "Search Moodle courses",
-                            "What's due this week?",
-                            "Help me study for CS220")
+                            Localization.t("suggestion_what_is_epfl"),
+                            Localization.t("suggestion_check_ed"),
+                            Localization.t("suggestion_show_schedule"),
+                            Localization.t("suggestion_library"),
+                            Localization.t("suggestion_check_grades"),
+                            Localization.t("suggestion_search_moodle"),
+                            Localization.t("suggestion_whats_due"),
+                            Localization.t("suggestion_study_help"))
 
                     val scrollState = rememberScrollState()
 
@@ -270,7 +304,7 @@ fun HomeScreen(
                     OutlinedTextField(
                         value = ui.messageDraft,
                         onValueChange = { viewModel.updateMessageDraft(it) },
-                        placeholder = { Text("Message EULER", color = Color.Gray) },
+                        placeholder = { Text(Localization.t("message_euler"), color = Color.Gray) },
                         modifier =
                             Modifier.fillMaxWidth()
                                 .padding(horizontal = 16.dp)
@@ -279,15 +313,37 @@ fun HomeScreen(
                         enabled = !ui.isSending,
                         singleLine = true,
                         trailingIcon = {
-                          val canSend = ui.messageDraft.isNotBlank() && !ui.isSending
-                          Row(
-                              modifier = Modifier.padding(end = 6.dp),
-                              verticalAlignment = Alignment.CenterVertically,
-                              horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                IconButton(
-                                    onClick = {
-                                      speechHelper?.startListening { recognized ->
+                          Row(horizontalArrangement = Arrangement.spacedBy(0.2.dp)) {
+                            // Voice chat button - opens voice visualizer
+                            IconButton(
+                                onClick = {
+                                  speechHelper?.startListening(
+                                      onResult = { recognized ->
                                         viewModel.updateMessageDraft(recognized)
+                                      })
+                                },
+                                enabled = speechHelper != null,
+                                modifier = Modifier.testTag(HomeTags.MicBtn)) {
+                                  Icon(
+                                      Icons.Default.Mic,
+                                      contentDescription = Localization.t("dictate"),
+                                      tint = Color.Gray)
+                                }
+
+                            val canSend = ui.messageDraft.isNotBlank() && !ui.isSending
+
+                            // Voice mode button (equalizer icon) - shown when there's no text
+                            AnimatedVisibility(
+                                visible = !canSend,
+                                enter = fadeIn() + scaleIn(),
+                                exit = fadeOut() + scaleOut()) {
+                                  IconButton(
+                                      onClick = { onVoiceChatClick() },
+                                      modifier = Modifier.testTag(HomeTags.VoiceBtn)) {
+                                        Icon(
+                                            Icons.Default.GraphicEq,
+                                            contentDescription = Localization.t("voice_mode"),
+                                            tint = Color.Gray)
                                       }
                                     },
                                     enabled = speechHelper != null,
@@ -350,7 +406,7 @@ fun HomeScreen(
 
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        text = "Powered by APERTUS",
+                        text = Localization.t("powered_by").uppercase(),
                         color = Color.Gray,
                         fontSize = 11.sp,
                         textAlign = TextAlign.Center,
@@ -388,6 +444,24 @@ fun HomeScreen(
                             items(items = ui.messages, key = { it.id }) { item ->
                               val showLeadingDot =
                                   item.id == ui.streamingMessageId && item.text.isEmpty()
+
+                              // If this message carries a source, draw the card first
+                              if (item.source != null && !item.isThinking) {
+                                val context = androidx.compose.ui.platform.LocalContext.current
+                                SourceCard(
+                                    siteLabel = item.source.siteLabel,
+                                    title = item.source.title,
+                                    url = item.source.url,
+                                    retrievedAt = item.source.retrievedAt,
+                                    onVisit = {
+                                      val intent =
+                                          Intent(Intent.ACTION_VIEW, Uri.parse(item.source.url))
+                                      context.startActivity(intent)
+                                    })
+                                Spacer(Modifier.height(8.dp))
+                              }
+
+                              // Then render the usual chat bubble (for USER/AI text)
                               ChatMessage(
                                   message = item,
                                   modifier = Modifier.fillMaxWidth(),
@@ -418,10 +492,7 @@ fun HomeScreen(
       exit = fadeOut(tween(200)),
       modifier = Modifier.fillMaxSize()) {
         DeleteConfirmationModal(
-            onConfirm = {
-              viewModel.clearChat()
-              viewModel.hideDeleteConfirmation()
-            },
+            onConfirm = { viewModel.deleteCurrentConversation() },
             onCancel = { viewModel.hideDeleteConfirmation() })
       }
 
@@ -459,9 +530,9 @@ private fun SuggestionChip(text: String, modifier: Modifier = Modifier, onClick:
 
 @Composable
 private fun TopRightPanelPlaceholder(onDismiss: () -> Unit, onDeleteClick: () -> Unit) {
-  DropdownMenuItem(text = { Text("Share") }, onClick = onDismiss)
+  DropdownMenuItem(text = { Text(Localization.t("share")) }, onClick = onDismiss)
   DropdownMenuItem(
-      text = { Text("Delete") },
+      text = { Text(Localization.t("delete")) },
       onClick = {
         onDeleteClick()
         onDismiss()
@@ -488,7 +559,7 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
                   modifier = Modifier.padding(24.dp),
                   horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "Clear Chat?",
+                        text = Localization.t("clear_chat"),
                         color = Color.White,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold)
@@ -496,7 +567,7 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = "This will delete all messages. This action cannot be undone.",
+                        text = Localization.t("clear_chat_message"),
                         color = Color.Gray,
                         fontSize = 14.sp,
                         textAlign = TextAlign.Center)
@@ -512,7 +583,7 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
                               colors =
                                   ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A2A)),
                               shape = RoundedCornerShape(8.dp)) {
-                                Text("Cancel", color = Color.White)
+                                Text(Localization.t("cancel"), color = Color.White)
                               }
 
                           Button(
@@ -520,7 +591,10 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
                               modifier = Modifier.weight(1f),
                               colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                               shape = RoundedCornerShape(8.dp)) {
-                                Text("Delete", color = Color.White, fontWeight = FontWeight.Bold)
+                                Text(
+                                    Localization.t("delete"),
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold)
                               }
                         }
                   }
@@ -541,7 +615,7 @@ private fun ThinkingIndicator(modifier: Modifier = Modifier) {
       dots = (dots + 1) % 4
     }
   }
-  val text = "Euler is thinking" + ".".repeat(dots)
+  val text = Localization.t("euler_thinking") + ".".repeat(dots)
   Surface(
       modifier = modifier,
       shape = RoundedCornerShape(12.dp),
@@ -613,8 +687,8 @@ private fun BubbleSendButton(
             Crossfade(targetState = enabled, label = "send-button-state") { canSend ->
               Icon(
                   imageVector = icon,
-                  contentDescription = "Send",
                   tint = if (canSend) Color.White else Color.White.copy(alpha = 0.35f),
+                  contentDescription = Localization.t("send"),
                   modifier = Modifier.size(18.dp))
             }
           }
@@ -630,11 +704,11 @@ private fun BubbleSendButton(
 internal fun AnimatedIntroTitle(modifier: Modifier = Modifier) {
   val suggestions = remember {
     listOf(
-        "Find CS220 past exams",
-        "Check my Moodle assignments",
-        "What's on Ed Discussion?",
-        "Show my IS-Academia schedule",
-        "Search EPFL Drive files")
+        Localization.t("intro_suggestion_1"),
+        Localization.t("intro_suggestion_2"),
+        Localization.t("intro_suggestion_3"),
+        Localization.t("intro_suggestion_4"),
+        Localization.t("intro_suggestion_5"))
   }
 
   var currentIndex by remember { mutableStateOf(0) }
@@ -653,7 +727,7 @@ internal fun AnimatedIntroTitle(modifier: Modifier = Modifier) {
       verticalArrangement = Arrangement.Center) {
         // Title: "Ask Euler Anything" in deep burgundy/plum
         Text(
-            text = "Ask Euler Anything",
+            text = Localization.t("ask_euler_anything"),
             color = Color(0xFF8B0000), // Deep burgundy red
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
@@ -685,6 +759,81 @@ internal fun AnimatedIntroTitle(modifier: Modifier = Modifier) {
                     textAlign = TextAlign.Center)
               }
         }
+      }
+}
+
+@Composable
+private fun SourceCard(
+    siteLabel: String,
+    title: String,
+    url: String,
+    retrievedAt: Long,
+    onVisit: () -> Unit
+) {
+  Column(
+      modifier =
+          Modifier.fillMaxWidth()
+              .clip(RoundedCornerShape(10.dp))
+              .background(Color(0xFF1C1C1E))
+              .padding(horizontal = 12.dp, vertical = 6.dp)) {
+        // Top line: “Retrieved from EPFL.ch Website”
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Icon(
+              imageVector = Icons.Default.CheckCircle,
+              contentDescription = null,
+              tint = Color(0xFF4CAF50), // green tick
+              modifier = Modifier.size(14.dp))
+          Spacer(Modifier.width(4.dp))
+          Text(
+              text = "Retrieved from  $siteLabel",
+              color = Color(0xFFBDBDBD),
+              style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp))
+        }
+
+        Spacer(Modifier.height(4.dp))
+
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+          // Title (ellipsized to one line)
+          Text(
+              text = url,
+              color = Color.White,
+              style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+              modifier = Modifier.weight(1f))
+
+          Spacer(Modifier.width(6.dp))
+
+          Button(
+              onClick = onVisit,
+              shape = RoundedCornerShape(6.dp),
+              contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+              colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))) {
+                Text("Visit")
+                Spacer(Modifier.width(6.dp))
+                Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Outlined.OpenInNew,
+                    contentDescription = null,
+                    modifier = Modifier.size(10.dp),
+                    tint = Color.White)
+              }
+        }
+
+        Spacer(Modifier.height(2.dp))
+
+        // Retrieved date
+        val dateStr =
+            remember(retrievedAt) {
+              val d =
+                  java.time.Instant.ofEpochMilli(retrievedAt)
+                      .atZone(java.time.ZoneId.systemDefault())
+                      .toLocalDate()
+              "%02d/%02d/%02d".format(d.dayOfMonth, d.monthValue, d.year % 100)
+            }
+        Text(
+            text = "Retrieved on $dateStr",
+            color = Color.Gray,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp))
       }
 }
 

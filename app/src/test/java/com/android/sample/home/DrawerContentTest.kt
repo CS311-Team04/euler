@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import com.android.sample.conversations.Conversation
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -21,7 +22,16 @@ class DrawerContentTest {
 
   @Test
   fun renders_core_elements() {
-    composeRule.setContent { MaterialTheme { DrawerContent() } }
+    val uiState =
+        HomeUiState(
+            userName = "Student",
+            conversations =
+                listOf(
+                    Conversation(id = "1", title = "CS220 Final Exam retrieval"),
+                    Conversation(id = "2", title = "Linear Algebra help"),
+                    Conversation(id = "3", title = "Project deadline query"),
+                    Conversation(id = "4", title = "Course registration info")))
+    composeRule.setContent { MaterialTheme { DrawerContent(ui = uiState) } }
 
     composeRule.onNodeWithTag(DrawerTags.Root).assertIsDisplayed()
 

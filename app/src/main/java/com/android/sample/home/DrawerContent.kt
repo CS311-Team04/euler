@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.sample.R
 import java.util.Locale
+import com.android.sample.settings.Localization
 
 object DrawerTags {
   const val Root = "drawer_root"
@@ -66,7 +67,9 @@ fun DrawerContent(
     onSettingsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onProfileDisabledClick: () -> Unit = {},
-    onClose: () -> Unit = {}
+    onClose: () -> Unit = {},
+    onNewChat: () -> Unit = {},
+    onPickConversation: (String) -> Unit = {}
 ) {
   Column(
       modifier =
@@ -79,7 +82,7 @@ fun DrawerContent(
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
           Image(
               painter = painterResource(id = R.drawable.euler_logo),
-              contentDescription = "Euler Logo",
+              contentDescription = Localization.t("euler_logo"),
               modifier = Modifier.height(30.dp).offset(x = 1.dp, y = 5.dp),
               contentScale = ContentScale.Fit)
         }
@@ -92,18 +95,21 @@ fun DrawerContent(
             modifier =
                 Modifier.fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .clickable { /* TODO new chat */}
+                    .clickable { onNewChat() }
                     .padding(vertical = 12.dp)
                     .testTag(DrawerTags.NewChatRow)) {
               Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier.size(28.dp).clip(CircleShape).background(Color(0xFFE53935)),
                     contentAlignment = Alignment.Center) {
-                      Icon(Icons.Filled.Add, contentDescription = "New chat", tint = Color.White)
+                      Icon(
+                          Icons.Filled.Add,
+                          contentDescription = Localization.t("new_chat"),
+                          tint = Color.White)
                     }
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    "New chat",
+                    Localization.t("new_chat"),
                     color = Color(0xFFFF6E6E),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Normal)
@@ -122,10 +128,13 @@ fun DrawerContent(
                     .padding(vertical = 12.dp)
                     .testTag(DrawerTags.ConnectorsRow)) {
               Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Link, contentDescription = "Connectors", tint = Color(0xFFB0B0B0))
+                Icon(
+                    Icons.Filled.Link,
+                    contentDescription = Localization.t("connectors"),
+                    tint = Color(0xFFB0B0B0))
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    "Connectors",
+                    Localization.t("connectors"),
                     color = Color.White,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Normal)
@@ -139,39 +148,45 @@ fun DrawerContent(
 
         Spacer(modifier = Modifier.height(24.dp))
         Text(
-            "RECENTS",
+            Localization.t("recents"),
             color = Color(0xFF8A8A8A),
             fontSize = 12.sp,
             modifier = Modifier.testTag(DrawerTags.RecentsSection))
         Spacer(modifier = Modifier.height(14.dp))
 
-        Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
-          RecentRow(title = "CS220 Final Exam retrieval")
-          RecentRow(title = "Linear Algebra help")
-          RecentRow(title = "Project deadline query")
-          RecentRow(title = "Course registration info")
+        if (ui.conversations.isEmpty()) {
+          Text("No conversations yet", color = Color.Gray, fontSize = 13.sp)
+        } else {
+          Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            ui.conversations.take(12).forEach { conv ->
+              RecentRow(
+                  title = conv.title.ifBlank { "Untitled" },
+                  selected = conv.id == ui.currentConversationId,
+                  onClick = { onPickConversation(conv.id) })
+            }
 
-          Surface(
-              color = Color.Transparent,
-              modifier =
-                  Modifier.fillMaxWidth()
-                      .clip(RoundedCornerShape(8.dp))
-                      .clickable {}
-                      .padding(vertical = 4.dp)
-                      .testTag(DrawerTags.ViewAllRow)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                  Text(
-                      "View all chats",
-                      color = Color.White,
-                      fontSize = 16.sp,
-                      fontWeight = FontWeight.Normal)
-                  Spacer(Modifier.weight(1f))
-                  Icon(
-                      Icons.Filled.KeyboardArrowRight,
-                      contentDescription = null,
-                      tint = Color(0xFFB0B0B0))
+            Surface(
+                color = Color.Transparent,
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { /* navigate to “All chats” screen later */}
+                        .padding(vertical = 4.dp)
+                        .testTag(DrawerTags.ViewAllRow)) {
+                  Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "View all chats",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Normal)
+                    Spacer(Modifier.weight(1f))
+                    Icon(
+                        Icons.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = Color(0xFFB0B0B0))
+                  }
                 }
-              }
+          }
         }
 
         Spacer(modifier = Modifier.weight(1f))
@@ -224,7 +239,7 @@ fun DrawerContent(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth()) {
-              Text("Powered by Apertus", color = Color.Gray, fontSize = 12.sp)
+              Text(Localization.t("powered_by"), color = Color.Gray, fontSize = 12.sp)
             }
       }
 }
@@ -240,21 +255,36 @@ private fun formatUserName(raw: String): String {
 }
 
 @Composable
-private fun RecentRow(title: String) {
-  Row(verticalAlignment = Alignment.CenterVertically) {
-    Box(
-        modifier =
-            Modifier.size(24.dp).clip(RoundedCornerShape(6.dp)).background(Color(0xFF2A2A2A)),
-        contentAlignment = Alignment.Center) {
-          Icon(
-              imageVector = Icons.Outlined.ChatBubbleOutline,
-              contentDescription = null,
-              tint = Color(0xFF8A8A8A),
-              modifier = Modifier.size(15.dp))
+private fun RecentRow(title: String, selected: Boolean = false, onClick: () -> Unit = {}) {
+  val bg = if (selected) Color(0x22FFFFFF) else Color.Transparent
+  Surface(
+      color = bg,
+      shape = RoundedCornerShape(8.dp),
+      modifier =
+          Modifier.fillMaxWidth()
+              .clip(RoundedCornerShape(8.dp))
+              .clickable { onClick() }
+              .padding(vertical = 6.dp, horizontal = 2.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Box(
+              modifier =
+                  Modifier.size(24.dp).clip(RoundedCornerShape(6.dp)).background(Color(0xFF2A2A2A)),
+              contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Outlined.ChatBubbleOutline,
+                    contentDescription = null,
+                    tint = Color(0xFF8A8A8A),
+                    modifier = Modifier.size(15.dp))
+              }
+          Spacer(Modifier.width(12.dp))
+          Text(
+              text = title,
+              color = Color.White,
+              fontSize = 13.sp,
+              maxLines = 1,
+              overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         }
-    Spacer(Modifier.width(12.dp))
-    Text(title, color = Color.White, fontSize = 13.sp)
-  }
+      }
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF121212)

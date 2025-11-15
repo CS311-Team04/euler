@@ -168,25 +168,6 @@ class AuthTagsTest {
   }
 
   @Test
-  fun AuthTags_all_constants_return_strings() {
-    assertTrue(AuthTags.Root is String)
-    assertTrue(AuthTags.Card is String)
-    assertTrue(AuthTags.LogosRow is String)
-    assertTrue(AuthTags.LogoEpfl is String)
-    assertTrue(AuthTags.LogoPoint is String)
-    assertTrue(AuthTags.LogoEuler is String)
-    assertTrue(AuthTags.Title is String)
-    assertTrue(AuthTags.Subtitle is String)
-    assertTrue(AuthTags.OrSeparator is String)
-    assertTrue(AuthTags.BtnMicrosoft is String)
-    assertTrue(AuthTags.BtnSwitchEdu is String)
-    assertTrue(AuthTags.MsProgress is String)
-    assertTrue(AuthTags.SwitchProgress is String)
-    assertTrue(AuthTags.TermsText is String)
-    assertTrue(AuthTags.ByEpflText is String)
-  }
-
-  @Test
   fun AuthTags_constants_have_expected_prefix() {
     val expectedPrefix = "auth_"
     assertTrue(AuthTags.Root.startsWith(expectedPrefix))

@@ -19,7 +19,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Extension
@@ -70,9 +69,8 @@ fun SettingsPage(
   val accentRed = Color(0xFFEB5757)
   val outline = Color.White.copy(alpha = 0.08f)
 
-  // Local state for dropdown selections
-  val appearance = remember { mutableStateOf("System") }
-  val language = remember { mutableStateOf("EN") }
+  // Bind to global AppSettings so changes update the whole app
+  val language = remember { mutableStateOf(AppSettings.language) }
 
   Box(modifier = Modifier.fillMaxSize().background(background)) {
     Column(
@@ -85,11 +83,11 @@ fun SettingsPage(
                 IconButton(onClick = onBackClick, modifier = Modifier.size(36.dp)) {
                   Icon(
                       imageVector = Icons.Filled.Close,
-                      contentDescription = "Close",
+                      contentDescription = Localization.t("close"),
                       tint = textPrimary)
                 }
                 Text(
-                    text = "Settings",
+                    text = Localization.t("settings_title"),
                     color = textPrimary,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
@@ -98,7 +96,7 @@ fun SettingsPage(
                 IconButton(onClick = onInfoClick, modifier = Modifier.size(36.dp)) {
                   Icon(
                       imageVector = Icons.Filled.Info,
-                      contentDescription = "Info",
+                      contentDescription = Localization.t("info"),
                       tint = textPrimary)
                 }
               }
@@ -111,7 +109,7 @@ fun SettingsPage(
               verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SettingsRow(
                     icon = Icons.Filled.Person,
-                    title = "Profile",
+                    title = Localization.t("profile"),
                     onClick = onProfileClick,
                     enabled = isProfileEnabled,
                     onDisabledClick = onProfileDisabledClick,
@@ -121,57 +119,24 @@ fun SettingsPage(
 
                 SettingsRow(
                     icon = Icons.Filled.Extension,
-                    title = "Connectors",
+                    title = Localization.t("connectors"),
                     onClick = onConnectorsClick,
                     backgroundColor = rowBackground,
                     textColor = textPrimary,
                     secondaryTextColor = textSecondary)
-
-                // Appearance with dropdown
-                val appearanceMenuExpanded = remember { mutableStateOf(false) }
-                Box {
-                  SettingsRow(
-                      icon = Icons.Filled.DarkMode,
-                      title = "Appearance",
-                      backgroundColor = rowBackground,
-                      textColor = textPrimary,
-                      secondaryTextColor = textSecondary,
-                      trailing = {
-                        TrailingValue(
-                            value = appearance.value,
-                            textColor = textSecondary,
-                            onClick = { appearanceMenuExpanded.value = true })
-                      },
-                      onClick = { appearanceMenuExpanded.value = true })
-
-                  DropdownMenu(
-                      expanded = appearanceMenuExpanded.value,
-                      onDismissRequest = { appearanceMenuExpanded.value = false },
-                      containerColor = rowBackground,
-                  ) {
-                    listOf("System", "Light", "Dark").forEach { option ->
-                      DropdownMenuItem(
-                          text = { Text(option, color = textPrimary) },
-                          onClick = {
-                            appearance.value = option
-                            appearanceMenuExpanded.value = false
-                          })
-                    }
-                  }
-                }
 
                 // Speech language with dropdown
                 val languageMenuExpanded = remember { mutableStateOf(false) }
                 Box {
                   SettingsRow(
                       icon = Icons.Filled.Language,
-                      title = "Speech language",
+                      title = Localization.t("speech_language"),
                       backgroundColor = rowBackground,
                       textColor = textPrimary,
                       secondaryTextColor = textSecondary,
                       trailing = {
                         TrailingValue(
-                            value = language.value,
+                            value = language.value.code,
                             textColor = textSecondary,
                             onClick = { languageMenuExpanded.value = true })
                       },
@@ -182,11 +147,12 @@ fun SettingsPage(
                       onDismissRequest = { languageMenuExpanded.value = false },
                       containerColor = rowBackground,
                   ) {
-                    listOf("EN", "FR", "DE").forEach { option ->
+                    Language.entries.forEach { option ->
                       DropdownMenuItem(
-                          text = { Text(option, color = textPrimary) },
+                          text = { Text(option.code, color = textPrimary) },
                           onClick = {
                             language.value = option
+                            AppSettings.setLanguage(option)
                             languageMenuExpanded.value = false
                           })
                     }
@@ -212,7 +178,7 @@ fun SettingsPage(
                                 modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                text = "Log out",
+                                text = Localization.t("log_out"),
                                 color = accentRed,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Medium)
@@ -222,7 +188,7 @@ fun SettingsPage(
         }
 
     Text(
-        text = "BY EPFL",
+        text = Localization.t("by_epfl"),
         color = textSecondary,
         fontSize = 12.sp,
         modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsKotlinAndroid)
@@ -7,16 +9,72 @@ plugins {
     alias(libs.plugins.googleServices) apply false
 }
 
-// Apply Google Services only locally when the JSON is present (not on CI)
-val isCi = !System.getenv("CI").isNullOrEmpty()
+// Apply Google Services whenever the JSON is present (file can be provisioned on CI)
 val hasGoogleServicesJson = file("google-services.json").exists()
-if (!isCi && hasGoogleServicesJson) {
+if (hasGoogleServicesJson) {
     apply(plugin = libs.plugins.googleServices.get().pluginId)
 }
+
+/**
+ * Gradle's `buildConfigField` expects string literals to be wrapped in quotes and have any embedded
+ * quotes escaped. This helper normalises values coming from env/properties before we inject them.
+ */
+fun quoteBuildConfig(value: String): String = "\"${value.replace("\"", "\\\"")}\""
+
+val localProperties = Properties().apply {
+    val propertiesFile = rootProject.file("local.properties")
+    if (propertiesFile.exists()) {
+        propertiesFile.inputStream().use { load(it) }
+    }
+}
+
+fun resolveConfigValue(key: String): String? =
+    localProperties.getProperty(key)?.trim().takeUnless { it.isNullOrEmpty() }
+        ?: System.getenv(key)?.trim().takeUnless { it.isNullOrEmpty() }
+
+val voiceChatOverrides = Properties().apply {
+    val file = rootProject.file("voicechat.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
+}
+
+fun resolveVoiceChatOverride(key: String, fallback: String = ""): String =
+    voiceChatOverrides.getProperty(key, fallback).trim()
+
+val llmHttpEndpoint: String =
+    resolveConfigValue("LLM_HTTP_ENDPOINT") ?: run {
+        resolveVoiceChatOverride(
+            "llm.httpEndpoint",
+            "http://10.0.2.2:5002/euler-e8edb/us-central1/answerWithRagHttp")
+    }
+val llmHttpApiKey: String =
+    resolveConfigValue("LLM_HTTP_API_KEY") ?: resolveVoiceChatOverride("llm.httpApiKey")
 
 android {
     namespace = "com.android.sample"
     compileSdk = 34
+
+    signingConfigs {
+        val releaseStoreFile = resolveConfigValue("RELEASE_STORE_FILE")
+        val releaseStorePassword = resolveConfigValue("RELEASE_STORE_PASSWORD")
+        val releaseKeyAlias = resolveConfigValue("RELEASE_KEY_ALIAS")
+        val releaseKeyPassword = resolveConfigValue("RELEASE_KEY_PASSWORD")
+
+        if (
+            releaseStoreFile != null &&
+            releaseStorePassword != null &&
+            releaseKeyAlias != null &&
+            releaseKeyPassword != null
+        ) {
+            create("release") {
+                storeFile = rootProject.file(releaseStoreFile)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "com.android.sample"
@@ -29,19 +87,35 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        // Default region for Firebase Functions (prod)
+        buildConfigField ("String", "FUNCTIONS_REGION", "\"europe-west6\"")
         buildConfigField ("String", "FUNCTIONS_HOST", "\"10.0.2.2\"")
         buildConfigField ("int",    "FUNCTIONS_PORT", "5002")
         buildConfigField ("boolean","USE_FUNCTIONS_EMULATOR", "true")
+        buildConfigField("String", "LLM_HTTP_ENDPOINT", quoteBuildConfig(llmHttpEndpoint))
+        buildConfigField("String", "LLM_HTTP_API_KEY", quoteBuildConfig(llmHttpApiKey))
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            signingConfigs.findByName("release")?.let { signingConfig = it }
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            // Ensure release APK talks to production Functions, not local emulator
+            buildConfigField ("boolean","USE_FUNCTIONS_EMULATOR", "false")
+            // Disable local HTTP fallback in release by default
+            buildConfigField("String", "LLM_HTTP_ENDPOINT", "\"\"")
         }
 
         debug {
             enableUnitTestCoverage = true
             enableAndroidTestCoverage = false
+            // Keep emulator defaults for local development
+            buildConfigField ("boolean","USE_FUNCTIONS_EMULATOR", "true")
         }
     }
 
@@ -90,8 +164,8 @@ android {
         }
     }
 
-    // Correctif JaCoCo : exclure les libs du SDK et BouncyCastle
-    // pour éviter les erreurs d'instrumentation pendant les tests
+    // JaCoCo fix: exclude SDK and BouncyCastle libraries
+    // to avoid instrumentation errors during tests
     tasks.withType<Test> {
         configure<JacocoTaskExtension> {
             isIncludeNoLocationClasses = true
@@ -140,12 +214,16 @@ dependencies {
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
 
+    // CustomTabs for Firebase OAuth browser flow
+    implementation("androidx.browser:browser:1.8.0")
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(platform(libs.compose.bom))
     testImplementation(libs.junit)
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     globalTestImplementation(libs.androidx.junit)
     globalTestImplementation(libs.androidx.espresso.core)
 
@@ -182,12 +260,18 @@ dependencies {
     testImplementation(libs.robolectric)
 
     // ----------       Mockito         ------------
+    testImplementation(libs.mockito.core)
+    testImplementation(libs.mockk)
     androidTestImplementation("org.mockito:mockito-android:5.8.0")
     androidTestImplementation("org.mockito:mockito-core:5.8.0")
+    testImplementation("org.mockito:mockito-inline:4.11.0")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:4.1.0")
+    androidTestImplementation("org.mockito:mockito-android:4.11.0")
+    androidTestImplementation("org.mockito:mockito-core:4.11.0")
 
     implementation("com.microsoft.identity.client:msal:6.0.1")
 
-    // --- Dépendances de sécurité manquantes requises par MSAL ---
+    // --- Additional security dependencies required by MSAL ---
     implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
     implementation("com.google.crypto.tink:tink-android:1.12.0")
@@ -197,6 +281,13 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.compose.ui:ui-tooling-preview")
+
+    // Networking for HTTP clients (LLM access, etc.)
+    implementation(libs.okhttp)
+
+    // DataStore for preferences
+    implementation(libs.datastore.core)
+    implementation(libs.datastore.preferences)
 
 }
 
@@ -281,7 +372,7 @@ sonar {
 
         // Basic source configuration - relative to project root
         property("sonar.sources", "src/main/java")
-        
+
         // Only add tests if directory exists and has content
         val testDir = file("src/test/java")
         if (testDir.exists() && testDir.listFiles()?.isNotEmpty() == true) {
@@ -290,13 +381,13 @@ sonar {
 
         // Basic exclusions
         property("sonar.exclusions", "**/build/**,**/R.java,**/R.kt,**/BuildConfig.*,**/*.xml,**/res/**")
-        
+
         // Coverage - only if report exists
         val coverageReport = file("${project.layout.buildDirectory.get()}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml")
         if (coverageReport.exists()) {
             property("sonar.coverage.jacoco.xmlReportPaths", coverageReport.absolutePath)
         }
-        
+
         // Test results - only if exists
         val testResults = file("${project.layout.buildDirectory.get()}/test-results/testDebugUnitTest")
         if (testResults.exists()) {
