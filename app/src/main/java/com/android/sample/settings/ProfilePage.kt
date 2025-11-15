@@ -52,6 +52,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.PopupProperties
+import com.android.sample.logic.ProfilePageLogic
 import com.android.sample.profile.UserProfile
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
@@ -70,23 +71,30 @@ fun ProfilePage(
   val accent = Color(0xFFEB5757)
 
   val authEmail = remember {
-    runCatching { FirebaseAuth.getInstance().currentUser?.email.orEmpty() }.getOrDefault("")
+    val firebaseEmail = runCatching { FirebaseAuth.getInstance().currentUser?.email }.getOrNull()
+    ProfilePageLogic.extractAuthEmail(firebaseEmail)
   }
 
-  val formManager = remember { ProfileFormManager(authEmail, initialProfile) }
+  val resolvedEmail =
+      remember(initialProfile, authEmail) {
+        ProfilePageLogic.resolveEmail(initialProfile?.email, authEmail)
+      }
+  val formManager =
+      remember(resolvedEmail, initialProfile) { ProfileFormManager(resolvedEmail, initialProfile) }
   var showSavedConfirmation by remember { mutableStateOf(false) }
   val isTesting = LocalInspectionMode.current
 
-  LaunchedEffect(initialProfile, authEmail) { formManager.reset(initialProfile, authEmail) }
+  LaunchedEffect(initialProfile, resolvedEmail) { formManager.reset(initialProfile, resolvedEmail) }
 
   LaunchedEffect(showSavedConfirmation) {
-    if (showSavedConfirmation) {
-      if (isTesting || skipDelayForTests) {
-        // Test mode → instant reset (prevents AppNotIdleException)
+    if (ProfilePageLogic.shouldShowSavedConfirmation(showSavedConfirmation)) {
+      val delayMs =
+          ProfilePageLogic.getConfirmationDelay(
+              isTesting = isTesting, skipDelayForTests = skipDelayForTests)
+      if (ProfilePageLogic.shouldResetConfirmationImmediately(isTesting, skipDelayForTests)) {
         showSavedConfirmation = false
       } else {
-        // Real device → delay then reset
-        delay(2500)
+        delay(delayMs)
         showSavedConfirmation = false
       }
     }
@@ -115,8 +123,10 @@ fun ProfilePage(
             TextButton(
                 onClick = {
                   val formState = formManager.buildSanitizedProfile()
-                  onSaveProfile(formState)
-                  showSavedConfirmation = true
+                  if (ProfilePageLogic.canSaveProfile(formState)) {
+                    onSaveProfile(formState)
+                    showSavedConfirmation = ProfilePageLogic.shouldShowSavedConfirmation(true)
+                  }
                 }) {
                   Text(text = "Save", color = textPrimary)
                 }
@@ -146,7 +156,7 @@ fun ProfilePage(
                                   placeholder = "Enter your full name"),
                           value = formManager.fullName,
                           onValueChange = { formManager.updateFullName(it) },
-                          enabled = !formManager.isFullNameLocked,
+                          enabled = ProfilePageLogic.isFieldEnabled(formManager.isFullNameLocked),
                           supportingText = "This name can only be set once.",
                           supportingTextColor = accent,
                           showSupportingTextWhenNotBlank = true),
@@ -209,10 +219,10 @@ fun ProfilePage(
                               ProfileFieldDefinition(
                                   icon = Icons.Filled.MailOutline,
                                   label = "Email",
-                                  placeholder = "name@epfl.ch"),
+                                  placeholder = ProfilePageLogic.getEmailPlaceholder()),
                           value = formManager.email,
                           onValueChange = { formManager.updateEmail(it) },
-                          enabled = !formManager.isEmailLocked,
+                          enabled = ProfilePageLogic.isFieldEnabled(formManager.isEmailLocked),
                           supportingText = "Managed via your Microsoft account",
                           supportingTextColor = textSecondary.copy(alpha = 0.7f),
                           placeholderColor = textSecondary.copy(alpha = 0.5f)),
@@ -221,7 +231,7 @@ fun ProfilePage(
                               ProfileFieldDefinition(
                                   icon = Icons.Filled.Phone,
                                   label = "Phone",
-                                  placeholder = "+41 00 000 00 00"),
+                                  placeholder = ProfilePageLogic.getPhonePlaceholder()),
                           value = formManager.phone,
                           onValueChange = { formManager.updatePhone(it) },
                           placeholderColor = textSecondary.copy(alpha = 0.5f))),

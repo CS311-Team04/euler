@@ -1,6 +1,7 @@
 package com.android.sample.profile
 
 import com.android.sample.logic.UserProfileMapper
+import com.android.sample.logic.UserProfileRepositoryLogic
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -44,16 +45,36 @@ class UserProfileRepository(
    * the existing `users/{uid}` document so no other fields (like the `logged` flag) are lost.
    */
   override suspend fun saveProfile(profile: UserProfile) {
-    val auth = runCatching { authProvider() }.getOrNull() ?: return
-    val uid = auth.currentUser?.uid ?: return
+    val auth = runCatching { authProvider() }.getOrNull()
+    val authAvailable = auth != null
+    val uid = auth?.currentUser?.uid
+    val uidAvailable = UserProfileRepositoryLogic.isValidUid(uid)
 
+    if (!UserProfileRepositoryLogic.shouldProceedWithSave(authAvailable, uidAvailable)) {
+      return
+    }
+
+    val basePayload = UserProfileRepositoryLogic.buildSavePayload(profile)
     val payload =
-        mapOf(
-            PROFILE_FIELD to UserProfileMapper.toFirestoreMap(profile),
-            PROFILE_UPDATED_AT_FIELD to FieldValue.serverTimestamp())
+        basePayload +
+            mapOf(
+                UserProfileRepositoryLogic.PROFILE_UPDATED_AT_FIELD to FieldValue.serverTimestamp())
 
-    val firestore = runCatching { firestoreProvider() }.getOrNull() ?: return
-    firestore.collection(COLLECTION_USERS).document(uid).set(payload, SetOptions.merge()).await()
+    val firestore = runCatching { firestoreProvider() }.getOrNull()
+    val firestoreAvailable = firestore != null
+
+    if (UserProfileRepositoryLogic.shouldReturnNull(
+        authAvailable, uidAvailable, firestoreAvailable)) {
+      return
+    }
+
+    requireNotNull(uid) // Safe here due to isValidUid check above
+    requireNotNull(firestore) // Safe here due to check above
+    firestore
+        .collection(UserProfileRepositoryLogic.COLLECTION_USERS)
+        .document(uid)
+        .set(payload, SetOptions.merge())
+        .await()
   }
 
   /**
@@ -61,23 +82,47 @@ class UserProfileRepository(
    * has been saved yet.
    */
   override suspend fun loadProfile(): UserProfile? {
-    val auth = runCatching { authProvider() }.getOrNull() ?: return null
-    val uid = auth.currentUser?.uid ?: return null
+    val auth = runCatching { authProvider() }.getOrNull()
+    val authAvailable = auth != null
+    val uid = auth?.currentUser?.uid
+    val uidAvailable = UserProfileRepositoryLogic.isValidUid(uid)
 
-    val firestore = runCatching { firestoreProvider() }.getOrNull() ?: return null
+    if (!UserProfileRepositoryLogic.shouldProceedWithLoad(authAvailable, uidAvailable)) {
+      return null
+    }
+
+    val firestore = runCatching { firestoreProvider() }.getOrNull()
+    val firestoreAvailable = firestore != null
+
+    if (UserProfileRepositoryLogic.shouldReturnNull(
+        authAvailable, uidAvailable, firestoreAvailable)) {
+      return null
+    }
+
+    requireNotNull(uid) // Safe here due to isValidUid check above
+    requireNotNull(firestore) // Safe here due to check above
     val snapshot =
-        runCatching { firestore.collection(COLLECTION_USERS).document(uid).get().await() }
+        runCatching {
+              firestore
+                  .collection(UserProfileRepositoryLogic.COLLECTION_USERS)
+                  .document(uid)
+                  .get()
+                  .await()
+            }
             .getOrNull() ?: return null
-    if (!snapshot.exists()) return null
 
-    val rawProfile = snapshot.get(PROFILE_FIELD) as? Map<*, *> ?: return null
+    val snapshotExists = snapshot.exists()
+    val rawProfile =
+        UserProfileRepositoryLogic.extractProfileFromSnapshot(
+            snapshot.get(UserProfileRepositoryLogic.PROFILE_FIELD))
+    val hasProfileField = rawProfile != null
+
+    if (!UserProfileRepositoryLogic.hasProfileInSnapshot(snapshotExists, hasProfileField)) {
+      return null
+    }
+
+    requireNotNull(rawProfile) // Safe here due to hasProfileField check above
     return UserProfileMapper.fromFirestore(rawProfile)
-  }
-
-  companion object {
-    private const val COLLECTION_USERS = "users"
-    private const val PROFILE_FIELD = "profile"
-    private const val PROFILE_UPDATED_AT_FIELD = "profileUpdatedAt"
   }
 }
 

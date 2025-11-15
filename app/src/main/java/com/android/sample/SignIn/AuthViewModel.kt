@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.android.sample.authentification.AuthProvider
 import com.android.sample.authentification.AuthUiState
 import com.android.sample.logic.AuthStateReducer
+import com.android.sample.logic.AuthViewModelLogic
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,24 +20,25 @@ class AuthViewModel : ViewModel() {
   private val auth = FirebaseAuth.getInstance()
   private val firestore = FirebaseFirestore.getInstance()
 
+  private var previousUser: com.google.firebase.auth.FirebaseUser? = null
+
   init {
     // Check if user is already signed in
     checkAuthState()
+    previousUser = auth.currentUser
 
     // Listen for auth state changes
     auth.addAuthStateListener { firebaseAuth ->
       val user = firebaseAuth.currentUser
       android.util.Log.d("AuthViewModel", "Auth state changed - current user: ${user?.uid}")
-      if (user != null) {
-        android.util.Log.d("AuthViewModel", "User signed in: ${user.email}")
-        _state.value = AuthStateReducer.onAuthStateChanged(true)
+      val wasNull = previousUser == null
+      val isNull = user == null
+      _state.value = AuthViewModelLogic.handleAuthStateChange(!wasNull, !isNull)
+      if (AuthViewModelLogic.shouldUpdateLoggedStatusOnAuthStateChange(wasNull, isNull)) {
         // Don't call setLoggedStatus here - it will be called by onAuthenticationSuccess()
         // when user actually signs in, not when we detect existing auth state
-      } else {
-        android.util.Log.d("AuthViewModel", "User signed out")
-        _state.value = AuthStateReducer.onAuthStateChanged(false)
-        // Note: We don't set logged to false here because signOut() already handles it
       }
+      previousUser = user
     }
   }
 
@@ -51,7 +53,9 @@ class AuthViewModel : ViewModel() {
       android.util.Log.d("AuthViewModel", "User is signed in, setting state to SignedIn")
       _state.value = AuthStateReducer.determineInitialState(true)
       // Update logged status for existing user (in case it was not set before)
-      setLoggedStatus(true)
+      if (AuthViewModelLogic.shouldSetLoggedStatusOnInitialCheck(true)) {
+        setLoggedStatus(true)
+      }
     } else {
       android.util.Log.d("AuthViewModel", "No user found, setting state to Idle")
       _state.value = AuthStateReducer.determineInitialState(false)
@@ -64,14 +68,16 @@ class AuthViewModel : ViewModel() {
 
   fun onSwitchEduLoginClick() {
     _state.value = AuthStateReducer.onSwitchEduLoginClick(_state.value)
-    if (_state.value is AuthUiState.Loading) {
+    if (AuthViewModelLogic.shouldProceedWithSwitchEduLogin(_state.value)) {
       startSignIn(AuthProvider.SWITCH_EDU)
     }
   }
 
   fun onAuthenticationSuccess() {
     _state.value = AuthStateReducer.onAuthenticationSuccess()
-    setLoggedStatus(true)
+    if (AuthViewModelLogic.shouldSetLoggedStatusOnSuccess()) {
+      setLoggedStatus(true)
+    }
   }
 
   fun onAuthenticationError(error: String) {
@@ -85,7 +91,9 @@ class AuthViewModel : ViewModel() {
     android.util.Log.d("AuthViewModel", "Current user email before signout: ${currentUser?.email}")
 
     // Update logged status BEFORE signing out (while user still exists)
-    setLoggedStatus(false)
+    if (AuthViewModelLogic.shouldSetLoggedStatusBeforeSignOut()) {
+      setLoggedStatus(false)
+    }
 
     auth.signOut()
 
@@ -93,14 +101,15 @@ class AuthViewModel : ViewModel() {
     val userAfterSignout = auth.currentUser
     android.util.Log.d("AuthViewModel", "Current user after signout: ${userAfterSignout?.uid}")
 
-    if (userAfterSignout == null) {
+    val isSuccessful = AuthViewModelLogic.isSignOutSuccessful(userAfterSignout == null)
+    if (isSuccessful) {
       android.util.Log.d("AuthViewModel", "Sign out successful - no current user")
     } else {
       android.util.Log.w(
-          "AuthViewModel", "Sign out failed - user still exists: ${userAfterSignout.uid}")
+          "AuthViewModel", "Sign out failed - user still exists: ${userAfterSignout?.uid}")
     }
 
-    _state.value = AuthStateReducer.onSignOut()
+    _state.value = AuthViewModelLogic.determineStateAfterSignOut(isSuccessful)
   }
 
   private fun setLoggedStatus(isLogged: Boolean) {
@@ -134,11 +143,11 @@ class AuthViewModel : ViewModel() {
         kotlinx.coroutines.delay(600)
         val nextState = AuthStateReducer.processSwitchEduFlow(provider)
         _state.value = nextState
-        if (nextState is AuthUiState.SignedIn) {
+        if (AuthViewModelLogic.shouldSetLoggedStatusAfterProviderFlow(nextState)) {
           setLoggedStatus(true)
         }
       } catch (t: Throwable) {
-        _state.value = AuthStateReducer.onAuthenticationError(t.message ?: "Unknown error")
+        _state.value = AuthStateReducer.onAuthenticationError(AuthViewModelLogic.getErrorMessage(t))
       }
     }
   }
