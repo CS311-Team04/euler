@@ -30,17 +30,17 @@ class GuestProfileWarningModalTest {
       GuestProfileWarningModal(
           onContinueAsGuest = { continueCount += 1 }, onLogin = { loginCount += 1 })
     }
-    composeRule.waitForIdle()
 
-    composeRule.onNodeWithText("Profile unavailable").assertIsDisplayed()
-    composeRule
-        .onNodeWithText("Sign in with Microsoft Entra ID to access your profile settings.")
-        .assertIsDisplayed()
+    composeRule.runOnIdle {
+      composeRule.onNodeWithText("Profile unavailable").assertIsDisplayed()
+      composeRule
+          .onNodeWithText("Sign in with Microsoft Entra ID to access your profile settings.")
+          .assertIsDisplayed()
+    }
 
-    composeRule.onNodeWithText("Continue as guest").performClick()
-    composeRule.waitForIdle()
-    composeRule.onNodeWithText("Log in now").performClick()
-    composeRule.waitForIdle()
+    composeRule.runOnIdle { composeRule.onNodeWithText("Continue as guest").performClick() }
+
+    composeRule.runOnIdle { composeRule.onNodeWithText("Log in now").performClick() }
 
     composeRule.runOnIdle {
       assertEquals(1, continueCount)
@@ -55,10 +55,8 @@ class GuestProfileWarningModalTest {
     composeRule.setContent {
       GuestProfileWarningModal(onContinueAsGuest = { continueCount += 1 }, onLogin = {})
     }
-    composeRule.waitForIdle()
 
-    composeRule.onRoot().performTouchInput { click(Offset(5f, 5f)) }
-    composeRule.waitForIdle()
+    composeRule.runOnIdle { composeRule.onRoot().performTouchInput { click(Offset(5f, 5f)) } }
 
     composeRule.runOnIdle { assertEquals(1, continueCount) }
   }

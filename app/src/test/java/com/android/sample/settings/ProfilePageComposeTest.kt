@@ -26,31 +26,29 @@ class ProfilePageComposeTest {
     var savedProfile: UserProfile? = null
 
     composeRule.setContent { MaterialTheme { ProfilePage(onSaveProfile = { savedProfile = it }) } }
-    composeRule.waitForIdle()
+    composeRule.runOnIdle { composeRule.onAllNodesWithText("Saved").assertCountEquals(0) }
 
-    composeRule.onAllNodesWithText("Saved").assertCountEquals(0)
+    composeRule.runOnIdle { composeRule.onNodeWithText("Save").performClick() }
 
-    composeRule.onNodeWithText("Save").performClick()
-    composeRule.waitForIdle()
-
-    composeRule.onNodeWithText("Saved").assertIsDisplayed()
-    composeRule.runOnIdle { assertEquals(UserProfile(), savedProfile) }
+    composeRule.runOnIdle {
+      composeRule.onNodeWithText("Saved").assertIsDisplayed()
+      assertEquals(UserProfile(), savedProfile)
+    }
 
     composeRule.mainClock.advanceTimeBy(2_600)
-    composeRule.waitForIdle()
-    composeRule.onAllNodesWithText("Saved").assertCountEquals(0)
+    composeRule.runOnIdle { composeRule.onAllNodesWithText("Saved").assertCountEquals(0) }
   }
 
   @Test
   fun role_dropdown_allows_selection_and_updates_display_text() {
     composeRule.setContent { MaterialTheme { ProfilePage() } }
-    composeRule.waitForIdle()
 
-    composeRule.onNodeWithText("Select your role").performClick()
-    composeRule.waitForIdle()
-    composeRule.onNodeWithText("Teacher").performClick()
-    composeRule.waitForIdle()
+    composeRule.runOnIdle { composeRule.onNodeWithText("Select your role").performClick() }
 
-    composeRule.onNodeWithText("Teacher", useUnmergedTree = true).assertIsDisplayed()
+    composeRule.runOnIdle { composeRule.onNodeWithText("Teacher").performClick() }
+
+    composeRule.runOnIdle {
+      composeRule.onNodeWithText("Teacher", useUnmergedTree = true).assertIsDisplayed()
+    }
   }
 }
