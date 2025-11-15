@@ -52,6 +52,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.PopupProperties
+import com.android.sample.logic.ProfileDisplayLogic
+import com.android.sample.logic.ProfileFieldConfiguration
 import com.android.sample.logic.ProfilePageLogic
 import com.android.sample.profile.UserProfile
 import com.google.firebase.auth.FirebaseAuth
@@ -123,7 +125,7 @@ fun ProfilePage(
             TextButton(
                 onClick = {
                   val formState = formManager.buildSanitizedProfile()
-                  if (ProfilePageLogic.canSaveProfile(formState)) {
+                  if (ProfileDisplayLogic.shouldEnableSaveButton(formManager, initialProfile)) {
                     onSaveProfile(formState)
                     showSavedConfirmation = ProfilePageLogic.shouldShowSavedConfirmation(true)
                   }
@@ -136,7 +138,7 @@ fun ProfilePage(
 
           if (showSavedConfirmation) {
             Text(
-                text = "Saved",
+                text = ProfileDisplayLogic.getConfirmationMessage(),
                 color = accent,
                 fontSize = 12.sp,
                 modifier = Modifier.align(Alignment.CenterHorizontally))
@@ -241,7 +243,7 @@ fun ProfilePage(
         }
 
     Text(
-        text = "BY EPFL",
+        text = ProfileDisplayLogic.getFooterText(),
         color = textSecondary,
         fontSize = 12.sp,
         textAlign = TextAlign.Center,
@@ -295,10 +297,10 @@ private fun EditableInfoSection(
                 textSecondary = textSecondary,
                 backgroundColor = backgroundColor)
 
-            if (index < fields.lastIndex) {
+            if (ProfileDisplayLogic.shouldShowDividerAfter(index, fields.size)) {
               HorizontalDivider(
-                  modifier = Modifier.padding(vertical = 12.dp),
-                  color = Color.White.copy(alpha = 0.08f))
+                  modifier = Modifier.padding(vertical = ProfileDisplayLogic.getHeaderSpacing().dp),
+                  color = Color.White.copy(alpha = ProfileDisplayLogic.getDividerAlpha()))
             }
           }
         }
@@ -312,7 +314,7 @@ private fun EditableInfoRow(
     textSecondary: Color,
     backgroundColor: Color
 ) {
-  val contentAlpha = if (field.enabled) 1f else 0.5f
+  val contentAlpha = ProfileFieldConfiguration.getContentAlpha(field.enabled)
   Column(
       modifier = Modifier.fillMaxWidth().alpha(contentAlpha),
       verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -322,7 +324,7 @@ private fun EditableInfoRow(
               Surface(
                   modifier = Modifier.size(40.dp),
                   shape = CircleShape,
-                  color = Color.White.copy(alpha = 0.06f)) {
+                  color = Color.White.copy(alpha = ProfileDisplayLogic.getIconBackgroundAlpha())) {
                     Box(contentAlignment = Alignment.Center) {
                       Icon(
                           imageVector = field.definition.icon,
@@ -337,9 +339,9 @@ private fun EditableInfoRow(
         if (field.options != null) {
           var expanded by rememberSaveable(field.definition.label) { mutableStateOf(false) }
           val displayText =
-              if (field.value.isNotBlank()) field.value else field.definition.placeholder
+              ProfileFieldConfiguration.getDisplayText(field.value, field.definition.placeholder)
           val displayColor =
-              if (field.value.isNotBlank()) {
+              if (ProfileFieldConfiguration.shouldUsePrimaryColor(field.value)) {
                 textPrimary
               } else {
                 field.placeholderColor ?: textSecondary
@@ -348,7 +350,7 @@ private fun EditableInfoRow(
           Surface(
               modifier =
                   Modifier.fillMaxWidth().let {
-                    if (field.enabled) {
+                    if (ProfileDisplayLogic.shouldAllowDropdownExpansion(field.enabled)) {
                       it.clickable { expanded = true }
                     } else {
                       it
@@ -398,11 +400,13 @@ private fun EditableInfoRow(
               enabled = field.enabled)
         }
 
-        if (field.supportingText != null &&
-            (!field.showSupportingTextWhenNotBlank || field.value.isNotBlank())) {
+        if (ProfileFieldConfiguration.shouldShowSupportingText(
+            field.supportingText, field.showSupportingTextWhenNotBlank, field.value)) {
           Text(
-              text = field.supportingText,
-              color = field.supportingTextColor ?: textSecondary.copy(alpha = 0.7f),
+              text = field.supportingText!!,
+              color =
+                  field.supportingTextColor
+                      ?: textSecondary.copy(alpha = ProfileDisplayLogic.getSupportingTextAlpha()),
               fontSize = 12.sp)
         }
       }
