@@ -197,7 +197,8 @@ class ProfileDisplayLogicTest {
     val initial = UserProfile(fullName = "John")
     val authEmail = "test@epfl.ch"
     val formManager = ProfileFormManager(authEmail, initial)
-    formManager.updateFullName("Jane") // Changed
+    // fullName is locked, so update a non-locked field
+    formManager.updateUsername("Jane") // Changed
 
     assertTrue(ProfileDisplayLogic.shouldEnableSaveButton(formManager, initial, authEmail))
   }

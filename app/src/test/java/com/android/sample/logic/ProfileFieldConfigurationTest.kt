@@ -190,7 +190,8 @@ class ProfileFieldConfigurationTest {
     val initial = UserProfile(fullName = "John", email = "john@epfl.ch")
     val authEmail = "john@epfl.ch"
     val formManager = ProfileFormManager(authEmail, initial)
-    formManager.updateFullName("Jane") // Changed
+    // fullName and email are locked, so update a non-locked field
+    formManager.updateUsername("Jane") // Changed
 
     assertTrue(ProfileFieldConfiguration.hasAnyFieldChanged(formManager, initial, authEmail))
   }
