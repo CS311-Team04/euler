@@ -132,7 +132,7 @@ object ProfileFieldConfiguration {
   /** Validates that all required contact fields are filled */
   fun validateContact(formManager: ProfileFormManager): Boolean {
     val emailField = getContactFields().firstOrNull { it.key == "email" }
-    return emailField?.getValue(formManager)?.isNotBlank() ?: false
+    return emailField?.let { it.getValue(formManager).isNotBlank() } ?: false
   }
 
   /** Gets all field values as a map */
