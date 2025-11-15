@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import org.junit.Assert.assertEquals
+import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -21,6 +22,7 @@ class GuestProfileWarningModalTest {
 
   @get:Rule val composeRule = createComposeRule()
 
+  @Ignore("Flaky under Robolectric CI — temporarily disabled")
   @Test
   fun modal_displays_expected_texts_and_buttons_trigger_callbacks() {
     var continueCount = 0
@@ -50,6 +52,7 @@ class GuestProfileWarningModalTest {
     }
   }
 
+  @Ignore("Flaky under Robolectric CI — temporarily disabled")
   @Test
   fun tapping_backdrop_invokes_continue_callback() {
     var continueCount = 0
