@@ -1,5 +1,6 @@
 package com.android.sample.profile
 
+import com.android.sample.logic.UserProfileMapper
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -48,7 +49,7 @@ class UserProfileRepository(
 
     val payload =
         mapOf(
-            PROFILE_FIELD to profile.toFirestoreMap(),
+            PROFILE_FIELD to UserProfileMapper.toFirestoreMap(profile),
             PROFILE_UPDATED_AT_FIELD to FieldValue.serverTimestamp())
 
     val firestore = runCatching { firestoreProvider() }.getOrNull() ?: return
@@ -70,7 +71,7 @@ class UserProfileRepository(
     if (!snapshot.exists()) return null
 
     val rawProfile = snapshot.get(PROFILE_FIELD) as? Map<*, *> ?: return null
-    return UserProfile.fromFirestore(rawProfile)
+    return UserProfileMapper.fromFirestore(rawProfile)
   }
 
   companion object {
@@ -89,26 +90,4 @@ data class UserProfile(
     val email: String = "",
     val phone: String = "",
     val roleDescription: String = "",
-) {
-  internal fun toFirestoreMap(): Map<String, Any?> =
-      mapOf(
-          "fullName" to fullName,
-          "preferredName" to preferredName,
-          "faculty" to faculty,
-          "section" to section,
-          "email" to email,
-          "phone" to phone,
-          "roleDescription" to roleDescription)
-
-  companion object {
-    internal fun fromFirestore(map: Map<*, *>): UserProfile =
-        UserProfile(
-            fullName = map["fullName"] as? String ?: "",
-            preferredName = map["preferredName"] as? String ?: "",
-            faculty = map["faculty"] as? String ?: "",
-            section = map["section"] as? String ?: "",
-            email = map["email"] as? String ?: "",
-            phone = map["phone"] as? String ?: "",
-            roleDescription = map["roleDescription"] as? String ?: "")
-  }
-}
+)

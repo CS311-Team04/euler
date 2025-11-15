@@ -13,6 +13,7 @@ import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.MessageDTO
 import com.android.sample.llm.FirebaseFunctionsLlmClient
 import com.android.sample.llm.LlmClient
+import com.android.sample.logic.HomeStateReducer
 import com.android.sample.profile.UserProfile
 import com.android.sample.profile.UserProfileRepository
 import com.google.firebase.auth.FirebaseAuth
@@ -238,7 +239,7 @@ class HomeViewModel(
     isInLocalNewChat = false
     // reset UI
     Log.d(TAG, "onSignedOutInternal(): reset UI state to defaults")
-    _uiState.value = HomeUiState() // vide messages, currentConversationId=null, etc.
+    _uiState.value = HomeStateReducer.onSignedOut(_uiState.value)
   }
 
   /**
@@ -249,55 +250,24 @@ class HomeViewModel(
   fun startLocalNewChat() {
     isInLocalNewChat = true
     Log.d(TAG, "startLocalNewChat(): clearing current conversation selection")
-    _uiState.update {
-      it.copy(
-          currentConversationId = null,
-          messages = emptyList(),
-          messageDraft = "",
-          isSending = false,
-          showDeleteConfirmation = false)
-    }
+    _uiState.update { HomeStateReducer.startLocalNewChat(it) }
   }
 
   // ============ UI BASICS (unchanged) ============
 
   fun toggleDrawer() {
-    _uiState.update { it.copy(isDrawerOpen = !it.isDrawerOpen) }
+    _uiState.update { HomeStateReducer.toggleDrawer(it) }
   }
 
   fun setGuestMode(isGuest: Boolean) {
-    if (isGuest) {
-      _uiState.value =
-          _uiState.value.copy(
-              isGuest = true, profile = null, userName = "guest", showGuestProfileWarning = false)
-    } else {
-      _uiState.value =
-          _uiState.value.copy(
-              isGuest = false,
-              userName = _uiState.value.userName.takeIf { it.isNotBlank() } ?: DEFAULT_USER_NAME)
-    }
+    _uiState.value = HomeStateReducer.setGuestMode(_uiState.value, isGuest)
   }
 
   fun refreshProfile() {
     viewModelScope.launch {
       try {
         val profile = profileRepository.loadProfile()
-        _uiState.value =
-            if (profile != null) {
-              _uiState.value.copy(
-                  profile = profile,
-                  userName =
-                      profile.preferredName
-                          .ifBlank { profile.fullName }
-                          .ifBlank { DEFAULT_USER_NAME },
-                  isGuest = false)
-            } else {
-              _uiState.value.copy(
-                  profile = null,
-                  userName =
-                      _uiState.value.userName.takeIf { it.isNotBlank() } ?: DEFAULT_USER_NAME,
-                  isGuest = false)
-            }
+        _uiState.value = HomeStateReducer.refreshProfile(_uiState.value, profile)
       } catch (t: Throwable) {
         Log.e("HomeViewModel", "Failed to load profile", t)
       }
@@ -308,14 +278,7 @@ class HomeViewModel(
     viewModelScope.launch {
       try {
         profileRepository.saveProfile(profile)
-        _uiState.value =
-            _uiState.value.copy(
-                profile = profile,
-                userName =
-                    profile.preferredName
-                        .ifBlank { profile.fullName }
-                        .ifBlank { DEFAULT_USER_NAME },
-                isGuest = false)
+        _uiState.value = HomeStateReducer.saveProfile(_uiState.value, profile)
       } catch (t: Throwable) {
         Log.e("HomeViewModel", "Failed to save profile", t)
       }
@@ -323,25 +286,20 @@ class HomeViewModel(
   }
 
   fun clearProfile() {
-    _uiState.value =
-        _uiState.value.copy(
-            profile = null,
-            userName = DEFAULT_USER_NAME,
-            isGuest = false,
-            showGuestProfileWarning = false)
+    _uiState.value = HomeStateReducer.clearProfile(_uiState.value)
   }
 
   fun showGuestProfileWarning() {
-    _uiState.value = _uiState.value.copy(showGuestProfileWarning = true)
+    _uiState.value = HomeStateReducer.showGuestProfileWarning(_uiState.value)
   }
 
   fun hideGuestProfileWarning() {
-    _uiState.value = _uiState.value.copy(showGuestProfileWarning = false)
+    _uiState.value = HomeStateReducer.hideGuestProfileWarning(_uiState.value)
   }
 
   /** Control the top-right overflow menu visibility. */
   fun setTopRightOpen(open: Boolean) {
-    _uiState.update { it.copy(isTopRightOpen = open) }
+    _uiState.update { HomeStateReducer.setTopRightOpen(it, open) }
   }
 
   /** Update the current message draft (bound to the input field). */

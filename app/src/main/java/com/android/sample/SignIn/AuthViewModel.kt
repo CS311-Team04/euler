@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.sample.authentification.AuthProvider
 import com.android.sample.authentification.AuthUiState
+import com.android.sample.logic.AuthStateReducer
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,12 +29,12 @@ class AuthViewModel : ViewModel() {
       android.util.Log.d("AuthViewModel", "Auth state changed - current user: ${user?.uid}")
       if (user != null) {
         android.util.Log.d("AuthViewModel", "User signed in: ${user.email}")
-        _state.value = AuthUiState.SignedIn
+        _state.value = AuthStateReducer.onAuthStateChanged(true)
         // Don't call setLoggedStatus here - it will be called by onAuthenticationSuccess()
         // when user actually signs in, not when we detect existing auth state
       } else {
         android.util.Log.d("AuthViewModel", "User signed out")
-        _state.value = AuthUiState.Idle
+        _state.value = AuthStateReducer.onAuthStateChanged(false)
         // Note: We don't set logged to false here because signOut() already handles it
       }
     }
@@ -48,32 +49,33 @@ class AuthViewModel : ViewModel() {
 
     if (currentUser != null) {
       android.util.Log.d("AuthViewModel", "User is signed in, setting state to SignedIn")
-      _state.value = AuthUiState.SignedIn
+      _state.value = AuthStateReducer.determineInitialState(true)
       // Update logged status for existing user (in case it was not set before)
       setLoggedStatus(true)
     } else {
       android.util.Log.d("AuthViewModel", "No user found, setting state to Idle")
-      _state.value = AuthUiState.Idle
+      _state.value = AuthStateReducer.determineInitialState(false)
     }
   }
 
   fun onMicrosoftLoginClick() {
-    if (_state.value is AuthUiState.Loading) return
-    _state.value = AuthUiState.Loading(AuthProvider.MICROSOFT)
+    _state.value = AuthStateReducer.onMicrosoftLoginClick(_state.value)
   }
 
   fun onSwitchEduLoginClick() {
-    if (_state.value is AuthUiState.Loading) return
-    startSignIn(AuthProvider.SWITCH_EDU)
+    _state.value = AuthStateReducer.onSwitchEduLoginClick(_state.value)
+    if (_state.value is AuthUiState.Loading) {
+      startSignIn(AuthProvider.SWITCH_EDU)
+    }
   }
 
   fun onAuthenticationSuccess() {
-    _state.value = AuthUiState.SignedIn
+    _state.value = AuthStateReducer.onAuthenticationSuccess()
     setLoggedStatus(true)
   }
 
   fun onAuthenticationError(error: String) {
-    _state.value = AuthUiState.Error(error)
+    _state.value = AuthStateReducer.onAuthenticationError(error)
   }
 
   fun signOut() {
@@ -98,7 +100,7 @@ class AuthViewModel : ViewModel() {
           "AuthViewModel", "Sign out failed - user still exists: ${userAfterSignout.uid}")
     }
 
-    _state.value = AuthUiState.Idle
+    _state.value = AuthStateReducer.onSignOut()
   }
 
   private fun setLoggedStatus(isLogged: Boolean) {
@@ -130,14 +132,13 @@ class AuthViewModel : ViewModel() {
       try {
         // Simulate async work for guest flow
         kotlinx.coroutines.delay(600)
-        if (provider == AuthProvider.SWITCH_EDU) {
-          _state.value = AuthUiState.Guest
-        } else {
-          _state.value = AuthUiState.SignedIn
+        val nextState = AuthStateReducer.processSwitchEduFlow(provider)
+        _state.value = nextState
+        if (nextState is AuthUiState.SignedIn) {
           setLoggedStatus(true)
         }
       } catch (t: Throwable) {
-        _state.value = AuthUiState.Error(t.message ?: "Unknown error")
+        _state.value = AuthStateReducer.onAuthenticationError(t.message ?: "Unknown error")
       }
     }
   }

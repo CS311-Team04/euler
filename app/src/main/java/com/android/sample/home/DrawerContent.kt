@@ -42,8 +42,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.sample.R
+import com.android.sample.logic.DrawerContentLogic
 import com.android.sample.settings.Localization
-import java.util.Locale
 
 object DrawerTags {
   const val Root = "drawer_root"
@@ -160,7 +160,7 @@ fun DrawerContent(
           Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             ui.conversations.take(12).forEach { conv ->
               RecentRow(
-                  title = conv.title.ifBlank { "Untitled" },
+                  title = DrawerContentLogic.formatConversationTitle(conv.title),
                   selected = conv.id == ui.currentConversationId,
                   onClick = { onPickConversation(conv.id) })
             }
@@ -193,7 +193,7 @@ fun DrawerContent(
 
         Surface(color = Color(0x22FFFFFF), modifier = Modifier.fillMaxWidth().height(1.dp)) {}
         Spacer(Modifier.height(12.dp))
-        val displayName = formatUserName(ui.userName)
+        val displayName = DrawerContentLogic.formatUserName(ui.userName)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().alpha(if (ui.isGuest) 0.4f else 1f)) {
@@ -242,16 +242,6 @@ fun DrawerContent(
               Text(Localization.t("powered_by"), color = Color.Gray, fontSize = 12.sp)
             }
       }
-}
-
-private fun formatUserName(raw: String): String {
-  val trimmed = raw.trim()
-  if (trimmed.isEmpty()) return "Student"
-  return trimmed.split("\\s+".toRegex()).joinToString(" ") { word ->
-    word.replaceFirstChar { ch ->
-      if (ch.isLowerCase()) ch.titlecase(Locale.getDefault()) else ch.toString()
-    }
-  }
 }
 
 @Composable
