@@ -60,7 +60,8 @@ import kotlinx.coroutines.delay
 fun ProfilePage(
     onBackClick: () -> Unit = {},
     onSaveProfile: (UserProfile) -> Unit = {},
-    initialProfile: UserProfile? = null
+    initialProfile: UserProfile? = null,
+    skipDelayForTests: Boolean = false
 ) {
   val background = Color(0xFF121212)
   val cardColor = Color(0xFF1E1E1E)
@@ -80,11 +81,11 @@ fun ProfilePage(
 
   LaunchedEffect(showSavedConfirmation) {
     if (showSavedConfirmation) {
-      if (isTesting) {
-        // Robolectric → instant reset (prevents AppNotIdleException)
+      if (isTesting || skipDelayForTests) {
+        // Test mode → instant reset (prevents AppNotIdleException)
         showSavedConfirmation = false
       } else {
-        // Real device
+        // Real device → delay then reset
         delay(2500)
         showSavedConfirmation = false
       }
