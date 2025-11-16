@@ -1,5 +1,7 @@
 package com.android.sample.settings
 
+import AnimationConfig
+import TestFlags
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -67,7 +69,8 @@ fun ProfilePage(
   val accent = Color(0xFFEB5757)
 
   val authEmail = remember {
-    runCatching { FirebaseAuth.getInstance().currentUser?.email.orEmpty() }.getOrDefault("")
+    TestFlags.fakeEmail
+        ?: runCatching { FirebaseAuth.getInstance().currentUser?.email.orEmpty() }.getOrDefault("")
   }
 
   val formManager = remember { ProfileFormManager(authEmail, initialProfile) }
@@ -77,8 +80,12 @@ fun ProfilePage(
 
   LaunchedEffect(showSavedConfirmation) {
     if (showSavedConfirmation) {
-      delay(2500)
-      showSavedConfirmation = false
+      if (AnimationConfig.disableAnimations) {
+        showSavedConfirmation = false
+      } else {
+        delay(2500)
+        showSavedConfirmation = false
+      }
     }
   }
 
@@ -352,7 +359,12 @@ private fun EditableInfoRow(
           DropdownMenu(
               expanded = expanded,
               onDismissRequest = { expanded = false },
-              containerColor = backgroundColor) {
+              containerColor = backgroundColor,
+              properties =
+                  androidx.compose.ui.window.PopupProperties(
+                      focusable = true,
+                      dismissOnClickOutside = true,
+                      usePlatformDefaultWidth = !AnimationConfig.disableAnimations)) {
                 field.options.forEach { option ->
                   DropdownMenuItem(
                       text = { Text(option, color = textPrimary) },
