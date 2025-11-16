@@ -1,5 +1,7 @@
 package com.android.sample.settings
 
+import AnimationConfig
+import TestFlags
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -8,11 +10,9 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.android.sample.profile.UserProfile
-import AnimationConfig
-import TestFlags
 import org.junit.After
-import org.junit.Before
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
