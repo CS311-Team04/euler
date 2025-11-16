@@ -64,10 +64,10 @@ class HomeViewModel(
 
   companion object {
     private const val TAG = "HomeViewModel"
-    
+
     // Global exception handler for uncaught coroutine exceptions
     private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
-        Log.e(TAG, "Uncaught exception in coroutine", throwable)
+      Log.e(TAG, "Uncaught exception in coroutine", throwable)
     }
   }
 
@@ -76,7 +76,7 @@ class HomeViewModel(
   private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
   private var conversationId: String? = null
 
-  //private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+  // private val auth: FirebaseAuth = FirebaseAuth.getInstance()
   private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
   private val repo = ConversationRepository(auth, db)
   private var isInLocalNewChat = false
@@ -99,8 +99,6 @@ class HomeViewModel(
               messages = emptyList()))
   /** Public, read-only UI state. */
   val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
-
-
 
   /**
    * Firebase Functions handle for the chat backend. Uses local emulator when configured via
@@ -299,40 +297,37 @@ class HomeViewModel(
   // ============ SENDING MESSAGE -> Firestore ============
 
   /**
-   * Helper function to handle errors when sending a message.
-   * Updates the UI to show the error message and clears streaming state.
+   * Helper function to handle errors when sending a message. Updates the UI to show the error
+   * message and clears streaming state.
    */
   private suspend fun handleSendMessageError(error: Throwable, aiMessageId: String) {
-      val details: String? =
-          (error as? FirebaseFunctionsException)?.details as? String
-      val code: String? =
-          (error as? FirebaseFunctionsException)?.code?.name
-      val errText =
-          buildString {
-              append("Error")
-              if (!code.isNullOrBlank()) append(" [").append(code).append("]")
-              append(": ")
-              append(details ?: error.message ?: "request failed")
-          }
-      try {
-          _uiState.update { state ->
-              state.copy(
-                  messages = state.messages.map { msg ->
-                      if (msg.id == aiMessageId) {
-                          msg.copy(text = errText, isThinking = false)
-                      } else {
-                          msg
-                      }
-                  },
-                  isSending = false,
-                  streamingMessageId = null
-              )
-          }
-          clearStreamingState(aiMessageId)
-      } catch (ex: Exception) {
-          Log.e(TAG, "Error updating UI with error message", ex)
-          _uiState.update { it.copy(isSending = false, streamingMessageId = null) }
+    val details: String? = (error as? FirebaseFunctionsException)?.details as? String
+    val code: String? = (error as? FirebaseFunctionsException)?.code?.name
+    val errText = buildString {
+      append("Error")
+      if (!code.isNullOrBlank()) append(" [").append(code).append("]")
+      append(": ")
+      append(details ?: error.message ?: "request failed")
+    }
+    try {
+      _uiState.update { state ->
+        state.copy(
+            messages =
+                state.messages.map { msg ->
+                  if (msg.id == aiMessageId) {
+                    msg.copy(text = errText, isThinking = false)
+                  } else {
+                    msg
+                  }
+                },
+            isSending = false,
+            streamingMessageId = null)
       }
+      clearStreamingState(aiMessageId)
+    } catch (ex: Exception) {
+      Log.e(TAG, "Error updating UI with error message", ex)
+      _uiState.update { it.copy(isSending = false, streamingMessageId = null) }
+    }
   }
 
   /**
@@ -372,231 +367,226 @@ class HomeViewModel(
           streamingSequence = st.streamingSequence + 1)
     }
 
-      viewModelScope.launch(exceptionHandler) {
-          try {
-              Log.d(TAG, "sendMessage: starting, message='${msg.take(50)}...'")
-              // GUEST: no Firestore, just streaming UI
-              if (isGuest()) {
-                  Log.d(TAG, "sendMessage: guest mode, starting streaming")
-                  startStreaming(
-                      question = msg,
-                      messageId = aiMessageId,
-                      conversationId = null,
-                      summary = null,
-                      transcript = null)
-                  return@launch
-              }
+    viewModelScope.launch(exceptionHandler) {
+      try {
+        Log.d(TAG, "sendMessage: starting, message='${msg.take(50)}...'")
+        // GUEST: no Firestore, just streaming UI
+        if (isGuest()) {
+          Log.d(TAG, "sendMessage: guest mode, starting streaming")
+          startStreaming(
+              question = msg,
+              messageId = aiMessageId,
+              conversationId = null,
+              summary = null,
+              transcript = null)
+          return@launch
+        }
 
-              // CONNECTED: ensure we have a conversation and persist the USER message immediately (repo)
-              val cid =
-                  _uiState.value.currentConversationId
-                      ?: run {
-                          val quickTitle = localTitleFrom(msg)
-                          val newId = repo.startNewConversation(quickTitle)
-                          _uiState.update { it.copy(currentConversationId = newId) }
-                          isInLocalNewChat = false
+        // CONNECTED: ensure we have a conversation and persist the USER message immediately (repo)
+        val cid =
+            _uiState.value.currentConversationId
+                ?: run {
+                  val quickTitle = localTitleFrom(msg)
+                  val newId = repo.startNewConversation(quickTitle)
+                  _uiState.update { it.copy(currentConversationId = newId) }
+                  isInLocalNewChat = false
 
-                          // Upgrade du titre en arrière-plan (UNE fois)
-                          launch {
-                              try {
-                                  val good = fetchTitle(msg)
-                                  if (good.isNotBlank() && good != quickTitle) {
-                                      repo.updateConversationTitle(newId, good)
-                                  }
-                              } catch (_: Exception) {
-                                  /* keep provisional */
-                              }
-                          }
-                          newId
-                      }
-
-              isInLocalNewChat = false
-              // Persister immédiatement le message USER côté repo
-              repo.appendMessage(cid, "user", msg)
-
-              // ---------- Firestore + RAG (from second snippet) ----------
-
-              // Note: User message is already persisted via repo.appendMessage() above
-              // The direct Firestore write was removed to avoid duplicate writes and timestamp type conflicts
-
-              val uid = auth.currentUser?.uid
-              val conversationId = cid   // unify naming
-
-              // Récupérer le résumé précédent (rolling summary) si disponible
-              val summary: String? =
-                  if (uid != null && conversationId != null) {
-                      val prior = fetchPriorSummary(uid, conversationId, userMsg.id)
-                      val source = if (prior != null) "prior" else "none"
-                      Log.d(
-                          TAG,
-                          "answerWithRagFn summarySource=$source len=${prior?.length ?: 0} " +
-                                  "head='${prior?.take(2000) ?: ""}'")
-                      prior
-                  } else null
-
-              // Construire un transcript récent si nécessaire
-              val recentTranscript: String? =
-                  if (uid != null && conversationId != null) {
-                      buildRecentTranscript(uid, conversationId, userMsg.id)
-                  } else null
-
-              // Appel RAG
-              startStreaming(
-                  question = msg,
-                  messageId = aiMessageId,
-                  conversationId = conversationId,
-                  summary = summary,
-                  transcript = recentTranscript
-              )
-
-
-          } catch (_: AuthNotReadyException) {
-              // L'auth n'est pas prête : côté UI, on signale une erreur de streaming / envoi
-              try {
-                  setStreamingError(aiMessageId, AuthNotReadyException())
-                  clearStreamingState(aiMessageId)
-              } catch (ex: Exception) {
-                  Log.e(TAG, "Error setting streaming error state", ex)
-                  _uiState.update { it.copy(isSending = false, streamingMessageId = null) }
-              }
-          } catch (e: Exception) {
-              // Erreurs back-end / Functions
-              Log.e(TAG, "Error sending message", e)
-              handleSendMessageError(e, aiMessageId)
-          } catch (t: Throwable) {
-              // Catch any other Throwable (Error, etc.) to prevent crashes
-              Log.e(TAG, "Unexpected error sending message", t)
-              handleSendMessageError(t, aiMessageId)
-          } finally {
-              // Toujours arrêter l'indicateur global d'envoi
-              try {
-                  _uiState.update { it.copy(isSending = false) }
-              } catch (ex: Exception) {
-                  Log.e(TAG, "Error updating isSending state in finally", ex)
-              }
-          }
-      }
-
-  }
-    /**
-     * Streaming helper using [LlmClient] and optional summary/transcript.
-     */
-    private fun startStreaming(
-        question: String,
-        messageId: String,
-        conversationId: String?,
-        summary: String?,
-        transcript: String?
-    ) {
-        activeStreamJob?.cancel()
-        userCancelledStream = false
-
-        activeStreamJob =
-            viewModelScope.launch(exceptionHandler) {
-                try {
-                    Log.d(TAG, "startStreaming: calling llmClient.generateReply for messageId=$messageId, question='${question.take(50)}...'")
-                    val reply = try {
-                        withContext(Dispatchers.IO) {
-                            llmClient.generateReply(
-                                prompt = question,
-                                summary = summary,
-                                transcript = transcript
-                            )
-                        }
-                    } catch (e: FirebaseFunctionsException) {
-                        Log.e(TAG, "Firebase Functions exception in startStreaming: code=${e.code}, message=${e.message}", e)
-                        throw e
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Exception in llmClient.generateReply: ${e.javaClass.simpleName}", e)
-                        throw e
-                    } catch (t: Throwable) {
-                        Log.e(TAG, "Unexpected throwable in llmClient.generateReply: ${t.javaClass.simpleName}", t)
-                        throw t
-                    }
-                    Log.d(TAG, "startStreaming: received reply, length=${reply.reply.length}")
-
-                    // simulate stream into the placeholder AI message
-                    simulateStreamingFromText(messageId, reply.reply)
-
-                    // add optional source card
-                    reply.url?.let { url ->
-                        val meta =
-                            SourceMeta(
-                                siteLabel = buildSiteLabel(url),
-                                title = buildFallbackTitle(url),
-                                url = url
-                            )
-                        _uiState.update { s ->
-                            s.copy(
-                                messages =
-                                    s.messages +
-                                            ChatUIModel(
-                                                id = UUID.randomUUID().toString(),
-                                                text = "",
-                                                timestamp = System.currentTimeMillis(),
-                                                type = ChatType.AI,
-                                                source = meta
-                                            ),
-                                streamingSequence = s.streamingSequence + 1
-                            )
-                        }
-                    }
-
-                    // Persist assistant message if we are signed in
-                    if (conversationId != null) {
-                        try {
-                            // Use repository method which handles timestamps correctly
-                            repo.appendMessage(conversationId, "assistant", reply.reply)
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Failed to persist assistant message: ${e.message}")
-                        }
-                    }
-                } catch (ce: CancellationException) {
-                    if (!userCancelledStream) {
-                        try {
-                            setStreamingError(messageId, ce)
-                        } catch (ex: Exception) {
-                            Log.e(TAG, "Error setting streaming error for cancellation", ex)
-                        }
-                    }
-                } catch (t: Throwable) {
-                    Log.e(TAG, "Unexpected error during streaming", t)
-                    if (!userCancelledStream) {
-                        try {
-                            setStreamingError(messageId, t)
-                        } catch (ex: Exception) {
-                            Log.e(TAG, "Error setting streaming error", ex)
-                            // Fallback: directly update UI state
-                            _uiState.update { state ->
-                                state.copy(
-                                    messages = state.messages.map { msg ->
-                                        if (msg.id == messageId) {
-                                            msg.copy(
-                                                text = "Error: ${t.message ?: "Unknown error"}",
-                                                isThinking = false
-                                            )
-                                        } else {
-                                            msg
-                                        }
-                                    },
-                                    streamingMessageId = null,
-                                    isSending = false
-                                )
-                            }
-                        }
-                    }
-                } finally {
+                  // Upgrade du titre en arrière-plan (UNE fois)
+                  launch {
                     try {
-                        clearStreamingState(messageId)
-                    } catch (ex: Exception) {
-                        Log.e(TAG, "Error clearing streaming state", ex)
-                        _uiState.update { it.copy(streamingMessageId = null, isSending = false) }
+                      val good = fetchTitle(msg)
+                      if (good.isNotBlank() && good != quickTitle) {
+                        repo.updateConversationTitle(newId, good)
+                      }
+                    } catch (_: Exception) {
+                      /* keep provisional */
                     }
-                    activeStreamJob = null
-                    userCancelledStream = false
+                  }
+                  newId
                 }
-            }
+
+        isInLocalNewChat = false
+        // Persister immédiatement le message USER côté repo
+        repo.appendMessage(cid, "user", msg)
+
+        // ---------- Firestore + RAG (from second snippet) ----------
+
+        // Note: User message is already persisted via repo.appendMessage() above
+        // The direct Firestore write was removed to avoid duplicate writes and timestamp type
+        // conflicts
+
+        val uid = auth.currentUser?.uid
+        val conversationId = cid // unify naming
+
+        // Récupérer le résumé précédent (rolling summary) si disponible
+        val summary: String? =
+            if (uid != null && conversationId != null) {
+              val prior = fetchPriorSummary(uid, conversationId, userMsg.id)
+              val source = if (prior != null) "prior" else "none"
+              Log.d(
+                  TAG,
+                  "answerWithRagFn summarySource=$source len=${prior?.length ?: 0} " +
+                      "head='${prior?.take(2000) ?: ""}'")
+              prior
+            } else null
+
+        // Construire un transcript récent si nécessaire
+        val recentTranscript: String? =
+            if (uid != null && conversationId != null) {
+              buildRecentTranscript(uid, conversationId, userMsg.id)
+            } else null
+
+        // Appel RAG
+        startStreaming(
+            question = msg,
+            messageId = aiMessageId,
+            conversationId = conversationId,
+            summary = summary,
+            transcript = recentTranscript)
+      } catch (_: AuthNotReadyException) {
+        // L'auth n'est pas prête : côté UI, on signale une erreur de streaming / envoi
+        try {
+          setStreamingError(aiMessageId, AuthNotReadyException())
+          clearStreamingState(aiMessageId)
+        } catch (ex: Exception) {
+          Log.e(TAG, "Error setting streaming error state", ex)
+          _uiState.update { it.copy(isSending = false, streamingMessageId = null) }
+        }
+      } catch (e: Exception) {
+        // Erreurs back-end / Functions
+        Log.e(TAG, "Error sending message", e)
+        handleSendMessageError(e, aiMessageId)
+      } catch (t: Throwable) {
+        // Catch any other Throwable (Error, etc.) to prevent crashes
+        Log.e(TAG, "Unexpected error sending message", t)
+        handleSendMessageError(t, aiMessageId)
+      } finally {
+        // Toujours arrêter l'indicateur global d'envoi
+        try {
+          _uiState.update { it.copy(isSending = false) }
+        } catch (ex: Exception) {
+          Log.e(TAG, "Error updating isSending state in finally", ex)
+        }
+      }
     }
+  }
+  /** Streaming helper using [LlmClient] and optional summary/transcript. */
+  private fun startStreaming(
+      question: String,
+      messageId: String,
+      conversationId: String?,
+      summary: String?,
+      transcript: String?
+  ) {
+    activeStreamJob?.cancel()
+    userCancelledStream = false
+
+    activeStreamJob =
+        viewModelScope.launch(exceptionHandler) {
+          try {
+            Log.d(
+                TAG,
+                "startStreaming: calling llmClient.generateReply for messageId=$messageId, question='${question.take(50)}...'")
+            val reply =
+                try {
+                  withContext(Dispatchers.IO) {
+                    llmClient.generateReply(
+                        prompt = question, summary = summary, transcript = transcript)
+                  }
+                } catch (e: FirebaseFunctionsException) {
+                  Log.e(
+                      TAG,
+                      "Firebase Functions exception in startStreaming: code=${e.code}, message=${e.message}",
+                      e)
+                  throw e
+                } catch (e: Exception) {
+                  Log.e(TAG, "Exception in llmClient.generateReply: ${e.javaClass.simpleName}", e)
+                  throw e
+                } catch (t: Throwable) {
+                  Log.e(
+                      TAG,
+                      "Unexpected throwable in llmClient.generateReply: ${t.javaClass.simpleName}",
+                      t)
+                  throw t
+                }
+            Log.d(TAG, "startStreaming: received reply, length=${reply.reply.length}")
+
+            // simulate stream into the placeholder AI message
+            simulateStreamingFromText(messageId, reply.reply)
+
+            // add optional source card
+            reply.url?.let { url ->
+              val meta =
+                  SourceMeta(
+                      siteLabel = buildSiteLabel(url), title = buildFallbackTitle(url), url = url)
+              _uiState.update { s ->
+                s.copy(
+                    messages =
+                        s.messages +
+                            ChatUIModel(
+                                id = UUID.randomUUID().toString(),
+                                text = "",
+                                timestamp = System.currentTimeMillis(),
+                                type = ChatType.AI,
+                                source = meta),
+                    streamingSequence = s.streamingSequence + 1)
+              }
+            }
+
+            // Persist assistant message if we are signed in
+            if (conversationId != null) {
+              try {
+                // Use repository method which handles timestamps correctly
+                repo.appendMessage(conversationId, "assistant", reply.reply)
+              } catch (e: Exception) {
+                Log.w(TAG, "Failed to persist assistant message: ${e.message}")
+              }
+            }
+          } catch (ce: CancellationException) {
+            if (!userCancelledStream) {
+              try {
+                setStreamingError(messageId, ce)
+              } catch (ex: Exception) {
+                Log.e(TAG, "Error setting streaming error for cancellation", ex)
+              }
+            }
+          } catch (t: Throwable) {
+            Log.e(TAG, "Unexpected error during streaming", t)
+            if (!userCancelledStream) {
+              try {
+                setStreamingError(messageId, t)
+              } catch (ex: Exception) {
+                Log.e(TAG, "Error setting streaming error", ex)
+                // Fallback: directly update UI state
+                _uiState.update { state ->
+                  state.copy(
+                      messages =
+                          state.messages.map { msg ->
+                            if (msg.id == messageId) {
+                              msg.copy(
+                                  text = "Error: ${t.message ?: "Unknown error"}",
+                                  isThinking = false)
+                            } else {
+                              msg
+                            }
+                          },
+                      streamingMessageId = null,
+                      isSending = false)
+                }
+              }
+            }
+          } finally {
+            try {
+              clearStreamingState(messageId)
+            } catch (ex: Exception) {
+              Log.e(TAG, "Error clearing streaming state", ex)
+              _uiState.update { it.copy(streamingMessageId = null, isSending = false) }
+            }
+            activeStreamJob = null
+            userCancelledStream = false
+          }
+        }
+  }
 
   private fun buildSiteLabel(url: String): String {
     val host = runCatching { Uri.parse(url).host ?: "" }.getOrNull().orEmpty()
@@ -785,118 +775,123 @@ class HomeViewModel(
     activeStreamJob = null
   }
 
-    /**
-     * Ensure a conversation document exists for the current session. Creates one if needed and caches
-     * its ID locally.
-     */
-    private suspend fun ensureConversation(uid: String?): String? {
-        val userId = uid ?: return null
-        conversationId?.let {
-            return it
-        }
-        val newId = UUID.randomUUID().toString()
-        val ref =
-            firestore.collection("users").document(userId).collection("conversations").document(newId)
-        val data = hashMapOf("createdAt" to System.currentTimeMillis())
-        ref.set(data).await()
-        conversationId = newId
-        return newId
+  /**
+   * Ensure a conversation document exists for the current session. Creates one if needed and caches
+   * its ID locally.
+   */
+  private suspend fun ensureConversation(uid: String?): String? {
+    val userId = uid ?: return null
+    conversationId?.let {
+      return it
     }
+    val newId = UUID.randomUUID().toString()
+    val ref =
+        firestore.collection("users").document(userId).collection("conversations").document(newId)
+    val data = hashMapOf("createdAt" to System.currentTimeMillis())
+    ref.set(data).await()
+    conversationId = newId
+    return newId
+  }
 
-    /**
-     * Fetches the rolling summary from the most recent message that has one.
-     * The onMessageCreate Cloud Function stores summaries in message documents.
-     * We look for the most recent message (before the current one) that has a summary field.
-     * 
-     * Note: The Cloud Function generates summaries asynchronously, so we may need to wait
-     * a bit for the previous message's summary to be generated.
-     */
-    private suspend fun fetchPriorSummary(uid: String, cid: String, currentMid: String): String? {
-        return try {
-            val col =
-                firestore
-                    .collection("users")
-                    .document(uid)
-                    .collection("conversations")
-                    .document(cid)
-                    .collection("messages")
-            
-            // Get recent messages ordered by createdAt
-            var snap = col.orderBy("createdAt", Query.Direction.ASCENDING).limitToLast(30).get().await()
-            var docs = snap.documents
-            
-            // Look backwards from the most recent message to find one with a summary
-            for (i in docs.size - 1 downTo 0) {
-                val d = docs[i]
-                if (d.id == currentMid) continue  // Skip the current message
-                
-                val summary = d.getString("summary")?.trim()
-                if (!summary.isNullOrEmpty()) {
-                    Log.d(TAG, "fetchPriorSummary: found summary in message ${d.id}, length=${summary.length}")
-                    return summary
-                }
-            }
-            
-            // If no summary found, the Cloud Function might still be processing.
-            // Wait a bit and check the most recent assistant message (summaries are usually on assistant messages)
-            Log.d(TAG, "fetchPriorSummary: no summary found, waiting for Cloud Function to generate...")
-            delay(500) // Wait 500ms for the Cloud Function to process
-            
-            // Re-fetch and check again, focusing on the most recent assistant message
-            snap = col.orderBy("createdAt", Query.Direction.ASCENDING).limitToLast(10).get().await()
-            docs = snap.documents
-            
-            // Look for the most recent assistant message with a summary
-            for (i in docs.size - 1 downTo 0) {
-                val d = docs[i]
-                if (d.id == currentMid) continue
-                
-                val role = d.getString("role") ?: ""
-                // Summaries are typically on assistant messages
-                if (role == "assistant") {
-                    val summary = d.getString("summary")?.trim()
-                    if (!summary.isNullOrEmpty()) {
-                        Log.d(TAG, "fetchPriorSummary: found summary in assistant message ${d.id} after wait, length=${summary.length}")
-                        return summary
-                    }
-                }
-            }
-            
-            Log.d(TAG, "fetchPriorSummary: no summary found after waiting")
-            null
-        } catch (e: Exception) {
-            Log.w(TAG, "fetchPriorSummary: error fetching summary", e)
-            null
+  /**
+   * Fetches the rolling summary from the most recent message that has one. The onMessageCreate
+   * Cloud Function stores summaries in message documents. We look for the most recent message
+   * (before the current one) that has a summary field.
+   *
+   * Note: The Cloud Function generates summaries asynchronously, so we may need to wait a bit for
+   * the previous message's summary to be generated.
+   */
+  private suspend fun fetchPriorSummary(uid: String, cid: String, currentMid: String): String? {
+    return try {
+      val col =
+          firestore
+              .collection("users")
+              .document(uid)
+              .collection("conversations")
+              .document(cid)
+              .collection("messages")
+
+      // Get recent messages ordered by createdAt
+      var snap = col.orderBy("createdAt", Query.Direction.ASCENDING).limitToLast(30).get().await()
+      var docs = snap.documents
+
+      // Look backwards from the most recent message to find one with a summary
+      for (i in docs.size - 1 downTo 0) {
+        val d = docs[i]
+        if (d.id == currentMid) continue // Skip the current message
+
+        val summary = d.getString("summary")?.trim()
+        if (!summary.isNullOrEmpty()) {
+          Log.d(
+              TAG, "fetchPriorSummary: found summary in message ${d.id}, length=${summary.length}")
+          return summary
         }
-    }
+      }
 
-    /**
-     * Builds a compact transcript window containing ONLY the previous round
-     * (last user message + last assistant reply), to complement the prior summary.
-     */
-    private suspend fun buildRecentTranscript(uid: String, cid: String, currentMid: String): String? {
-        val col =
-            firestore
-                .collection("users")
-                .document(uid)
-                .collection("conversations")
-                .document(cid)
-                .collection("messages")
-        // Fetch a small tail and then pick the two messages immediately preceding currentMid
-        val snap = col.orderBy("createdAt").limitToLast(4).get().await()
-        if (snap.isEmpty) return null
-        val docs = snap.documents
+      // If no summary found, the Cloud Function might still be processing.
+      // Wait a bit and check the most recent assistant message (summaries are usually on assistant
+      // messages)
+      Log.d(TAG, "fetchPriorSummary: no summary found, waiting for Cloud Function to generate...")
+      delay(500) // Wait 500ms for the Cloud Function to process
+
+      // Re-fetch and check again, focusing on the most recent assistant message
+      snap = col.orderBy("createdAt", Query.Direction.ASCENDING).limitToLast(10).get().await()
+      docs = snap.documents
+
+      // Look for the most recent assistant message with a summary
+      for (i in docs.size - 1 downTo 0) {
+        val d = docs[i]
+        if (d.id == currentMid) continue
+
+        val role = d.getString("role") ?: ""
+        // Summaries are typically on assistant messages
+        if (role == "assistant") {
+          val summary = d.getString("summary")?.trim()
+          if (!summary.isNullOrEmpty()) {
+            Log.d(
+                TAG,
+                "fetchPriorSummary: found summary in assistant message ${d.id} after wait, length=${summary.length}")
+            return summary
+          }
+        }
+      }
+
+      Log.d(TAG, "fetchPriorSummary: no summary found after waiting")
+      null
+    } catch (e: Exception) {
+      Log.w(TAG, "fetchPriorSummary: error fetching summary", e)
+      null
+    }
+  }
+
+  /**
+   * Builds a compact transcript window containing ONLY the previous round (last user message + last
+   * assistant reply), to complement the prior summary.
+   */
+  private suspend fun buildRecentTranscript(uid: String, cid: String, currentMid: String): String? {
+    val col =
+        firestore
+            .collection("users")
+            .document(uid)
+            .collection("conversations")
+            .document(cid)
+            .collection("messages")
+    // Fetch a small tail and then pick the two messages immediately preceding currentMid
+    val snap = col.orderBy("createdAt").limitToLast(4).get().await()
+    if (snap.isEmpty) return null
+    val docs =
+        snap.documents
             .filter { it.id != currentMid }
             .takeLast(2) // previous user + assistant, if present
-        if (docs.isEmpty()) return null
-        val lines =
-            docs.map { d ->
-                val role = (d.getString("role") ?: "").lowercase()
-                val text = d.getString("text")?.trim().orEmpty()  // Use "text" field, not "content"
-                val tag = if (role == "assistant") "Assistant" else "Utilisateur"
-                "$tag: $text"
-            }
-        val txt = lines.joinToString("\n")
-        return if (txt.isBlank()) null else txt.take(600)
-    }
+    if (docs.isEmpty()) return null
+    val lines =
+        docs.map { d ->
+          val role = (d.getString("role") ?: "").lowercase()
+          val text = d.getString("text")?.trim().orEmpty() // Use "text" field, not "content"
+          val tag = if (role == "assistant") "Assistant" else "Utilisateur"
+          "$tag: $text"
+        }
+    val txt = lines.joinToString("\n")
+    return if (txt.isBlank()) null else txt.take(600)
+  }
 }
