@@ -17,6 +17,7 @@ import com.android.sample.authentification.AuthUiState
 import com.android.sample.home.DrawerTags
 import com.android.sample.home.HomeTags
 import com.android.sample.sign_in.AuthViewModel
+import com.android.sample.speech.SpeechPlayback
 import com.android.sample.speech.SpeechToTextHelper
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
@@ -431,6 +432,7 @@ class NavGraphComposeTest {
   fun appNav_settings_from_drawer_navigates_to_settings_screen() {
     val speechHelper = mock<SpeechToTextHelper>()
     val stateFlow = MutableStateFlow<AuthUiState>(AuthUiState.SignedIn)
+    val ttsHelper = mock<SpeechPlayback>()
 
     val construction =
         mockConstruction(AuthViewModel::class.java) { mock, _ ->
@@ -447,7 +449,11 @@ class NavGraphComposeTest {
     construction.use {
       composeRule.setContent {
         MaterialTheme {
-          AppNav(startOnSignedIn = false, activity = activity, speechHelper = speechHelper)
+          AppNav(
+              startOnSignedIn = false,
+              activity = activity,
+              speechHelper = speechHelper,
+              ttsHelper = ttsHelper)
         }
       }
 
@@ -468,6 +474,7 @@ class NavGraphComposeTest {
   fun appNav_voice_button_navigates_to_voice_screen_and_back() {
     val speechHelper = mock<SpeechToTextHelper>()
     val stateFlow = MutableStateFlow<AuthUiState>(AuthUiState.SignedIn)
+    val ttsHelper = mock<SpeechPlayback>()
 
     val construction =
         mockConstruction(AuthViewModel::class.java) { mock, _ ->
@@ -484,7 +491,11 @@ class NavGraphComposeTest {
     construction.use {
       composeRule.setContent {
         MaterialTheme {
-          AppNav(startOnSignedIn = false, activity = activity, speechHelper = speechHelper)
+          AppNav(
+              startOnSignedIn = false,
+              activity = activity,
+              speechHelper = speechHelper,
+              ttsHelper = ttsHelper)
         }
       }
 
@@ -515,6 +526,7 @@ class NavGraphComposeTest {
   fun appNav_settings_log_out_returns_to_sign_in() {
     val speechHelper = mock<SpeechToTextHelper>()
     val stateFlow = MutableStateFlow<AuthUiState>(AuthUiState.SignedIn)
+    val ttsHelper = mock<SpeechPlayback>()
 
     val construction =
         mockConstruction(AuthViewModel::class.java) { mock, _ ->
@@ -531,7 +543,11 @@ class NavGraphComposeTest {
     construction.use {
       composeRule.setContent {
         MaterialTheme {
-          AppNav(startOnSignedIn = false, activity = activity, speechHelper = speechHelper)
+          AppNav(
+              startOnSignedIn = false,
+              activity = activity,
+              speechHelper = speechHelper,
+              ttsHelper = ttsHelper)
         }
       }
 
@@ -562,6 +578,7 @@ class NavGraphComposeTest {
   fun appNav_opening_idle_navigates_to_sign_in() {
     val speechHelper = mock<SpeechToTextHelper>()
     val stateFlow = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
+    val ttsHelper = mock<SpeechPlayback>()
 
     val construction =
         mockConstruction(AuthViewModel::class.java) { mock, _ ->
@@ -576,7 +593,11 @@ class NavGraphComposeTest {
     construction.use {
       composeRule.setContent {
         MaterialTheme {
-          AppNav(startOnSignedIn = false, activity = activity, speechHelper = speechHelper)
+          AppNav(
+              startOnSignedIn = false,
+              activity = activity,
+              speechHelper = speechHelper,
+              ttsHelper = ttsHelper)
         }
       }
 
