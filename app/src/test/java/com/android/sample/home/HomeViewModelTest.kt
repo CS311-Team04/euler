@@ -174,13 +174,10 @@ class HomeViewModelTest {
   @Test
   fun deleteCurrentConversation_authNotReady_hides_confirmation() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel(FakeLlmClient())
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
-        viewModel.setPrivateField("auth", auth)
-
         val repo = mock<ConversationRepository>()
         runBlocking { whenever(repo.deleteConversation("conv-1")).thenAnswer {} }
-        viewModel.setPrivateField("repo", repo)
+        val viewModel = HomeViewModel(FakeLlmClient(), auth, repo)
 
         viewModel.updateUiState {
           it.copy(currentConversationId = "conv-1", showDeleteConfirmation = true)
@@ -195,15 +192,12 @@ class HomeViewModelTest {
   @Test
   fun startData_populates_conversations_and_auto_selects() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel(FakeLlmClient())
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
-        viewModel.setPrivateField("auth", auth)
-
         val repo = mock<ConversationRepository>()
         val conversationsFlow = MutableSharedFlow<List<Conversation>>(replay = 1)
         whenever(repo.conversationsFlow()).thenReturn(conversationsFlow)
         whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
-        viewModel.setPrivateField("repo", repo)
+        val viewModel = HomeViewModel(FakeLlmClient(), auth, repo)
         viewModel.setPrivateField("isInLocalNewChat", false)
 
         viewModel.invokeStartData()
@@ -218,26 +212,27 @@ class HomeViewModelTest {
   @Test
   fun auth_listener_sign_in_triggers_startData() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel(FakeLlmClient())
-
+        val auth = mock<FirebaseAuth>()
+        // Configure auth to have no current user initially (guest mode)
+        whenever(auth.currentUser).thenReturn(null)
+        
         val repo = mock<ConversationRepository>()
         val conversationsFlow = MutableSharedFlow<List<Conversation>>(replay = 1)
         whenever(repo.conversationsFlow()).thenReturn(conversationsFlow)
         whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
-        viewModel.setPrivateField("repo", repo)
+        val viewModel = HomeViewModel(FakeLlmClient(), auth, repo)
         viewModel.setPrivateField("lastUid", null)
 
         val listenerField = HomeViewModel::class.java.getDeclaredField("authListener")
         listenerField.isAccessible = true
         val listener = listenerField.get(viewModel) as FirebaseAuth.AuthStateListener
 
-        val signedInAuth = mock<FirebaseAuth>()
+        // Now simulate sign-in by updating the same mock auth
         val user = mock<FirebaseUser>()
-        whenever(signedInAuth.currentUser).thenReturn(user)
+        whenever(auth.currentUser).thenReturn(user)
         whenever(user.uid).thenReturn("user-123")
-        viewModel.setPrivateField("auth", signedInAuth)
 
-        listener.onAuthStateChanged(signedInAuth)
+        listener.onAuthStateChanged(auth)
         advanceUntilIdle()
 
         runBlocking { verify(repo, timeout(1_000)).conversationsFlow() }
@@ -247,12 +242,9 @@ class HomeViewModelTest {
   fun deleteCurrentConversation_signedIn_calls_repository() =
       runTest(testDispatcher) {
         val fakeClient = FakeLlmClient()
-        val viewModel = HomeViewModel(fakeClient)
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
-        viewModel.setPrivateField("auth", auth)
-
         val repo = mock<ConversationRepository>()
-        viewModel.setPrivateField("repo", repo)
+        val viewModel = HomeViewModel(fakeClient, auth, repo)
 
         viewModel.updateUiState { it.copy(currentConversationId = "conv-1") }
 
@@ -322,15 +314,12 @@ class HomeViewModelTest {
   @Test
   fun startData_withEmptyRemoteList_keeps_null_selection() =
       runTest(testDispatcher) {
-        val viewModel = HomeViewModel(FakeLlmClient())
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
-        viewModel.setPrivateField("auth", auth)
-
         val repo = mock<ConversationRepository>()
         val conversationsFlow = MutableSharedFlow<List<Conversation>>(replay = 1)
         whenever(repo.conversationsFlow()).thenReturn(conversationsFlow)
         whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
-        viewModel.setPrivateField("repo", repo)
+        val viewModel = HomeViewModel(FakeLlmClient(), auth, repo)
         viewModel.setPrivateField("isInLocalNewChat", false)
 
         viewModel.invokeStartData()
@@ -346,15 +335,12 @@ class HomeViewModelTest {
   fun sendMessage_signedIn_creates_conversation_and_updates_title() =
       runTest(testDispatcher) {
         val fakeClient = FakeLlmClient().apply { nextReply = "AI reply" }
-        val viewModel = HomeViewModel(fakeClient)
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
-        viewModel.setPrivateField("auth", auth)
-
         val repo = mock<ConversationRepository>()
         runBlocking { whenever(repo.startNewConversation(any())).thenReturn("conv-123") }
         runBlocking { whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit) }
         runBlocking { whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit) }
-        viewModel.setPrivateField("repo", repo)
+        val viewModel = HomeViewModel(fakeClient, auth, repo)
 
         val functions = mock<FirebaseFunctions>()
         val callable = mock<HttpsCallableReference>()
@@ -380,15 +366,12 @@ class HomeViewModelTest {
   fun sendMessage_signedIn_title_generation_failure_keeps_quick_title() =
       runTest(testDispatcher) {
         val fakeClient = FakeLlmClient().apply { nextReply = "AI reply" }
-        val viewModel = HomeViewModel(fakeClient)
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
-        viewModel.setPrivateField("auth", auth)
-
         val repo = mock<ConversationRepository>()
         runBlocking { whenever(repo.startNewConversation(any())).thenReturn("conv-999") }
         runBlocking { whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit) }
         runBlocking { whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit) }
-        viewModel.setPrivateField("repo", repo)
+        val viewModel = HomeViewModel(fakeClient, auth, repo)
 
         val functions = mock<FirebaseFunctions>()
         val callable = mock<HttpsCallableReference>()

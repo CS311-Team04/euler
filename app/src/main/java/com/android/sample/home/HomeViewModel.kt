@@ -60,6 +60,11 @@ data class SourceMeta(
  */
 class HomeViewModel(
     private val llmClient: LlmClient = FirebaseFunctionsLlmClient(),
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
+    private val repo: ConversationRepository = ConversationRepository(
+        FirebaseAuth.getInstance(),
+        FirebaseFirestore.getInstance()
+    )
 ) : ViewModel() {
 
   companion object {
@@ -72,13 +77,11 @@ class HomeViewModel(
   }
 
   // Auth / Firestore handles
-  private val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
   private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
   private var conversationId: String? = null
 
   // private val auth: FirebaseAuth = FirebaseAuth.getInstance()
   private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
-  private val repo = ConversationRepository(auth, db)
   private var isInLocalNewChat = false
   private var conversationsJob: kotlinx.coroutines.Job? = null
   private var messagesJob: kotlinx.coroutines.Job? = null
