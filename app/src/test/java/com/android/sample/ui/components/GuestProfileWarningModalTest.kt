@@ -8,6 +8,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import AnimationConfig
+import TestFlags
+import org.junit.After
+import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -21,29 +25,52 @@ class GuestProfileWarningModalTest {
 
   @get:Rule val composeRule = createComposeRule()
 
-  @Test
-  fun modal_displays_expected_texts_and_buttons_trigger_callbacks() {
-    var continueCount = 0
-    var loginCount = 0
+  @Before
+  fun setup() {
+    AnimationConfig.disableAnimations = true
+    TestFlags.fakeEmail = ""
+  }
 
-    composeRule.setContent {
-      GuestProfileWarningModal(
-          onContinueAsGuest = { continueCount += 1 }, onLogin = { loginCount += 1 })
-    }
-    composeRule.waitForIdle()
+  @After
+  fun teardown() {
+    AnimationConfig.disableAnimations = false
+    TestFlags.fakeEmail = null
+  }
+
+  @Test
+  fun modal_shows_expected_texts() {
+    composeRule.setContent { GuestProfileWarningModal(onContinueAsGuest = {}, onLogin = {}) }
 
     composeRule.onNodeWithText("Profile unavailable").assertIsDisplayed()
     composeRule
         .onNodeWithText("Sign in with Microsoft Entra ID to access your profile settings.")
         .assertIsDisplayed()
+  }
+
+  @Test
+  fun continue_button_triggers_callback() {
+    var continueCount = 0
+    composeRule.setContent {
+      GuestProfileWarningModal(onContinueAsGuest = { continueCount += 1 }, onLogin = {})
+    }
 
     composeRule.onNodeWithText("Continue as guest").performClick()
-    composeRule.onNodeWithText("Log in now").performClick()
+    composeRule.waitForIdle()
 
-    composeRule.runOnIdle {
-      assertEquals(1, continueCount)
-      assertEquals(1, loginCount)
+    composeRule.runOnIdle { assertEquals(1, continueCount) }
+  }
+
+  @Test
+  fun login_button_triggers_callback() {
+    var loginCount = 0
+    composeRule.setContent {
+      GuestProfileWarningModal(onContinueAsGuest = {}, onLogin = { loginCount += 1 })
     }
+
+    composeRule.onNodeWithText("Log in now").performClick()
+    composeRule.waitForIdle()
+
+    composeRule.runOnIdle { assertEquals(1, loginCount) }
   }
 
   @Test

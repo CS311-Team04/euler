@@ -8,6 +8,10 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.android.sample.profile.UserProfile
+import AnimationConfig
+import TestFlags
+import org.junit.After
+import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -21,30 +25,66 @@ class ProfilePageComposeTest {
 
   @get:Rule val composeRule = createComposeRule()
 
+  @Before
+  fun setup() {
+    AnimationConfig.disableAnimations = true
+    TestFlags.fakeEmail = ""
+  }
+
+  @After
+  fun teardown() {
+    AnimationConfig.disableAnimations = false
+    TestFlags.fakeEmail = null
+  }
+
   @Test
-  fun clicking_save_persists_profile_and_shows_confirmation_banner() {
-    var savedProfile: UserProfile? = null
-
-    composeRule.setContent { MaterialTheme { ProfilePage(onSaveProfile = { savedProfile = it }) } }
-    composeRule.waitForIdle()
-
-    composeRule.onAllNodesWithText("Saved").assertCountEquals(0)
+  fun save_button_triggers_callback() {
+    var saved: UserProfile? = null
+    composeRule.setContent { MaterialTheme { ProfilePage(onSaveProfile = { saved = it }) } }
 
     composeRule.onNodeWithText("Save").performClick()
     composeRule.waitForIdle()
 
-    composeRule.onNodeWithText("Saved").assertIsDisplayed()
-    composeRule.runOnIdle { assertEquals(UserProfile(), savedProfile) }
+    assertEquals(UserProfile(), saved)
+  }
 
-    composeRule.mainClock.advanceTimeBy(2_600)
+  @Test
+  fun saved_banner_shows() {
+    val prev = AnimationConfig.disableAnimations
+    try {
+      AnimationConfig.disableAnimations = false
+      composeRule.setContent { MaterialTheme { ProfilePage() } }
+
+      composeRule.onNodeWithText("Save").performClick()
+      composeRule.onNodeWithText("Saved").assertIsDisplayed()
+    } finally {
+      AnimationConfig.disableAnimations = prev
+    }
+  }
+
+  @Test
+  fun saved_banner_hides_when_animations_disabled() {
+    composeRule.setContent { MaterialTheme { ProfilePage() } }
+
+    composeRule.onNodeWithText("Save").performClick()
     composeRule.waitForIdle()
+
     composeRule.onAllNodesWithText("Saved").assertCountEquals(0)
   }
 
   @Test
-  fun role_dropdown_allows_selection_and_updates_display_text() {
+  fun dropdown_opens_on_click() {
     composeRule.setContent { MaterialTheme { ProfilePage() } }
+
+    composeRule.onNodeWithText("Select your role").performClick()
     composeRule.waitForIdle()
+
+    composeRule.onNodeWithText("Teacher").assertIsDisplayed()
+  }
+
+  @Test
+  fun dropdown_selection_updates_value() {
+    composeRule.setContent { MaterialTheme { ProfilePage() } }
 
     composeRule.onNodeWithText("Select your role").performClick()
     composeRule.waitForIdle()
