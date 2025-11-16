@@ -215,7 +215,7 @@ class HomeViewModelTest {
         val auth = mock<FirebaseAuth>()
         // Configure auth to have no current user initially (guest mode)
         whenever(auth.currentUser).thenReturn(null)
-        
+
         val repo = mock<ConversationRepository>()
         val conversationsFlow = MutableSharedFlow<List<Conversation>>(replay = 1)
         whenever(repo.conversationsFlow()).thenReturn(conversationsFlow)

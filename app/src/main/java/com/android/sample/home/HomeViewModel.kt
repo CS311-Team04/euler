@@ -61,10 +61,8 @@ data class SourceMeta(
 class HomeViewModel(
     private val llmClient: LlmClient = FirebaseFunctionsLlmClient(),
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
-    private val repo: ConversationRepository = ConversationRepository(
-        FirebaseAuth.getInstance(),
-        FirebaseFirestore.getInstance()
-    )
+    private val repo: ConversationRepository =
+        ConversationRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance())
 ) : ViewModel() {
 
   companion object {
