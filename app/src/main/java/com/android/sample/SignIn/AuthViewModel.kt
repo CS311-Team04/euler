@@ -128,10 +128,14 @@ class AuthViewModel : ViewModel() {
     _state.value = AuthUiState.Loading(provider)
     viewModelScope.launch {
       try {
-        // Simulate async work for other providers
-        kotlinx.coroutines.delay(1200)
-        _state.value = AuthUiState.SignedIn
-        setLoggedStatus(true)
+        // Simulate async work for guest flow
+        kotlinx.coroutines.delay(600)
+        if (provider == AuthProvider.SWITCH_EDU) {
+          _state.value = AuthUiState.Guest
+        } else {
+          _state.value = AuthUiState.SignedIn
+          setLoggedStatus(true)
+        }
       } catch (t: Throwable) {
         _state.value = AuthUiState.Error(t.message ?: "Unknown error")
       }

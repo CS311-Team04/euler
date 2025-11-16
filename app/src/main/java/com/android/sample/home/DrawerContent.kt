@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -42,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.sample.R
 import com.android.sample.settings.Localization
+import java.util.Locale
 
 object DrawerTags {
   const val Root = "drawer_root"
@@ -63,6 +65,8 @@ fun DrawerContent(
     onToggleSystem: (String) -> Unit = {},
     onSignOut: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
+    onProfileDisabledClick: () -> Unit = {},
     onClose: () -> Unit = {},
     onNewChat: () -> Unit = {},
     onPickConversation: (String) -> Unit = {}
@@ -189,28 +193,48 @@ fun DrawerContent(
 
         Surface(color = Color(0x22FFFFFF), modifier = Modifier.fillMaxWidth().height(1.dp)) {}
         Spacer(Modifier.height(12.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-          Box(
-              modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0xFF2A2A2A)),
-              contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.Person, contentDescription = null, tint = Color.White)
-              }
-          Spacer(Modifier.width(12.dp))
-          Text(
-              ui.userName.lowercase(),
-              color = Color.White,
-              fontSize = 16.sp,
-              fontWeight = FontWeight.Normal)
-          Spacer(Modifier.weight(1f))
-          Icon(
-              Icons.Filled.Settings,
-              contentDescription = Localization.t("settings"),
-              tint = Color.White,
-              modifier =
-                  Modifier.size(20.dp)
-                      .clickable { onSettingsClick() }
-                      .testTag(DrawerTags.UserSettings))
-        }
+        val displayName = formatUserName(ui.userName)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().alpha(if (ui.isGuest) 0.4f else 1f)) {
+              Box(
+                  modifier =
+                      Modifier.size(36.dp)
+                          .clip(CircleShape)
+                          .background(Color(0xFF2A2A2A))
+                          .clickable {
+                            if (ui.isGuest) {
+                              onProfileDisabledClick()
+                            } else {
+                              onProfileClick()
+                            }
+                          },
+                  contentAlignment = Alignment.Center) {
+                    Icon(Icons.Filled.Person, contentDescription = null, tint = Color.White)
+                  }
+              Spacer(Modifier.width(12.dp))
+              Text(
+                  displayName,
+                  color = Color.White,
+                  fontSize = 16.sp,
+                  fontWeight = FontWeight.Normal,
+                  modifier =
+                      Modifier.weight(1f).clickable {
+                        if (ui.isGuest) {
+                          onProfileDisabledClick()
+                        } else {
+                          onProfileClick()
+                        }
+                      })
+              Icon(
+                  Icons.Filled.Settings,
+                  contentDescription = "Settings",
+                  tint = Color.White,
+                  modifier =
+                      Modifier.size(20.dp)
+                          .clickable { onSettingsClick() }
+                          .testTag(DrawerTags.UserSettings))
+            }
         Spacer(Modifier.height(12.dp))
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -218,6 +242,16 @@ fun DrawerContent(
               Text(Localization.t("powered_by"), color = Color.Gray, fontSize = 12.sp)
             }
       }
+}
+
+private fun formatUserName(raw: String): String {
+  val trimmed = raw.trim()
+  if (trimmed.isEmpty()) return "Student"
+  return trimmed.split("\\s+".toRegex()).joinToString(" ") { word ->
+    word.replaceFirstChar { ch ->
+      if (ch.isLowerCase()) ch.titlecase(Locale.getDefault()) else ch.toString()
+    }
+  }
 }
 
 @Composable

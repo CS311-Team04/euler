@@ -11,7 +11,6 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
-import com.android.sample.llm.FakeLlmClient
 import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.util.MainDispatcherRule
 import com.google.firebase.FirebaseApp
@@ -672,7 +671,7 @@ class HomeScreenComposeInteractionsTest {
     FirebaseAuth.getInstance().signOut()
   }
 
-  private fun createViewModel(): HomeViewModel = HomeViewModel(FakeLlmClient())
+  private fun createViewModel(): HomeViewModel = HomeViewModel()
 
   @After
   fun tearDownMocks() {

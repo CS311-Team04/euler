@@ -39,6 +39,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -47,12 +48,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.android.sample.ui.components.GuestProfileWarningModal
 
 @Composable
 fun SettingsPage(
     onBackClick: () -> Unit = {},
     onSignOut: () -> Unit = {},
     onProfileClick: () -> Unit = {},
+    onProfileDisabledClick: () -> Unit = {},
+    isProfileEnabled: Boolean = true,
+    showProfileWarning: Boolean = false,
+    onDismissProfileWarning: () -> Unit = {},
     onConnectorsClick: () -> Unit = {},
     onInfoClick: () -> Unit = {}
 ) {
@@ -105,6 +111,8 @@ fun SettingsPage(
                     icon = Icons.Filled.Person,
                     title = Localization.t("profile"),
                     onClick = onProfileClick,
+                    enabled = isProfileEnabled,
+                    onDisabledClick = onProfileDisabledClick,
                     backgroundColor = rowBackground,
                     textColor = textPrimary,
                     secondaryTextColor = textSecondary)
@@ -185,6 +193,11 @@ fun SettingsPage(
         fontSize = 12.sp,
         modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
         textAlign = TextAlign.Center)
+
+    if (showProfileWarning) {
+      GuestProfileWarningModal(
+          onContinueAsGuest = onDismissProfileWarning, onLogin = onProfileDisabledClick)
+    }
   }
 }
 
@@ -195,11 +208,22 @@ private fun SettingsRow(
     backgroundColor: Color,
     textColor: Color,
     secondaryTextColor: Color,
+    enabled: Boolean = true,
     trailing: (@Composable () -> Unit)? = null,
-    onClick: () -> Unit = {}
+    onClick: () -> Unit = {},
+    onDisabledClick: (() -> Unit)? = null
 ) {
   Surface(
-      modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onClick() },
+      modifier =
+          Modifier.fillMaxWidth()
+              .clip(RoundedCornerShape(12.dp))
+              .alpha(if (enabled) 1f else 0.4f)
+              .then(
+                  when {
+                    enabled -> Modifier.clickable { onClick() }
+                    onDisabledClick != null -> Modifier.clickable { onDisabledClick() }
+                    else -> Modifier
+                  }),
       color = backgroundColor) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),

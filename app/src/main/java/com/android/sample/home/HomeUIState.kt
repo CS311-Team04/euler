@@ -8,6 +8,8 @@ import com.android.sample.Chat.ChatUIModel
  */
 data class HomeUiState(
     val userName: String = "Student",
+    val isGuest: Boolean = false,
+    val profile: com.android.sample.profile.UserProfile? = null,
     val systems: List<SystemItem> = emptyList(),
     val messages: List<ChatUIModel> = emptyList(),
     val messageDraft: String = "",
@@ -17,6 +19,7 @@ data class HomeUiState(
     val isTopRightOpen: Boolean = false,
     val isLoading: Boolean = false,
     val showDeleteConfirmation: Boolean = false,
+    val showGuestProfileWarning: Boolean = false,
     val isSending: Boolean = false,
     val conversations: List<com.android.sample.conversations.Conversation> = emptyList(),
     val currentConversationId: String? = null
