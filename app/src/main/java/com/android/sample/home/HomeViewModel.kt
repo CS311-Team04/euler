@@ -8,13 +8,13 @@ import androidx.lifecycle.viewModelScope
 import com.android.sample.BuildConfig
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
-import com.android.sample.profile.UserProfile
-import com.android.sample.profile.UserProfileRepository
 import com.android.sample.conversations.AuthNotReadyException
 import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.MessageDTO
 import com.android.sample.llm.FirebaseFunctionsLlmClient
 import com.android.sample.llm.LlmClient
+import com.android.sample.profile.UserProfile
+import com.android.sample.profile.UserProfileRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
@@ -61,12 +61,12 @@ class HomeViewModel(
     private val profileRepository: com.android.sample.profile.ProfileDataSource =
         UserProfileRepository()
 ) : ViewModel() {
-    private val llmClient: LlmClient = FirebaseFunctionsLlmClient(),
-) : ViewModel() {
-
   companion object {
     private const val TAG = "HomeViewModel"
+    private const val DEFAULT_USER_NAME = "Student"
   }
+
+  private val llmClient: LlmClient = FirebaseFunctionsLlmClient()
 
   private val auth: FirebaseAuth = FirebaseAuth.getInstance()
   private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
@@ -89,6 +89,7 @@ class HomeViewModel(
                       SystemItem(id = "drive", name = "EPFL Drive", isConnected = true),
                   ),
               messages = emptyList()))
+
   /** Public, read-only UI state. */
   val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
@@ -389,7 +390,7 @@ class HomeViewModel(
             type = ChatType.AI,
             isThinking = true)
 
-    // UI optimiste : on ajoute user + placeholder, on vide l’input, on marque l’état de streaming
+    // UI optimiste : on ajoute user + placeholder, on vide l'input, on marque l'état de streaming
     _uiState.update { st ->
       st.copy(
           messages = st.messages + userMsg + placeholder,
@@ -407,7 +408,7 @@ class HomeViewModel(
           return@launch
         }
 
-        // CONNECTÉ : s’assurer d’avoir une conversation et persister le message USER tout de suite
+        // CONNECTÉ : s'assurer d'avoir une conversation et persister le message USER tout de suite
         val cid =
             _uiState.value.currentConversationId
                 ?: run {
@@ -437,7 +438,7 @@ class HomeViewModel(
         // démarrer le streaming; à la fin on persiste le message AI
         startStreaming(question = msg, messageId = aiMessageId, conversationId = cid)
       } catch (_: AuthNotReadyException) {
-        // rien : l’auth se (re)stabilisera
+        // rien : l'auth se (re)stabilisera
         setStreamingError(aiMessageId, AuthNotReadyException())
         clearStreamingState(aiMessageId)
       } catch (t: Throwable) {
@@ -667,9 +668,6 @@ class HomeViewModel(
       (t?.takeIf { it.isNotBlank() } ?: localTitleFrom(question)).also {
         Log.d(TAG, "fetchTitle(): generated='$it'")
       }
-
-  companion object {
-    private const val DEFAULT_USER_NAME = "Student"
     } catch (_: Exception) {
       Log.d(TAG, "fetchTitle(): fallback to local extraction")
       localTitleFrom(question)
