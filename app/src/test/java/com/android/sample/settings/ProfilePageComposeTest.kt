@@ -26,6 +26,7 @@ class ProfilePageComposeTest {
     var savedProfile: UserProfile? = null
 
     composeRule.setContent { MaterialTheme { ProfilePage(onSaveProfile = { savedProfile = it }) } }
+    composeRule.waitForIdle()
 
     composeRule.onAllNodesWithText("Saved").assertCountEquals(0)
 
@@ -43,9 +44,12 @@ class ProfilePageComposeTest {
   @Test
   fun role_dropdown_allows_selection_and_updates_display_text() {
     composeRule.setContent { MaterialTheme { ProfilePage() } }
+    composeRule.waitForIdle()
 
     composeRule.onNodeWithText("Select your role").performClick()
+    composeRule.waitForIdle()
     composeRule.onNodeWithText("Teacher").performClick()
+    composeRule.waitForIdle()
 
     composeRule.onNodeWithText("Teacher", useUnmergedTree = true).assertIsDisplayed()
   }

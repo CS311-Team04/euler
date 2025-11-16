@@ -586,15 +586,6 @@ class HomeScreenTestCov {
       }
     }
 
-    @Test
-    fun screen_openDrawerOnStart_parameter_works() {
-      val viewModel = createHomeViewModel()
-      composeRule.setContent {
-        MaterialTheme { HomeScreen(viewModel = viewModel, openDrawerOnStart = true) }
-      }
-      composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
-    }
-
     // ========== Tests for ChatMessage Component ==========
     composeRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed().performClick()
     composeRule.waitForIdle()
@@ -605,6 +596,15 @@ class HomeScreenTestCov {
         viewModel.uiState.value.messages.any {
           it.type == ChatType.USER && it.text == "What is EPFL"
         })
+  }
+
+  @Test
+  fun screen_openDrawerOnStart_parameter_works() {
+    val viewModel = createHomeViewModel()
+    composeRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = viewModel, openDrawerOnStart = true) }
+    }
+    composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
   }
 
   @Test
