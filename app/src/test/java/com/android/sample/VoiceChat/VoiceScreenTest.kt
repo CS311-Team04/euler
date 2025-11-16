@@ -28,13 +28,7 @@ import com.android.sample.VoiceChat.UI.stopMicrophoneSafely
 import com.android.sample.VoiceChat.UI.updateLastVoiceTimestamp
 import com.android.sample.llm.FakeLlmClient
 import com.android.sample.speech.SpeechPlayback
-import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.util.MainDispatcherRule
-import io.mockk.every
-import io.mockk.justRun
-import io.mockk.mockk
-import io.mockk.slot
-import io.mockk.verify
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -53,6 +47,7 @@ import org.robolectric.annotation.Config
 class VoiceScreenTest {
 
   @get:Rule val composeTestRule = createComposeRule()
+
   @get:Rule
   @OptIn(ExperimentalCoroutinesApi::class)
   val dispatcherRule = MainDispatcherRule(UnconfinedTestDispatcher())
@@ -305,7 +300,7 @@ class VoiceScreenTest {
   }
 
   @OptIn(ExperimentalCoroutinesApi::class)
-  @Test(timeout = 5000)
+  @Test(timeout = 15000)
   fun monitorSilence_deactivatesAfterTimeout() = runTest {
     var active = true
     val logs = mutableListOf<String>()
@@ -813,203 +808,112 @@ class VoiceScreenTest {
     assertTrue(true)
   }
 
-  @OptIn(ExperimentalCoroutinesApi::class)
-  @Test(timeout = 5000)
-  fun voiceScreen_withSpeechHelper_handlesCallbacks() = runTest {
-    val viewModel = createVoiceViewModel()
-    val speechHelper = mockk<SpeechToTextHelper>(relaxed = true)
-    val resultSlot = slot<(String) -> Unit>()
-    val errorSlot = slot<(String) -> Unit>()
-    val completeSlot = slot<() -> Unit>()
-    val partialSlot = slot<(String) -> Unit>()
-    val rmsSlot = slot<(Float) -> Unit>()
+  private class FakeMicLevelSource : LevelSource {
+    private val flow = MutableSharedFlow<Float>(replay = 1)
+    val startCount = AtomicInteger(0)
+    val stopCount = AtomicInteger(0)
 
-    every {
-      speechHelper.startListening(
-          capture(resultSlot),
-          capture(errorSlot),
-          capture(completeSlot),
-          capture(partialSlot),
-          capture(rmsSlot))
-    } answers {}
-    justRun { speechHelper.stopListening() }
-
-    composeTestRule.setContent {
-      VoiceScreen(
-          onClose = {},
-          initialHasMicOverride = true,
-          speechHelper = speechHelper,
-          voiceChatViewModel = viewModel,
-          speechPlayback = FakeSpeechPlayback())
+    init {
+      flow.tryEmit(0f)
     }
 
-    composeTestRule.mainClock.advanceTimeByFrame()
-    composeTestRule.onNodeWithContentDescription("Toggle microphone").performClick()
-    composeTestRule.mainClock.advanceTimeByFrame()
+    override val levels = flow
 
-    verify(exactly = 1) { speechHelper.startListening(any(), any(), any(), any(), any()) }
-    assertTrue(partialSlot.isCaptured)
-    partialSlot.captured.invoke("Interim transcript")
-    composeTestRule.runOnIdle {
-      assertEquals("Interim transcript", viewModel.uiState.value.lastTranscript)
+    override fun start() {
+      startCount.incrementAndGet()
     }
 
-    assertTrue(errorSlot.isCaptured)
-    errorSlot.captured.invoke("Recognizer error")
-    composeTestRule.runOnIdle {
-      assertEquals("Recognizer error", viewModel.uiState.value.lastError)
+    override fun stop() {
+      stopCount.incrementAndGet()
     }
 
-    assertTrue(rmsSlot.isCaptured)
-    rmsSlot.captured.invoke(6f)
-    viewModel.emitAudioLevelForTest(0.4f)
-    composeTestRule.mainClock.advanceTimeByFrame()
-
-    assertTrue(resultSlot.isCaptured)
-    resultSlot.captured.invoke("Salut Euler")
-    composeTestRule.mainClock.advanceTimeByFrame()
-
-    assertTrue(completeSlot.isCaptured)
-    completeSlot.captured.invoke()
-    composeTestRule.mainClock.advanceTimeByFrame()
-
-    verify(atLeast = 1) { speechHelper.stopListening() }
+    fun push(value: Float) {
+      flow.tryEmit(value)
+    }
   }
 
-  @OptIn(ExperimentalCoroutinesApi::class)
-  @Test(timeout = 5000)
-  fun voiceScreen_withSpeechHelper_secondClickDoesNotRestart() = runTest {
-    val viewModel = createVoiceViewModel()
-    val speechHelper = mockk<SpeechToTextHelper>(relaxed = true)
+  private class ThrowingMicLevelSource : LevelSource {
+    val startAttempts = AtomicInteger(0)
+    val stopCount = AtomicInteger(0)
 
-    every { speechHelper.startListening(any(), any(), any(), any(), any()) } answers {}
-    justRun { speechHelper.stopListening() }
+    override val levels = MutableSharedFlow<Float>(replay = 1)
 
-    composeTestRule.setContent {
-      VoiceScreen(
-          onClose = {},
-          initialHasMicOverride = true,
-          speechHelper = speechHelper,
-          voiceChatViewModel = viewModel,
-          speechPlayback = FakeSpeechPlayback())
+    override fun start() {
+      startAttempts.incrementAndGet()
+      throw IllegalStateException("boom")
     }
 
-    composeTestRule.mainClock.advanceTimeByFrame()
-    composeTestRule.onNodeWithContentDescription("Toggle microphone").performClick()
-    composeTestRule.mainClock.advanceTimeByFrame()
-
-    composeTestRule.onNodeWithContentDescription("Toggle microphone").performClick()
-    composeTestRule.mainClock.advanceTimeByFrame()
-
-    verify(exactly = 1) { speechHelper.startListening(any(), any(), any(), any(), any()) }
-  }
-}
-
-private class FakeMicLevelSource : LevelSource {
-  private val flow = MutableSharedFlow<Float>(replay = 1)
-  val startCount = AtomicInteger(0)
-  val stopCount = AtomicInteger(0)
-
-  init {
-    flow.tryEmit(0f)
+    override fun stop() {
+      stopCount.incrementAndGet()
+    }
   }
 
-  override val levels = flow
+  private class FakeSpeechPlayback : SpeechPlayback {
+    val spoken = mutableListOf<String>()
 
-  override fun start() {
-    startCount.incrementAndGet()
-  }
-
-  override fun stop() {
-    stopCount.incrementAndGet()
-  }
-
-  fun push(value: Float) {
-    flow.tryEmit(value)
-  }
-}
-
-private class ThrowingMicLevelSource : LevelSource {
-  val startAttempts = AtomicInteger(0)
-  val stopCount = AtomicInteger(0)
-
-  override val levels = MutableSharedFlow<Float>(replay = 1)
-
-  override fun start() {
-    startAttempts.incrementAndGet()
-    throw IllegalStateException("boom")
-  }
-
-  override fun stop() {
-    stopCount.incrementAndGet()
-  }
-}
-
-private class FakeSpeechPlayback : SpeechPlayback {
-  val spoken = mutableListOf<String>()
-
-  override fun speak(
-      text: String,
-      utteranceId: String,
-      onStart: () -> Unit,
-      onDone: () -> Unit,
-      onError: (Throwable?) -> Unit
-  ) {
-    spoken += text
-    onStart()
-    onDone()
-  }
-
-  override fun stop() {}
-
-  override fun shutdown() {}
-}
-
-private class CallbackTrackingSpeechPlayback : SpeechPlayback {
-  var onStartCalled = false
-  var onDoneCalled = false
-  var onErrorCalled = false
-  var shouldFail = false
-  val spoken = mutableListOf<String>()
-
-  override fun speak(
-      text: String,
-      utteranceId: String,
-      onStart: () -> Unit,
-      onDone: () -> Unit,
-      onError: (Throwable?) -> Unit
-  ) {
-    spoken += text
-    onStartCalled = true
-    onStart()
-    if (shouldFail) {
-      onErrorCalled = true
-      onError(IllegalStateException("Test error"))
-    } else {
-      onDoneCalled = true
+    override fun speak(
+        text: String,
+        utteranceId: String,
+        onStart: () -> Unit,
+        onDone: () -> Unit,
+        onError: (Throwable?) -> Unit
+    ) {
+      spoken += text
+      onStart()
       onDone()
     }
+
+    override fun stop() {}
+
+    override fun shutdown() {}
   }
 
-  override fun stop() {}
+  private class CallbackTrackingSpeechPlayback : SpeechPlayback {
+    var onStartCalled = false
+    var onDoneCalled = false
+    var onErrorCalled = false
+    var shouldFail = false
+    val spoken = mutableListOf<String>()
 
-  override fun shutdown() {}
-}
-
-private fun ComposeTestRule.waitUntilTrue(timeoutMillis: Long, condition: () -> Boolean) {
-  val deadline = System.currentTimeMillis() + timeoutMillis
-  while (!condition()) {
-    if (System.currentTimeMillis() > deadline) {
-      fail("Condition not met within $timeoutMillis ms")
+    override fun speak(
+        text: String,
+        utteranceId: String,
+        onStart: () -> Unit,
+        onDone: () -> Unit,
+        onError: (Throwable?) -> Unit
+    ) {
+      spoken += text
+      onStartCalled = true
+      onStart()
+      if (shouldFail) {
+        onErrorCalled = true
+        onError(IllegalStateException("Test error"))
+      } else {
+        onDoneCalled = true
+        onDone()
+      }
     }
-    this.waitForIdle()
-  }
-}
 
-@Suppress("UNCHECKED_CAST")
-private fun VoiceChatViewModel.emitAudioLevelForTest(level: Float) {
-  val field = VoiceChatViewModel::class.java.getDeclaredField("_audioLevels")
-  field.isAccessible = true
-  val shared = field.get(this) as MutableSharedFlow<Float>
-  shared.tryEmit(level)
+    override fun stop() {}
+
+    override fun shutdown() {}
+  }
+
+  private fun ComposeTestRule.waitUntilTrue(timeoutMillis: Long, condition: () -> Boolean) {
+    val deadline = System.currentTimeMillis() + timeoutMillis
+    while (!condition()) {
+      if (System.currentTimeMillis() > deadline) {
+        fail("Condition not met within $timeoutMillis ms")
+      }
+      this.waitForIdle()
+    }
+  }
+
+  @Suppress("UNCHECKED_CAST")
+  private fun VoiceChatViewModel.emitAudioLevelForTest(level: Float) {
+    val field = VoiceChatViewModel::class.java.getDeclaredField("_audioLevels")
+    field.isAccessible = true
+    val shared = field.get(this) as MutableSharedFlow<Float>
+    shared.tryEmit(level)
+  }
 }

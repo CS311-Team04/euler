@@ -7,6 +7,7 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
+data class BotReply(val reply: String, val url: String?)
 /**
  * Abstraction over the Large Language Model backend.
  *
@@ -16,7 +17,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * - return natural-language strings ready for display or speech.
  */
 interface LlmClient {
-  suspend fun generateReply(prompt: String): String
+  suspend fun generateReply(prompt: String): BotReply
 }
 
 /**
@@ -45,7 +46,7 @@ class FirebaseFunctionsLlmClient(
    * When the function fails (timeout, malformed response, empty reply) the optional fallback is
    * invoked before ultimately throwing an [IllegalStateException].
    */
-  override suspend fun generateReply(prompt: String): String =
+  override suspend fun generateReply(prompt: String): BotReply =
       withContext(Dispatchers.IO) {
         val data = hashMapOf("question" to prompt)
         val result =
@@ -64,9 +65,13 @@ class FirebaseFunctionsLlmClient(
                 ?: return@withContext fallback?.generateReply(prompt)
                     ?: throw IllegalStateException("Invalid LLM response payload")
 
-        (map["reply"] as? String)?.takeIf { it.isNotBlank() }
-            ?: return@withContext fallback?.generateReply(prompt)
-                ?: throw IllegalStateException("Empty LLM reply")
+        val replyText =
+            (map["reply"] as? String)?.takeIf { it.isNotBlank() }
+                ?: return@withContext fallback?.generateReply(prompt)
+                    ?: throw IllegalStateException("Empty LLM reply")
+
+        val url = (map["primary_url"] as? String)
+        BotReply(replyText, url)
       }
 
   companion object {
@@ -78,7 +83,7 @@ class FirebaseFunctionsLlmClient(
      * requested via build config flags.
      */
     private fun defaultFunctions(): FirebaseFunctions =
-        FirebaseFunctions.getInstance("us-central1").apply {
+        FirebaseFunctions.getInstance(BuildConfig.FUNCTIONS_REGION).apply {
           if (BuildConfig.USE_FUNCTIONS_EMULATOR) {
             useEmulator(BuildConfig.FUNCTIONS_HOST, BuildConfig.FUNCTIONS_PORT)
           }

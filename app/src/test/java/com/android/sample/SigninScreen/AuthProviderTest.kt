@@ -72,17 +72,21 @@ class AuthProviderTest {
 
   @Test
   fun AuthProvider_hashCode_consistency() {
-    val hash1 = AuthProvider.MICROSOFT.hashCode()
-    val hash2 = AuthProvider.MICROSOFT.hashCode()
-    assertEquals(hash1, hash2)
+    assertEquals(AuthProvider.MICROSOFT.hashCode(), AuthProvider.MICROSOFT.hashCode())
   }
 
   @Test
   fun AuthProvider_hashCode_different_for_different_values() {
-    val hash1 = AuthProvider.MICROSOFT.hashCode()
-    val hash2 = AuthProvider.SWITCH_EDU.hashCode()
-    // Note: Enum hashCodes might be equal, so we check they are different enum values
-    assertNotEquals(AuthProvider.MICROSOFT, AuthProvider.SWITCH_EDU)
+    val sameEnumObject = AuthProvider.MICROSOFT
+    val differentEnumObject = AuthProvider.SWITCH_EDU
+    assertNotEquals(
+        "Enum instances representing different values should not be equal",
+        sameEnumObject,
+        differentEnumObject)
+    assertNotEquals(
+        "Hash codes for different enum values should typically differ",
+        sameEnumObject.hashCode(),
+        differentEnumObject.hashCode())
   }
 
   @Test

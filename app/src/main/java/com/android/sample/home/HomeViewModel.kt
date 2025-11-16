@@ -1,5 +1,6 @@
 package com.android.sample.home
 
+import android.net.Uri
 import android.util.Log
 import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
@@ -33,6 +34,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
+data class SourceMeta(
+    val siteLabel: String, // e.g. "EPFL.ch Website"
+    val title: String, // e.g. "Projet de Semestre – Bachelor"
+    val url: String,
+    val retrievedAt: Long = System.currentTimeMillis()
+)
 /**
  * HomeViewModel
  *
@@ -80,8 +87,12 @@ class HomeViewModel(
   /** Public, read-only UI state. */
   val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+  /**
+   * Firebase Functions handle for the chat backend. Uses local emulator when configured via
+   * BuildConfig flags.
+   */
   private val functions: FirebaseFunctions by lazy {
-    FirebaseFunctions.getInstance("us-central1").apply {
+    FirebaseFunctions.getInstance(BuildConfig.FUNCTIONS_REGION).apply {
       if (BuildConfig.USE_FUNCTIONS_EMULATOR) {
         useEmulator(BuildConfig.FUNCTIONS_HOST, BuildConfig.FUNCTIONS_PORT)
       }
@@ -249,10 +260,12 @@ class HomeViewModel(
     _uiState.update { it.copy(isDrawerOpen = !it.isDrawerOpen) }
   }
 
+  /** Control the top-right overflow menu visibility. */
   fun setTopRightOpen(open: Boolean) {
     _uiState.update { it.copy(isTopRightOpen = open) }
   }
 
+  /** Update the current message draft (bound to the input field). */
   fun updateMessageDraft(text: String) {
     _uiState.update { it.copy(messageDraft = text) }
   }
@@ -363,12 +376,32 @@ class HomeViewModel(
         viewModelScope.launch {
           try {
             val reply = withContext(Dispatchers.IO) { llmClient.generateReply(question) }
-            simulateStreamingFromText(messageId, reply)
-
+            simulateStreamingFromText(messageId, reply.reply)
+            reply.url?.let { url ->
+              val meta =
+                  SourceMeta(
+                      siteLabel = buildSiteLabel(url),
+                      title = /* if you return primary_title from backend, use it here */
+                          buildFallbackTitle(url),
+                      url = url)
+              _uiState.update { s ->
+                s.copy(
+                    messages =
+                        s.messages +
+                            ChatUIModel(
+                                id = UUID.randomUUID().toString(),
+                                text = "", // card has no body text
+                                timestamp = System.currentTimeMillis(),
+                                type = ChatType.AI,
+                                source = meta // <—— drives the card UI
+                                ),
+                    streamingSequence = s.streamingSequence + 1)
+              }
+            }
             // si connecté → persister le message AI une fois le texte complet connu
             if (conversationId != null) {
               try {
-                repo.appendMessage(conversationId, "assistant", reply)
+                repo.appendMessage(conversationId, "assistant", reply.reply)
               } catch (e: Exception) {
                 // on a déjà montré la réponse côté UI; on loggue seulement
                 Log.w(TAG, "Failed to persist assistant message: ${e.message}")
@@ -384,6 +417,21 @@ class HomeViewModel(
             userCancelledStream = false
           }
         }
+  }
+
+  private fun buildSiteLabel(url: String): String {
+    val host = runCatching { Uri.parse(url).host ?: "" }.getOrNull().orEmpty()
+    val clean = host.removePrefix("www.")
+    return if (clean.endsWith("epfl.ch")) "EPFL.ch Website" else "$clean Website"
+  }
+
+  private fun buildFallbackTitle(url: String): String {
+    // Simple fallback: last non-empty path segment or the domain
+    val uri = runCatching { Uri.parse(url) }.getOrNull()
+    val seg = uri?.pathSegments?.lastOrNull { it.isNotBlank() } ?: ""
+    return if (seg.isNotBlank())
+        seg.replace('-', ' ').replace('_', ' ').replaceFirstChar { it.uppercase() }
+    else (uri?.host?.removePrefix("www.") ?: url)
   }
 
   @VisibleForTesting(otherwise = VisibleForTesting.NONE)

@@ -41,6 +41,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.sample.R
+import com.android.sample.settings.Localization
 
 object DrawerTags {
   const val Root = "drawer_root"
@@ -77,7 +78,7 @@ fun DrawerContent(
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
           Image(
               painter = painterResource(id = R.drawable.euler_logo),
-              contentDescription = "Euler Logo",
+              contentDescription = Localization.t("euler_logo"),
               modifier = Modifier.height(30.dp).offset(x = 1.dp, y = 5.dp),
               contentScale = ContentScale.Fit)
         }
@@ -97,11 +98,14 @@ fun DrawerContent(
                 Box(
                     modifier = Modifier.size(28.dp).clip(CircleShape).background(Color(0xFFE53935)),
                     contentAlignment = Alignment.Center) {
-                      Icon(Icons.Filled.Add, contentDescription = "New chat", tint = Color.White)
+                      Icon(
+                          Icons.Filled.Add,
+                          contentDescription = Localization.t("new_chat"),
+                          tint = Color.White)
                     }
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    "New chat",
+                    Localization.t("new_chat"),
                     color = Color(0xFFFF6E6E),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Normal)
@@ -120,10 +124,13 @@ fun DrawerContent(
                     .padding(vertical = 12.dp)
                     .testTag(DrawerTags.ConnectorsRow)) {
               Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Link, contentDescription = "Connectors", tint = Color(0xFFB0B0B0))
+                Icon(
+                    Icons.Filled.Link,
+                    contentDescription = Localization.t("connectors"),
+                    tint = Color(0xFFB0B0B0))
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    "Connectors",
+                    Localization.t("connectors"),
                     color = Color.White,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Normal)
@@ -137,7 +144,7 @@ fun DrawerContent(
 
         Spacer(modifier = Modifier.height(24.dp))
         Text(
-            "RECENTS",
+            Localization.t("recents"),
             color = Color(0xFF8A8A8A),
             fontSize = 12.sp,
             modifier = Modifier.testTag(DrawerTags.RecentsSection))
@@ -197,7 +204,7 @@ fun DrawerContent(
           Spacer(Modifier.weight(1f))
           Icon(
               Icons.Filled.Settings,
-              contentDescription = "Settings",
+              contentDescription = Localization.t("settings"),
               tint = Color.White,
               modifier =
                   Modifier.size(20.dp)
@@ -208,7 +215,7 @@ fun DrawerContent(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth()) {
-              Text("Powered by Apertus", color = Color.Gray, fontSize = 12.sp)
+              Text(Localization.t("powered_by"), color = Color.Gray, fontSize = 12.sp)
             }
       }
 }
