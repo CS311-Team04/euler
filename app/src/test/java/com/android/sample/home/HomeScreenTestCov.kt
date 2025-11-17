@@ -302,22 +302,16 @@ class HomeScreenTestCov {
   @Test
   fun screen_action_buttons_trigger_callbacks() {
     var action1Clicked = false
-    var action2Clicked = false
     val viewModel = HomeViewModel(FakeProfileRepository())
     composeRule.setContent {
       MaterialTheme {
-        HomeScreen(
-            viewModel = viewModel,
-            onAction1Click = { action1Clicked = true },
-            onAction2Click = { action2Clicked = true })
+        HomeScreen(viewModel = viewModel, onAction1Click = { action1Clicked = true })
       }
     }
+    composeRule.waitForIdle()
     composeRule.onNodeWithTag(HomeTags.Action1Btn).performClick()
     composeRule.waitForIdle()
     assertTrue(action1Clicked)
-    composeRule.onNodeWithTag(HomeTags.Action2Btn).performClick()
-    composeRule.waitForIdle()
-    assertTrue(action2Clicked)
   }
 
   @Test
@@ -821,8 +815,11 @@ class HomeScreenTestCov {
   fun screen_all_suggestion_texts_are_displayed() {
     val viewModel = createHomeViewModel()
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
-    composeRule.onNodeWithTag(HomeTags.SendBtn).assertIsDisplayed()
-    composeRule.onAllNodesWithTag(HomeTags.VoiceBtn).assertCountEquals(0)
+    composeRule.waitForIdle()
+    composeRule.onNodeWithText("What is EPFL").assertIsDisplayed()
+    composeRule.onNodeWithText("Check Ed Discussion").assertIsDisplayed()
+    composeRule.onNodeWithText("Show my schedule").assertIsDisplayed()
+    composeRule.onNodeWithText("Find library resources").assertIsDisplayed()
   }
 
   @Test

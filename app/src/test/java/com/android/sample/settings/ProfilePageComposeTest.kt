@@ -41,6 +41,7 @@ class ProfilePageComposeTest {
   fun save_button_triggers_callback() {
     var saved: UserProfile? = null
     composeRule.setContent { MaterialTheme { ProfilePage(onSaveProfile = { saved = it }) } }
+    composeRule.waitForIdle()
 
     composeRule.onNodeWithText("Save").performClick()
     composeRule.waitForIdle()
@@ -65,6 +66,7 @@ class ProfilePageComposeTest {
   @Test
   fun saved_banner_hides_when_animations_disabled() {
     composeRule.setContent { MaterialTheme { ProfilePage() } }
+    composeRule.waitForIdle()
 
     composeRule.onNodeWithText("Save").performClick()
     composeRule.waitForIdle()
@@ -75,6 +77,7 @@ class ProfilePageComposeTest {
   @Test
   fun dropdown_opens_on_click() {
     composeRule.setContent { MaterialTheme { ProfilePage() } }
+    composeRule.waitForIdle()
 
     composeRule.onNodeWithText("Select your role").performClick()
     composeRule.waitForIdle()
@@ -85,6 +88,7 @@ class ProfilePageComposeTest {
   @Test
   fun dropdown_selection_updates_value() {
     composeRule.setContent { MaterialTheme { ProfilePage() } }
+    composeRule.waitForIdle()
 
     composeRule.onNodeWithText("Select your role").performClick()
     composeRule.waitForIdle()

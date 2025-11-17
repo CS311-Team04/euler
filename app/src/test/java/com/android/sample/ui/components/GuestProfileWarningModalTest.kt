@@ -40,6 +40,7 @@ class GuestProfileWarningModalTest {
   @Test
   fun modal_shows_expected_texts() {
     composeRule.setContent { GuestProfileWarningModal(onContinueAsGuest = {}, onLogin = {}) }
+    composeRule.waitForIdle()
 
     composeRule.onNodeWithText("Profile unavailable").assertIsDisplayed()
     composeRule
@@ -53,6 +54,7 @@ class GuestProfileWarningModalTest {
     composeRule.setContent {
       GuestProfileWarningModal(onContinueAsGuest = { continueCount += 1 }, onLogin = {})
     }
+    composeRule.waitForIdle()
 
     composeRule.onNodeWithText("Continue as guest").performClick()
     composeRule.waitForIdle()
@@ -66,6 +68,7 @@ class GuestProfileWarningModalTest {
     composeRule.setContent {
       GuestProfileWarningModal(onContinueAsGuest = {}, onLogin = { loginCount += 1 })
     }
+    composeRule.waitForIdle()
 
     composeRule.onNodeWithText("Log in now").performClick()
     composeRule.waitForIdle()
@@ -83,6 +86,7 @@ class GuestProfileWarningModalTest {
     composeRule.waitForIdle()
 
     composeRule.onRoot().performTouchInput { click(Offset(5f, 5f)) }
+    composeRule.waitForIdle()
 
     composeRule.runOnIdle { assertEquals(1, continueCount) }
   }
