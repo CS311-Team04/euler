@@ -210,16 +210,54 @@ class HomeViewModel(
                 if (cid == null) flowOf(emptyList()) else repo.messagesFlow(cid)
               }
               .collect { msgs ->
-                // IMPORTANT: si on est en train de streamer (placeholder + chunks),
-                // on NE REMPLACE PAS la liste par Firestore, sinon on perd le streaming visuel.
                 val streamingId = _uiState.value.streamingMessageId
                 if (streamingId != null) {
-                  // On ignore cette emission Firestore pendant le streaming
+
                   return@collect
                 }
 
-                // Pas de streaming en cours → on peut refléter Firestore tel quel
-                _uiState.update { st -> st.copy(messages = msgs.map { it.toUi() }) }
+                _uiState.update { currentState ->
+                  val firestoreMessages = msgs.map { it.toUi() }
+
+                  val existingSourceCards =
+                      currentState.messages.filter { it.source != null && it.text.isBlank() }
+
+                  val finalMessages = mutableListOf<ChatUIModel>()
+
+                  finalMessages.addAll(firestoreMessages)
+
+                  existingSourceCards.forEach { sourceCard ->
+                    val originalIndex =
+                        currentState.messages.indexOfFirst { it.id == sourceCard.id }
+                    if (originalIndex > 0) {
+
+                      val precedingAssistant = currentState.messages[originalIndex - 1]
+                      if (precedingAssistant.type == ChatType.AI &&
+                          precedingAssistant.text.isNotBlank()) {
+
+                        val firestoreIndex =
+                            finalMessages.indexOfFirst {
+                              it.type == ChatType.AI && it.text == precedingAssistant.text
+                            }
+                        if (firestoreIndex >= 0) {
+
+                          finalMessages.add(firestoreIndex + 1, sourceCard)
+                        } else {
+
+                          finalMessages.add(sourceCard)
+                        }
+                      } else {
+
+                        finalMessages.add(sourceCard)
+                      }
+                    } else {
+
+                      finalMessages.add(sourceCard)
+                    }
+                  }
+
+                  currentState.copy(messages = finalMessages)
+                }
               }
         }
   }
