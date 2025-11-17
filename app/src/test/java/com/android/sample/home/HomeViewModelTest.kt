@@ -443,6 +443,286 @@ class HomeViewModelTest {
         assertEquals("example.com", title)
       }
 
+  // ============ Tests for handleSendMessageError (via sendMessage with auth) ============
+
+  @Test
+  fun sendMessage_authenticated_withRepositoryFirebaseException_formatsError() =
+      runTest(testDispatcher) {
+        // Mock authenticated user
+        val auth =
+            mock<FirebaseAuth> {
+              val user = mock<FirebaseUser>()
+              on { currentUser } doReturn user
+            }
+
+        val repo = mock<ConversationRepository>()
+
+        // Mock exception with code and details during repository operation
+        val mockException =
+            mock<com.google.firebase.functions.FirebaseFunctionsException> {
+              on { message } doReturn "Test error"
+              on { code } doReturn
+                  com.google.firebase.functions.FirebaseFunctionsException.Code.PERMISSION_DENIED
+              on { details } doReturn "Access denied"
+            }
+
+        runBlocking {
+          whenever(repo.startNewConversation(any())).thenAnswer { throw mockException }
+        }
+
+        val fakeClient = FakeLlmClient()
+        val viewModel = HomeViewModel(fakeClient, auth, repo)
+
+        viewModel.updateMessageDraft("Test message")
+        viewModel.sendMessage()
+        advanceUntilIdle()
+        viewModel.awaitStreamingCompletion()
+
+        val messages = viewModel.uiState.value.messages
+        val aiMessage = messages.firstOrNull { it.type == ChatType.AI }
+
+        assertNotNull(aiMessage)
+        assertTrue(aiMessage!!.text.contains("Error"))
+        assertTrue(aiMessage.text.contains("[PERMISSION_DENIED]"))
+        assertTrue(aiMessage.text.contains("Access denied"))
+        assertFalse(aiMessage.isThinking)
+        assertFalse(viewModel.uiState.value.isSending)
+        assertNull(viewModel.uiState.value.streamingMessageId)
+      }
+
+  @Test
+  fun sendMessage_authenticated_withRepositoryException_withDetails_formatsError() =
+      runTest(testDispatcher) {
+        val auth =
+            mock<FirebaseAuth> {
+              val user = mock<FirebaseUser>()
+              on { currentUser } doReturn user
+            }
+
+        val repo = mock<ConversationRepository>()
+
+        // Mock exception with details
+        val mockException =
+            mock<com.google.firebase.functions.FirebaseFunctionsException> {
+              on { message } doReturn "Test error"
+              on { code } doReturn
+                  com.google.firebase.functions.FirebaseFunctionsException.Code.INTERNAL
+              on { details } doReturn "Custom error details"
+            }
+
+        runBlocking {
+          whenever(repo.startNewConversation(any())).thenAnswer { throw mockException }
+        }
+
+        val fakeClient = FakeLlmClient()
+        val viewModel = HomeViewModel(fakeClient, auth, repo)
+
+        viewModel.updateMessageDraft("Test message")
+        viewModel.sendMessage()
+        advanceUntilIdle()
+        viewModel.awaitStreamingCompletion()
+
+        val messages = viewModel.uiState.value.messages
+        val aiMessage = messages.firstOrNull { it.type == ChatType.AI }
+
+        assertNotNull(aiMessage)
+        assertTrue(aiMessage!!.text.contains("Error"))
+        assertTrue(aiMessage.text.contains("Custom error details"))
+        assertFalse(aiMessage.isThinking)
+      }
+
+  @Test
+  fun sendMessage_authenticated_withRepositoryException_withNoDetails_usesMessage() =
+      runTest(testDispatcher) {
+        val auth =
+            mock<FirebaseAuth> {
+              val user = mock<FirebaseUser>()
+              on { currentUser } doReturn user
+            }
+
+        val repo = mock<ConversationRepository>()
+
+        // Mock exception without details (null details)
+        val mockException =
+            mock<com.google.firebase.functions.FirebaseFunctionsException> {
+              on { message } doReturn "Original error message"
+              on { code } doReturn
+                  com.google.firebase.functions.FirebaseFunctionsException.Code.UNAVAILABLE
+              on { details } doReturn null
+            }
+
+        runBlocking {
+          whenever(repo.appendMessage(any(), any(), any())).thenAnswer { throw mockException }
+          whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+        }
+
+        val fakeClient = FakeLlmClient()
+        val viewModel = HomeViewModel(fakeClient, auth, repo)
+
+        viewModel.updateMessageDraft("Test message")
+        viewModel.sendMessage()
+        advanceUntilIdle()
+        viewModel.awaitStreamingCompletion()
+
+        val messages = viewModel.uiState.value.messages
+        val aiMessage = messages.firstOrNull { it.type == ChatType.AI }
+
+        assertNotNull(aiMessage)
+        assertTrue(aiMessage!!.text.contains("Error"))
+        assertTrue(aiMessage.text.contains("[UNAVAILABLE]"))
+        assertTrue(aiMessage.text.contains("Original error message"))
+      }
+
+  @Test
+  fun sendMessage_authenticated_withRegularException_usesExceptionMessage() =
+      runTest(testDispatcher) {
+        val auth =
+            mock<FirebaseAuth> {
+              val user = mock<FirebaseUser>()
+              on { currentUser } doReturn user
+            }
+
+        val repo = mock<ConversationRepository>()
+
+        runBlocking {
+          whenever(repo.startNewConversation(any())).thenAnswer {
+            throw IllegalStateException("Something went wrong")
+          }
+        }
+
+        val fakeClient = FakeLlmClient()
+        val viewModel = HomeViewModel(fakeClient, auth, repo)
+
+        viewModel.updateMessageDraft("Test message")
+        viewModel.sendMessage()
+        advanceUntilIdle()
+        viewModel.awaitStreamingCompletion()
+
+        val messages = viewModel.uiState.value.messages
+        val aiMessage = messages.firstOrNull { it.type == ChatType.AI }
+
+        assertNotNull(aiMessage)
+        assertTrue(aiMessage!!.text.contains("Error"))
+        assertTrue(aiMessage.text.contains("Something went wrong"))
+        assertFalse(aiMessage.text.contains("[")) // No code should be present
+      }
+
+  @Test
+  fun sendMessage_authenticated_withExceptionWithoutMessage_usesFallback() =
+      runTest(testDispatcher) {
+        val auth =
+            mock<FirebaseAuth> {
+              val user = mock<FirebaseUser>()
+              on { currentUser } doReturn user
+            }
+
+        val repo = mock<ConversationRepository>()
+
+        // Exception with null message
+        runBlocking {
+          whenever(repo.startNewConversation(any())).thenAnswer {
+            throw RuntimeException(null as String?)
+          }
+        }
+
+        val fakeClient = FakeLlmClient()
+        val viewModel = HomeViewModel(fakeClient, auth, repo)
+
+        viewModel.updateMessageDraft("Test message")
+        viewModel.sendMessage()
+        advanceUntilIdle()
+        viewModel.awaitStreamingCompletion()
+
+        val messages = viewModel.uiState.value.messages
+        val aiMessage = messages.firstOrNull { it.type == ChatType.AI }
+
+        assertNotNull(aiMessage)
+        assertTrue(aiMessage!!.text.contains("Error"))
+        assertTrue(aiMessage.text.contains("request failed"))
+      }
+
+  @Test
+  fun sendMessage_authenticated_errorUpdatesCorrectMessage() =
+      runTest(testDispatcher) {
+        val auth =
+            mock<FirebaseAuth> {
+              val user = mock<FirebaseUser>()
+              on { currentUser } doReturn user
+            }
+
+        val repo = mock<ConversationRepository>()
+
+        // First message succeeds
+        runBlocking {
+          whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+          whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+        }
+
+        val fakeClient = FakeLlmClient().apply { nextReply = "First response" }
+        val viewModel = HomeViewModel(fakeClient, auth, repo)
+
+        viewModel.updateMessageDraft("First message")
+        viewModel.sendMessage()
+        advanceUntilIdle()
+        viewModel.awaitStreamingCompletion()
+
+        // Second message fails
+        runBlocking {
+          whenever(repo.appendMessage(any(), any(), any())).thenAnswer {
+            throw RuntimeException("Test error")
+          }
+        }
+
+        viewModel.updateMessageDraft("Second message")
+        viewModel.sendMessage()
+        advanceUntilIdle()
+        viewModel.awaitStreamingCompletion()
+
+        val messages = viewModel.uiState.value.messages
+
+        // First AI message should be unchanged
+        val firstAiMessage = messages.firstOrNull { it.text.contains("First response") }
+        assertNotNull(firstAiMessage)
+        assertFalse(firstAiMessage!!.isThinking)
+
+        // Second AI message should have error
+        val errorMessage = messages.lastOrNull { it.type == ChatType.AI }
+        assertNotNull(errorMessage)
+        assertTrue(errorMessage!!.text.contains("Error"))
+        assertTrue(errorMessage.text.contains("Test error"))
+        assertFalse(errorMessage.isThinking)
+      }
+
+  @Test
+  fun sendMessage_authenticated_errorClearsStreamingState() =
+      runTest(testDispatcher) {
+        val auth =
+            mock<FirebaseAuth> {
+              val user = mock<FirebaseUser>()
+              on { currentUser } doReturn user
+            }
+
+        val repo = mock<ConversationRepository>()
+
+        runBlocking {
+          whenever(repo.startNewConversation(any())).thenAnswer {
+            throw RuntimeException("Outer error")
+          }
+        }
+
+        val fakeClient = FakeLlmClient()
+        val viewModel = HomeViewModel(fakeClient, auth, repo)
+
+        viewModel.updateMessageDraft("Test message")
+        viewModel.sendMessage()
+        advanceUntilIdle()
+        viewModel.awaitStreamingCompletion()
+
+        // Verify that streaming state is cleared
+        assertFalse(viewModel.uiState.value.isSending)
+        assertNull(viewModel.uiState.value.streamingMessageId)
+      }
+
   private fun HomeViewModel.setPrivateField(name: String, value: Any?) {
     val field = HomeViewModel::class.java.getDeclaredField(name)
     field.isAccessible = true
