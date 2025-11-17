@@ -275,9 +275,11 @@ class HomeViewModel(
     messagesJob = null
     dataStarted = false
     isInLocalNewChat = false
-    // reset UI
+    // reset UI but preserve systems list
     Log.d(TAG, "onSignedOutInternal(): reset UI state to defaults")
-    _uiState.value = HomeUiState() // vide messages, currentConversationId=null, etc.
+    val currentSystems = _uiState.value.systems
+    _uiState.value =
+        HomeUiState(systems = currentSystems) // preserve systems, reset everything else
   }
 
   /**
