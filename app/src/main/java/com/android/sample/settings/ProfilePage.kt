@@ -69,8 +69,11 @@ fun ProfilePage(
   val accent = Color(0xFFEB5757)
 
   val authEmail = remember {
-    TestFlags.fakeEmail
-        ?: runCatching { FirebaseAuth.getInstance().currentUser?.email.orEmpty() }.getOrDefault("")
+    if (TestFlags.fakeEmail != null) {
+      TestFlags.fakeEmail ?: ""
+    } else {
+      runCatching { FirebaseAuth.getInstance().currentUser?.email.orEmpty() }.getOrDefault("")
+    }
   }
 
   val formManager = remember { ProfileFormManager(authEmail, initialProfile) }
