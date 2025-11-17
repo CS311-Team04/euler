@@ -25,8 +25,16 @@ class ProfilePageComposeTest {
 
   @get:Rule val composeRule = createComposeRule()
 
+  companion object {
+    init {
+      // Ensure TestFlags is set before any test runs to prevent Firebase initialization
+      TestFlags.fakeEmail = ""
+    }
+  }
+
   @Before
   fun setup() {
+    // Set flags BEFORE any composition happens to prevent Firebase initialization
     AnimationConfig.disableAnimations = true
     TestFlags.fakeEmail = ""
   }
@@ -51,15 +59,19 @@ class ProfilePageComposeTest {
 
   @Test
   fun saved_banner_shows() {
-    val prev = AnimationConfig.disableAnimations
+    val prevAnimations = AnimationConfig.disableAnimations
+    val prevFakeEmail = TestFlags.fakeEmail
     try {
+      // Keep TestFlags.fakeEmail set to prevent Firebase initialization
+      TestFlags.fakeEmail = ""
       AnimationConfig.disableAnimations = false
       composeRule.setContent { MaterialTheme { ProfilePage() } }
 
       composeRule.onNodeWithText("Save").performClick()
       composeRule.onNodeWithText("Saved").assertIsDisplayed()
     } finally {
-      AnimationConfig.disableAnimations = prev
+      AnimationConfig.disableAnimations = prevAnimations
+      TestFlags.fakeEmail = prevFakeEmail
     }
   }
 
