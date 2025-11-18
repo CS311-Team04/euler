@@ -25,7 +25,12 @@ import java.util.concurrent.TimeUnit
 import kotlin.jvm.functions.Function0
 import kotlin.jvm.functions.Function1
 import kotlin.use
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
@@ -403,16 +408,19 @@ private fun anyFunction0(): Function0<Unit> = Mockito.any(Function0::class.java)
 private fun anyFunction1(): Function1<Exception, Unit> =
     Mockito.any(Function1::class.java) as Function1<Exception, Unit>
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [31])
 class NavGraphComposeTest {
 
   @get:Rule val composeRule = createComposeRule()
+  private val testDispatcher = UnconfinedTestDispatcher()
 
   private lateinit var activity: ComponentActivity
 
   @Before
   fun setup() {
+    Dispatchers.setMain(testDispatcher)
     val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     if (FirebaseApp.getApps(context).isEmpty()) {
       FirebaseApp.initializeApp(
@@ -425,6 +433,11 @@ class NavGraphComposeTest {
     }
     FirebaseAuth.getInstance().signOut()
     activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
+  }
+
+  @org.junit.After
+  fun tearDown() {
+    Dispatchers.resetMain()
   }
 
   @Test
