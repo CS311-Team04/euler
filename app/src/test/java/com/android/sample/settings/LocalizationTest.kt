@@ -1,27 +1,27 @@
-//package com.android.sample.settings
+// package com.android.sample.settings
 //
-//import android.content.Context
-//import androidx.test.core.app.ApplicationProvider
-//import kotlinx.coroutines.Dispatchers
-//import kotlinx.coroutines.ExperimentalCoroutinesApi
-//import kotlinx.coroutines.test.StandardTestDispatcher
-//import kotlinx.coroutines.test.advanceUntilIdle
-//import kotlinx.coroutines.test.resetMain
-//import kotlinx.coroutines.test.runTest
-//import kotlinx.coroutines.test.setMain
-//import org.junit.After
-//import org.junit.Assert.*
-//import org.junit.Before
-//import org.junit.Ignore
-//import org.junit.Test
-//import org.junit.runner.RunWith
-//import org.robolectric.RobolectricTestRunner
-//import org.robolectric.annotation.Config
+// import android.content.Context
+// import androidx.test.core.app.ApplicationProvider
+// import kotlinx.coroutines.Dispatchers
+// import kotlinx.coroutines.ExperimentalCoroutinesApi
+// import kotlinx.coroutines.test.StandardTestDispatcher
+// import kotlinx.coroutines.test.advanceUntilIdle
+// import kotlinx.coroutines.test.resetMain
+// import kotlinx.coroutines.test.runTest
+// import kotlinx.coroutines.test.setMain
+// import org.junit.After
+// import org.junit.Assert.*
+// import org.junit.Before
+// import org.junit.Ignore
+// import org.junit.Test
+// import org.junit.runner.RunWith
+// import org.robolectric.RobolectricTestRunner
+// import org.robolectric.annotation.Config
 //
-//@OptIn(ExperimentalCoroutinesApi::class)
-//@RunWith(RobolectricTestRunner::class)
-//@Config(sdk = [28])
-//class LocalizationTest {
+// @OptIn(ExperimentalCoroutinesApi::class)
+// @RunWith(RobolectricTestRunner::class)
+// @Config(sdk = [28])
+// class LocalizationTest {
 //
 //  private lateinit var context: Context
 //  private val testDispatcher = StandardTestDispatcher()
@@ -309,7 +309,8 @@
 //  fun recent_items_translated() {
 //    val recentKeys =
 //        listOf(
-//            "recent_cs220_exam", "recent_linear_algebra", "recent_deadline", "recent_registration")
+//            "recent_cs220_exam", "recent_linear_algebra", "recent_deadline",
+// "recent_registration")
 //
 //    Language.entries.forEach { language ->
 //      AppSettings.setLanguage(language)
@@ -417,4 +418,4 @@
 //    // Should have 7 unique translations (one per language)
 //    assertEquals(7, translations.size)
 //  }
-//}
+// }

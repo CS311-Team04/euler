@@ -1,27 +1,27 @@
-//package com.android.sample.settings
+// package com.android.sample.settings
 //
-//import android.content.Context
-//import androidx.test.core.app.ApplicationProvider
-//import kotlinx.coroutines.Dispatchers
-//import kotlinx.coroutines.ExperimentalCoroutinesApi
-//import kotlinx.coroutines.test.StandardTestDispatcher
-//import kotlinx.coroutines.test.advanceUntilIdle
-//import kotlinx.coroutines.test.resetMain
-//import kotlinx.coroutines.test.runTest
-//import kotlinx.coroutines.test.setMain
-//import org.junit.After
-//import org.junit.Assert.*
-//import org.junit.Before
-//import org.junit.Ignore
-//import org.junit.Test
-//import org.junit.runner.RunWith
-//import org.robolectric.RobolectricTestRunner
-//import org.robolectric.annotation.Config
+// import android.content.Context
+// import androidx.test.core.app.ApplicationProvider
+// import kotlinx.coroutines.Dispatchers
+// import kotlinx.coroutines.ExperimentalCoroutinesApi
+// import kotlinx.coroutines.test.StandardTestDispatcher
+// import kotlinx.coroutines.test.advanceUntilIdle
+// import kotlinx.coroutines.test.resetMain
+// import kotlinx.coroutines.test.runTest
+// import kotlinx.coroutines.test.setMain
+// import org.junit.After
+// import org.junit.Assert.*
+// import org.junit.Before
+// import org.junit.Ignore
+// import org.junit.Test
+// import org.junit.runner.RunWith
+// import org.robolectric.RobolectricTestRunner
+// import org.robolectric.annotation.Config
 //
-//@OptIn(ExperimentalCoroutinesApi::class)
-//@RunWith(RobolectricTestRunner::class)
-//@Config(sdk = [28])
-//class AppSettingsTest {
+// @OptIn(ExperimentalCoroutinesApi::class)
+// @RunWith(RobolectricTestRunner::class)
+// @Config(sdk = [28])
+// class AppSettingsTest {
 //
 //  private lateinit var context: Context
 //  private val testDispatcher = StandardTestDispatcher()
@@ -436,4 +436,4 @@
 //    assertNotNull(getter)
 //    assertEquals("getLanguage", getter.name)
 //  }
-//}
+// }
