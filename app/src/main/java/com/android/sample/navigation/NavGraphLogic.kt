@@ -23,7 +23,8 @@ fun shouldTriggerMicrosoftAuth(authState: AuthUiState): Boolean {
  * @return true if should navigate to Home
  */
 fun shouldNavigateToHomeFromSignIn(authState: AuthUiState, currentDestination: String?): Boolean {
-  return authState is AuthUiState.SignedIn && currentDestination == Routes.SignIn
+  return currentDestination == Routes.SignIn &&
+      (authState is AuthUiState.SignedIn || authState is AuthUiState.Guest)
 }
 
 /**

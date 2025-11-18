@@ -5,7 +5,6 @@ import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -51,6 +50,7 @@ import com.android.sample.R
 import com.android.sample.speech.SpeechPlayback
 import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.settings.Localization
+import com.android.sample.ui.components.GuestProfileWarningModal
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -92,6 +92,7 @@ fun HomeScreen(
     onSendMessage: (String) -> Unit = {},
     onSignOut: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
     onVoiceChatClick: () -> Unit = {},
     openDrawerOnStart: Boolean = false,
     speechHelper: SpeechToTextHelper? = null,
@@ -150,6 +151,20 @@ fun HomeScreen(
               scope.launch { drawerState.close() }
               if (ui.isDrawerOpen) viewModel.toggleDrawer()
               onSettingsClick()
+            },
+            onProfileClick = {
+              scope.launch { drawerState.close() }
+              if (ui.isDrawerOpen) viewModel.toggleDrawer()
+              if (ui.isGuest) {
+                viewModel.showGuestProfileWarning()
+              } else {
+                onProfileClick()
+              }
+            },
+            onProfileDisabledClick = {
+              scope.launch { drawerState.close() }
+              if (ui.isDrawerOpen) viewModel.toggleDrawer()
+              viewModel.showGuestProfileWarning()
             },
             onClose = {
               scope.launch { drawerState.close() }
@@ -326,36 +341,37 @@ fun HomeScreen(
 
                             val canSend = ui.messageDraft.isNotBlank() && !ui.isSending
 
-                            // Voice mode button (equalizer icon) - shown when there's no text
-                            AnimatedVisibility(
-                                visible = !canSend,
-                                enter = fadeIn() + scaleIn(),
-                                exit = fadeOut() + scaleOut()) {
-                                  IconButton(
-                                      onClick = { onVoiceChatClick() },
-                                      modifier = Modifier.testTag(HomeTags.VoiceBtn)) {
-                                        Icon(
-                                            Icons.Default.GraphicEq,
-                                            contentDescription = Localization.t("voice_mode"),
-                                            tint = Color.Gray)
-                                      }
+                            Box(
+                                modifier = Modifier.size(36.dp),
+                                contentAlignment = Alignment.Center) {
+                                  Crossfade(targetState = canSend, label = "voice-button") {
+                                      readyToSend ->
+                                    if (!readyToSend) {
+                                      IconButton(
+                                          onClick = onVoiceChatClick,
+                                          modifier =
+                                              Modifier.fillMaxSize().testTag(HomeTags.VoiceBtn)) {
+                                            Icon(
+                                                Icons.Default.GraphicEq,
+                                                contentDescription = "Voice mode",
+                                                tint = Color.Gray,
+                                                modifier = Modifier.size(18.dp))
+                                          }
+                                    } else {
+                                      Spacer(modifier = Modifier.size(18.dp))
+                                    }
+                                  }
                                 }
 
-                            // Send button - shown only when there's text
-                            AnimatedVisibility(
-                                visible = canSend,
-                                enter = fadeIn() + scaleIn(),
-                                exit = fadeOut() + scaleOut()) {
-                                  BubbleSendButton(
-                                      enabled = canSend,
-                                      isSending = ui.isSending,
-                                      onClick = {
-                                        if (canSend) {
-                                          onSendMessage(ui.messageDraft)
-                                          viewModel.sendMessage()
-                                        }
-                                      })
-                                }
+                            BubbleSendButton(
+                                enabled = canSend,
+                                isSending = ui.isSending,
+                                onClick = {
+                                  if (canSend) {
+                                    onSendMessage(ui.messageDraft)
+                                    viewModel.sendMessage()
+                                  }
+                                })
                           }
                         },
                         shape = RoundedCornerShape(50),
@@ -466,6 +482,19 @@ fun HomeScreen(
         DeleteConfirmationModal(
             onConfirm = { viewModel.deleteCurrentConversation() },
             onCancel = { viewModel.hideDeleteConfirmation() })
+      }
+
+  AnimatedVisibility(
+      visible = ui.showGuestProfileWarning,
+      enter = fadeIn(tween(200)),
+      exit = fadeOut(tween(200)),
+      modifier = Modifier.fillMaxSize()) {
+        GuestProfileWarningModal(
+            onContinueAsGuest = { viewModel.hideGuestProfileWarning() },
+            onLogin = {
+              viewModel.hideGuestProfileWarning()
+              onSignOut()
+            })
       }
 }
 
@@ -602,44 +631,29 @@ private fun BubbleSendButton(
     isSending: Boolean,
     onClick: () -> Unit,
 ) {
-  val targetSize =
-      when {
-        isSending -> 40.dp
-        enabled -> 42.dp
-        else -> 40.dp
-      }
-  val size by animateDpAsState(targetValue = targetSize, label = "bubble-size")
-
-  // Colors: bright red when enabled, deeper red while sending, neutral gray when disabled
-  val targetContainer =
-      when {
-        isSending -> Color(0xFFC62828) // deeper red
-        enabled -> Color(0xFFE53935) // bright red
-        else -> Color(0xFF3C3C3C) // gray
-      }
-  val container by animateColorAsState(targetValue = targetContainer, label = "bubble-color")
-
-  val borderColor =
-      when {
-        enabled || isSending -> Color(0x33FFFFFF) // subtle white ring for separation
-        else -> Color(0x22000000)
-      }
-  val elevation by
-      animateDpAsState(targetValue = if (enabled) 8.dp else 0.dp, label = "bubble-elev")
-
+  val size = 40.dp
   val interaction = remember { MutableInteractionSource() }
 
+  val containerColor by
+      animateColorAsState(
+          targetValue =
+              when {
+                isSending -> Color(0xFFC62828)
+                enabled -> Color(0xFFE53935)
+                else -> Color(0xFF3C3C3C)
+              },
+          label = "bubble-color")
+
   Surface(
-      modifier = Modifier.size(size).padding(end = 6.dp).testTag(HomeTags.SendBtn),
-      color = container,
+      modifier = Modifier.size(size).testTag(HomeTags.SendBtn),
+      color = containerColor,
       shape = CircleShape,
       tonalElevation = 0.dp,
-      shadowElevation = elevation,
+      shadowElevation = 0.dp,
   ) {
     Box(
         modifier =
             Modifier.fillMaxSize()
-                .padding(6.dp)
                 .testTag(HomeTags.SendBtn)
                 .then(
                     if (enabled && !isSending)
@@ -650,7 +664,7 @@ private fun BubbleSendButton(
         contentAlignment = Alignment.Center) {
           if (isSending) {
             CircularProgressIndicator(
-                strokeWidth = 2.dp, modifier = Modifier.size(20.dp), color = Color.White)
+                strokeWidth = 2.dp, modifier = Modifier.size(18.dp), color = Color.White)
           } else {
             val icon =
                 try {
@@ -658,12 +672,13 @@ private fun BubbleSendButton(
                 } catch (_: Throwable) {
                   androidx.compose.material.icons.Icons.Default.Send
                 }
-            Icon(
-                imageVector = icon,
-                contentDescription = Localization.t("send"),
-                tint = Color.White,
-                modifier = Modifier.size(22.dp) // larger arrow for visibility
-                )
+            Crossfade(targetState = enabled, label = "send-button-state") { canSend ->
+              Icon(
+                  imageVector = icon,
+                  tint = if (canSend) Color.White else Color.White.copy(alpha = 0.35f),
+                  contentDescription = Localization.t("send"),
+                  modifier = Modifier.size(18.dp))
+            }
           }
         }
   }
@@ -813,5 +828,6 @@ private fun SourceCard(
 @Preview(showBackground = true, backgroundColor = 0x000000)
 @Composable
 private fun HomeScreenPreview() {
-  MaterialTheme { HomeScreen() }
+  val previewViewModel = remember { HomeViewModel() }
+  MaterialTheme { HomeScreen(viewModel = previewViewModel) }
 }

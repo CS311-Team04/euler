@@ -10,6 +10,8 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -37,8 +39,8 @@ object AppSettings {
 
   // Allow dispatcher injection for testing
   private var dispatcher: CoroutineDispatcher = Dispatchers.IO
-  private val scope: CoroutineScope
-    get() = CoroutineScope(dispatcher)
+  private var scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
+  private var initializationJob: Job? = null
 
   /**
    * Initialize AppSettings with the app context. This loads saved settings from disk. Call this
@@ -46,8 +48,10 @@ object AppSettings {
    */
   fun initialize(context: Context) {
     dataStore = context.dataStore
+    // Cancel any previous initialization job
+    initializationJob?.cancel()
     // Load settings from DataStore
-    scope.launch { loadSettings() }
+    initializationJob = scope.launch { loadSettings() }
   }
 
   /** Load settings from DataStore into memory. */
@@ -69,17 +73,29 @@ object AppSettings {
 
   /**
    * Set the dispatcher to use for coroutines. This is primarily for testing purposes. Call this
-   * before initialize() in test setup.
+   * before initialize() in test setup. Cancels any pending coroutines from the old dispatcher.
    */
   internal fun setDispatcher(dispatcher: CoroutineDispatcher) {
+    // Cancel any pending jobs and old scope
+    initializationJob?.cancel()
+    scope.cancel()
     this.dispatcher = dispatcher
+    // Recreate scope with new dispatcher to ensure new coroutines use the test dispatcher
+    scope = CoroutineScope(dispatcher)
+    initializationJob = null
   }
 
   /**
    * Reset the dispatcher to the default (Dispatchers.IO). This is primarily for testing purposes to
-   * reset state after tests.
+   * reset state after tests. Cancels any pending coroutines.
    */
   internal fun resetDispatcher() {
+    // Cancel any pending jobs
+    initializationJob?.cancel()
+    scope.cancel()
     this.dispatcher = Dispatchers.IO
+    // Recreate scope with default dispatcher
+    scope = CoroutineScope(Dispatchers.IO)
+    initializationJob = null
   }
 }

@@ -18,7 +18,6 @@ import com.android.sample.TestConstants
 import com.android.sample.home.HomeScreen
 import com.android.sample.home.HomeTags
 import com.android.sample.home.HomeViewModel
-import com.android.sample.llm.FakeLlmClient
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import org.junit.Assert.assertTrue
@@ -47,9 +46,7 @@ class HomeScreenTest {
 
   private fun launchHomeScreen() {
     ensureFirebaseInitialized()
-    composeRule.setContent {
-      MaterialTheme { HomeScreen(viewModel = HomeViewModel(FakeLlmClient())) }
-    }
+    composeRule.setContent { MaterialTheme { HomeScreen(viewModel = HomeViewModel()) } }
   }
 
   @Test
@@ -59,8 +56,7 @@ class HomeScreenTest {
 
     composeRule.setContent {
       MaterialTheme {
-        HomeScreen(
-            viewModel = HomeViewModel(FakeLlmClient()), onAction1Click = { action1Clicked = true })
+        HomeScreen(viewModel = HomeViewModel(), onAction1Click = { action1Clicked = true })
       }
     }
 
@@ -77,8 +73,7 @@ class HomeScreenTest {
 
     composeRule.setContent {
       MaterialTheme {
-        HomeScreen(
-            viewModel = HomeViewModel(FakeLlmClient()), onAction2Click = { action2Clicked = true })
+        HomeScreen(viewModel = HomeViewModel(), onAction2Click = { action2Clicked = true })
       }
     }
 
