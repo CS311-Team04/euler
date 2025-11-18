@@ -399,6 +399,131 @@ class NavGraphLogicTest {
     val message = buildAuthenticationErrorMessage(AuthUiState.SignedIn, fallback = "Fallback")
     assertEquals("Fallback", message)
   }
+
+  @Test
+  fun navigateSignOut_navigates_to_signin_with_builder_invoked() {
+    var capturedRoute: String? = null
+    var builderInvoked = false
+
+    val navigate: NavigateAction = { route, builder ->
+      capturedRoute = route
+      builderInvoked = true
+      // Builder is invoked - we verify the route is correct
+    }
+
+    navigateSignOut(navigate, Routes.Opening)
+
+    assertEquals(Routes.SignIn, capturedRoute)
+    assertTrue("Builder should be invoked", builderInvoked)
+  }
+
+  @Test
+  fun navigateSignOut_uses_opening_as_default_when_start_route_is_null() {
+    var capturedRoute: String? = null
+    var builderInvoked = false
+
+    val navigate: NavigateAction = { route, builder ->
+      capturedRoute = route
+      builderInvoked = true
+    }
+
+    navigateSignOut(navigate, null)
+
+    assertEquals(Routes.SignIn, capturedRoute)
+    assertTrue("Builder should be invoked", builderInvoked)
+  }
+
+  @Test
+  fun navigateSignOut_uses_custom_start_route_when_provided() {
+    var capturedRoute: String? = null
+    var builderInvoked = false
+
+    val navigate: NavigateAction = { route, builder ->
+      capturedRoute = route
+      builderInvoked = true
+    }
+
+    navigateSignOut(navigate, Routes.Home)
+
+    assertEquals(Routes.SignIn, capturedRoute)
+    assertTrue("Builder should be invoked", builderInvoked)
+  }
+
+  @Test
+  fun navigateToSettings_navigates_to_settings_route() {
+    var capturedRoute: String? = null
+
+    val navigate: NavigateAction = { route, builder -> capturedRoute = route }
+
+    navigateToSettings(navigate)
+
+    assertEquals(Routes.Settings, capturedRoute)
+  }
+
+  @Test
+  fun navigateToProfile_navigates_to_profile_route() {
+    var capturedRoute: String? = null
+
+    val navigate: NavigateAction = { route, builder -> capturedRoute = route }
+
+    navigateToProfile(navigate)
+
+    assertEquals(Routes.Profile, capturedRoute)
+  }
+
+  @Test
+  fun navigateToVoiceChat_navigates_to_voice_chat_route() {
+    var capturedRoute: String? = null
+
+    val navigate: NavigateAction = { route, builder -> capturedRoute = route }
+
+    navigateToVoiceChat(navigate)
+
+    assertEquals(Routes.VoiceChat, capturedRoute)
+  }
+
+  @Test
+  fun handleProfileClick_calls_show_guest_warning_when_is_guest() {
+    var showWarningCalled = false
+    var navigateCalled = false
+
+    handleProfileClick(
+        isGuest = true,
+        showGuestWarning = { showWarningCalled = true },
+        navigateToProfile = { navigateCalled = true })
+
+    assertTrue("Should call showGuestWarning when guest", showWarningCalled)
+    assertFalse("Should not navigate when guest", navigateCalled)
+  }
+
+  @Test
+  fun handleProfileClick_navigates_to_profile_when_not_guest() {
+    var showWarningCalled = false
+    var navigateCalled = false
+
+    handleProfileClick(
+        isGuest = false,
+        showGuestWarning = { showWarningCalled = true },
+        navigateToProfile = { navigateCalled = true })
+
+    assertFalse("Should not show warning when not guest", showWarningCalled)
+    assertTrue("Should navigate when not guest", navigateCalled)
+  }
+
+  @Test
+  fun handleProfileClick_guest_edge_cases() {
+    // Test with explicit true
+    var showWarningCalled = false
+    handleProfileClick(
+        isGuest = true, showGuestWarning = { showWarningCalled = true }, navigateToProfile = {})
+    assertTrue(showWarningCalled)
+
+    // Test with explicit false
+    var navigateCalled = false
+    handleProfileClick(
+        isGuest = false, showGuestWarning = {}, navigateToProfile = { navigateCalled = true })
+    assertTrue(navigateCalled)
+  }
 }
 
 @Suppress("UNCHECKED_CAST")

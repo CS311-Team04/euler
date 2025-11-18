@@ -120,6 +120,44 @@ internal fun navigateSettingsBack(navigate: NavigateAction) {
   navigate(Routes.HomeWithDrawer) { popUpTo(Routes.Home) { inclusive = false } }
 }
 
+@VisibleForTesting
+internal fun navigateSignOut(navigate: NavigateAction, startDestinationRoute: String?) {
+  val startRoute = startDestinationRoute ?: Routes.Opening
+  navigate(Routes.SignIn) {
+    popUpTo(startRoute) { inclusive = true }
+    launchSingleTop = true
+    restoreState = false
+  }
+}
+
+@VisibleForTesting
+internal fun navigateToSettings(navigate: NavigateAction) {
+  navigate(Routes.Settings) {}
+}
+
+@VisibleForTesting
+internal fun navigateToProfile(navigate: NavigateAction) {
+  navigate(Routes.Profile) {}
+}
+
+@VisibleForTesting
+internal fun navigateToVoiceChat(navigate: NavigateAction) {
+  navigate(Routes.VoiceChat) {}
+}
+
+@VisibleForTesting
+internal fun handleProfileClick(
+    isGuest: Boolean,
+    showGuestWarning: () -> Unit,
+    navigateToProfile: () -> Unit
+) {
+  if (isGuest) {
+    showGuestWarning()
+  } else {
+    navigateToProfile()
+  }
+}
+
 @SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
 fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: SpeechToTextHelper) {
@@ -242,22 +280,26 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
                   authViewModel.signOut()
                   android.util.Log.d("NavGraph", "Navigating to SignIn (HomeWithDrawer)")
                   // Navigate to SignIn and clear entire back stack
-                  val startRoute = nav.graph.startDestinationRoute ?: Routes.Opening
-                  nav.navigate(Routes.SignIn) {
-                    popUpTo(startRoute) { inclusive = true }
-                    launchSingleTop = true
-                    restoreState = false
-                  }
+                  navigateSignOut(
+                      navigate = { route, builder -> nav.navigate(route) { builder(this) } },
+                      startDestinationRoute = nav.graph.startDestinationRoute)
                 },
-                onSettingsClick = { nav.navigate(Routes.Settings) },
+                onSettingsClick = {
+                  navigateToSettings { route, builder -> nav.navigate(route) { builder(this) } }
+                },
                 onProfileClick = {
-                  if (homeUiState.isGuest) {
-                    homeViewModel.showGuestProfileWarning()
-                  } else {
-                    nav.navigate(Routes.Profile)
-                  }
+                  handleProfileClick(
+                      isGuest = homeUiState.isGuest,
+                      showGuestWarning = { homeViewModel.showGuestProfileWarning() },
+                      navigateToProfile = {
+                        navigateToProfile { route, builder ->
+                          nav.navigate(route) { builder(this) }
+                        }
+                      })
                 },
-                onVoiceChatClick = { nav.navigate(Routes.VoiceChat) },
+                onVoiceChatClick = {
+                  navigateToVoiceChat { route, builder -> nav.navigate(route) { builder(this) } }
+                },
                 openDrawerOnStart = true)
           }
 
