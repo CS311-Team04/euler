@@ -2,15 +2,20 @@ package com.android.sample.screen
 
 import android.content.Context
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -18,10 +23,10 @@ import com.android.sample.TestConstants
 import com.android.sample.home.HomeScreen
 import com.android.sample.home.HomeTags
 import com.android.sample.home.HomeViewModel
-import com.android.sample.llm.FakeLlmClient
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -47,9 +52,24 @@ class HomeScreenTest {
 
   private fun launchHomeScreen() {
     ensureFirebaseInitialized()
-    composeRule.setContent {
-      MaterialTheme { HomeScreen(viewModel = HomeViewModel(FakeLlmClient())) }
+    composeRule.setContent { MaterialTheme { HomeScreen(viewModel = HomeViewModel()) } }
+  }
+
+  // Helper function to assert a node does not exist
+  private fun assertNodeDoesNotExist(text: String) {
+    try {
+      composeRule.onNodeWithText(text).assertIsDisplayed()
+      fail("Node with text '$text' should not exist")
+    } catch (e: AssertionError) {
+      // Expected - node does not exist
     }
+  }
+
+  // Helper function to wait for and click the Send button
+  private fun waitAndClickSendButton() {
+    val sendMatcher = hasContentDescription("Send")
+    composeRule.waitUntilAtLeastOneExists(sendMatcher, timeoutMillis = 5_000)
+    composeRule.onAllNodesWithContentDescription("Send")[0].performClick()
   }
 
   @Test
@@ -59,8 +79,7 @@ class HomeScreenTest {
 
     composeRule.setContent {
       MaterialTheme {
-        HomeScreen(
-            viewModel = HomeViewModel(FakeLlmClient()), onAction1Click = { action1Clicked = true })
+        HomeScreen(viewModel = HomeViewModel(), onAction1Click = { action1Clicked = true })
       }
     }
 
@@ -77,8 +96,7 @@ class HomeScreenTest {
 
     composeRule.setContent {
       MaterialTheme {
-        HomeScreen(
-            viewModel = HomeViewModel(FakeLlmClient()), onAction2Click = { action2Clicked = true })
+        HomeScreen(viewModel = HomeViewModel(), onAction2Click = { action2Clicked = true })
       }
     }
 
@@ -435,13 +453,13 @@ class HomeScreenTest {
 
     val sendMatcher = hasContentDescription("Send")
     composeRule.waitUntilAtLeastOneExists(sendMatcher, timeoutMillis = 5_000)
-    composeRule.onAllNodes(sendMatcher)[0].assertIsDisplayed()
+    composeRule.onAllNodesWithContentDescription("Send")[0].assertIsDisplayed()
 
     // Enter text to make send button appear
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test")
     composeRule.waitForIdle()
     composeRule.waitUntilAtLeastOneExists(sendMatcher, timeoutMillis = 5_000)
-    composeRule.onAllNodes(sendMatcher)[0].assertIsDisplayed()
+    composeRule.onAllNodesWithContentDescription("Send")[0].assertIsDisplayed()
   }
 
   @Test
@@ -785,7 +803,7 @@ class HomeScreenTest {
     // Enter and clear text
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("Test")
     composeRule.waitForIdle()
-    composeRule.onNodeWithTag(HomeTags.MessageField).performTextClearance()
+    composeRule.onNodeWithTag(HomeTags.MessageField).performTextReplacement("")
     composeRule.waitForIdle()
 
     // Voice mode button should reappear
@@ -822,7 +840,7 @@ class HomeScreenTest {
     composeRule.onNodeWithTag(HomeTags.SendBtn).assertIsDisplayed()
 
     // Clear text
-    composeRule.onNodeWithTag(HomeTags.MessageField).performTextClearance()
+    composeRule.onNodeWithTag(HomeTags.MessageField).performTextReplacement("")
     composeRule.waitForIdle()
 
     // Send button should disappear
@@ -849,7 +867,7 @@ class HomeScreenTest {
     composeRule.onNodeWithTag(HomeTags.MicBtn).assertIsDisplayed()
 
     // Clear text
-    composeRule.onNodeWithTag(HomeTags.MessageField).performTextClearance()
+    composeRule.onNodeWithTag(HomeTags.MessageField).performTextReplacement("")
     composeRule.waitForIdle()
 
     // Microphone should still be visible
@@ -895,7 +913,7 @@ class HomeScreenTest {
     composeRule.onNodeWithTag(HomeTags.SendBtn).assertIsDisplayed()
 
     // Clear text
-    composeRule.onNodeWithTag(HomeTags.MessageField).performTextClearance()
+    composeRule.onNodeWithTag(HomeTags.MessageField).performTextReplacement("")
     composeRule.waitForIdle()
 
     // Back to initial state
