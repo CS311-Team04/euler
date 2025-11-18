@@ -17,17 +17,14 @@ import androidx.test.core.app.ApplicationProvider
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
 import com.android.sample.conversations.Conversation
+import com.android.sample.util.MainDispatcherRule
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -49,11 +46,10 @@ private fun createHomeViewModel() = HomeViewModel(FakeProfileRepository())
 class HomeScreenTestCov {
 
   @get:Rule val composeRule = createComposeRule()
-  private val dispatcher = UnconfinedTestDispatcher()
+  @get:Rule val dispatcherRule = MainDispatcherRule()
 
   @Before
   fun setup() {
-    Dispatchers.setMain(dispatcher)
     initFirebase()
     FirebaseAuth.getInstance().signOut()
   }
@@ -61,7 +57,6 @@ class HomeScreenTestCov {
   @After
   fun tearDown() {
     FirebaseAuth.getInstance().signOut()
-    Dispatchers.resetMain()
   }
 
   // ========== HomeViewModel Tests ==========
@@ -119,7 +114,7 @@ class HomeScreenTestCov {
 
   @Test
   fun viewModel_sendMessage_adds_user_message_to_messages() =
-      runTest(dispatcher) {
+      runTest(dispatcherRule.dispatcher) {
         val viewModel = createHomeViewModel()
         val initialCount = viewModel.uiState.value.messages.size
         viewModel.updateMessageDraft("Hello, world!")
@@ -165,7 +160,7 @@ class HomeScreenTestCov {
 
   @Test
   fun viewModel_sendMessage_handles_response_and_finally_block() =
-      runTest(dispatcher) {
+      runTest(dispatcherRule.dispatcher) {
         val viewModel = createHomeViewModel()
         viewModel.updateMessageDraft("Test query")
         viewModel.sendMessage()
@@ -177,7 +172,7 @@ class HomeScreenTestCov {
 
   @Test
   fun viewModel_sendMessage_adds_ai_message_when_callAnswerWithRag_succeeds() =
-      runTest(dispatcher) {
+      runTest(dispatcherRule.dispatcher) {
         val viewModel = createHomeViewModel()
         val initialCount = viewModel.uiState.value.messages.size
 
@@ -375,7 +370,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_displays_thinking_indicator_when_sending() =
-      runTest(dispatcher) {
+      runTest(dispatcherRule.dispatcher) {
         val viewModel = createHomeViewModel()
         composeRule.setContent {
           MaterialTheme { HomeScreen(viewModel = viewModel, onSendMessage = {}) }
@@ -418,7 +413,7 @@ class HomeScreenTestCov {
 
   @Test
   fun viewModel_messages_displayed_when_sending() =
-      runTest(dispatcher) {
+      runTest(dispatcherRule.dispatcher) {
         val viewModel = createHomeViewModel()
         composeRule.setContent {
           MaterialTheme { HomeScreen(viewModel = viewModel, onSendMessage = {}) }
@@ -516,7 +511,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_thinking_indicator_appears_during_sending() =
-      runTest(dispatcher) {
+      runTest(dispatcherRule.dispatcher) {
         val viewModel = createHomeViewModel()
         composeRule.setContent {
           MaterialTheme { HomeScreen(viewModel = viewModel, onSendMessage = {}) }
@@ -541,7 +536,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_message_field_disabled_during_sending() =
-      runTest(dispatcher) {
+      runTest(dispatcherRule.dispatcher) {
         val viewModel = createHomeViewModel()
         composeRule.setContent {
           MaterialTheme { HomeScreen(viewModel = viewModel, onSendMessage = {}) }
@@ -624,7 +619,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_suggestions_hide_after_ai_response() =
-      runTest(dispatcher) {
+      runTest(dispatcherRule.dispatcher) {
         val viewModel = createHomeViewModel()
         composeRule.setContent {
           MaterialTheme { HomeScreen(viewModel = viewModel, onSendMessage = {}) }
@@ -705,7 +700,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_action1_click_calls_callbacks_and_updates_viewModel() =
-      runTest(dispatcher) {
+      runTest(dispatcherRule.dispatcher) {
         var action1Called = false
         var sendMessageCalled = false
         var sendMessageText = ""
@@ -742,7 +737,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_action2_click_calls_callbacks_and_updates_viewModel() =
-      runTest(dispatcher) {
+      runTest(dispatcherRule.dispatcher) {
         var action2Called = false
         var sendMessageCalled = false
         var sendMessageText = ""
@@ -779,7 +774,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_suggestion_click_triggers_viewModel_sendMessage() =
-      runTest(dispatcher) {
+      runTest(dispatcherRule.dispatcher) {
         val viewModel = createHomeViewModel()
         var sendMessageCalled = false
 
@@ -868,7 +863,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_suggestion_click_updates_draft_before_sending() =
-      runTest(dispatcher) {
+      runTest(dispatcherRule.dispatcher) {
         var sendMessageText = ""
         val viewModel = createHomeViewModel()
         composeRule.setContent {
@@ -980,7 +975,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_animated_visibility_hides_suggestions_after_ai_response() =
-      runTest(dispatcher) {
+      runTest(dispatcherRule.dispatcher) {
         val viewModel = createHomeViewModel()
         composeRule.setContent {
           MaterialTheme { HomeScreen(viewModel = viewModel, onSendMessage = {}) }
@@ -1017,7 +1012,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_suggestion_index_0_calls_action1_callback() =
-      runTest(dispatcher) {
+      runTest(dispatcherRule.dispatcher) {
         var action1Called = false
         var action2Called = false
 
@@ -1045,7 +1040,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_suggestion_index_1_calls_action2_callback() =
-      runTest(dispatcher) {
+      runTest(dispatcherRule.dispatcher) {
         var action1Called = false
         var action2Called = false
 
@@ -1073,7 +1068,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_suggestion_index_greater_than_1_does_not_call_action_callbacks() =
-      runTest(dispatcher) {
+      runTest(dispatcherRule.dispatcher) {
         var action1Called = false
         var action2Called = false
         var sendMessageCalled = false
@@ -1111,7 +1106,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_suggestion_click_sequence_works_correctly() =
-      runTest(dispatcher) {
+      runTest(dispatcherRule.dispatcher) {
         var action1CallCount = 0
         var action2CallCount = 0
         var sendMessageCallCount = 0
