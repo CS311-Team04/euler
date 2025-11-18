@@ -11,6 +11,9 @@ sealed interface AuthUiState {
   /** Indicates the user has successfully signed in. */
   object SignedIn : AuthUiState
 
+  /** Indicates the user chose the guest flow (no authenticated session). */
+  object Guest : AuthUiState
+
   /** Represents an error that occurred during sign-in. */
   data class Error(val message: String) : AuthUiState
 }

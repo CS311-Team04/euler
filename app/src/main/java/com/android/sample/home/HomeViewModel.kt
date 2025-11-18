@@ -13,6 +13,8 @@ import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.MessageDTO
 import com.android.sample.llm.FirebaseFunctionsLlmClient
 import com.android.sample.llm.LlmClient
+import com.android.sample.profile.UserProfile
+import com.android.sample.profile.UserProfileRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
@@ -56,12 +58,15 @@ data class SourceMeta(
  *   chat. • On sign-in → attach Firestore, still show a local empty chat until first send.
  */
 class HomeViewModel(
-    private val llmClient: LlmClient = FirebaseFunctionsLlmClient(),
+    private val profileRepository: com.android.sample.profile.ProfileDataSource =
+        UserProfileRepository()
 ) : ViewModel() {
-
   companion object {
     private const val TAG = "HomeViewModel"
+    private const val DEFAULT_USER_NAME = "Student"
   }
+
+  private val llmClient: LlmClient = FirebaseFunctionsLlmClient()
 
   private val auth: FirebaseAuth = FirebaseAuth.getInstance()
   private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
@@ -84,6 +89,7 @@ class HomeViewModel(
                       SystemItem(id = "drive", name = "EPFL Drive", isConnected = true),
                   ),
               messages = emptyList()))
+
   /** Public, read-only UI state. */
   val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
@@ -269,9 +275,11 @@ class HomeViewModel(
     messagesJob = null
     dataStarted = false
     isInLocalNewChat = false
-    // reset UI
+    // reset UI but preserve systems list
     Log.d(TAG, "onSignedOutInternal(): reset UI state to defaults")
-    _uiState.value = HomeUiState() // vide messages, currentConversationId=null, etc.
+    val currentSystems = _uiState.value.systems
+    _uiState.value =
+        HomeUiState(systems = currentSystems) // preserve systems, reset everything else
   }
 
   /**
@@ -296,6 +304,80 @@ class HomeViewModel(
 
   fun toggleDrawer() {
     _uiState.update { it.copy(isDrawerOpen = !it.isDrawerOpen) }
+  }
+
+  fun setGuestMode(isGuest: Boolean) {
+    if (isGuest) {
+      _uiState.value =
+          _uiState.value.copy(
+              isGuest = true, profile = null, userName = "guest", showGuestProfileWarning = false)
+    } else {
+      _uiState.value =
+          _uiState.value.copy(
+              isGuest = false,
+              userName = _uiState.value.userName.takeIf { it.isNotBlank() } ?: DEFAULT_USER_NAME)
+    }
+  }
+
+  fun refreshProfile() {
+    viewModelScope.launch {
+      try {
+        val profile = profileRepository.loadProfile()
+        _uiState.value =
+            if (profile != null) {
+              _uiState.value.copy(
+                  profile = profile,
+                  userName =
+                      profile.preferredName
+                          .ifBlank { profile.fullName }
+                          .ifBlank { DEFAULT_USER_NAME },
+                  isGuest = false)
+            } else {
+              _uiState.value.copy(
+                  profile = null,
+                  userName =
+                      _uiState.value.userName.takeIf { it.isNotBlank() } ?: DEFAULT_USER_NAME,
+                  isGuest = false)
+            }
+      } catch (t: Throwable) {
+        Log.e("HomeViewModel", "Failed to load profile", t)
+      }
+    }
+  }
+
+  fun saveProfile(profile: UserProfile) {
+    viewModelScope.launch {
+      try {
+        profileRepository.saveProfile(profile)
+        _uiState.value =
+            _uiState.value.copy(
+                profile = profile,
+                userName =
+                    profile.preferredName
+                        .ifBlank { profile.fullName }
+                        .ifBlank { DEFAULT_USER_NAME },
+                isGuest = false)
+      } catch (t: Throwable) {
+        Log.e("HomeViewModel", "Failed to save profile", t)
+      }
+    }
+  }
+
+  fun clearProfile() {
+    _uiState.value =
+        _uiState.value.copy(
+            profile = null,
+            userName = DEFAULT_USER_NAME,
+            isGuest = false,
+            showGuestProfileWarning = false)
+  }
+
+  fun showGuestProfileWarning() {
+    _uiState.value = _uiState.value.copy(showGuestProfileWarning = true)
+  }
+
+  fun hideGuestProfileWarning() {
+    _uiState.value = _uiState.value.copy(showGuestProfileWarning = false)
   }
 
   /** Control the top-right overflow menu visibility. */
@@ -348,7 +430,7 @@ class HomeViewModel(
             type = ChatType.AI,
             isThinking = true)
 
-    // UI optimiste : on ajoute user + placeholder, on vide l’input, on marque l’état de streaming
+    // UI optimiste : on ajoute user + placeholder, on vide l'input, on marque l'état de streaming
     _uiState.update { st ->
       st.copy(
           messages = st.messages + userMsg + placeholder,
@@ -366,7 +448,7 @@ class HomeViewModel(
           return@launch
         }
 
-        // CONNECTÉ : s’assurer d’avoir une conversation et persister le message USER tout de suite
+        // CONNECTÉ : s'assurer d'avoir une conversation et persister le message USER tout de suite
         val cid =
             _uiState.value.currentConversationId
                 ?: run {
@@ -396,7 +478,7 @@ class HomeViewModel(
         // démarrer le streaming; à la fin on persiste le message AI
         startStreaming(question = msg, messageId = aiMessageId, conversationId = cid)
       } catch (_: AuthNotReadyException) {
-        // rien : l’auth se (re)stabilisera
+        // rien : l'auth se (re)stabilisera
         setStreamingError(aiMessageId, AuthNotReadyException())
         clearStreamingState(aiMessageId)
       } catch (t: Throwable) {

@@ -10,6 +10,14 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.sample.settings.AppSettings
 import com.android.sample.settings.Language
 import com.android.sample.settings.Localization
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
@@ -23,22 +31,33 @@ import org.robolectric.annotation.Config
  * - Auto-scroll logic
  * - Empty state conditional rendering
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34])
 class HomeScreenNewFeaturesTest {
 
   @get:Rule val composeTestRule = createComposeRule()
+  private val testDispatcher = StandardTestDispatcher()
 
   private lateinit var context: Context
 
   @Before
-  fun setup() {
-    context = ApplicationProvider.getApplicationContext()
-    AppSettings.initialize(context)
-    Thread.sleep(100)
-    // Reset to English for consistent tests
-    AppSettings.setLanguage(Language.EN)
-    Thread.sleep(100)
+  fun setup() =
+      runTest(testDispatcher) {
+        Dispatchers.setMain(testDispatcher)
+        AppSettings.setDispatcher(testDispatcher)
+        context = ApplicationProvider.getApplicationContext()
+        AppSettings.initialize(context)
+        advanceUntilIdle()
+        // Reset to English for consistent tests
+        AppSettings.setLanguage(Language.EN)
+        advanceUntilIdle()
+      }
+
+  @After
+  fun tearDown() {
+    AppSettings.resetDispatcher()
+    Dispatchers.resetMain()
   }
 
   // Expected suggestions in the exact order they should appear (using localization)
