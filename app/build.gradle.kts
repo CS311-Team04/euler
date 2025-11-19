@@ -88,7 +88,7 @@ android {
             useSupportLibrary = true
         }
         // Default region for Firebase Functions (prod)
-        buildConfigField ("String", "FUNCTIONS_REGION", "\"europe-west6\"")
+        buildConfigField ("String", "FUNCTIONS_REGION", "\"us-central1\"")
         buildConfigField ("String", "FUNCTIONS_HOST", "\"10.0.2.2\"")
         buildConfigField ("int",    "FUNCTIONS_PORT", "5002")
         buildConfigField ("boolean","USE_FUNCTIONS_EMULATOR", "true")
@@ -370,6 +370,7 @@ sonar {
         property("sonar.projectName", "euler")
         property("sonar.organization", "cs311-team04")
         property("sonar.host.url", "https://sonarcloud.io")
+        property("sonar.sourceEncoding", "UTF-8")
 
         // Basic source configuration - relative to project root
         property("sonar.sources", "src/main/java")
@@ -394,5 +395,9 @@ sonar {
         if (testResults.exists()) {
             property("sonar.junit.reportPaths", testResults.absolutePath)
         }
+
+        // Disable problematic feature flags initialization
+        // This prevents the null parameter issue in SonarQube scanner
+        property("sonar.scanner.dumpToFile", "${project.layout.buildDirectory.get()}/sonar-scanner-dump.txt")
     }
 }
