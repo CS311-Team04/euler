@@ -27,4 +27,3 @@ class LocalizationAppearanceLabelTest {
     assertEquals("Sombre", Localization.appearanceLabel(AppearanceMode.DARK))
   }
 }
-

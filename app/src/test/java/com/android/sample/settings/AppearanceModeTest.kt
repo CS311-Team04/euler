@@ -18,4 +18,3 @@ class AppearanceModeTest {
     assertEquals(AppearanceMode.SYSTEM, AppearanceMode.fromPreference("unexpected"))
   }
 }
-
