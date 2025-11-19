@@ -51,9 +51,7 @@ import com.android.sample.R
 import com.android.sample.settings.Localization
 import java.util.Locale
 
-/**
- * Test tags used to find drawer elements in UI tests.
- */
+/** Test tags used to find drawer elements in UI tests. */
 object DrawerTags {
   const val Root = "drawer_root"
   const val NewChatRow = "drawer_newchat_row"
@@ -64,8 +62,8 @@ object DrawerTags {
 }
 
 /**
- * Max number of conversations shown by default in "RECENTS" mode.
- * If the user has more than this, the "View all chats" row is displayed.
+ * Max number of conversations shown by default in "RECENTS" mode. If the user has more than this,
+ * the "View all chats" row is displayed.
  */
 private const val RECENT_CONVERSATIONS_LIMIT = 4
 
@@ -82,7 +80,6 @@ fun DrawerContentPreviewable() {
  * - Primary actions: "New chat", "Connectors"
  * - Body: conversations section (RECENTS / ALL CHATS, scrollable)
  * - Footer: user/profile area and Settings
- *
  *
  * @param ui Current home UI state (user name, guest flag, conversations, drawer open/close, …).
  * @param onToggleSystem Unused for now, reserved for future system toggles.
@@ -106,17 +103,16 @@ fun DrawerContent(
     onNewChat: () -> Unit = {},
     onPickConversation: (String) -> Unit = {}
 ) {
-    // Controls RECENTS vs ALL CHATS; reset every time the drawer is reopened
-    var showAllChats by remember(ui.isDrawerOpen) { mutableStateOf(false) }
+  // Controls RECENTS vs ALL CHATS; reset every time the drawer is reopened
+  var showAllChats by remember(ui.isDrawerOpen) { mutableStateOf(false) }
 
-    Column(
-        modifier =
-            Modifier.fillMaxHeight()
-                .width(300.dp)
-                .background(Color(0xFF121212))
-                .padding(horizontal = 20.dp, vertical = 16.dp)
-                .testTag(DrawerTags.Root)) {
-
+  Column(
+      modifier =
+          Modifier.fillMaxHeight()
+              .width(300.dp)
+              .background(Color(0xFF121212))
+              .padding(horizontal = 20.dp, vertical = 16.dp)
+              .testTag(DrawerTags.Root)) {
         DrawerHeader()
 
         Spacer(modifier = Modifier.height(35.dp))
@@ -144,92 +140,87 @@ fun DrawerContent(
             onProfileDisabledClick = onProfileDisabledClick,
             onSettingsClick = onSettingsClick,
         )
-    }
+      }
 }
 
-/**
- * Top header of the drawer containing only the Euler logo.
- */
+/** Top header of the drawer containing only the Euler logo. */
 @Composable
 private fun DrawerHeader() {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Image(
-            painter = painterResource(id = R.drawable.euler_logo),
-            contentDescription = Localization.t("euler_logo"),
-            modifier = Modifier.height(30.dp).offset(x = 1.dp, y = 5.dp),
-            contentScale = ContentScale.Fit)
-    }
+  Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Image(
+        painter = painterResource(id = R.drawable.euler_logo),
+        contentDescription = Localization.t("euler_logo"),
+        modifier = Modifier.height(30.dp).offset(x = 1.dp, y = 5.dp),
+        contentScale = ContentScale.Fit)
+  }
 }
 
 /**
  * “New chat” primary action row.
  *
- * Visually appears as a red circular plus icon followed by the label.
- * Tapping the whole row invokes [onNewChat].
+ * Visually appears as a red circular plus icon followed by the label. Tapping the whole row invokes
+ * [onNewChat].
  */
 @Composable
 private fun DrawerNewChatRow(onNewChat: () -> Unit) {
-    Surface(
-        color = Color.Transparent,
-        modifier =
-            Modifier.fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .clickable { onNewChat() }
-                .padding(vertical = 12.dp)
-                .testTag(DrawerTags.NewChatRow)) {
+  Surface(
+      color = Color.Transparent,
+      modifier =
+          Modifier.fillMaxWidth()
+              .clip(RoundedCornerShape(12.dp))
+              .clickable { onNewChat() }
+              .padding(vertical = 12.dp)
+              .testTag(DrawerTags.NewChatRow)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.size(28.dp).clip(CircleShape).background(Color(0xFFE53935)),
-                contentAlignment = Alignment.Center) {
+          Box(
+              modifier = Modifier.size(28.dp).clip(CircleShape).background(Color(0xFFE53935)),
+              contentAlignment = Alignment.Center) {
                 Icon(
                     Icons.Filled.Add,
                     contentDescription = Localization.t("new_chat"),
                     tint = Color.White)
-            }
-            Spacer(Modifier.width(12.dp))
-            Text(
-                Localization.t("new_chat"),
-                color = Color(0xFFFF6E6E),
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Normal)
+              }
+          Spacer(Modifier.width(12.dp))
+          Text(
+              Localization.t("new_chat"),
+              color = Color(0xFFFF6E6E),
+              fontSize = 16.sp,
+              fontWeight = FontWeight.Normal)
         }
-    }
+      }
 }
 
 /**
  * “Connectors” row, currently wired to the Settings screen.
  *
- * Tapping the row invokes [onSettingsClick]. A dedicated tag is exposed so
- * tests can distinguish this entry from the bottom Settings icon.
+ * Tapping the row invokes [onSettingsClick]. A dedicated tag is exposed so tests can distinguish
+ * this entry from the bottom Settings icon.
  */
 @Composable
 private fun DrawerConnectorsRow(onSettingsClick: () -> Unit) {
-    Surface(
-        color = Color.Transparent,
-        modifier =
-            Modifier.fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .clickable { onSettingsClick() }
-                .padding(vertical = 12.dp)
-                .testTag(DrawerTags.ConnectorsRow)) {
+  Surface(
+      color = Color.Transparent,
+      modifier =
+          Modifier.fillMaxWidth()
+              .clip(RoundedCornerShape(12.dp))
+              .clickable { onSettingsClick() }
+              .padding(vertical = 12.dp)
+              .testTag(DrawerTags.ConnectorsRow)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Icons.Filled.Link,
-                contentDescription = Localization.t("connectors"),
-                tint = Color(0xFFB0B0B0))
-            Spacer(Modifier.width(12.dp))
-            Text(
-                Localization.t("connectors"),
-                color = Color.White,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Normal)
-            Spacer(Modifier.weight(1f))
-            Icon(
-                Icons.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = Color(0xFFB0B0B0))
+          Icon(
+              Icons.Filled.Link,
+              contentDescription = Localization.t("connectors"),
+              tint = Color(0xFFB0B0B0))
+          Spacer(Modifier.width(12.dp))
+          Text(
+              Localization.t("connectors"),
+              color = Color.White,
+              fontSize = 16.sp,
+              fontWeight = FontWeight.Normal)
+          Spacer(Modifier.weight(1f))
+          Icon(Icons.Filled.KeyboardArrowRight, contentDescription = null, tint = Color(0xFFB0B0B0))
         }
-    }
+      }
 }
 
 /**
@@ -238,9 +229,8 @@ private fun DrawerConnectorsRow(onSettingsClick: () -> Unit) {
  * Behavior:
  * - When there are no conversations, shows a “RECENTS” label and an empty state message.
  * - Otherwise, shows either:
- *   - the last [RECENT_CONVERSATIONS_LIMIT] conversations (RECENTS mode), or
- *   - the full list (ALL CHATS mode) after “View all chats” is tapped.
- *
+ *     - the last [RECENT_CONVERSATIONS_LIMIT] conversations (RECENTS mode), or
+ *     - the full list (ALL CHATS mode) after “View all chats” is tapped.
  *
  * @param ui Current [HomeUiState] providing the conversations list.
  * @param showAllChats Whether ALL CHATS mode is currently active.
@@ -256,75 +246,74 @@ private fun DrawerConversationsSection(
     onPickConversation: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val scrollState = rememberScrollState()
+  val scrollState = rememberScrollState()
 
-    Column(modifier = modifier.verticalScroll(scrollState)) {
-        if (ui.conversations.isEmpty()) {
-            Text(
-                text = "RECENTS",
-                color = Color(0xFF8A8A8A),
-                fontSize = 12.sp,
-                modifier = Modifier.testTag(DrawerTags.RecentsSection))
-            Spacer(modifier = Modifier.height(14.dp))
-            Text("No conversations yet", color = Color.Gray, fontSize = 13.sp)
-        } else {
-            val hasMoreThanLimit = ui.conversations.size > RECENT_CONVERSATIONS_LIMIT
-            val isShowingAll = !hasMoreThanLimit || showAllChats
-            val sectionTitle = if (isShowingAll) "ALL CHATS" else "RECENTS"
+  Column(modifier = modifier.verticalScroll(scrollState)) {
+    if (ui.conversations.isEmpty()) {
+      Text(
+          text = "RECENTS",
+          color = Color(0xFF8A8A8A),
+          fontSize = 12.sp,
+          modifier = Modifier.testTag(DrawerTags.RecentsSection))
+      Spacer(modifier = Modifier.height(14.dp))
+      Text("No conversations yet", color = Color.Gray, fontSize = 13.sp)
+    } else {
+      val hasMoreThanLimit = ui.conversations.size > RECENT_CONVERSATIONS_LIMIT
+      val isShowingAll = !hasMoreThanLimit || showAllChats
+      val sectionTitle = if (isShowingAll) "ALL CHATS" else "RECENTS"
 
-            Text(
-                text = sectionTitle,
-                color = Color(0xFF8A8A8A),
-                fontSize = 12.sp,
-                modifier = Modifier.testTag(DrawerTags.RecentsSection))
-            Spacer(modifier = Modifier.height(14.dp))
+      Text(
+          text = sectionTitle,
+          color = Color(0xFF8A8A8A),
+          fontSize = 12.sp,
+          modifier = Modifier.testTag(DrawerTags.RecentsSection))
+      Spacer(modifier = Modifier.height(14.dp))
 
-            val displayedConversations =
-                if (isShowingAll) {
-                    ui.conversations
-                } else {
-                    ui.conversations.take(RECENT_CONVERSATIONS_LIMIT)
-                }
+      val displayedConversations =
+          if (isShowingAll) {
+            ui.conversations
+          } else {
+            ui.conversations.take(RECENT_CONVERSATIONS_LIMIT)
+          }
 
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                displayedConversations.forEach { conv ->
-                    RecentRow(
-                        title = conv.title.ifBlank { "Untitled" },
-                        selected = conv.id == ui.currentConversationId,
-                        onClick = { onPickConversation(conv.id) })
-                }
-
-                if (hasMoreThanLimit && !showAllChats) {
-                    Surface(
-                        color = Color.Transparent,
-                        modifier =
-                            Modifier.fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { onShowAllChats() }
-                                .padding(vertical = 4.dp)
-                                .testTag(DrawerTags.ViewAllRow)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "View all chats",
-                                color = Color.White,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Normal)
-                            Spacer(Modifier.weight(1f))
-                            Icon(
-                                Icons.Filled.KeyboardArrowRight,
-                                contentDescription = null,
-                                tint = Color(0xFFB0B0B0))
-                        }
-                    }
-                }
-            }
+      Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        displayedConversations.forEach { conv ->
+          RecentRow(
+              title = conv.title.ifBlank { "Untitled" },
+              selected = conv.id == ui.currentConversationId,
+              onClick = { onPickConversation(conv.id) })
         }
+
+        if (hasMoreThanLimit && !showAllChats) {
+          Surface(
+              color = Color.Transparent,
+              modifier =
+                  Modifier.fillMaxWidth()
+                      .clip(RoundedCornerShape(8.dp))
+                      .clickable { onShowAllChats() }
+                      .padding(vertical = 4.dp)
+                      .testTag(DrawerTags.ViewAllRow)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                  Text(
+                      "View all chats",
+                      color = Color.White,
+                      fontSize = 16.sp,
+                      fontWeight = FontWeight.Normal)
+                  Spacer(Modifier.weight(1f))
+                  Icon(
+                      Icons.Filled.KeyboardArrowRight,
+                      contentDescription = null,
+                      tint = Color(0xFFB0B0B0))
+                }
+              }
+        }
+      }
     }
+  }
 }
 
 /**
  * Drawer footer showing the current user and a Settings entry.
- *
  * - The Settings icon always calls [onSettingsClick].
  */
 @Composable
@@ -335,30 +324,29 @@ private fun DrawerFooter(
     onProfileDisabledClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
-    Surface(color = Color(0x22FFFFFF), modifier = Modifier.fillMaxWidth().height(1.dp)) {}
-    Spacer(Modifier.height(12.dp))
+  Surface(color = Color(0x22FFFFFF), modifier = Modifier.fillMaxWidth().height(1.dp)) {}
+  Spacer(Modifier.height(12.dp))
 
-    val alpha = if (isGuest) 0.4f else 1f
-    val onProfile = {
-        if (isGuest) {
-            onProfileDisabledClick()
-        } else {
-            onProfileClick()
-        }
+  val alpha = if (isGuest) 0.4f else 1f
+  val onProfile = {
+    if (isGuest) {
+      onProfileDisabledClick()
+    } else {
+      onProfileClick()
     }
+  }
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().alpha(alpha)) {
+  Row(
+      verticalAlignment = Alignment.CenterVertically,
+      modifier = Modifier.fillMaxWidth().alpha(alpha)) {
         Box(
             modifier =
-                Modifier.size(36.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF2A2A2A))
-                    .clickable { onProfile() },
+                Modifier.size(36.dp).clip(CircleShape).background(Color(0xFF2A2A2A)).clickable {
+                  onProfile()
+                },
             contentAlignment = Alignment.Center) {
-            Icon(Icons.Filled.Person, contentDescription = null, tint = Color.White)
-        }
+              Icon(Icons.Filled.Person, contentDescription = null, tint = Color.White)
+            }
         Spacer(Modifier.width(12.dp))
         Text(
             displayName,
@@ -374,18 +362,16 @@ private fun DrawerFooter(
                 Modifier.size(20.dp)
                     .clickable { onSettingsClick() }
                     .testTag(DrawerTags.UserSettings))
-    }
+      }
 
-    Spacer(Modifier.height(12.dp))
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-        Text(Localization.t("powered_by"), color = Color.Gray, fontSize = 12.sp)
-    }
+  Spacer(Modifier.height(12.dp))
+  Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+    Text(Localization.t("powered_by"), color = Color.Gray, fontSize = 12.sp)
+  }
 }
-
 
 /**
  * Formats the raw username into a display-friendly value.
- *
  * - Falls back to "Student" when the name is blank.
  * - Normalizes whitespace and capitalizes each word.
  */
@@ -402,9 +388,9 @@ private fun formatUserName(raw: String): String {
 /**
  * Single conversation row in the drawer.
  *
- * @param title      Conversation title (already fallback-handled upstream).
- * @param selected   Whether this row represents the currently selected conversation.
- * @param onClick    Invoked when the row is tapped.
+ * @param title Conversation title (already fallback-handled upstream).
+ * @param selected Whether this row represents the currently selected conversation.
+ * @param onClick Invoked when the row is tapped.
  */
 @Composable
 private fun RecentRow(title: String, selected: Boolean = false, onClick: () -> Unit = {}) {
@@ -439,10 +425,7 @@ private fun RecentRow(title: String, selected: Boolean = false, onClick: () -> U
       }
 }
 
-
-/**
- * Preview for the drawer in isolation with default state.
- */
+/** Preview for the drawer in isolation with default state. */
 @Preview(showBackground = true, backgroundColor = 0xFF121212)
 @Composable
 fun DrawerContentPreview() {
