@@ -47,9 +47,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.android.sample.Chat.ChatMessage
 import com.android.sample.Chat.ChatType
 import com.android.sample.R
+import com.android.sample.settings.Localization
 import com.android.sample.speech.SpeechPlayback
 import com.android.sample.speech.SpeechToTextHelper
-import com.android.sample.settings.Localization
 import com.android.sample.ui.components.GuestProfileWarningModal
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
