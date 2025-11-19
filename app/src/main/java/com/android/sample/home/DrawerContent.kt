@@ -15,8 +15,10 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -29,6 +31,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -54,6 +60,8 @@ object DrawerTags {
   const val UserSettings = "drawer_user_settings"
 }
 
+private const val RECENT_CONVERSATIONS_LIMIT = 4
+
 @Composable
 fun DrawerContentPreviewable() {
   DrawerContent()
@@ -71,6 +79,10 @@ fun DrawerContent(
     onNewChat: () -> Unit = {},
     onPickConversation: (String) -> Unit = {}
 ) {
+
+  var showAllChats by remember(ui.isDrawerOpen) { mutableStateOf(false) }
+  val scrollState = rememberScrollState()
+
   Column(
       modifier =
           Modifier.fillMaxHeight()
@@ -147,49 +159,69 @@ fun DrawerContent(
             }
 
         Spacer(modifier = Modifier.height(24.dp))
-        Text(
-            Localization.t("recents"),
-            color = Color(0xFF8A8A8A),
-            fontSize = 12.sp,
-            modifier = Modifier.testTag(DrawerTags.RecentsSection))
-        Spacer(modifier = Modifier.height(14.dp))
 
-        if (ui.conversations.isEmpty()) {
-          Text("No conversations yet", color = Color.Gray, fontSize = 13.sp)
-        } else {
-          Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            ui.conversations.take(12).forEach { conv ->
-              RecentRow(
-                  title = conv.title.ifBlank { "Untitled" },
-                  selected = conv.id == ui.currentConversationId,
-                  onClick = { onPickConversation(conv.id) })
-            }
+        Column(modifier = Modifier.weight(1f).verticalScroll(scrollState)) {
+          if (ui.conversations.isEmpty()) {
+            Text(
+                text = "RECENTS",
+                color = Color(0xFF8A8A8A),
+                fontSize = 12.sp,
+                modifier = Modifier.testTag(DrawerTags.RecentsSection))
+            Spacer(modifier = Modifier.height(14.dp))
+            Text("No conversations yet", color = Color.Gray, fontSize = 13.sp)
+          } else {
+            val hasMoreThanLimit = ui.conversations.size > RECENT_CONVERSATIONS_LIMIT
+            val isShowingAll = !hasMoreThanLimit || showAllChats
+            val sectionTitle = if (isShowingAll) "ALL CHATS" else "RECENTS"
 
-            Surface(
-                color = Color.Transparent,
-                modifier =
-                    Modifier.fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { /* navigate to “All chats” screen later */}
-                        .padding(vertical = 4.dp)
-                        .testTag(DrawerTags.ViewAllRow)) {
-                  Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "View all chats",
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Normal)
-                    Spacer(Modifier.weight(1f))
-                    Icon(
-                        Icons.Filled.KeyboardArrowRight,
-                        contentDescription = null,
-                        tint = Color(0xFFB0B0B0))
-                  }
+            Text(
+                text = sectionTitle,
+                color = Color(0xFF8A8A8A),
+                fontSize = 12.sp,
+                modifier = Modifier.testTag(DrawerTags.RecentsSection))
+            Spacer(modifier = Modifier.height(14.dp))
+
+            val displayedConversations =
+                if (isShowingAll) {
+                  ui.conversations
+                } else {
+                  ui.conversations.take(RECENT_CONVERSATIONS_LIMIT)
                 }
+
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+              displayedConversations.forEach { conv ->
+                RecentRow(
+                    title = conv.title.ifBlank { "Untitled" },
+                    selected = conv.id == ui.currentConversationId,
+                    onClick = { onPickConversation(conv.id) })
+              }
+
+              if (hasMoreThanLimit && !showAllChats) {
+                Surface(
+                    color = Color.Transparent,
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { showAllChats = true }
+                            .padding(vertical = 4.dp)
+                            .testTag(DrawerTags.ViewAllRow)) {
+                      Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "View all chats",
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Normal)
+                        Spacer(Modifier.weight(1f))
+                        Icon(
+                            Icons.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = Color(0xFFB0B0B0))
+                      }
+                    }
+              }
+            }
           }
         }
-
-        Spacer(modifier = Modifier.weight(1f))
 
         Surface(color = Color(0x22FFFFFF), modifier = Modifier.fillMaxWidth().height(1.dp)) {}
         Spacer(Modifier.height(12.dp))

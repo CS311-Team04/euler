@@ -30,7 +30,9 @@ class DrawerContentTest {
                     Conversation(id = "1", title = "CS220 Final Exam retrieval"),
                     Conversation(id = "2", title = "Linear Algebra help"),
                     Conversation(id = "3", title = "Project deadline query"),
-                    Conversation(id = "4", title = "Course registration info")))
+                    Conversation(id = "4", title = "Course registration info"),
+                    Conversation(id = "5", title = "Extra conversation"),
+                ))
     composeRule.setContent { MaterialTheme { DrawerContent(ui = uiState) } }
 
     composeRule.onNodeWithTag(DrawerTags.Root).assertIsDisplayed()
@@ -39,14 +41,13 @@ class DrawerContentTest {
     composeRule.onNodeWithText("New chat").assertIsDisplayed()
     composeRule.onNodeWithText("Connectors").assertIsDisplayed()
 
-    // Recents section and sample items
+    // Recents / All chats section et items visibles
     composeRule.onNodeWithTag(DrawerTags.RecentsSection).assertIsDisplayed()
     composeRule.onNodeWithText("CS220 Final Exam retrieval").assertIsDisplayed()
     composeRule.onNodeWithText("Linear Algebra help").assertIsDisplayed()
     composeRule.onNodeWithText("Project deadline query").assertIsDisplayed()
     composeRule.onNodeWithText("Course registration info").assertIsDisplayed()
 
-    // Footer link
     composeRule.onNodeWithText("View all chats").assertIsDisplayed()
   }
 
