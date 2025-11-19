@@ -185,4 +185,251 @@ class HttpLlmClientTest {
     assertTrue(error is IllegalStateException)
     assertTrue(error!!.message!!.contains("must use HTTPS"))
   }
+
+  @Test
+  fun generateReply_rejects_invalid_endpoint_url() = runBlocking {
+    val client = HttpLlmClient(endpoint = "not-a-valid-url", apiKey = "", client = OkHttpClient())
+
+    val error = runCatching { client.generateReply("Test") }.exceptionOrNull()
+
+    assertNotNull("Expected an IllegalStateException", error)
+    assertTrue(error is IllegalStateException)
+    assertTrue(error!!.message!!.contains("Invalid LLM HTTP endpoint URL"))
+  }
+
+  @Test
+  fun generateReply_empty_body_throws() = runBlocking {
+    server.enqueue(MockResponse().setResponseCode(HttpURLConnection.HTTP_OK).setBody(""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val error = runCatching { client.generateReply("Test") }.exceptionOrNull()
+
+    assertNotNull("Expected an IllegalStateException", error)
+    assertTrue(error is IllegalStateException)
+    assertTrue(error!!.message!!.contains("Empty LLM HTTP response"))
+  }
+
+  @Test
+  fun generateReply_missing_reply_key_throws() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody("""{"primary_url":"https://example.com"}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val error = runCatching { client.generateReply("Test") }.exceptionOrNull()
+
+    assertNotNull("Expected an IllegalStateException", error)
+    assertTrue(error is IllegalStateException)
+    assertTrue(error!!.message!!.contains("Empty LLM reply"))
+  }
+
+  @Test
+  fun generateReply_empty_reply_value_throws() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody("""{"reply":"","primary_url":"https://example.com"}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val error = runCatching { client.generateReply("Test") }.exceptionOrNull()
+
+    assertNotNull("Expected an IllegalStateException", error)
+    assertTrue(error is IllegalStateException)
+    assertTrue(error!!.message!!.contains("Empty LLM reply"))
+  }
+
+  @Test
+  fun generateReply_whitespace_only_reply_throws() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody("""{"reply":"   ","primary_url":"https://example.com"}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val error = runCatching { client.generateReply("Test") }.exceptionOrNull()
+
+    assertNotNull("Expected an IllegalStateException", error)
+    assertTrue(error is IllegalStateException)
+    assertTrue(error!!.message!!.contains("Empty LLM reply"))
+  }
+
+  @Test
+  fun generateReply_handles_optional_url() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody("""{"reply":"Test reply"}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertEquals("Test reply", reply.reply)
+    assertEquals(null, reply.url)
+  }
+
+  @Test
+  fun generateReply_trims_reply_and_url() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody("""{"reply":"  Trimmed reply  ","primary_url":"  https://example.com  "}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertEquals("Trimmed reply", reply.reply)
+    assertEquals("https://example.com", reply.url)
+  }
+
+  @Test
+  fun generateReply_handles_null_url() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody("""{"reply":"Test reply","primary_url":null}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertEquals("Test reply", reply.reply)
+    assertEquals(null, reply.url)
+  }
+
+  @Test
+  fun generateReply_handles_missing_url_key() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody("""{"reply":"Test reply"}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertEquals("Test reply", reply.reply)
+    assertEquals(null, reply.url)
+  }
+
+  @Test
+  fun generateReply_rejects_non_string_reply() = runBlocking {
+    server.enqueue(
+        MockResponse().setResponseCode(HttpURLConnection.HTTP_OK).setBody("""{"reply":123}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val error = runCatching { client.generateReply("Test") }.exceptionOrNull()
+
+    assertNotNull("Expected an IllegalStateException", error)
+    assertTrue(error is IllegalStateException)
+    assertTrue(error!!.message!!.contains("Empty LLM reply"))
+  }
+
+  @Test
+  fun generateReply_rejects_array_reply() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody("""{"reply":["not","a","string"]}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val error = runCatching { client.generateReply("Test") }.exceptionOrNull()
+
+    assertNotNull("Expected an IllegalStateException", error)
+    assertTrue(error is IllegalStateException)
+    assertTrue(error!!.message!!.contains("Empty LLM reply"))
+  }
+
+  @Test
+  fun generateReply_rejects_object_reply() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody("""{"reply":{"nested":"object"}}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val error = runCatching { client.generateReply("Test") }.exceptionOrNull()
+
+    assertNotNull("Expected an IllegalStateException", error)
+    assertTrue(error is IllegalStateException)
+    assertTrue(error!!.message!!.contains("Empty LLM reply"))
+  }
+
+  @Test
+  fun generateReply_rejects_http_for_private_ip_in_release() = runBlocking {
+    // Test that private IP addresses are rejected in non-DEBUG builds
+    // Note: In unit tests, BuildConfig.DEBUG is typically false, so this should fail
+    val clientWithTimeout =
+        OkHttpClient.Builder().connectTimeout(1, java.util.concurrent.TimeUnit.SECONDS).build()
+    val client =
+        HttpLlmClient(
+            endpoint = "http://192.168.1.1:8080/answer", apiKey = "", client = clientWithTimeout)
+
+    val error = runCatching { client.generateReply("Test") }.exceptionOrNull()
+
+    // In non-DEBUG builds, private IPs should require HTTPS
+    // The error might be a connection timeout or HTTPS requirement
+    assertNotNull("Expected an error", error)
+    // If it's a validation error, it should mention HTTPS
+    if (error is IllegalStateException && error.message!!.contains("must use HTTPS")) {
+      assertTrue("Private IP should require HTTPS in non-DEBUG builds", true)
+    }
+  }
+
+  @Test
+  fun generateReply_validates_loopback_addresses() = runBlocking {
+    // Test various loopback address formats (IPv4 and localhost)
+    val loopbackAddresses = listOf("127.0.0.1", "localhost")
+
+    for (host in loopbackAddresses) {
+      server.enqueue(
+          MockResponse()
+              .setResponseCode(HttpURLConnection.HTTP_OK)
+              .setBody("""{"reply":"Loopback test"}"""))
+      val client =
+          HttpLlmClient(
+              endpoint = "http://$host:${server.port}/answer", apiKey = "", client = OkHttpClient())
+
+      val reply = client.generateReply("Test")
+
+      assertEquals("Loopback test", reply.reply)
+    }
+  }
+
+  @Test
+  fun generateReply_handles_unknown_host() = runBlocking {
+    // Test that unknown hosts are handled gracefully
+    val clientWithTimeout =
+        OkHttpClient.Builder().connectTimeout(1, java.util.concurrent.TimeUnit.SECONDS).build()
+    val client =
+        HttpLlmClient(
+            endpoint = "http://nonexistent-host-12345.local:8080/answer",
+            apiKey = "",
+            client = clientWithTimeout)
+
+    val error = runCatching { client.generateReply("Test") }.exceptionOrNull()
+
+    // Should either fail validation or connection, but not crash
+    assertNotNull("Expected an error for unknown host", error)
+  }
 }

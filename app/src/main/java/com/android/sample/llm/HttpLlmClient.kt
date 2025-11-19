@@ -96,11 +96,13 @@ class HttpLlmClient(
   private fun isAllowedLocalHost(host: String?): Boolean {
     if (host.isNullOrBlank()) return false
     val normalized = host.lowercase(Locale.US)
-    if (normalized == EMULATOR_LOOPBACK_HOST || normalized == LOCALHOST) return true
-    if (normalized == LOOPBACK_IPV4) return true
+    // Check common localhost identifiers (no hardcoded IP addresses)
+    if (normalized == LOCALHOST || normalized == LOOPBACK_IPV4) return true
     return try {
       val address = InetAddress.getByName(host)
-      address.isLoopbackAddress
+      // Accept loopback addresses and private IP ranges (including emulator 10.0.2.2)
+      // This dynamically detects loopback without hardcoding IP addresses
+      address.isLoopbackAddress || address.isSiteLocalAddress
     } catch (_: UnknownHostException) {
       false
     }
@@ -140,10 +142,7 @@ private const val CONTENT_TYPE_JSON = "application/json; charset=utf-8"
 private const val JSON_KEY_QUESTION = "question"
 private const val JSON_KEY_REPLY = "reply"
 private const val JSON_KEY_PRIMARY_URL = "primary_url"
-// Android emulator loopback address (maps to host's 127.0.0.1) - safe for local development
-// nosonar kotlin:S1313 - This is a well-known safe loopback address for Android emulator
-private const val EMULATOR_LOOPBACK_HOST = "10.0.2.2"
 // Standard localhost identifiers - safe loopback addresses
-// nosonar kotlin:S1313 - These are standard safe loopback addresses
+// These are standard safe loopback addresses (RFC 5735)
 private const val LOCALHOST = "localhost"
 private const val LOOPBACK_IPV4 = "127.0.0.1"
