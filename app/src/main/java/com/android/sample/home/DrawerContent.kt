@@ -286,12 +286,12 @@ private fun DrawerConversationsSection(
 @Composable
 private fun DrawerConversationsEmptyState() {
   Text(
-      text = "RECENTS",
+      text = Localization.t("recents"),
       color = EulerDrawerSectionLabel,
       fontSize = 12.sp,
       modifier = Modifier.testTag(DrawerTags.RecentsSection))
   Spacer(modifier = Modifier.height(14.dp))
-  Text("No conversations yet", color = EulerDrawerEmptyText, fontSize = 13.sp)
+  Text(Localization.t("no_conversations_yet"), color = EulerDrawerEmptyText, fontSize = 13.sp)
 }
 
 /**
@@ -319,10 +319,10 @@ private fun DrawerConversationsList(
 ) {
   val hasMoreThanLimit = ui.conversations.size > RECENT_CONVERSATIONS_LIMIT
   val isShowingAll = !hasMoreThanLimit || showAllChats
-  val sectionTitle = if (isShowingAll) "ALL CHATS" else "RECENTS"
+  val sectionTitleKey = if (isShowingAll) "all_chats" else "recents"
 
   Text(
-      text = sectionTitle,
+      text = Localization.t(sectionTitleKey),
       color = EulerDrawerSectionLabel,
       fontSize = 12.sp,
       modifier = Modifier.testTag(DrawerTags.RecentsSection))
@@ -338,7 +338,7 @@ private fun DrawerConversationsList(
   Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
     displayedConversations.forEach { conv ->
       RecentRow(
-          title = conv.title.ifBlank { "Untitled" },
+          title = conv.title.ifBlank { Localization.t("untitled_conversation") },
           selected = conv.id == ui.currentConversationId,
           onClick = { onPickConversation(conv.id) })
     }
@@ -370,7 +370,7 @@ private fun ViewAllChatsRow(onShowAllChats: () -> Unit) {
               .testTag(DrawerTags.ViewAllRow)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
           Text(
-              "View all chats",
+              Localization.t("view_all_chats"),
               color = Color.White,
               fontSize = 16.sp,
               fontWeight = FontWeight.Normal)
@@ -428,7 +428,7 @@ private fun DrawerFooter(
             modifier = Modifier.weight(1f).clickable { onProfile() })
         Icon(
             Icons.Filled.Settings,
-            contentDescription = "Settings",
+            contentDescription = Localization.t("settings"),
             tint = Color.White,
             modifier =
                 Modifier.size(20.dp)
@@ -449,7 +449,7 @@ private fun DrawerFooter(
  */
 private fun formatUserName(raw: String): String {
   val trimmed = raw.trim()
-  if (trimmed.isEmpty()) return "Student"
+  if (trimmed.isEmpty()) return Localization.t("default_user_name")
   return trimmed.split("\\s+".toRegex()).joinToString(" ") { word ->
     word.replaceFirstChar { ch ->
       if (ch.isLowerCase()) ch.titlecase(Locale.getDefault()) else ch.toString()
