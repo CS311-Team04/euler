@@ -101,7 +101,8 @@ internal fun parseBotReply(body: String, gson: Gson): BotReply {
         throw IllegalStateException("Invalid LLM HTTP response", error)
       } ?: throw IllegalStateException("Invalid LLM HTTP response")
 
-  val replyText = json.getTrimmedString(JSON_KEY_REPLY) ?: throw IllegalStateException("Empty LLM reply")
+  val replyText =
+      json.getTrimmedString(JSON_KEY_REPLY) ?: throw IllegalStateException("Empty LLM reply")
   val url = json.getTrimmedString(JSON_KEY_PRIMARY_URL)
   return BotReply(replyText, url)
 }

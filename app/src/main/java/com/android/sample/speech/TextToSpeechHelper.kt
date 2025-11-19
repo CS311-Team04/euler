@@ -343,14 +343,9 @@ class TextToSpeechHelper(
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) return
     val availableVoices =
         runCatching { textToSpeech.voices }
-            .onFailure { error ->
-              Log.w(TAG, "Unable to query available voices", error)
-            }
-            .getOrNull()
-            ?: return
-    val selected =
-        selectPreferredVoice(availableVoices)
-            ?: return
+            .onFailure { error -> Log.w(TAG, "Unable to query available voices", error) }
+            .getOrNull() ?: return
+    val selected = selectPreferredVoice(availableVoices) ?: return
     val result = textToSpeech.setVoice(selected)
     if (result != TextToSpeech.SUCCESS) {
       Log.w(TAG, "Failed to apply preferred voice ${selected.name} (code=$result)")

@@ -90,8 +90,7 @@ class HttpLlmClientTest {
   @Test
   fun generateReply_requires_https_for_remote_endpoint() = runBlocking {
     val client =
-        HttpLlmClient(
-            endpoint = "http://example.com/answer", apiKey = "", client = OkHttpClient())
+        HttpLlmClient(endpoint = "http://example.com/answer", apiKey = "", client = OkHttpClient())
 
     val error = runCatching { client.generateReply("Hello") }.exceptionOrNull()
 
