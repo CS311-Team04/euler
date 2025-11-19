@@ -64,12 +64,13 @@ class HomeViewModel(
     private val llmClient: LlmClient = FirebaseFunctionsLlmClient(),
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
     private val repo: ConversationRepository =
-        ConversationRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance())
+        ConversationRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance()),
     private val profileRepository: com.android.sample.profile.ProfileDataSource =
         UserProfileRepository()
 ) : ViewModel() {
   companion object {
     private const val TAG = "HomeViewModel"
+    private const val DEFAULT_USER_NAME = "Student"
 
     // Global exception handler for uncaught coroutine exceptions
     private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->

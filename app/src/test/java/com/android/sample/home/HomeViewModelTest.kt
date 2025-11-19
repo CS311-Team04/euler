@@ -56,7 +56,8 @@ class HomeViewModelTest {
   private val testDispatcher
     get() = dispatcherRule.dispatcher
 
-  private fun createHomeViewModel(): HomeViewModel = HomeViewModel(FakeProfileRepository())
+  private fun createHomeViewModel(): HomeViewModel =
+      HomeViewModel(profileRepository = FakeProfileRepository())
 
   private fun HomeViewModel.replaceMessages(vararg texts: String) {
     val field = HomeViewModel::class.java.getDeclaredField("_uiState")
@@ -77,6 +78,47 @@ class HomeViewModelTest {
     @Suppress("UNCHECKED_CAST") val stateFlow = field.get(this) as MutableStateFlow<HomeUiState>
     val current = stateFlow.value
     stateFlow.value = current.copy(userName = name)
+  }
+
+  private fun HomeViewModel.setPrivateField(name: String, value: Any?) {
+    val field = HomeViewModel::class.java.getDeclaredField(name)
+    field.isAccessible = true
+    field.set(this, value)
+  }
+
+  private fun HomeViewModel.invokeStartData() {
+    val method = HomeViewModel::class.java.getDeclaredMethod("startData")
+    method.isAccessible = true
+    method.invoke(this)
+  }
+
+  private fun HomeViewModel.updateUiState(transform: (HomeUiState) -> HomeUiState) {
+    val field = HomeViewModel::class.java.getDeclaredField("_uiState")
+    field.isAccessible = true
+    @Suppress("UNCHECKED_CAST") val stateFlow = field.get(this) as MutableStateFlow<HomeUiState>
+    stateFlow.value = transform(stateFlow.value)
+  }
+
+  private fun HomeViewModel.getBooleanField(name: String): Boolean {
+    val field = HomeViewModel::class.java.getDeclaredField(name)
+    field.isAccessible = true
+    return field.getBoolean(this)
+  }
+
+  private fun HomeViewModel.setFunctions(fake: FirebaseFunctions) {
+    val delegateField = HomeViewModel::class.java.getDeclaredField("functions\$delegate")
+    delegateField.isAccessible = true
+    delegateField.set(this, lazyOf(fake))
+  }
+
+  private suspend fun HomeViewModel.awaitStreamingCompletion(timeoutMs: Long = 2_000L) {
+    var remaining = timeoutMs
+    while ((uiState.value.streamingMessageId != null || uiState.value.isSending) && remaining > 0) {
+      dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+      delay(20)
+      remaining -= 20
+    }
+    dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
   }
 
   @Test
@@ -119,7 +161,7 @@ class HomeViewModelTest {
                 phone = "+41 79 123 45 67",
                 roleDescription = "Student")
         repo.savedProfile = profile
-        val viewModel = HomeViewModel(repo)
+        val viewModel = HomeViewModel(profileRepository = repo)
 
         viewModel.refreshProfile()
         advanceUntilIdle()
@@ -134,7 +176,7 @@ class HomeViewModelTest {
   fun refreshProfile_with_null_profile_keeps_defaults() =
       runTest(testDispatcher) {
         val repo = FakeProfileRepository()
-        val viewModel = HomeViewModel(repo)
+        val viewModel = HomeViewModel(profileRepository = repo)
         viewModel.setUserNameForTest("")
 
         viewModel.refreshProfile()
@@ -150,7 +192,7 @@ class HomeViewModelTest {
   fun saveProfile_persists_and_updates_ui_state() =
       runTest(testDispatcher) {
         val repo = FakeProfileRepository()
-        val viewModel = HomeViewModel(repo)
+        val viewModel = HomeViewModel(profileRepository = repo)
         val profile =
             UserProfile(
                 fullName = "Alice Example",
@@ -175,7 +217,7 @@ class HomeViewModelTest {
   fun clearProfile_resets_profile_and_guest_flags() =
       runTest(testDispatcher) {
         val repo = FakeProfileRepository()
-        val viewModel = HomeViewModel(repo)
+        val viewModel = HomeViewModel(profileRepository = repo)
         val profile =
             UserProfile(
                 fullName = "Bob Example",
@@ -602,7 +644,6 @@ class HomeViewModelTest {
   fun sendMessage_signedIn_creates_conversation_and_updates_title() =
       runTest(testDispatcher) {
         val fakeClient = FakeLlmClient().apply { nextReply = "AI reply" }
-        viewModel.setPrivateField("llmClient", fakeClient)
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
         val repo = mock<ConversationRepository>()
         runBlocking { whenever(repo.startNewConversation(any())).thenReturn("conv-123") }
@@ -634,7 +675,6 @@ class HomeViewModelTest {
   fun sendMessage_signedIn_title_generation_failure_keeps_quick_title() =
       runTest(testDispatcher) {
         val fakeClient = FakeLlmClient().apply { nextReply = "AI reply" }
-        viewModel.setPrivateField("llmClient", fakeClient)
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
         val repo = mock<ConversationRepository>()
         runBlocking { whenever(repo.startNewConversation(any())).thenReturn("conv-999") }
@@ -990,21 +1030,24 @@ class HomeViewModelTest {
         // Verify that streaming state is cleared
         assertFalse(viewModel.uiState.value.isSending)
         assertNull(viewModel.uiState.value.streamingMessageId)
+      }
+
   @Test
-  fun hideDeleteConfirmation_does_not_affect_other_flags() {
-    val viewModel = createHomeViewModel()
+  fun hideDeleteConfirmation_does_not_affect_other_flags() =
+      runTest(testDispatcher) {
+        val viewModel = createHomeViewModel()
 
-    viewModel.showDeleteConfirmation()
-    val before = viewModel.uiState.value
+        viewModel.showDeleteConfirmation()
+        val before = viewModel.uiState.value
 
-    viewModel.hideDeleteConfirmation()
-    val after = viewModel.uiState.value
+        viewModel.hideDeleteConfirmation()
+        val after = viewModel.uiState.value
 
-    assertEquals(before.isDrawerOpen, after.isDrawerOpen)
-    assertEquals(before.isTopRightOpen, after.isTopRightOpen)
-    assertEquals(before.isLoading, after.isLoading)
-    assertNotEquals(before.showDeleteConfirmation, after.showDeleteConfirmation)
-  }
+        assertEquals(before.isDrawerOpen, after.isDrawerOpen)
+        assertEquals(before.isTopRightOpen, after.isTopRightOpen)
+        assertEquals(before.isLoading, after.isLoading)
+        assertNotEquals(before.showDeleteConfirmation, after.showDeleteConfirmation)
+      }
 
   @Test
   fun setLoading_to_true_and_then_false() =
@@ -1045,45 +1088,4 @@ class HomeViewModelTest {
           assertFalse(viewModel.uiState.value.showDeleteConfirmation)
         }
       }
-
-  private fun HomeViewModel.setPrivateField(name: String, value: Any?) {
-    val field = HomeViewModel::class.java.getDeclaredField(name)
-    field.isAccessible = true
-    field.set(this, value)
-  }
-
-  private fun HomeViewModel.invokeStartData() {
-    val method = HomeViewModel::class.java.getDeclaredMethod("startData")
-    method.isAccessible = true
-    method.invoke(this)
-  }
-
-  private fun HomeViewModel.updateUiState(transform: (HomeUiState) -> HomeUiState) {
-    val field = HomeViewModel::class.java.getDeclaredField("_uiState")
-    field.isAccessible = true
-    @Suppress("UNCHECKED_CAST") val stateFlow = field.get(this) as MutableStateFlow<HomeUiState>
-    stateFlow.value = transform(stateFlow.value)
-  }
-
-  private fun HomeViewModel.getBooleanField(name: String): Boolean {
-    val field = HomeViewModel::class.java.getDeclaredField(name)
-    field.isAccessible = true
-    return field.getBoolean(this)
-  }
-
-  private fun HomeViewModel.setFunctions(fake: FirebaseFunctions) {
-    val delegateField = HomeViewModel::class.java.getDeclaredField("functions\$delegate")
-    delegateField.isAccessible = true
-    delegateField.set(this, lazyOf(fake))
-  }
-
-  private suspend fun HomeViewModel.awaitStreamingCompletion(timeoutMs: Long = 2_000L) {
-    var remaining = timeoutMs
-    while ((uiState.value.streamingMessageId != null || uiState.value.isSending) && remaining > 0) {
-      dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
-      delay(20)
-      remaining -= 20
-    }
-    dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
-  }
 }

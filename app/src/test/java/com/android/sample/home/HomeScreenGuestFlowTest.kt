@@ -23,7 +23,7 @@ class HomeScreenGuestFlowTest {
 
   @Test
   fun guest_profile_click_shows_warning_and_continue_hides_modal() {
-    val viewModel = HomeViewModel(FakeProfileRepository())
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
     viewModel.setGuestMode(true)
 
     composeRule.setContent {
@@ -46,7 +46,7 @@ class HomeScreenGuestFlowTest {
 
   @Test
   fun guest_warning_login_invokes_sign_out_callback() {
-    val viewModel = HomeViewModel(FakeProfileRepository())
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
     viewModel.setGuestMode(true)
     var signOutInvoked = false
 
