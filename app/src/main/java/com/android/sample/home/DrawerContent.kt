@@ -20,8 +20,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
@@ -49,6 +49,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.sample.R
 import com.android.sample.settings.Localization
+import com.android.sample.ui.theme.EulerDrawerAvatarBackground
+import com.android.sample.ui.theme.EulerDrawerBackground
+import com.android.sample.ui.theme.EulerDrawerDivider
+import com.android.sample.ui.theme.EulerDrawerEmptyText
+import com.android.sample.ui.theme.EulerDrawerMutedIcon
+import com.android.sample.ui.theme.EulerDrawerSectionLabel
+import com.android.sample.ui.theme.EulerNewChatCircleRed
+import com.android.sample.ui.theme.EulerNewChatTextRed
+import com.android.sample.ui.theme.EulerRecentRowIconBackground
+import com.android.sample.ui.theme.EulerRecentRowSelectedBg
 import java.util.Locale
 
 /** Test tags used to find drawer elements in UI tests. */
@@ -110,7 +120,7 @@ fun DrawerContent(
       modifier =
           Modifier.fillMaxHeight()
               .width(300.dp)
-              .background(Color(0xFF121212))
+              .background(EulerDrawerBackground)
               .padding(horizontal = 20.dp, vertical = 16.dp)
               .testTag(DrawerTags.Root)) {
         DrawerHeader()
@@ -173,7 +183,7 @@ private fun DrawerNewChatRow(onNewChat: () -> Unit) {
               .testTag(DrawerTags.NewChatRow)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
           Box(
-              modifier = Modifier.size(28.dp).clip(CircleShape).background(Color(0xFFE53935)),
+              modifier = Modifier.size(28.dp).clip(CircleShape).background(EulerNewChatCircleRed),
               contentAlignment = Alignment.Center) {
                 Icon(
                     Icons.Filled.Add,
@@ -183,7 +193,7 @@ private fun DrawerNewChatRow(onNewChat: () -> Unit) {
           Spacer(Modifier.width(12.dp))
           Text(
               Localization.t("new_chat"),
-              color = Color(0xFFFF6E6E),
+              color = EulerNewChatTextRed,
               fontSize = 16.sp,
               fontWeight = FontWeight.Normal)
         }
@@ -210,7 +220,7 @@ private fun DrawerConnectorsRow(onSettingsClick: () -> Unit) {
           Icon(
               Icons.Filled.Link,
               contentDescription = Localization.t("connectors"),
-              tint = Color(0xFFB0B0B0))
+              tint = EulerDrawerMutedIcon)
           Spacer(Modifier.width(12.dp))
           Text(
               Localization.t("connectors"),
@@ -218,19 +228,23 @@ private fun DrawerConnectorsRow(onSettingsClick: () -> Unit) {
               fontSize = 16.sp,
               fontWeight = FontWeight.Normal)
           Spacer(Modifier.weight(1f))
-          Icon(Icons.Filled.KeyboardArrowRight, contentDescription = null, tint = Color(0xFFB0B0B0))
+          Icon(
+              imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+              contentDescription = null,
+              tint = EulerDrawerMutedIcon)
         }
       }
 }
 
 /**
- * Scrollable conversations section that lives between header and footer.
+ * Scrollable conversations section that sits between header and footer.
  *
- * Behavior:
- * - When there are no conversations, shows a “RECENTS” label and an empty state message.
- * - Otherwise, shows either:
- *     - the last [RECENT_CONVERSATIONS_LIMIT] conversations (RECENTS mode), or
- *     - the full list (ALL CHATS mode) after “View all chats” is tapped.
+ * This composable is responsible only for wiring:
+ * - a vertical scroll container, and
+ * - the choice between the empty state and the populated list.
+ *
+ * The actual UI for both states is delegated to [DrawerConversationsEmptyState] and
+ * [DrawerConversationsList] to keep the control flow simple and testable.
  *
  * @param ui Current [HomeUiState] providing the conversations list.
  * @param showAllChats Whether ALL CHATS mode is currently active.
@@ -250,66 +264,123 @@ private fun DrawerConversationsSection(
 
   Column(modifier = modifier.verticalScroll(scrollState)) {
     if (ui.conversations.isEmpty()) {
-      Text(
-          text = "RECENTS",
-          color = Color(0xFF8A8A8A),
-          fontSize = 12.sp,
-          modifier = Modifier.testTag(DrawerTags.RecentsSection))
-      Spacer(modifier = Modifier.height(14.dp))
-      Text("No conversations yet", color = Color.Gray, fontSize = 13.sp)
+      DrawerConversationsEmptyState()
     } else {
-      val hasMoreThanLimit = ui.conversations.size > RECENT_CONVERSATIONS_LIMIT
-      val isShowingAll = !hasMoreThanLimit || showAllChats
-      val sectionTitle = if (isShowingAll) "ALL CHATS" else "RECENTS"
-
-      Text(
-          text = sectionTitle,
-          color = Color(0xFF8A8A8A),
-          fontSize = 12.sp,
-          modifier = Modifier.testTag(DrawerTags.RecentsSection))
-      Spacer(modifier = Modifier.height(14.dp))
-
-      val displayedConversations =
-          if (isShowingAll) {
-            ui.conversations
-          } else {
-            ui.conversations.take(RECENT_CONVERSATIONS_LIMIT)
-          }
-
-      Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        displayedConversations.forEach { conv ->
-          RecentRow(
-              title = conv.title.ifBlank { "Untitled" },
-              selected = conv.id == ui.currentConversationId,
-              onClick = { onPickConversation(conv.id) })
-        }
-
-        if (hasMoreThanLimit && !showAllChats) {
-          Surface(
-              color = Color.Transparent,
-              modifier =
-                  Modifier.fillMaxWidth()
-                      .clip(RoundedCornerShape(8.dp))
-                      .clickable { onShowAllChats() }
-                      .padding(vertical = 4.dp)
-                      .testTag(DrawerTags.ViewAllRow)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                  Text(
-                      "View all chats",
-                      color = Color.White,
-                      fontSize = 16.sp,
-                      fontWeight = FontWeight.Normal)
-                  Spacer(Modifier.weight(1f))
-                  Icon(
-                      Icons.Filled.KeyboardArrowRight,
-                      contentDescription = null,
-                      tint = Color(0xFFB0B0B0))
-                }
-              }
-        }
-      }
+      DrawerConversationsList(
+          ui = ui,
+          showAllChats = showAllChats,
+          onShowAllChats = onShowAllChats,
+          onPickConversation = onPickConversation,
+      )
     }
   }
+}
+
+/**
+ * Empty state shown when the user has no stored conversations yet.
+ *
+ * Renders the "RECENTS" section label followed by a short placeholder message. This keeps the
+ * layout consistent with the populated state while clearly communicating that there is nothing to
+ * list.
+ */
+@Composable
+private fun DrawerConversationsEmptyState() {
+  Text(
+      text = "RECENTS",
+      color = EulerDrawerSectionLabel,
+      fontSize = 12.sp,
+      modifier = Modifier.testTag(DrawerTags.RecentsSection))
+  Spacer(modifier = Modifier.height(14.dp))
+  Text("No conversations yet", color = EulerDrawerEmptyText, fontSize = 13.sp)
+}
+
+/**
+ * Populated conversations list for the drawer.
+ *
+ * Behavior:
+ * - Computes whether we should show only the last [RECENT_CONVERSATIONS_LIMIT] items ("RECENTS"
+ *   mode) or the full list ("ALL CHATS" mode).
+ * - Shows the appropriate section title based on that mode.
+ * - Renders each conversation as a [RecentRow].
+ * - If there are more than [RECENT_CONVERSATIONS_LIMIT] conversations and we are still in "RECENTS"
+ *   mode, appends a [ViewAllChatsRow] at the bottom.
+ *
+ * @param ui Current [HomeUiState] providing the ordered conversations.
+ * @param showAllChats True when the user has expanded to "ALL CHATS".
+ * @param onShowAllChats Called when the user taps the “View all chats” row.
+ * @param onPickConversation Invoked when a conversation row is selected.
+ */
+@Composable
+private fun DrawerConversationsList(
+    ui: HomeUiState,
+    showAllChats: Boolean,
+    onShowAllChats: () -> Unit,
+    onPickConversation: (String) -> Unit,
+) {
+  val hasMoreThanLimit = ui.conversations.size > RECENT_CONVERSATIONS_LIMIT
+  val isShowingAll = !hasMoreThanLimit || showAllChats
+  val sectionTitle = if (isShowingAll) "ALL CHATS" else "RECENTS"
+
+  Text(
+      text = sectionTitle,
+      color = EulerDrawerSectionLabel,
+      fontSize = 12.sp,
+      modifier = Modifier.testTag(DrawerTags.RecentsSection))
+  Spacer(modifier = Modifier.height(14.dp))
+
+  val displayedConversations =
+      if (isShowingAll) {
+        ui.conversations
+      } else {
+        ui.conversations.take(RECENT_CONVERSATIONS_LIMIT)
+      }
+
+  Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    displayedConversations.forEach { conv ->
+      RecentRow(
+          title = conv.title.ifBlank { "Untitled" },
+          selected = conv.id == ui.currentConversationId,
+          onClick = { onPickConversation(conv.id) })
+    }
+
+    if (hasMoreThanLimit && !showAllChats) {
+      ViewAllChatsRow(onShowAllChats = onShowAllChats)
+    }
+  }
+}
+
+/**
+ * Row displayed at the end of the RECENTS list when there are more conversations than
+ * [RECENT_CONVERSATIONS_LIMIT].
+ *
+ * Shows a "View all chats" label with a chevron icon. Tapping the row promotes the drawer into "ALL
+ * CHATS" mode by invoking [onShowAllChats].
+ *
+ * @param onShowAllChats Callback used to switch from RECENTS to ALL CHATS mode.
+ */
+@Composable
+private fun ViewAllChatsRow(onShowAllChats: () -> Unit) {
+  Surface(
+      color = Color.Transparent,
+      modifier =
+          Modifier.fillMaxWidth()
+              .clip(RoundedCornerShape(8.dp))
+              .clickable { onShowAllChats() }
+              .padding(vertical = 4.dp)
+              .testTag(DrawerTags.ViewAllRow)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Text(
+              "View all chats",
+              color = Color.White,
+              fontSize = 16.sp,
+              fontWeight = FontWeight.Normal)
+          Spacer(Modifier.weight(1f))
+          Icon(
+              imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+              contentDescription = null,
+              tint = EulerDrawerMutedIcon)
+        }
+      }
 }
 
 /**
@@ -324,7 +395,7 @@ private fun DrawerFooter(
     onProfileDisabledClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
-  Surface(color = Color(0x22FFFFFF), modifier = Modifier.fillMaxWidth().height(1.dp)) {}
+  Surface(color = EulerDrawerDivider, modifier = Modifier.fillMaxWidth().height(1.dp)) {}
   Spacer(Modifier.height(12.dp))
 
   val alpha = if (isGuest) 0.4f else 1f
@@ -341,9 +412,10 @@ private fun DrawerFooter(
       modifier = Modifier.fillMaxWidth().alpha(alpha)) {
         Box(
             modifier =
-                Modifier.size(36.dp).clip(CircleShape).background(Color(0xFF2A2A2A)).clickable {
-                  onProfile()
-                },
+                Modifier.size(36.dp)
+                    .clip(CircleShape)
+                    .background(EulerDrawerAvatarBackground)
+                    .clickable { onProfile() },
             contentAlignment = Alignment.Center) {
               Icon(Icons.Filled.Person, contentDescription = null, tint = Color.White)
             }
@@ -394,7 +466,7 @@ private fun formatUserName(raw: String): String {
  */
 @Composable
 private fun RecentRow(title: String, selected: Boolean = false, onClick: () -> Unit = {}) {
-  val bg = if (selected) Color(0x22FFFFFF) else Color.Transparent
+  val bg = if (selected) EulerRecentRowSelectedBg else Color.Transparent
   Surface(
       color = bg,
       shape = RoundedCornerShape(8.dp),
@@ -406,12 +478,14 @@ private fun RecentRow(title: String, selected: Boolean = false, onClick: () -> U
         Row(verticalAlignment = Alignment.CenterVertically) {
           Box(
               modifier =
-                  Modifier.size(24.dp).clip(RoundedCornerShape(6.dp)).background(Color(0xFF2A2A2A)),
+                  Modifier.size(24.dp)
+                      .clip(RoundedCornerShape(6.dp))
+                      .background(EulerRecentRowIconBackground),
               contentAlignment = Alignment.Center) {
                 Icon(
                     imageVector = Icons.Outlined.ChatBubbleOutline,
                     contentDescription = null,
-                    tint = Color(0xFF8A8A8A),
+                    tint = EulerDrawerSectionLabel,
                     modifier = Modifier.size(15.dp))
               }
           Spacer(Modifier.width(12.dp))
