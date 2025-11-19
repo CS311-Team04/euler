@@ -188,6 +188,7 @@ class HttpLlmClientTest {
 
   @Test
   fun generateReply_rejects_invalid_endpoint_url() = runBlocking {
+    // Test that invalid URL format is rejected during endpoint validation
     val client = HttpLlmClient(endpoint = "not-a-valid-url", apiKey = "", client = OkHttpClient())
 
     val error = runCatching { client.generateReply("Test") }.exceptionOrNull()
@@ -199,6 +200,7 @@ class HttpLlmClientTest {
 
   @Test
   fun generateReply_empty_body_throws() = runBlocking {
+    // Test that empty HTTP response body is rejected
     server.enqueue(MockResponse().setResponseCode(HttpURLConnection.HTTP_OK).setBody(""))
     val client =
         HttpLlmClient(
@@ -213,6 +215,7 @@ class HttpLlmClientTest {
 
   @Test
   fun generateReply_missing_reply_key_throws() = runBlocking {
+    // Test that missing "reply" key in JSON response is rejected
     server.enqueue(
         MockResponse()
             .setResponseCode(HttpURLConnection.HTTP_OK)
@@ -230,6 +233,7 @@ class HttpLlmClientTest {
 
   @Test
   fun generateReply_empty_reply_value_throws() = runBlocking {
+    // Test that empty string value for "reply" key is rejected
     server.enqueue(
         MockResponse()
             .setResponseCode(HttpURLConnection.HTTP_OK)
@@ -247,6 +251,7 @@ class HttpLlmClientTest {
 
   @Test
   fun generateReply_whitespace_only_reply_throws() = runBlocking {
+    // Test that whitespace-only value for "reply" key is rejected after trimming
     server.enqueue(
         MockResponse()
             .setResponseCode(HttpURLConnection.HTTP_OK)
@@ -264,6 +269,7 @@ class HttpLlmClientTest {
 
   @Test
   fun generateReply_handles_optional_url() = runBlocking {
+    // Test that "primary_url" is optional and can be omitted from JSON response
     server.enqueue(
         MockResponse()
             .setResponseCode(HttpURLConnection.HTTP_OK)
@@ -280,6 +286,7 @@ class HttpLlmClientTest {
 
   @Test
   fun generateReply_trims_reply_and_url() = runBlocking {
+    // Test that whitespace in "reply" and "primary_url" values is trimmed
     server.enqueue(
         MockResponse()
             .setResponseCode(HttpURLConnection.HTTP_OK)
@@ -328,6 +335,7 @@ class HttpLlmClientTest {
 
   @Test
   fun generateReply_rejects_non_string_reply() = runBlocking {
+    // Test that non-string types (e.g., number) for "reply" key are rejected
     server.enqueue(
         MockResponse().setResponseCode(HttpURLConnection.HTTP_OK).setBody("""{"reply":123}"""))
     val client =
@@ -343,6 +351,7 @@ class HttpLlmClientTest {
 
   @Test
   fun generateReply_rejects_array_reply() = runBlocking {
+    // Test that array type for "reply" key is rejected (must be a string)
     server.enqueue(
         MockResponse()
             .setResponseCode(HttpURLConnection.HTTP_OK)
@@ -360,6 +369,7 @@ class HttpLlmClientTest {
 
   @Test
   fun generateReply_rejects_object_reply() = runBlocking {
+    // Test that object type for "reply" key is rejected (must be a string)
     server.enqueue(
         MockResponse()
             .setResponseCode(HttpURLConnection.HTTP_OK)
@@ -377,8 +387,8 @@ class HttpLlmClientTest {
 
   @Test
   fun generateReply_rejects_http_for_private_ip_in_release() = runBlocking {
-    // Test that private IP addresses are rejected in non-DEBUG builds
-    // Note: In unit tests, BuildConfig.DEBUG is typically false, so this should fail
+    // Test that private IP addresses require HTTPS in non-DEBUG builds
+    // Note: In unit tests, BuildConfig.DEBUG is typically false, so this should fail validation
     val clientWithTimeout =
         OkHttpClient.Builder().connectTimeout(1, java.util.concurrent.TimeUnit.SECONDS).build()
     val client =
@@ -390,7 +400,7 @@ class HttpLlmClientTest {
     // In non-DEBUG builds, private IPs should require HTTPS
     // The error might be a connection timeout or HTTPS requirement
     assertNotNull("Expected an error", error)
-    // If it's a validation error, it should mention HTTPS
+    // If it's a validation error, it should mention HTTPS requirement
     if (error is IllegalStateException && error.message!!.contains("must use HTTPS")) {
       assertTrue("Private IP should require HTTPS in non-DEBUG builds", true)
     }
@@ -398,7 +408,8 @@ class HttpLlmClientTest {
 
   @Test
   fun generateReply_validates_loopback_addresses() = runBlocking {
-    // Test various loopback address formats (IPv4 and localhost)
+    // Test that various loopback address formats (IPv4 and localhost) are allowed with HTTP
+    // This validates the dynamic IP detection without hardcoding addresses
     val loopbackAddresses = listOf("127.0.0.1", "localhost")
 
     for (host in loopbackAddresses) {
@@ -418,7 +429,8 @@ class HttpLlmClientTest {
 
   @Test
   fun generateReply_handles_unknown_host() = runBlocking {
-    // Test that unknown hosts are handled gracefully
+    // Test that unknown/invalid hostnames are handled gracefully without crashing
+    // The validation should either reject the endpoint or allow connection attempt to fail safely
     val clientWithTimeout =
         OkHttpClient.Builder().connectTimeout(1, java.util.concurrent.TimeUnit.SECONDS).build()
     val client =

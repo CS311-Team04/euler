@@ -93,17 +93,30 @@ class HttpLlmClient(
     }
   }
 
+  /**
+   * Checks if the given host is an allowed localhost/loopback address. This function validates
+   * hosts without hardcoding IP addresses to comply with SonarQube rules.
+   *
+   * @param host The hostname or IP address to validate
+   * @return true if the host is a valid localhost/loopback address, false otherwise
+   */
   private fun isAllowedLocalHost(host: String?): Boolean {
     if (host.isNullOrBlank()) return false
+    // Normalize hostname to lowercase for case-insensitive comparison
     val normalized = host.lowercase(Locale.US)
     // Check common localhost identifiers (no hardcoded IP addresses)
+    // These are standard safe loopback addresses per RFC 5735
     if (normalized == LOCALHOST || normalized == LOOPBACK_IPV4) return true
     return try {
+      // Resolve the hostname to an InetAddress for dynamic detection
       val address = InetAddress.getByName(host)
-      // Accept loopback addresses and private IP ranges (including emulator 10.0.2.2)
+      // Accept loopback addresses (127.0.0.0/8) and private IP ranges (10.0.0.0/8, 172.16.0.0/12,
+      // 192.168.0.0/16)
       // This dynamically detects loopback without hardcoding IP addresses
+      // Note: isSiteLocalAddress includes the Android emulator address 10.0.2.2
       address.isLoopbackAddress || address.isSiteLocalAddress
     } catch (_: UnknownHostException) {
+      // If hostname resolution fails, it's not a valid localhost address
       false
     }
   }
