@@ -34,7 +34,11 @@ class MainActivity : ComponentActivity() {
     setContent {
       val appearanceMode by AppSettings.appearanceState
       SampleAppTheme(appearanceMode = appearanceMode) {
-        AppNav(startOnSignedIn = false, activity = this@MainActivity, speechHelper = speechHelper, ttsHelper = ttsHelper))
+        AppNav(
+            startOnSignedIn = false,
+            activity = this@MainActivity,
+            speechHelper = speechHelper,
+            ttsHelper = ttsHelper)
       }
     }
   }

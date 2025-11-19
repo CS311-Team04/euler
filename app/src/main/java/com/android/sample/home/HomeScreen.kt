@@ -462,8 +462,8 @@ fun HomeScreen(
                                   message = item,
                                   modifier = Modifier.fillMaxWidth(),
                                   isStreaming = showLeadingDot,
+                                  audioState = audioState,
                                   aiText = textPrimary)
-                                  audioState = audioState)
                             }
 
                             // Global thinking indicator shown AFTER the last user message.
@@ -645,11 +645,7 @@ private fun ThinkingIndicator(modifier: Modifier = Modifier) {
  * - Disabled when the draft is blank or a send is in progress.
  */
 @Composable
-private fun BubbleSendButton(
-    enabled: Boolean,
-    isSending: Boolean,
-    onClick: () -> Unit,
-) {
+private fun BubbleSendButton(enabled: Boolean, isSending: Boolean, onClick: () -> Unit) {
   val colorScheme = MaterialTheme.colorScheme
   val accent = colorScheme.primary
   val size = 40.dp
