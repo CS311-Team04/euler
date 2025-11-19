@@ -88,7 +88,7 @@ android {
             useSupportLibrary = true
         }
         // Default region for Firebase Functions (prod)
-        buildConfigField ("String", "FUNCTIONS_REGION", "\"europe-west6\"")
+        buildConfigField ("String", "FUNCTIONS_REGION", "\"us-central1\"")
         buildConfigField ("String", "FUNCTIONS_HOST", "\"10.0.2.2\"")
         buildConfigField ("int",    "FUNCTIONS_PORT", "5002")
         buildConfigField ("boolean","USE_FUNCTIONS_EMULATOR", "true")
@@ -284,6 +284,7 @@ dependencies {
 
     // Networking for HTTP clients (LLM access, etc.)
     implementation(libs.okhttp)
+    implementation(libs.gson)
 
     // DataStore for preferences
     implementation(libs.datastore.core)

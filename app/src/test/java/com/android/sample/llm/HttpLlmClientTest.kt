@@ -45,6 +45,21 @@ class HttpLlmClientTest {
   }
 
   @Test
+  fun generateReply_invalidJson_throws() = runBlocking {
+    server.enqueue(
+        MockResponse().setResponseCode(HttpURLConnection.HTTP_OK).setBody("""{"oops":true"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val error = runCatching { client.generateReply("Salut ?") }.exceptionOrNull()
+
+    assertNotNull("Expected an IllegalStateException", error)
+    assertTrue(error is IllegalStateException)
+    assertTrue(error!!.message!!.contains("Invalid LLM HTTP response"))
+  }
+
+  @Test
   fun generateReply_throws_on_http_error() = runBlocking {
     server.enqueue(
         MockResponse()
@@ -70,5 +85,18 @@ class HttpLlmClientTest {
     } catch (e: IllegalStateException) {
       assertEquals("LLM HTTP endpoint not configured", e.message)
     }
+  }
+
+  @Test
+  fun generateReply_requires_https_for_remote_endpoint() = runBlocking {
+    val client =
+        HttpLlmClient(
+            endpoint = "http://example.com/answer", apiKey = "", client = OkHttpClient())
+
+    val error = runCatching { client.generateReply("Hello") }.exceptionOrNull()
+
+    assertNotNull("Expected an IllegalStateException", error)
+    assertTrue(error is IllegalStateException)
+    assertTrue(error!!.message!!.contains("must use HTTPS"))
   }
 }
