@@ -48,6 +48,8 @@ import com.android.sample.Chat.ChatMessage
 import com.android.sample.Chat.ChatType
 import com.android.sample.R
 import com.android.sample.settings.Localization
+import com.android.sample.speech.SpeechPlayback
+import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.ui.components.GuestProfileWarningModal
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -93,7 +95,8 @@ fun HomeScreen(
     onProfileClick: () -> Unit = {},
     onVoiceChatClick: () -> Unit = {},
     openDrawerOnStart: Boolean = false,
-    speechHelper: com.android.sample.speech.SpeechToTextHelper? = null,
+    speechHelper: SpeechToTextHelper? = null,
+    ttsHelper: SpeechPlayback? = null,
     forceNewChatOnFirstOpen: Boolean = false
 ) {
   val ui by viewModel.uiState.collectAsState()
@@ -106,6 +109,12 @@ fun HomeScreen(
   val textPrimary = colorScheme.onBackground
   val textSecondary = colorScheme.onSurfaceVariant
   val accentColor = colorScheme.primary
+
+  val audioController = remember(ttsHelper) { HomeAudioController(ttsHelper) }
+
+  DisposableEffect(audioController) { onDispose { audioController.stop() } }
+
+  LaunchedEffect(ui.messages) { audioController.handleMessagesChanged(ui.messages) }
 
   val ranNewChatOnce = remember { mutableStateOf(false) }
   LaunchedEffect(forceNewChatOnFirstOpen) {
@@ -429,6 +438,8 @@ fun HomeScreen(
                             items(items = ui.messages, key = { it.id }) { item ->
                               val showLeadingDot =
                                   item.id == ui.streamingMessageId && item.text.isEmpty()
+                              val audioState =
+                                  audioController.audioStateFor(item, ui.streamingMessageId)
 
                               // If this message carries a source, draw the card first
                               if (item.source != null && !item.isThinking) {
@@ -452,6 +463,7 @@ fun HomeScreen(
                                   modifier = Modifier.fillMaxWidth(),
                                   isStreaming = showLeadingDot,
                                   aiText = textPrimary)
+                                  audioState = audioState)
                             }
 
                             // Global thinking indicator shown AFTER the last user message.

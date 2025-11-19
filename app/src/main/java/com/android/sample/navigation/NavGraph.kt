@@ -28,6 +28,7 @@ import com.android.sample.home.HomeViewModel
 import com.android.sample.settings.ProfilePage
 import com.android.sample.settings.SettingsPage
 import com.android.sample.sign_in.AuthViewModel
+import com.android.sample.speech.SpeechPlayback
 import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.splash.OpeningScreen
 
@@ -160,7 +161,12 @@ internal fun handleProfileClick(
 
 @SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
-fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: SpeechToTextHelper) {
+fun AppNav(
+    startOnSignedIn: Boolean = false,
+    activity: Activity,
+    speechHelper: SpeechToTextHelper,
+    ttsHelper: SpeechPlayback
+) {
   val nav =
       rememberNavController().also { controller -> appNavControllerObserver?.invoke(controller) }
   val authViewModel = remember { authViewModelFactory?.invoke() ?: AuthViewModel() }
@@ -238,6 +244,7 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
                 onAction2Click = { /* ... */},
                 onSendMessage = { /* ... */},
                 speechHelper = speechHelper,
+                ttsHelper = ttsHelper,
                 onSignOut = {
                   android.util.Log.d("NavGraph", "Sign out button clicked")
                   homeViewModel.clearProfile()
@@ -274,6 +281,7 @@ fun AppNav(startOnSignedIn: Boolean = false, activity: Activity, speechHelper: S
                 onAction2Click = { /* ... */},
                 onSendMessage = { /* ... */},
                 speechHelper = speechHelper,
+                ttsHelper = ttsHelper,
                 onSignOut = {
                   android.util.Log.d("NavGraph", "Sign out button clicked (HomeWithDrawer)")
                   homeViewModel.clearProfile()
