@@ -140,7 +140,9 @@ class ConversationRepository(private val auth: FirebaseAuth, private val db: Fir
     val msgRef = msgCol(conversationId).document()
     val now = FieldValue.serverTimestamp()
     db.runBatch { b ->
-          b.set(msgRef, mapOf("role" to role, "text" to text, "createdAt" to now))
+          // Write both "text" (for our app) and "content" (for Cloud Function compatibility)
+          b.set(
+              msgRef, mapOf("role" to role, "text" to text, "content" to text, "createdAt" to now))
           b.update(convRef, mapOf("lastMessagePreview" to text.take(120), "updatedAt" to now))
         }
         .await()
