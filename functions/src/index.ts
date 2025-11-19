@@ -10,6 +10,8 @@ import { randomUUID } from "node:crypto";
 import * as functions from "firebase-functions/v1";
 import admin from "firebase-admin";
 
+const europeFunctions = functions.region("europe-west6");
+
 /* ---------- helpers ---------- */
 function withV1(url?: string): string {
   const u = (url ?? "").trim();
@@ -574,7 +576,7 @@ async function buildRollingSummary({
   return clampText(updated, 1200);
 }
 
-export const onMessageCreate = functions.firestore
+export const onMessageCreate = europeFunctions.firestore
   .document("users/{uid}/conversations/{cid}/messages/{mid}")
   .onCreate(async (snap: functions.firestore.DocumentSnapshot, ctx: functions.EventContext) => {
     try {
@@ -631,12 +633,12 @@ export const onMessageCreate = functions.firestore
  * ======================================================= */
 
 // ping
-export const ping = functions.https.onRequest((_req, res) => {
+export const ping = europeFunctions.https.onRequest((_req, res) => {
   res.status(200).send("pong");
 });
 
 // callable (for Kotlin via Firebase SDK)
-export const indexChunksFn = functions.https.onCall(async (data: IndexChunksInput) => {
+export const indexChunksFn = europeFunctions.https.onCall(async (data: IndexChunksInput) => {
   try {
     const { chunks } = data || ({} as any);
     if (!Array.isArray(chunks) || chunks.length === 0) {
@@ -654,7 +656,7 @@ export const indexChunksFn = functions.https.onCall(async (data: IndexChunksInpu
   }
 });
 
-export const answerWithRagFn = functions.https.onCall(async (data: AnswerWithRagInput) => {
+export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerWithRagInput) => {
   try {
     const question = String(data?.question || "").trim();
     const topK = Number(data?.topK ?? 5);
@@ -695,7 +697,7 @@ function checkKey(req: functions.https.Request) {
   }
 }
 
-export const indexChunksHttp = functions.https.onRequest(async (req: functions.https.Request, res: functions.Response<any>) => {
+export const indexChunksHttp = europeFunctions.https.onRequest(async (req: functions.https.Request, res: functions.Response<any>) => {
   try {
     if (req.method !== "POST") { res.status(405).end(); return; }
     checkKey(req);
@@ -706,7 +708,7 @@ export const indexChunksHttp = functions.https.onRequest(async (req: functions.h
   }
 });
 
-export const answerWithRagHttp = functions.https.onRequest(async (req: functions.https.Request, res: functions.Response<any>) => {
+export const answerWithRagHttp = europeFunctions.https.onRequest(async (req: functions.https.Request, res: functions.Response<any>) => {
   try {
     if (req.method !== "POST") { res.status(405).end(); return; }
     checkKey(req);
@@ -717,7 +719,7 @@ export const answerWithRagHttp = functions.https.onRequest(async (req: functions
   }
 });
 
-export const generateTitleFn = functions.https.onCall(async (data: GenerateTitleInput) => {
+export const generateTitleFn = europeFunctions.https.onCall(async (data: GenerateTitleInput) => {
   const q = String(data?.question || "").trim();
   const model = data?.model;
   if (!q) throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
