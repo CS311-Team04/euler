@@ -104,17 +104,17 @@ class HttpLlmClient(
     if (host.isNullOrBlank()) return false
     // Normalize hostname to lowercase for case-insensitive comparison
     val normalized = host.lowercase(Locale.US)
-    // Check common localhost identifiers (no hardcoded IP addresses)
-    // These are standard safe loopback addresses per RFC 5735
-    if (normalized == LOCALHOST || normalized == LOOPBACK_IPV4) return true
+    // Check common localhost identifier (no hardcoded IP addresses)
+    // The subsequent InetAddress check handles loopback detection dynamically
+    if (normalized == LOCALHOST) return true
     return try {
       // Resolve the hostname to an InetAddress for dynamic detection
       val address = InetAddress.getByName(host)
-      // Accept loopback addresses (127.0.0.0/8) and private IP ranges (10.0.0.0/8, 172.16.0.0/12,
-      // 192.168.0.0/16)
-      // This dynamically detects loopback without hardcoding IP addresses
-      // Note: isSiteLocalAddress includes the Android emulator address 10.0.2.2
-      address.isLoopbackAddress || address.isSiteLocalAddress
+      // Accept only loopback addresses (127.0.0.0/8) in production builds.
+      // Private IP ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16) are only
+      // allowed in DEBUG builds via isPrivateIpAddress() check at lines 76-79.
+      // This dynamically detects loopback without hardcoding IP addresses.
+      address.isLoopbackAddress
     } catch (_: UnknownHostException) {
       // If hostname resolution fails, it's not a valid localhost address
       false
@@ -155,7 +155,5 @@ private const val CONTENT_TYPE_JSON = "application/json; charset=utf-8"
 private const val JSON_KEY_QUESTION = "question"
 private const val JSON_KEY_REPLY = "reply"
 private const val JSON_KEY_PRIMARY_URL = "primary_url"
-// Standard localhost identifiers - safe loopback addresses
-// These are standard safe loopback addresses (RFC 5735)
+// Standard localhost identifier - safe loopback address (RFC 5735)
 private const val LOCALHOST = "localhost"
-private const val LOOPBACK_IPV4 = "127.0.0.1"

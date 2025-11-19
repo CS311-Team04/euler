@@ -16,8 +16,6 @@ import android.util.Log
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.math.max
-import kotlin.math.min
 
 /** Abstraction so UI/test code can provide custom playback implementations if needed. */
 interface SpeechPlayback {
@@ -463,6 +461,8 @@ class TextToSpeechHelper(
   }
 
   data class SpeechStyle(
+      // Base rate of 1.4f (40% faster than normal) chosen for improved speech clarity
+      // and reduced robotic feel. Can be adjusted via updateSpeechStyle() if needed.
       val baseRate: Float = 1.4f,
       val minRate: Float = 1.0f,
       val maxRate: Float = 1.5f,
@@ -527,7 +527,7 @@ class TextToSpeechHelper(
     }
 
     rate = rate.coerceIn(style.minRate, style.maxRate)
-    val boundedPitch = min(style.maxPitch, max(style.minPitch, pitch))
+    val boundedPitch = pitch.coerceIn(style.minPitch, style.maxPitch)
 
     return Prosody(rate = rate, pitch = boundedPitch)
   }

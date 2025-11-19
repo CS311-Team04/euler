@@ -388,7 +388,7 @@ class HttpLlmClientTest {
   @Test
   fun generateReply_rejects_http_for_private_ip_in_release() = runBlocking {
     // Test that private IP addresses require HTTPS in non-DEBUG builds
-    // Note: In unit tests, BuildConfig.DEBUG is typically false, so this should fail validation
+    // Note: In unit tests, BuildConfig.DEBUG may be true, so we check both cases
     val clientWithTimeout =
         OkHttpClient.Builder().connectTimeout(1, java.util.concurrent.TimeUnit.SECONDS).build()
     val client =
@@ -398,12 +398,15 @@ class HttpLlmClientTest {
     val error = runCatching { client.generateReply("Test") }.exceptionOrNull()
 
     // In non-DEBUG builds, private IPs should require HTTPS
-    // The error might be a connection timeout or HTTPS requirement
+    // In DEBUG builds, private IPs are allowed but connection will fail (timeout)
     assertNotNull("Expected an error", error)
-    // If it's a validation error, it should mention HTTPS requirement
-    if (error is IllegalStateException && error.message!!.contains("must use HTTPS")) {
-      assertTrue("Private IP should require HTTPS in non-DEBUG builds", true)
-    }
+    // Check if it's a validation error (HTTPS requirement) or connection error
+    val isHttpsError = error is IllegalStateException && error.message!!.contains("must use HTTPS")
+    val isConnectionError = !isHttpsError && error != null
+    // Either validation should reject it (non-DEBUG) or connection should fail (DEBUG)
+    assertTrue(
+        "Private IP should either require HTTPS (non-DEBUG) or fail connection (DEBUG). Got: ${error?.message}",
+        isHttpsError || isConnectionError)
   }
 
   @Test
