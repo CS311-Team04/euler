@@ -94,7 +94,7 @@ fun ChatMessage(
     // AI: full-width plain text
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
       if (isStreaming && message.text.isEmpty()) {
-        LeadingThinkingDot()
+        LeadingThinkingDot(color = aiText)
       } else {
         Text(
             text = message.text,
@@ -108,7 +108,7 @@ fun ChatMessage(
 }
 
 @Composable
-private fun LeadingThinkingDot() {
+private fun LeadingThinkingDot(color: Color) {
   val transition = rememberInfiniteTransition(label = "cursor")
   val alpha by
       transition.animateFloat(
@@ -122,7 +122,7 @@ private fun LeadingThinkingDot() {
 
   Surface(
       modifier = Modifier.size(10.dp).testTag("chat_ai_cursor"),
-      color = Color.White.copy(alpha = alpha),
+      color = color.copy(alpha = alpha),
       shape = CircleShape,
       tonalElevation = 0.dp,
       shadowElevation = 0.dp) {}

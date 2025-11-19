@@ -71,11 +71,18 @@ fun DrawerContent(
     onNewChat: () -> Unit = {},
     onPickConversation: (String) -> Unit = {}
 ) {
+  val colorScheme = MaterialTheme.colorScheme
+  val drawerBackground = colorScheme.surface
+  val textPrimary = colorScheme.onSurface
+  val textSecondary = colorScheme.onSurfaceVariant
+  val accent = colorScheme.primary
+  val dividerColor = colorScheme.outline.copy(alpha = 0.2f)
+
   Column(
       modifier =
           Modifier.fillMaxHeight()
               .width(300.dp)
-              .background(Color(0xFF121212))
+              .background(drawerBackground)
               .padding(horizontal = 20.dp, vertical = 16.dp)
               .testTag(DrawerTags.Root)) {
         // Logo header
@@ -100,17 +107,17 @@ fun DrawerContent(
                     .testTag(DrawerTags.NewChatRow)) {
               Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
-                    modifier = Modifier.size(28.dp).clip(CircleShape).background(Color(0xFFE53935)),
+                    modifier = Modifier.size(28.dp).clip(CircleShape).background(accent),
                     contentAlignment = Alignment.Center) {
                       Icon(
                           Icons.Filled.Add,
                           contentDescription = Localization.t("new_chat"),
-                          tint = Color.White)
+                          tint = colorScheme.onPrimary)
                     }
                 Spacer(Modifier.width(12.dp))
                 Text(
                     Localization.t("new_chat"),
-                    color = Color(0xFFFF6E6E),
+                    color = accent,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Normal)
               }
@@ -131,31 +138,31 @@ fun DrawerContent(
                 Icon(
                     Icons.Filled.Link,
                     contentDescription = Localization.t("connectors"),
-                    tint = Color(0xFFB0B0B0))
+                    tint = textSecondary)
                 Spacer(Modifier.width(12.dp))
                 Text(
                     Localization.t("connectors"),
-                    color = Color.White,
+                    color = textPrimary,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Normal)
                 Spacer(Modifier.weight(1f))
                 Icon(
                     Icons.Filled.KeyboardArrowRight,
                     contentDescription = null,
-                    tint = Color(0xFFB0B0B0))
+                    tint = textSecondary)
               }
             }
 
         Spacer(modifier = Modifier.height(24.dp))
         Text(
             Localization.t("recents"),
-            color = Color(0xFF8A8A8A),
+            color = textSecondary,
             fontSize = 12.sp,
             modifier = Modifier.testTag(DrawerTags.RecentsSection))
         Spacer(modifier = Modifier.height(14.dp))
 
         if (ui.conversations.isEmpty()) {
-          Text("No conversations yet", color = Color.Gray, fontSize = 13.sp)
+          Text("No conversations yet", color = textSecondary, fontSize = 13.sp)
         } else {
           Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             ui.conversations.take(12).forEach { conv ->
@@ -176,14 +183,14 @@ fun DrawerContent(
                   Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         "View all chats",
-                        color = Color.White,
+                        color = textPrimary,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Normal)
                     Spacer(Modifier.weight(1f))
                     Icon(
                         Icons.Filled.KeyboardArrowRight,
                         contentDescription = null,
-                        tint = Color(0xFFB0B0B0))
+                        tint = textSecondary)
                   }
                 }
           }
@@ -191,7 +198,7 @@ fun DrawerContent(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        Surface(color = Color(0x22FFFFFF), modifier = Modifier.fillMaxWidth().height(1.dp)) {}
+        Surface(color = dividerColor, modifier = Modifier.fillMaxWidth().height(1.dp)) {}
         Spacer(Modifier.height(12.dp))
         val displayName = formatUserName(ui.userName)
         Row(
@@ -201,7 +208,7 @@ fun DrawerContent(
                   modifier =
                       Modifier.size(36.dp)
                           .clip(CircleShape)
-                          .background(Color(0xFF2A2A2A))
+                          .background(colorScheme.surfaceVariant)
                           .clickable {
                             if (ui.isGuest) {
                               onProfileDisabledClick()
@@ -210,12 +217,12 @@ fun DrawerContent(
                             }
                           },
                   contentAlignment = Alignment.Center) {
-                    Icon(Icons.Filled.Person, contentDescription = null, tint = Color.White)
+                    Icon(Icons.Filled.Person, contentDescription = null, tint = textPrimary)
                   }
               Spacer(Modifier.width(12.dp))
               Text(
                   displayName,
-                  color = Color.White,
+                  color = textPrimary,
                   fontSize = 16.sp,
                   fontWeight = FontWeight.Normal,
                   modifier =
@@ -229,7 +236,7 @@ fun DrawerContent(
               Icon(
                   Icons.Filled.Settings,
                   contentDescription = "Settings",
-                  tint = Color.White,
+                  tint = textPrimary,
                   modifier =
                       Modifier.size(20.dp)
                           .clickable { onSettingsClick() }
@@ -239,7 +246,7 @@ fun DrawerContent(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth()) {
-              Text(Localization.t("powered_by"), color = Color.Gray, fontSize = 12.sp)
+              Text(Localization.t("powered_by"), color = textSecondary, fontSize = 12.sp)
             }
       }
 }
@@ -256,7 +263,11 @@ private fun formatUserName(raw: String): String {
 
 @Composable
 private fun RecentRow(title: String, selected: Boolean = false, onClick: () -> Unit = {}) {
-  val bg = if (selected) Color(0x22FFFFFF) else Color.Transparent
+  val colorScheme = MaterialTheme.colorScheme
+  val bg = if (selected) colorScheme.onSurface.copy(alpha = 0.08f) else Color.Transparent
+  val iconBackground = colorScheme.surfaceVariant
+  val iconTint = colorScheme.onSurfaceVariant
+  val textColor = colorScheme.onSurface
   Surface(
       color = bg,
       shape = RoundedCornerShape(8.dp),
@@ -268,18 +279,18 @@ private fun RecentRow(title: String, selected: Boolean = false, onClick: () -> U
         Row(verticalAlignment = Alignment.CenterVertically) {
           Box(
               modifier =
-                  Modifier.size(24.dp).clip(RoundedCornerShape(6.dp)).background(Color(0xFF2A2A2A)),
+                  Modifier.size(24.dp).clip(RoundedCornerShape(6.dp)).background(iconBackground),
               contentAlignment = Alignment.Center) {
                 Icon(
                     imageVector = Icons.Outlined.ChatBubbleOutline,
                     contentDescription = null,
-                    tint = Color(0xFF8A8A8A),
+                    tint = iconTint,
                     modifier = Modifier.size(15.dp))
               }
           Spacer(Modifier.width(12.dp))
           Text(
               text = title,
-              color = Color.White,
+              color = textColor,
               fontSize = 13.sp,
               maxLines = 1,
               overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)

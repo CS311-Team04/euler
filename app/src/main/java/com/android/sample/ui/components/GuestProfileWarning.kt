@@ -14,6 +14,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -26,6 +27,9 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun GuestProfileWarningModal(onContinueAsGuest: () -> Unit, onLogin: () -> Unit) {
+  val colorScheme = MaterialTheme.colorScheme
+  val textPrimary = colorScheme.onSurface
+  val textSecondary = colorScheme.onSurfaceVariant
   Box(
       modifier =
           Modifier.fillMaxSize()
@@ -34,7 +38,7 @@ fun GuestProfileWarningModal(onContinueAsGuest: () -> Unit, onLogin: () -> Unit)
       contentAlignment = Alignment.Center) {
         Card(
             modifier = Modifier.wrapContentWidth().width(280.dp).padding(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+            colors = CardDefaults.cardColors(containerColor = colorScheme.surface),
             shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)) {
               Column(
                   modifier = Modifier.padding(24.dp),
@@ -42,13 +46,13 @@ fun GuestProfileWarningModal(onContinueAsGuest: () -> Unit, onLogin: () -> Unit)
                   verticalArrangement = Arrangement.spacedBy(18.dp)) {
                     Text(
                         text = "Profile unavailable",
-                        color = Color.White,
+                        color = textPrimary,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center)
                     Text(
                         text = "Sign in with Microsoft Entra ID to access your profile settings.",
-                        color = Color.Gray,
+                        color = textSecondary,
                         fontSize = 14.sp,
                         textAlign = TextAlign.Center)
                     Row(
@@ -58,14 +62,15 @@ fun GuestProfileWarningModal(onContinueAsGuest: () -> Unit, onLogin: () -> Unit)
                               onClick = onContinueAsGuest,
                               modifier = Modifier.weight(1f),
                               colors =
-                                  ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A2A)),
+                                  ButtonDefaults.buttonColors(
+                                      containerColor = colorScheme.surfaceVariant),
                               shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
                               contentPadding =
                                   androidx.compose.foundation.layout.PaddingValues(
                                       horizontal = 16.dp, vertical = 12.dp)) {
                                 Text(
                                     "Continue as guest",
-                                    color = Color.White,
+                                    color = textPrimary,
                                     fontWeight = FontWeight.Medium,
                                     textAlign = TextAlign.Center)
                               }
@@ -73,13 +78,15 @@ fun GuestProfileWarningModal(onContinueAsGuest: () -> Unit, onLogin: () -> Unit)
                               onClick = onLogin,
                               modifier = Modifier.weight(1f),
                               colors =
-                                  ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935)),
+                                  ButtonDefaults.buttonColors(containerColor = colorScheme.primary),
                               shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
                               contentPadding =
                                   androidx.compose.foundation.layout.PaddingValues(
                                       horizontal = 16.dp, vertical = 12.dp)) {
                                 Text(
-                                    "Log in now", color = Color.White, fontWeight = FontWeight.Bold)
+                                    "Log in now",
+                                    color = colorScheme.onPrimary,
+                                    fontWeight = FontWeight.Bold)
                               }
                         }
                   }
