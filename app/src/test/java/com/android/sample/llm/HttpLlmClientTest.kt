@@ -175,8 +175,9 @@ class HttpLlmClientTest {
 
   @Test
   fun generateReply_rejects_http_for_non_loopback_host() = runBlocking {
+    // Use a public domain (not private IP) to test HTTPS enforcement
     val client =
-        HttpLlmClient(endpoint = "http://192.168.1.1/answer", apiKey = "", client = OkHttpClient())
+        HttpLlmClient(endpoint = "http://example.com/answer", apiKey = "", client = OkHttpClient())
 
     val error = runCatching { client.generateReply("Test") }.exceptionOrNull()
 

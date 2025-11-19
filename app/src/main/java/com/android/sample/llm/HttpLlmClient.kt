@@ -73,7 +73,24 @@ class HttpLlmClient(
             ?: throw IllegalStateException("Invalid LLM HTTP endpoint URL: $endpoint")
     if (url.isHttps) return
     if (url.scheme.equals("http", ignoreCase = true) && isAllowedLocalHost(url.host)) return
+    // In debug builds, allow HTTP for private IP ranges (common in CI/test environments)
+    if (BuildConfig.DEBUG && isPrivateIpAddress(url.host)) {
+      return
+    }
     throw IllegalStateException("LLM HTTP endpoint must use HTTPS (was $endpoint)")
+  }
+
+  private fun isPrivateIpAddress(host: String?): Boolean {
+    if (host.isNullOrBlank()) return false
+    return try {
+      val address = InetAddress.getByName(host)
+      address.isAnyLocalAddress ||
+          address.isLoopbackAddress ||
+          address.isLinkLocalAddress ||
+          address.isSiteLocalAddress
+    } catch (_: UnknownHostException) {
+      false
+    }
   }
 
   private fun isAllowedLocalHost(host: String?): Boolean {
