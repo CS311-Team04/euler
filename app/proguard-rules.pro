@@ -72,3 +72,16 @@
     public *** startActivityForSignInWithProvider(...);
     public *** getPendingAuthResult();
 }
+
+# Keep Play Services Auth (required for OAuth browser flow)
+-keep class com.google.android.gms.auth.** { *; }
+-keep class com.google.android.gms.common.** { *; }
+-keep class com.google.android.gms.tasks.** { *; }
+
+# Keep CustomTabs (used for OAuth browser flow)
+-keep class androidx.browser.customtabs.** { *; }
+-dontwarn androidx.browser.customtabs.**
+
+# Preserve line numbers for debugging release crashes
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile

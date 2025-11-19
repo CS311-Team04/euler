@@ -12,8 +12,10 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertTrue
@@ -33,7 +35,7 @@ class AAASettingsPageTest {
   @get:Rule val composeTestRule = createComposeRule()
 
   private lateinit var context: Context
-  private val testDispatcher = UnconfinedTestDispatcher()
+  private val testDispatcher = StandardTestDispatcher()
 
   @Before
   fun setup() {
@@ -91,15 +93,18 @@ class AAASettingsPageTest {
   }
 
   @Test
-  fun language_dropdown_allows_selection() {
+  fun language_dropdown_allows_selection() = runTest {
     composeTestRule.setContent { MaterialTheme { SettingsPage() } }
     composeTestRule.waitForIdle()
+    advanceUntilIdle()
 
     composeTestRule.onNodeWithText(Localization.t("speech_language")).performClick()
     composeTestRule.waitForIdle()
+    advanceUntilIdle()
 
     composeTestRule.onNodeWithText("FR").performClick()
     composeTestRule.waitForIdle()
+    advanceUntilIdle()
 
     composeTestRule.onNodeWithText("FR").assertIsDisplayed()
   }

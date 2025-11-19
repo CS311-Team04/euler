@@ -25,7 +25,12 @@ import java.util.concurrent.TimeUnit
 import kotlin.jvm.functions.Function0
 import kotlin.jvm.functions.Function1
 import kotlin.use
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
@@ -394,6 +399,131 @@ class NavGraphLogicTest {
     val message = buildAuthenticationErrorMessage(AuthUiState.SignedIn, fallback = "Fallback")
     assertEquals("Fallback", message)
   }
+
+  @Test
+  fun navigateSignOut_navigates_to_signin_with_builder_invoked() {
+    var capturedRoute: String? = null
+    var builderInvoked = false
+
+    val navigate: NavigateAction = { route, builder ->
+      capturedRoute = route
+      builderInvoked = true
+      // Builder is invoked - we verify the route is correct
+    }
+
+    navigateSignOut(navigate, Routes.Opening)
+
+    assertEquals(Routes.SignIn, capturedRoute)
+    assertTrue("Builder should be invoked", builderInvoked)
+  }
+
+  @Test
+  fun navigateSignOut_uses_opening_as_default_when_start_route_is_null() {
+    var capturedRoute: String? = null
+    var builderInvoked = false
+
+    val navigate: NavigateAction = { route, builder ->
+      capturedRoute = route
+      builderInvoked = true
+    }
+
+    navigateSignOut(navigate, null)
+
+    assertEquals(Routes.SignIn, capturedRoute)
+    assertTrue("Builder should be invoked", builderInvoked)
+  }
+
+  @Test
+  fun navigateSignOut_uses_custom_start_route_when_provided() {
+    var capturedRoute: String? = null
+    var builderInvoked = false
+
+    val navigate: NavigateAction = { route, builder ->
+      capturedRoute = route
+      builderInvoked = true
+    }
+
+    navigateSignOut(navigate, Routes.Home)
+
+    assertEquals(Routes.SignIn, capturedRoute)
+    assertTrue("Builder should be invoked", builderInvoked)
+  }
+
+  @Test
+  fun navigateToSettings_navigates_to_settings_route() {
+    var capturedRoute: String? = null
+
+    val navigate: NavigateAction = { route, builder -> capturedRoute = route }
+
+    navigateToSettings(navigate)
+
+    assertEquals(Routes.Settings, capturedRoute)
+  }
+
+  @Test
+  fun navigateToProfile_navigates_to_profile_route() {
+    var capturedRoute: String? = null
+
+    val navigate: NavigateAction = { route, builder -> capturedRoute = route }
+
+    navigateToProfile(navigate)
+
+    assertEquals(Routes.Profile, capturedRoute)
+  }
+
+  @Test
+  fun navigateToVoiceChat_navigates_to_voice_chat_route() {
+    var capturedRoute: String? = null
+
+    val navigate: NavigateAction = { route, builder -> capturedRoute = route }
+
+    navigateToVoiceChat(navigate)
+
+    assertEquals(Routes.VoiceChat, capturedRoute)
+  }
+
+  @Test
+  fun handleProfileClick_calls_show_guest_warning_when_is_guest() {
+    var showWarningCalled = false
+    var navigateCalled = false
+
+    handleProfileClick(
+        isGuest = true,
+        showGuestWarning = { showWarningCalled = true },
+        navigateToProfile = { navigateCalled = true })
+
+    assertTrue("Should call showGuestWarning when guest", showWarningCalled)
+    assertFalse("Should not navigate when guest", navigateCalled)
+  }
+
+  @Test
+  fun handleProfileClick_navigates_to_profile_when_not_guest() {
+    var showWarningCalled = false
+    var navigateCalled = false
+
+    handleProfileClick(
+        isGuest = false,
+        showGuestWarning = { showWarningCalled = true },
+        navigateToProfile = { navigateCalled = true })
+
+    assertFalse("Should not show warning when not guest", showWarningCalled)
+    assertTrue("Should navigate when not guest", navigateCalled)
+  }
+
+  @Test
+  fun handleProfileClick_guest_edge_cases() {
+    // Test with explicit true
+    var showWarningCalled = false
+    handleProfileClick(
+        isGuest = true, showGuestWarning = { showWarningCalled = true }, navigateToProfile = {})
+    assertTrue(showWarningCalled)
+
+    // Test with explicit false
+    var navigateCalled = false
+    handleProfileClick(
+        isGuest = false, showGuestWarning = {}, navigateToProfile = { navigateCalled = true })
+    assertTrue(navigateCalled)
+  }
 }
 
 @Suppress("UNCHECKED_CAST")
@@ -403,16 +533,19 @@ private fun anyFunction0(): Function0<Unit> = Mockito.any(Function0::class.java)
 private fun anyFunction1(): Function1<Exception, Unit> =
     Mockito.any(Function1::class.java) as Function1<Exception, Unit>
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [31])
 class NavGraphComposeTest {
 
   @get:Rule val composeRule = createComposeRule()
+  private val testDispatcher = UnconfinedTestDispatcher()
 
   private lateinit var activity: ComponentActivity
 
   @Before
   fun setup() {
+    Dispatchers.setMain(testDispatcher)
     val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     if (FirebaseApp.getApps(context).isEmpty()) {
       FirebaseApp.initializeApp(
@@ -425,6 +558,11 @@ class NavGraphComposeTest {
     }
     FirebaseAuth.getInstance().signOut()
     activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
+  }
+
+  @org.junit.After
+  fun tearDown() {
+    Dispatchers.resetMain()
   }
 
   @Test
