@@ -108,7 +108,7 @@ class OpeningScreenNavigationHandlerTest {
   @Test
   fun getOpeningScreenBackgroundColor_returns_correct_value() {
     val color = getOpeningScreenBackgroundColor()
-    assertEquals("Background color should be 0xFF121212", 0xFF121212, color)
+    assertEquals("Background color should be 0xFFFFFFFF", 0xFFFFFFFF, color)
   }
 
   @Test
