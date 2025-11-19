@@ -98,4 +98,90 @@ class HttpLlmClientTest {
     assertTrue(error is IllegalStateException)
     assertTrue(error!!.message!!.contains("must use HTTPS"))
   }
+
+  @Test
+  fun generateReply_allows_http_for_emulator_loopback() = runBlocking {
+    // Test that 10.0.2.2 (Android emulator loopback) passes validation
+    // Note: This won't actually connect in unit tests, but validates the security check
+    val clientWithTimeout =
+        OkHttpClient.Builder().connectTimeout(1, java.util.concurrent.TimeUnit.SECONDS).build()
+    val client =
+        HttpLlmClient(
+            endpoint = "http://10.0.2.2:8080/answer", apiKey = "", client = clientWithTimeout)
+
+    // Should not fail with "must use HTTPS" - validation should pass
+    // The actual connection will timeout, but that's expected in unit tests
+    val error = runCatching { client.generateReply("Test") }.exceptionOrNull()
+
+    // Should not complain about HTTPS requirement for emulator loopback
+    assertNotNull("Expected connection error, not validation error", error)
+    assertTrue(
+        "Emulator loopback should not require HTTPS, got: ${error!!.message}",
+        !error.message!!.contains("must use HTTPS"))
+  }
+
+  @Test
+  fun generateReply_allows_http_for_localhost() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody("""{"reply":"Localhost test"}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = "http://localhost:${server.port}/answer",
+            apiKey = "",
+            client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertEquals("Localhost test", reply.reply)
+  }
+
+  @Test
+  fun generateReply_allows_http_for_127_0_0_1() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody("""{"reply":"Loopback test"}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = "http://127.0.0.1:${server.port}/answer",
+            apiKey = "",
+            client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertEquals("Loopback test", reply.reply)
+  }
+
+  @Test
+  fun generateReply_allows_https_for_any_endpoint() = runBlocking {
+    // Test that HTTPS endpoints are accepted (validation passes)
+    // We use a real HTTPS endpoint that should exist (or at least validate correctly)
+    val client =
+        HttpLlmClient(endpoint = "https://example.com/answer", apiKey = "", client = OkHttpClient())
+
+    // The validation should pass (no "must use HTTPS" error)
+    // The actual HTTP call may fail, but that's not what we're testing
+    val error = runCatching { client.generateReply("Test") }.exceptionOrNull()
+
+    // Should not fail with "must use HTTPS" - validation should pass
+    if (error != null) {
+      assertTrue(
+          "Should not complain about HTTPS requirement for HTTPS URLs",
+          !error.message!!.contains("must use HTTPS"))
+    }
+  }
+
+  @Test
+  fun generateReply_rejects_http_for_non_loopback_host() = runBlocking {
+    val client =
+        HttpLlmClient(endpoint = "http://192.168.1.1/answer", apiKey = "", client = OkHttpClient())
+
+    val error = runCatching { client.generateReply("Test") }.exceptionOrNull()
+
+    assertNotNull("Expected an IllegalStateException", error)
+    assertTrue(error is IllegalStateException)
+    assertTrue(error!!.message!!.contains("must use HTTPS"))
+  }
 }

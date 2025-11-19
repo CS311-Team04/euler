@@ -123,6 +123,10 @@ private const val CONTENT_TYPE_JSON = "application/json; charset=utf-8"
 private const val JSON_KEY_QUESTION = "question"
 private const val JSON_KEY_REPLY = "reply"
 private const val JSON_KEY_PRIMARY_URL = "primary_url"
+// Android emulator loopback address (maps to host's 127.0.0.1) - safe for local development
+// nosonar kotlin:S1313 - This is a well-known safe loopback address for Android emulator
 private const val EMULATOR_LOOPBACK_HOST = "10.0.2.2"
+// Standard localhost identifiers - safe loopback addresses
+// nosonar kotlin:S1313 - These are standard safe loopback addresses
 private const val LOCALHOST = "localhost"
 private const val LOOPBACK_IPV4 = "127.0.0.1"
