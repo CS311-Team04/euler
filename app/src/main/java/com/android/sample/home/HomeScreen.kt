@@ -11,6 +11,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -224,16 +226,22 @@ fun HomeScreen(
                               modifier = Modifier.size(24.dp))
                         }
 
-                    // Top-right menu (placeholder)
+                    // Top-right menu with Delete and Share
                     DropdownMenu(
                         expanded = ui.isTopRightOpen,
                         onDismissRequest = { viewModel.setTopRightOpen(false) },
-                        modifier = Modifier.testTag(HomeTags.TopRightMenu)) {
-                          DropdownMenuItem(
-                              text = { Text("Delete current chat") },
+                        modifier = Modifier.testTag(HomeTags.TopRightMenu),
+                        containerColor = Color.Black) {
+                          DeleteMenuItem(
                               onClick = {
                                 viewModel.setTopRightOpen(false)
                                 viewModel.showDeleteConfirmation()
+                              })
+                          DropdownMenuItem(
+                              text = { Text(Localization.t("share"), color = Color.White) },
+                              onClick = {
+                                viewModel.setTopRightOpen(false)
+                                // TODO: Implement share functionality
                               })
                         }
                   },
@@ -527,10 +535,25 @@ private fun TopRightPanelPlaceholder(onDismiss: () -> Unit, onDeleteClick: () ->
       })
 }
 
-/**
- * Modal shown to confirm clearing the chat history. Exposes two testTags: "home_delete_cancel" and
- * "home_delete_confirm" on buttons.
- */
+/** Delete menu item that turns red on hover/press. */
+@Composable
+private fun DeleteMenuItem(onClick: () -> Unit) {
+  val interactionSource = remember { MutableInteractionSource() }
+  val isPressed by interactionSource.collectIsPressedAsState()
+  val isHovered by interactionSource.collectIsHoveredAsState()
+
+  val textColor by
+      animateColorAsState(
+          targetValue = if (isPressed || isHovered) Color.Red else Color.White,
+          label = "delete-text-color")
+
+  DropdownMenuItem(
+      text = { Text(Localization.t("delete"), color = textColor) },
+      onClick = onClick,
+      interactionSource = interactionSource)
+}
+
+/** Simple delete confirmation modal with "Delete chat?" title and Cancel/Delete buttons. */
 @Composable
 private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit) {
   Box(
@@ -547,18 +570,10 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
                   modifier = Modifier.padding(24.dp),
                   horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = Localization.t("clear_chat"),
+                        text = "Delete chat?",
                         color = Color.White,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold)
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = Localization.t("clear_chat_message"),
-                        color = Color.Gray,
-                        fontSize = 14.sp,
-                        textAlign = TextAlign.Center)
 
                     Spacer(modifier = Modifier.height(24.dp))
 
