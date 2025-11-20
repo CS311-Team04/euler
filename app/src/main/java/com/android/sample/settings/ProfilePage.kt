@@ -92,10 +92,10 @@ fun ProfilePage(
     }
   }
 
-  Box(modifier = Modifier.fillMaxSize().background(background)) {
+  Column(modifier = Modifier.fillMaxSize().background(background)) {
     Column(
         modifier =
-            Modifier.fillMaxSize()
+            Modifier.weight(1f)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 16.dp)) {
           Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -183,17 +183,21 @@ fun ProfilePage(
                               ProfileFieldDefinition(
                                   icon = Icons.Filled.HomeWork,
                                   label = "Faculty",
-                                  placeholder = "Add your faculty"),
+                                  placeholder = "Select your faculty"),
                           value = formManager.faculty,
-                          onValueChange = { formManager.updateFaculty(it) }),
+                          onValueChange = { formManager.updateFaculty(it) },
+                          options = formManager.facultyOptions,
+                          placeholderColor = textSecondary.copy(alpha = 0.6f)),
                       ProfileFieldState(
                           definition =
                               ProfileFieldDefinition(
                                   icon = Icons.Filled.LocationCity,
                                   label = "Section",
-                                  placeholder = "Add your section/program"),
+                                  placeholder = "Select your section/program"),
                           value = formManager.section,
-                          onValueChange = { formManager.updateSection(it) })),
+                          onValueChange = { formManager.updateSection(it) },
+                          options = formManager.sectionOptions,
+                          placeholderColor = textSecondary.copy(alpha = 0.6f))),
               backgroundColor = cardColor,
               textPrimary = textPrimary,
               textSecondary = textSecondary)
@@ -228,14 +232,18 @@ fun ProfilePage(
               backgroundColor = cardColor,
               textPrimary = textPrimary,
               textSecondary = textSecondary)
-        }
 
-    Text(
-        text = "BY EPFL",
-        color = textSecondary,
-        fontSize = 12.sp,
-        textAlign = TextAlign.Center,
-        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp))
+          Spacer(modifier = Modifier.height(24.dp))
+
+          Spacer(modifier = Modifier.height(32.dp))
+
+          Text(
+              text = "BY EPFL",
+              color = textSecondary,
+              fontSize = 12.sp,
+              textAlign = TextAlign.Center,
+              modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp))
+        }
   }
 }
 
