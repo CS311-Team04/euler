@@ -231,14 +231,18 @@ fun HomeScreen(
                         expanded = ui.isTopRightOpen,
                         onDismissRequest = { viewModel.setTopRightOpen(false) },
                         modifier = Modifier.testTag(HomeTags.TopRightMenu),
-                        containerColor = Color.Black) {
+                        containerColor = MaterialTheme.colorScheme.surface) {
                           DeleteMenuItem(
                               onClick = {
                                 viewModel.setTopRightOpen(false)
                                 viewModel.showDeleteConfirmation()
                               })
                           DropdownMenuItem(
-                              text = { Text(Localization.t("share"), color = Color.White) },
+                              text = {
+                                Text(
+                                    Localization.t("share"),
+                                    color = MaterialTheme.colorScheme.onSurface)
+                              },
                               onClick = {
                                 viewModel.setTopRightOpen(false)
                                 // TODO: Implement share functionality
@@ -541,10 +545,11 @@ private fun DeleteMenuItem(onClick: () -> Unit) {
   val interactionSource = remember { MutableInteractionSource() }
   val isPressed by interactionSource.collectIsPressedAsState()
   val isHovered by interactionSource.collectIsHoveredAsState()
+  val colorScheme = MaterialTheme.colorScheme
 
   val textColor by
       animateColorAsState(
-          targetValue = if (isPressed || isHovered) Color.Red else Color.White,
+          targetValue = if (isPressed || isHovered) colorScheme.error else colorScheme.onSurface,
           label = "delete-text-color")
 
   DropdownMenuItem(
