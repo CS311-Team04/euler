@@ -346,10 +346,12 @@ private fun DrawerConversationsSection(
           showAllChats = showAllChats,
           onShowAllChats = onShowAllChats,
           onPickConversation = onPickConversation,
-          isSelectionMode = isSelectionMode,
-          selectedConversationIds = selectedConversationIds,
-          onToggleSelection = onToggleSelection,
-          onLongPressConversation = onLongPressConversation,
+          selectionState =
+              DrawerSelectionState(
+                  isSelectionMode = isSelectionMode,
+                  selectedConversationIds = selectedConversationIds,
+                  onToggleSelection = onToggleSelection,
+                  onLongPressConversation = onLongPressConversation),
       )
     }
   }
@@ -374,6 +376,17 @@ private fun DrawerConversationsEmptyState() {
 }
 
 /**
+ * State data class for selection mode parameters. Groups related selection parameters to reduce
+ * function parameter count.
+ */
+private data class DrawerSelectionState(
+    val isSelectionMode: Boolean,
+    val selectedConversationIds: Set<String>,
+    val onToggleSelection: (String) -> Unit,
+    val onLongPressConversation: (String) -> Unit
+)
+
+/**
  * Populated conversations list for the drawer.
  *
  * Behavior:
@@ -388,10 +401,7 @@ private fun DrawerConversationsEmptyState() {
  * @param showAllChats True when the user has expanded to "ALL CHATS".
  * @param onShowAllChats Called when the user taps the "View all chats" row.
  * @param onPickConversation Invoked when a conversation row is selected.
- * @param isSelectionMode Whether selection mode is active.
- * @param selectedConversationIds Set of selected conversation IDs.
- * @param onToggleSelection Called when a conversation's selection should be toggled.
- * @param onLongPressConversation Called when a conversation is long-pressed.
+ * @param selectionState State and callbacks for selection mode.
  */
 @Composable
 private fun DrawerConversationsList(
@@ -399,55 +409,110 @@ private fun DrawerConversationsList(
     showAllChats: Boolean,
     onShowAllChats: () -> Unit,
     onPickConversation: (String) -> Unit,
-    isSelectionMode: Boolean,
-    selectedConversationIds: Set<String>,
-    onToggleSelection: (String) -> Unit,
-    onLongPressConversation: (String) -> Unit,
+    selectionState: DrawerSelectionState,
 ) {
-  val hasMoreThanLimit = ui.conversations.size > RECENT_CONVERSATIONS_LIMIT
-  val isShowingAll = !hasMoreThanLimit || showAllChats
-  val sectionTitleKey = if (isShowingAll) "all_chats" else "recents"
+  val displayedConversations = computeDisplayedConversations(ui.conversations, showAllChats)
+  val sectionTitleKey =
+      if (showAllChats || ui.conversations.size <= RECENT_CONVERSATIONS_LIMIT) "all_chats"
+      else "recents"
 
+  DrawerConversationsSectionHeader(sectionTitleKey)
+  DrawerConversationsItems(
+      conversations = displayedConversations,
+      currentConversationId = ui.currentConversationId,
+      selectionState = selectionState,
+      onPickConversation = onPickConversation)
+
+  if (ui.conversations.size > RECENT_CONVERSATIONS_LIMIT && !showAllChats) {
+    ViewAllChatsRow(onShowAllChats = onShowAllChats)
+  }
+}
+
+/** Computes which conversations should be displayed based on the current mode. */
+private fun computeDisplayedConversations(
+    conversations: List<com.android.sample.conversations.Conversation>,
+    showAllChats: Boolean
+): List<com.android.sample.conversations.Conversation> =
+    if (showAllChats || conversations.size <= RECENT_CONVERSATIONS_LIMIT) {
+      conversations
+    } else {
+      conversations.take(RECENT_CONVERSATIONS_LIMIT)
+    }
+
+/** Renders the section header (title) for the conversations list. */
+@Composable
+private fun DrawerConversationsSectionHeader(sectionTitleKey: String) {
   Text(
       text = Localization.t(sectionTitleKey),
       color = EulerDrawerSectionLabel,
       fontSize = 12.sp,
       modifier = Modifier.testTag(DrawerTags.RecentsSection))
   Spacer(modifier = Modifier.height(14.dp))
+}
 
-  val displayedConversations =
-      if (isShowingAll) {
-        ui.conversations
-      } else {
-        ui.conversations.take(RECENT_CONVERSATIONS_LIMIT)
-      }
-
+/** Renders the list of conversation items. */
+@Composable
+private fun DrawerConversationsItems(
+    conversations: List<com.android.sample.conversations.Conversation>,
+    currentConversationId: String?,
+    selectionState: DrawerSelectionState,
+    onPickConversation: (String) -> Unit,
+) {
   Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-    displayedConversations.forEach { conv ->
-      val isSelected =
-          if (isSelectionMode) {
-            selectedConversationIds.contains(conv.id)
-          } else {
-            conv.id == ui.currentConversationId
-          }
-      RecentRow(
-          title = conv.title.ifBlank { Localization.t("untitled_conversation") },
-          selected = isSelected,
-          isSelectionMode = isSelectionMode,
-          isItemSelected = selectedConversationIds.contains(conv.id),
-          onClick = {
-            if (isSelectionMode) {
-              onToggleSelection(conv.id)
-            } else {
-              onPickConversation(conv.id)
-            }
-          },
-          onLongClick = { onLongPressConversation(conv.id) })
+    conversations.forEach { conv ->
+      DrawerConversationItem(
+          conversation = conv,
+          currentConversationId = currentConversationId,
+          selectionState = selectionState,
+          onPickConversation = onPickConversation)
     }
+  }
+}
 
-    if (hasMoreThanLimit && !showAllChats) {
-      ViewAllChatsRow(onShowAllChats = onShowAllChats)
-    }
+/** Renders a single conversation item row. */
+@Composable
+private fun DrawerConversationItem(
+    conversation: com.android.sample.conversations.Conversation,
+    currentConversationId: String?,
+    selectionState: DrawerSelectionState,
+    onPickConversation: (String) -> Unit,
+) {
+  val isSelected =
+      computeIsSelected(
+          conversationId = conversation.id,
+          currentConversationId = currentConversationId,
+          isSelectionMode = selectionState.isSelectionMode,
+          selectedConversationIds = selectionState.selectedConversationIds)
+
+  val isItemSelected = selectionState.selectedConversationIds.contains(conversation.id)
+  val title = conversation.title.ifBlank { Localization.t("untitled_conversation") }
+
+  RecentRow(
+      title = title,
+      selected = isSelected,
+      isSelectionMode = selectionState.isSelectionMode,
+      isItemSelected = isItemSelected,
+      onClick = {
+        if (selectionState.isSelectionMode) {
+          selectionState.onToggleSelection(conversation.id)
+        } else {
+          onPickConversation(conversation.id)
+        }
+      },
+      onLongClick = { selectionState.onLongPressConversation(conversation.id) })
+}
+
+/** Computes whether a conversation should be visually marked as selected. */
+private fun computeIsSelected(
+    conversationId: String,
+    currentConversationId: String?,
+    isSelectionMode: Boolean,
+    selectedConversationIds: Set<String>
+): Boolean {
+  return if (isSelectionMode) {
+    selectedConversationIds.contains(conversationId)
+  } else {
+    conversationId == currentConversationId
   }
 }
 
