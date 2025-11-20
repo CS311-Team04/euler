@@ -38,6 +38,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.android.sample.ui.theme.EulerAudioButtonLoadingColor
+import com.android.sample.ui.theme.EulerAudioButtonTint
+import com.android.sample.ui.theme.EulerAudioButtonTintSemiTransparent
+import com.android.sample.ui.theme.EulerThinkingCursorColor
 
 /**
  * Renders a single chat message as either:
@@ -66,9 +70,9 @@ fun ChatMessage(
     modifier: Modifier = Modifier,
     isStreaming: Boolean = false,
     audioState: MessageAudioState? = null,
-    userBubbleBg: Color = MaterialTheme.colorScheme.surfaceVariant,
-    userBubbleText: Color = MaterialTheme.colorScheme.onSurface,
-    aiText: Color = MaterialTheme.colorScheme.onBackground,
+    userBubbleBg: Color = Color(0xFF2B2B2B),
+    userBubbleText: Color = Color.White,
+    aiText: Color = Color(0xFFEDEDED),
     maxUserBubbleWidthFraction: Float = 0.78f
 ) {
   val isUser = message.type == ChatType.USER
@@ -121,8 +125,7 @@ fun ChatMessage(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically) {
                   AudioPlaybackButton(
-                      state = audioState,
-                      tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f))
+                      state = audioState, tint = EulerAudioButtonTintSemiTransparent)
                 }
           }
         }
@@ -144,10 +147,9 @@ private fun LeadingThinkingDot() {
                   repeatMode = RepeatMode.Reverse),
           label = "cursorAlpha")
 
-  val colorScheme = MaterialTheme.colorScheme
   Surface(
       modifier = Modifier.size(10.dp).testTag("chat_ai_cursor"),
-      color = colorScheme.onBackground.copy(alpha = alpha),
+      color = EulerThinkingCursorColor.copy(alpha = alpha),
       shape = CircleShape,
       tonalElevation = 0.dp,
       shadowElevation = 0.dp) {}
@@ -165,15 +167,14 @@ data class MessageAudioState(
 private fun AudioPlaybackButton(
     state: MessageAudioState,
     modifier: Modifier = Modifier.size(24.dp),
-    tint: Color = MaterialTheme.colorScheme.onSurface
+    tint: Color = EulerAudioButtonTint
 ) {
-  val colorScheme = MaterialTheme.colorScheme
   when {
     state.isLoading -> {
       CircularProgressIndicator(
           modifier = Modifier.size(14.dp).testTag("chat_audio_btn_loading"),
           strokeWidth = 2.dp,
-          color = colorScheme.onSurfaceVariant)
+          color = EulerAudioButtonLoadingColor)
     }
     state.isPlaying -> {
       IconButton(modifier = modifier.testTag("chat_audio_btn_stop"), onClick = state.onStop) {
