@@ -102,7 +102,10 @@ class HomeScreenE2ETest {
     // Click the send button
     composeRule.onNodeWithTag(HomeTags.SendBtn).performClick()
 
-    // Wait for the message to appear in the chat
+    // Wait for the UI to update after clicking send
+    composeRule.waitForIdle()
+
+    // Wait for the message to appear in the chat (message is added immediately in sendMessage)
     composeRule.waitUntilAtLeastOneExists(
         hasText(testMessage, substring = true), timeoutMillis = 10_000)
     composeRule.onNodeWithText(testMessage, substring = true).assertIsDisplayed()

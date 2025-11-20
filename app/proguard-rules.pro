@@ -85,3 +85,36 @@
 # Preserve line numbers for debugging release crashes
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
+
+# --- Firestore Data Models ---
+# Keep Conversation and MessageDTO classes for Firestore serialization
+# Firestore uses reflection to serialize/deserialize these classes
+-keep class com.android.sample.conversations.Conversation { *; }
+-keep class com.android.sample.conversations.MessageDTO { *; }
+-keep class com.android.sample.conversations.AuthNotReadyException { *; }
+
+# Keep all data classes in the conversations package with their constructors and properties
+-keep class com.android.sample.conversations.** {
+    <fields>;
+    <init>(...);
+}
+
+# Preserve Kotlin data class properties for Firestore serialization
+-keepclassmembers class com.android.sample.conversations.Conversation {
+    <fields>;
+    <init>(...);
+}
+
+-keepclassmembers class com.android.sample.conversations.MessageDTO {
+    <fields>;
+    <init>(...);
+}
+
+# Keep Firebase Firestore custom class mapper and related classes
+-keep class com.google.firebase.firestore.util.CustomClassMapper { *; }
+-keep class com.google.firebase.firestore.util.CustomClassMapper$* { *; }
+-keep class com.google.firebase.firestore.util.CustomClassMapper$BeanMapper { *; }
+
+# Keep Kotlin metadata for data classes (required for Firestore serialization)
+-keepattributes RuntimeVisibleAnnotations
+-keepattributes *Annotation*

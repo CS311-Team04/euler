@@ -25,6 +25,7 @@ import kotlin.getValue
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -177,6 +178,7 @@ class HomeViewModel(
    * - If nothing is selected and we're not in a local placeholder, auto-select the most recent.
    * - If the list is empty, keep `currentConversationId = null`.
    */
+  @OptIn(ExperimentalCoroutinesApi::class)
   private fun startData() {
     if (dataStarted || isGuest()) return
     dataStarted = true
