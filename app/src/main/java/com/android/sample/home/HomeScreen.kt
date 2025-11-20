@@ -187,9 +187,7 @@ fun HomeScreen(
                 if (ui.isDrawerOpen) viewModel.toggleDrawer()
               }
             },
-            onDeleteConversations = { ids ->
-              viewModel.deleteConversations(ids)
-            })
+            onDeleteConversations = { ids -> viewModel.deleteConversations(ids) })
       }) {
         Scaffold(
             modifier = modifier.fillMaxSize().background(Color.Black).testTag(HomeTags.Root),

@@ -853,10 +853,10 @@ class HomeViewModel(
 
   /**
    * Delete multiple conversations from Firebase.
-   * 
-   * This function deletes each conversation ID from Firestore and updates local state.
-   * The conversationsFlow listener will automatically refresh the UI after deletion.
-   * 
+   *
+   * This function deletes each conversation ID from Firestore and updates local state. The
+   * conversationsFlow listener will automatically refresh the UI after deletion.
+   *
    * @param ids List of conversation IDs to delete.
    */
   fun deleteConversations(ids: List<String>) {
@@ -882,7 +882,7 @@ class HomeViewModel(
             // Continue with other deletions even if one fails
           }
         }
-        
+
         // If the current conversation was deleted, start a new local chat
         val currentId = _uiState.value.currentConversationId
         if (currentId != null && ids.contains(currentId)) {

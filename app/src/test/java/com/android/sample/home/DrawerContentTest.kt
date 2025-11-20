@@ -141,9 +141,7 @@ class DrawerContentTest {
     var deletedIds: List<String>? = null
     composeRule.setContent {
       MaterialTheme {
-        DrawerContent(
-            ui = uiState,
-            onDeleteConversations = { ids -> deletedIds = ids })
+        DrawerContent(ui = uiState, onDeleteConversations = { ids -> deletedIds = ids })
       }
     }
 

@@ -125,11 +125,11 @@ fun DrawerContent(
 ) {
   // Controls RECENTS vs ALL CHATS; reset every time the drawer is reopened
   var showAllChats by remember(ui.isDrawerOpen) { mutableStateOf(false) }
-  
+
   // Selection mode state
   var selectedConversationIds by remember { mutableStateOf<Set<String>>(emptySet()) }
   var isSelectionMode by remember { mutableStateOf(false) }
-  
+
   // Reset selection when drawer closes
   LaunchedEffect(ui.isDrawerOpen) {
     if (!ui.isDrawerOpen) {
@@ -165,15 +165,16 @@ fun DrawerContent(
             isSelectionMode = isSelectionMode,
             selectedConversationIds = selectedConversationIds,
             onToggleSelection = { id ->
-              selectedConversationIds = if (selectedConversationIds.contains(id)) {
-                val newSet = selectedConversationIds - id
-                if (newSet.isEmpty()) {
-                  isSelectionMode = false
-                }
-                newSet
-              } else {
-                selectedConversationIds + id
-              }
+              selectedConversationIds =
+                  if (selectedConversationIds.contains(id)) {
+                    val newSet = selectedConversationIds - id
+                    if (newSet.isEmpty()) {
+                      isSelectionMode = false
+                    }
+                    newSet
+                  } else {
+                    selectedConversationIds + id
+                  }
             },
             onLongPressConversation = { id ->
               isSelectionMode = true
@@ -181,7 +182,7 @@ fun DrawerContent(
             },
             modifier = Modifier.weight(1f),
         )
-        
+
         // Selection mode actions
         if (isSelectionMode) {
           Spacer(modifier = Modifier.height(12.dp))
@@ -195,8 +196,7 @@ fun DrawerContent(
               onCancel = {
                 selectedConversationIds = emptySet()
                 isSelectionMode = false
-              }
-          )
+              })
         }
 
         DrawerFooter(
@@ -413,11 +413,12 @@ private fun DrawerConversationsList(
 
   Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
     displayedConversations.forEach { conv ->
-      val isSelected = if (isSelectionMode) {
-        selectedConversationIds.contains(conv.id)
-      } else {
-        conv.id == ui.currentConversationId
-      }
+      val isSelected =
+          if (isSelectionMode) {
+            selectedConversationIds.contains(conv.id)
+          } else {
+            conv.id == ui.currentConversationId
+          }
       RecentRow(
           title = conv.title.ifBlank { Localization.t("untitled_conversation") },
           selected = isSelected,
@@ -430,9 +431,7 @@ private fun DrawerConversationsList(
               onPickConversation(conv.id)
             }
           },
-          onLongClick = {
-            onLongPressConversation(conv.id)
-          })
+          onLongClick = { onLongPressConversation(conv.id) })
     }
 
     if (hasMoreThanLimit && !showAllChats) {
@@ -569,21 +568,19 @@ private fun RecentRow(
     onClick: () -> Unit = {},
     onLongClick: () -> Unit = {}
 ) {
-  val bg = when {
-    isSelectionMode && isItemSelected -> EulerRecentRowSelectedBg
-    !isSelectionMode && selected -> EulerRecentRowSelectedBg
-    else -> Color.Transparent
-  }
+  val bg =
+      when {
+        isSelectionMode && isItemSelected -> EulerRecentRowSelectedBg
+        !isSelectionMode && selected -> EulerRecentRowSelectedBg
+        else -> Color.Transparent
+      }
   Surface(
       color = bg,
       shape = RoundedCornerShape(8.dp),
       modifier =
           Modifier.fillMaxWidth()
               .clip(RoundedCornerShape(8.dp))
-              .combinedClickable(
-                  onClick = onClick,
-                  onLongClick = onLongClick
-              )
+              .combinedClickable(onClick = onClick, onLongClick = onLongClick)
               .padding(vertical = 6.dp, horizontal = 2.dp)
               .testTag(DrawerTags.ConversationRow)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -618,70 +615,59 @@ private fun RecentRow(
       }
 }
 
-/**
- * Selection mode actions bar showing delete and cancel buttons.
- */
+/** Selection mode actions bar showing delete and cancel buttons. */
 @Composable
-private fun DrawerSelectionActions(
-    selectedCount: Int,
-    onDelete: () -> Unit,
-    onCancel: () -> Unit
-) {
+private fun DrawerSelectionActions(selectedCount: Int, onDelete: () -> Unit, onCancel: () -> Unit) {
   Row(
       modifier = Modifier.fillMaxWidth(),
       horizontalArrangement = Arrangement.spacedBy(12.dp),
-      verticalAlignment = Alignment.CenterVertically
-  ) {
-    Surface(
-        color = Color(0xFFE53935),
-        shape = RoundedCornerShape(8.dp),
-        modifier =
-            Modifier.weight(1f)
-                .clickable { onDelete() }
-                .padding(vertical = 12.dp)
-                .testTag(DrawerTags.DeleteButton)
-    ) {
-      Row(
-          modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-          horizontalArrangement = Arrangement.Center,
-          verticalAlignment = Alignment.CenterVertically
-      ) {
-        Icon(
-            imageVector = Icons.Filled.Delete,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = if (selectedCount == 1) "Delete" else "Delete ($selectedCount)",
-            color = Color.White,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium)
+      verticalAlignment = Alignment.CenterVertically) {
+        Surface(
+            color = EulerNewChatCircleRed,
+            shape = RoundedCornerShape(8.dp),
+            modifier =
+                Modifier.weight(1f)
+                    .clickable { onDelete() }
+                    .padding(vertical = 12.dp)
+                    .testTag(DrawerTags.DeleteButton)) {
+              Row(
+                  modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                  horizontalArrangement = Arrangement.Center,
+                  verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Delete ($selectedCount)",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium)
+                  }
+            }
+
+        Surface(
+            color = Color.Transparent,
+            shape = RoundedCornerShape(8.dp),
+            modifier =
+                Modifier.weight(1f)
+                    .clickable { onCancel() }
+                    .padding(vertical = 12.dp)
+                    .testTag(DrawerTags.CancelButton)) {
+              Row(
+                  modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                  horizontalArrangement = Arrangement.Center,
+                  verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Cancel",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium)
+                  }
+            }
       }
-    }
-    
-    Surface(
-        color = Color.Transparent,
-        shape = RoundedCornerShape(8.dp),
-        modifier =
-            Modifier.weight(1f)
-                .clickable { onCancel() }
-                .padding(vertical = 12.dp)
-                .testTag(DrawerTags.CancelButton)
-    ) {
-      Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.Center,
-          verticalAlignment = Alignment.CenterVertically
-      ) {
-        Text(
-            text = "Cancel",
-            color = Color.White,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium)
-      }
-    }
-  }
 }
 
 /** Preview for the drawer in isolation with default state. */
