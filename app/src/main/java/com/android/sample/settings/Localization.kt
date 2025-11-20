@@ -67,7 +67,7 @@ object Localization {
           // Home Screen - Actions
           "share" to "Share",
           "delete" to "Delete",
-          "clear_chat" to "Clear Chat?",
+          "clear_chat" to "Delete chat?",
           "clear_chat_message" to "This will delete all messages. This action cannot be undone.",
           "cancel" to "Cancel",
 

@@ -824,7 +824,7 @@ class HomeScreenTestCov {
 
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
-    composeRule.onNodeWithText("Clear Chat?").assertIsDisplayed()
+    composeRule.onNodeWithText("Delete chat?").assertIsDisplayed()
     composeRule.runOnIdle { viewModel.hideDeleteConfirmation() }
     composeRule.waitUntil(timeoutMillis = 2_000) { !viewModel.uiState.value.showDeleteConfirmation }
 
