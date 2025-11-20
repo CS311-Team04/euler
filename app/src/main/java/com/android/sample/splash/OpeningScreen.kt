@@ -2,17 +2,25 @@ package com.android.sample.splash
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import com.android.sample.R
 import com.android.sample.authentification.AuthUiState
+import com.android.sample.settings.Localization
 
 @Composable
 fun OpeningScreen(
@@ -29,16 +37,27 @@ fun OpeningScreen(
         onNavigateToSignIn = onNavigateToSignIn)
   }
 
-  // Display the splash image from resources
-  Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-    // Background color as fallback
-    Box(modifier = Modifier.fillMaxSize().background(Color(getOpeningScreenBackgroundColor())))
+  val colorScheme = MaterialTheme.colorScheme
 
-    // Display the splash image
-    Image(
-        painter = painterResource(id = R.drawable.opening_screen),
-        contentDescription = "Opening Screen",
-        modifier = Modifier.fillMaxSize(),
-        contentScale = ContentScale.FillBounds)
-  }
+  Box(
+      modifier =
+          modifier.fillMaxSize().background(colorScheme.background).semantics {
+            contentDescription = "Opening Screen"
+          }) {
+        Column(
+            modifier = Modifier.align(Alignment.Center),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center) {
+              Image(
+                  painter = painterResource(id = R.drawable.euler_logo),
+                  contentDescription = null,
+                  modifier = Modifier.fillMaxWidth(0.45f),
+                  alignment = Alignment.Center)
+            }
+        Text(
+            text = Localization.t("by_epfl"),
+            color = colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 48.dp))
+      }
 }
