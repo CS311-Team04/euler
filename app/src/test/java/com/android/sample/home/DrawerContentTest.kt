@@ -8,7 +8,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performLongClick
+import androidx.compose.ui.test.performTouchInput
 import com.android.sample.conversations.Conversation
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -86,8 +86,10 @@ class DrawerContentTest {
                 ))
     composeRule.setContent { MaterialTheme { DrawerContent(ui = uiState) } }
 
-    // Long-press a conversation row
-    composeRule.onAllNodesWithTag(DrawerTags.ConversationRow).onFirst().performLongClick()
+    // Long-press a conversation row (simulate with down, wait, up)
+    composeRule.onAllNodesWithTag(DrawerTags.ConversationRow)[0].performTouchInput { down(center) }
+    Thread.sleep(500) // Simulate long press duration
+    composeRule.onAllNodesWithTag(DrawerTags.ConversationRow)[0].performTouchInput { up() }
 
     // Selection mode should be active: delete and cancel buttons should appear
     composeRule.onNodeWithTag(DrawerTags.DeleteButton).assertIsDisplayed()
@@ -109,7 +111,9 @@ class DrawerContentTest {
 
     // Enter selection mode by long-pressing first item
     val conversationRows = composeRule.onAllNodesWithTag(DrawerTags.ConversationRow)
-    conversationRows.onFirst().performLongClick()
+    conversationRows[0].performTouchInput { down(center) }
+    Thread.sleep(500) // Simulate long press duration
+    conversationRows[0].performTouchInput { up() }
 
     // Delete button should show count
     composeRule.onNodeWithText("Delete (1)").assertIsDisplayed()
@@ -121,7 +125,7 @@ class DrawerContentTest {
     composeRule.onNodeWithText("Delete (2)").assertIsDisplayed()
 
     // Click first item again to deselect it
-    conversationRows.onFirst().performClick()
+    conversationRows[0].performClick()
 
     // Delete button should show updated count
     composeRule.onNodeWithText("Delete (1)").assertIsDisplayed()
@@ -147,7 +151,9 @@ class DrawerContentTest {
 
     // Enter selection mode
     val conversationRows = composeRule.onAllNodesWithTag(DrawerTags.ConversationRow)
-    conversationRows.onFirst().performLongClick()
+    conversationRows[0].performTouchInput { down(center) }
+    Thread.sleep(500) // Simulate long press duration
+    conversationRows[0].performTouchInput { up() }
 
     // Select another item
     conversationRows[1].performClick()
@@ -175,7 +181,9 @@ class DrawerContentTest {
     composeRule.setContent { MaterialTheme { DrawerContent(ui = uiState) } }
 
     // Enter selection mode
-    composeRule.onAllNodesWithTag(DrawerTags.ConversationRow).onFirst().performLongClick()
+    composeRule.onAllNodesWithTag(DrawerTags.ConversationRow)[0].performTouchInput { down(center) }
+    Thread.sleep(500) // Simulate long press duration
+    composeRule.onAllNodesWithTag(DrawerTags.ConversationRow)[0].performTouchInput { up() }
 
     // Verify selection mode is active
     composeRule.onNodeWithTag(DrawerTags.DeleteButton).assertIsDisplayed()
@@ -201,13 +209,15 @@ class DrawerContentTest {
     composeRule.setContent { MaterialTheme { DrawerContent(ui = uiState) } }
 
     // Enter selection mode
-    composeRule.onAllNodesWithTag(DrawerTags.ConversationRow).onFirst().performLongClick()
+    composeRule.onAllNodesWithTag(DrawerTags.ConversationRow)[0].performTouchInput { down(center) }
+    Thread.sleep(500) // Simulate long press duration
+    composeRule.onAllNodesWithTag(DrawerTags.ConversationRow)[0].performTouchInput { up() }
 
     // Verify selection mode is active
     composeRule.onNodeWithTag(DrawerTags.DeleteButton).assertIsDisplayed()
 
     // Deselect the item
-    composeRule.onAllNodesWithTag(DrawerTags.ConversationRow).onFirst().performClick()
+    composeRule.onAllNodesWithTag(DrawerTags.ConversationRow)[0].performClick()
 
     // Selection mode should be exited automatically
     composeRule.onNodeWithTag(DrawerTags.DeleteButton).assertIsNotDisplayed()
