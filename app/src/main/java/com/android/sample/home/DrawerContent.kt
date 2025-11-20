@@ -109,6 +109,8 @@ fun DrawerContentPreviewable() {
  * @param onNewChat Called when the "New chat" row is pressed.
  * @param onPickConversation Called when a conversation entry is selected.
  * @param onDeleteConversations Called when conversations should be deleted (with their IDs).
+ * @param testLongPressConversationId For testing only: directly trigger long press on this
+ *   conversation ID.
  */
 @Composable
 fun DrawerContent(
@@ -121,7 +123,8 @@ fun DrawerContent(
     onClose: () -> Unit = {},
     onNewChat: () -> Unit = {},
     onPickConversation: (String) -> Unit = {},
-    onDeleteConversations: (List<String>) -> Unit = {}
+    onDeleteConversations: (List<String>) -> Unit = {},
+    testLongPressConversationId: String? = null
 ) {
   // Controls RECENTS vs ALL CHATS; reset every time the drawer is reopened
   var showAllChats by remember(ui.isDrawerOpen) { mutableStateOf(false) }
@@ -130,9 +133,17 @@ fun DrawerContent(
   var selectedConversationIds by remember { mutableStateOf<Set<String>>(emptySet()) }
   var isSelectionMode by remember { mutableStateOf(false) }
 
-  // Reset selection when drawer closes
-  LaunchedEffect(ui.isDrawerOpen) {
-    if (!ui.isDrawerOpen) {
+  // Test helper: directly trigger long press for testing (must run before drawer close check)
+  LaunchedEffect(testLongPressConversationId) {
+    testLongPressConversationId?.let { id ->
+      isSelectionMode = true
+      selectedConversationIds = setOf(id)
+    }
+  }
+
+  // Reset selection when drawer closes (but not if test helper is active)
+  LaunchedEffect(ui.isDrawerOpen, testLongPressConversationId) {
+    if (!ui.isDrawerOpen && testLongPressConversationId == null) {
       selectedConversationIds = emptySet()
       isSelectionMode = false
     }
