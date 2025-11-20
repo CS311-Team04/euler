@@ -21,6 +21,16 @@ object Localization {
     }
   }
 
+  fun appearanceLabel(mode: AppearanceMode): String {
+    val key =
+        when (mode) {
+          AppearanceMode.SYSTEM -> "appearance_system"
+          AppearanceMode.LIGHT -> "appearance_light"
+          AppearanceMode.DARK -> "appearance_dark"
+        }
+    return t(key)
+  }
+
   private fun english() =
       mapOf(
           // Settings
@@ -28,6 +38,9 @@ object Localization {
           "profile" to "Profile",
           "connectors" to "Connectors",
           "appearance" to "Appearance",
+          "appearance_system" to "System default",
+          "appearance_light" to "Light",
+          "appearance_dark" to "Dark",
           "speech_language" to "Speech language",
           "log_out" to "Log out",
           "close" to "Close",
@@ -96,6 +109,9 @@ object Localization {
           "profile" to "Profil",
           "connectors" to "Connecteurs",
           "appearance" to "Apparence",
+          "appearance_system" to "Défaut système",
+          "appearance_light" to "Clair",
+          "appearance_dark" to "Sombre",
           "speech_language" to "Langue de synthèse",
           "log_out" to "Se déconnecter",
           "close" to "Fermer",
@@ -165,6 +181,9 @@ object Localization {
           "profile" to "Profil",
           "connectors" to "Konnektoren",
           "appearance" to "Erscheinungsbild",
+          "appearance_system" to "Systemstandard",
+          "appearance_light" to "Hell",
+          "appearance_dark" to "Dunkel",
           "speech_language" to "Sprachsprache",
           "log_out" to "Abmelden",
           "close" to "Schließen",
@@ -234,6 +253,9 @@ object Localization {
           "profile" to "Perfil",
           "connectors" to "Conectores",
           "appearance" to "Apariencia",
+          "appearance_system" to "Sistema",
+          "appearance_light" to "Claro",
+          "appearance_dark" to "Oscuro",
           "speech_language" to "Idioma de voz",
           "log_out" to "Cerrar sesión",
           "close" to "Cerrar",
@@ -303,6 +325,9 @@ object Localization {
           "profile" to "Profilo",
           "connectors" to "Connettori",
           "appearance" to "Aspetto",
+          "appearance_system" to "Sistema",
+          "appearance_light" to "Chiaro",
+          "appearance_dark" to "Scuro",
           "speech_language" to "Lingua vocale",
           "log_out" to "Disconnetti",
           "close" to "Chiudi",
@@ -372,6 +397,9 @@ object Localization {
           "profile" to "Perfil",
           "connectors" to "Conectores",
           "appearance" to "Aparência",
+          "appearance_system" to "Sistema",
+          "appearance_light" to "Claro",
+          "appearance_dark" to "Escuro",
           "speech_language" to "Idioma de voz",
           "log_out" to "Sair",
           "close" to "Fechar",
@@ -441,6 +469,9 @@ object Localization {
           "profile" to "个人资料",
           "connectors" to "连接器",
           "appearance" to "外观",
+          "appearance_system" to "系统默认",
+          "appearance_light" to "浅色",
+          "appearance_dark" to "深色",
           "speech_language" to "语音语言",
           "log_out" to "登出",
           "close" to "关闭",

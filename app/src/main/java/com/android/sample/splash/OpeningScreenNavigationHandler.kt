@@ -34,7 +34,7 @@ suspend fun handleOpeningScreenNavigation(
  * @return The background color as Long (ARGB)
  */
 fun getOpeningScreenBackgroundColor(): Long {
-  return 0xFF121212
+  return 0xFFFFFFFF
 }
 
 /**

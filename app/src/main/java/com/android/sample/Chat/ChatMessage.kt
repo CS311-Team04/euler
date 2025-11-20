@@ -41,7 +41,6 @@ import androidx.compose.ui.unit.sp
 import com.android.sample.ui.theme.EulerAudioButtonLoadingColor
 import com.android.sample.ui.theme.EulerAudioButtonTint
 import com.android.sample.ui.theme.EulerAudioButtonTintSemiTransparent
-import com.android.sample.ui.theme.EulerThinkingCursorColor
 
 /**
  * Renders a single chat message as either:
@@ -108,7 +107,7 @@ fun ChatMessage(
     // AI: full-width plain text
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
       if (isStreaming && message.text.isEmpty()) {
-        LeadingThinkingDot()
+        LeadingThinkingDot(color = aiText)
       } else {
         Column(modifier = Modifier.fillMaxWidth()) {
           Text(
@@ -135,7 +134,7 @@ fun ChatMessage(
 }
 
 @Composable
-private fun LeadingThinkingDot() {
+private fun LeadingThinkingDot(color: Color) {
   val transition = rememberInfiniteTransition(label = "cursor")
   val alpha by
       transition.animateFloat(
@@ -149,7 +148,7 @@ private fun LeadingThinkingDot() {
 
   Surface(
       modifier = Modifier.size(10.dp).testTag("chat_ai_cursor"),
-      color = EulerThinkingCursorColor.copy(alpha = alpha),
+      color = color.copy(alpha = alpha),
       shape = CircleShape,
       tonalElevation = 0.dp,
       shadowElevation = 0.dp) {}

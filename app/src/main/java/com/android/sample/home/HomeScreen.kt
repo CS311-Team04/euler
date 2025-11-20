@@ -105,6 +105,13 @@ fun HomeScreen(
   val ui by viewModel.uiState.collectAsState()
   val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
   val scope = rememberCoroutineScope()
+  val colorScheme = MaterialTheme.colorScheme
+  val backgroundColor = colorScheme.background
+  val surfaceColor = colorScheme.surface
+  val surfaceVariantColor = colorScheme.surfaceVariant
+  val textPrimary = colorScheme.onBackground
+  val textSecondary = colorScheme.onSurfaceVariant
+  val accentColor = colorScheme.primary
 
   val audioController = remember(ttsHelper) { HomeAudioController(ttsHelper) }
 
@@ -189,8 +196,8 @@ fun HomeScreen(
             })
       }) {
         Scaffold(
-            modifier = modifier.fillMaxSize().background(Color.Black).testTag(HomeTags.Root),
-            containerColor = Color.Black,
+            modifier = modifier.fillMaxSize().background(backgroundColor).testTag(HomeTags.Root),
+            containerColor = backgroundColor,
             topBar = {
               CenterAlignedTopAppBar(
                   navigationIcon = {
@@ -205,7 +212,7 @@ fun HomeScreen(
                           Icon(
                               Icons.Default.Menu,
                               contentDescription = Localization.t("menu"),
-                              tint = Color.White,
+                              tint = textPrimary,
                               modifier = Modifier.size(24.dp))
                         }
                   },
@@ -223,7 +230,7 @@ fun HomeScreen(
                           Icon(
                               Icons.Default.MoreVert,
                               contentDescription = Localization.t("more"),
-                              tint = Color.White,
+                              tint = textPrimary,
                               modifier = Modifier.size(24.dp))
                         }
 
@@ -252,14 +259,14 @@ fun HomeScreen(
                   },
                   colors =
                       TopAppBarDefaults.topAppBarColors(
-                          containerColor = Color.Black,
-                          titleContentColor = Color.White,
-                          navigationIconContentColor = Color.White,
-                          actionIconContentColor = Color.White))
+                          containerColor = backgroundColor,
+                          titleContentColor = textPrimary,
+                          navigationIconContentColor = textPrimary,
+                          actionIconContentColor = textPrimary))
             },
             bottomBar = {
               Column(
-                  Modifier.fillMaxWidth().background(Color.Black).padding(bottom = 16.dp),
+                  Modifier.fillMaxWidth().background(backgroundColor).padding(bottom = 16.dp),
                   horizontalAlignment = Alignment.CenterHorizontally) {
                     // Horizontal scrollable row of suggestion chips
                     val suggestions =
@@ -326,7 +333,9 @@ fun HomeScreen(
                     OutlinedTextField(
                         value = ui.messageDraft,
                         onValueChange = { viewModel.updateMessageDraft(it) },
-                        placeholder = { Text(Localization.t("message_euler"), color = Color.Gray) },
+                        placeholder = {
+                          Text(Localization.t("message_euler"), color = textSecondary)
+                        },
                         modifier =
                             Modifier.fillMaxWidth()
                                 .padding(horizontal = 16.dp)
@@ -349,7 +358,7 @@ fun HomeScreen(
                                   Icon(
                                       Icons.Default.Mic,
                                       contentDescription = Localization.t("dictate"),
-                                      tint = Color.Gray)
+                                      tint = textSecondary)
                                 }
 
                             val canSend = ui.messageDraft.isNotBlank() && !ui.isSending
@@ -367,7 +376,7 @@ fun HomeScreen(
                                             Icon(
                                                 Icons.Default.GraphicEq,
                                                 contentDescription = "Voice mode",
-                                                tint = Color.Gray,
+                                                tint = textSecondary,
                                                 modifier = Modifier.size(18.dp))
                                           }
                                     } else {
@@ -390,22 +399,22 @@ fun HomeScreen(
                         shape = RoundedCornerShape(50),
                         colors =
                             OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                disabledTextColor = Color.LightGray,
-                                cursorColor = Color.White,
-                                focusedPlaceholderColor = Color.Gray,
-                                unfocusedPlaceholderColor = Color.Gray,
-                                focusedBorderColor = Color.DarkGray,
-                                unfocusedBorderColor = Color.DarkGray,
-                                focusedContainerColor = Color(0xFF121212),
-                                unfocusedContainerColor = Color(0xFF121212),
-                                disabledContainerColor = Color(0xFF121212)))
+                                focusedTextColor = textPrimary,
+                                unfocusedTextColor = textPrimary,
+                                disabledTextColor = textPrimary.copy(alpha = 0.6f),
+                                cursorColor = textPrimary,
+                                focusedPlaceholderColor = textSecondary,
+                                unfocusedPlaceholderColor = textSecondary,
+                                focusedBorderColor = textSecondary.copy(alpha = 0.6f),
+                                unfocusedBorderColor = textSecondary.copy(alpha = 0.4f),
+                                focusedContainerColor = surfaceVariantColor,
+                                unfocusedContainerColor = surfaceVariantColor,
+                                disabledContainerColor = surfaceVariantColor))
 
                     Spacer(Modifier.height(16.dp))
                     Text(
                         text = Localization.t("powered_by").uppercase(),
-                        color = Color.Gray,
+                        color = textSecondary,
                         fontSize = 11.sp,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(horizontal = 16.dp))
@@ -413,7 +422,7 @@ fun HomeScreen(
             }) { padding ->
               // Chat content: list of messages + thinking indicator at the end while sending.
               Box(
-                  modifier = Modifier.fillMaxSize().padding(padding).background(Color.Black),
+                  modifier = Modifier.fillMaxSize().padding(padding).background(backgroundColor),
                   contentAlignment = Alignment.Center) {
                     if (ui.messages.isEmpty() && !ui.isSending) {
                       // Show animated intro title when list is empty
@@ -466,7 +475,8 @@ fun HomeScreen(
                                   message = item,
                                   modifier = Modifier.fillMaxWidth(),
                                   isStreaming = showLeadingDot,
-                                  audioState = audioState)
+                                  audioState = audioState,
+                                  aiText = textPrimary)
                             }
 
                             // Global thinking indicator shown AFTER the last user message.
@@ -514,15 +524,16 @@ fun HomeScreen(
 /** Compact, rounded action button used in the bottom actions row. */
 @Composable
 private fun SuggestionChip(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+  val colorScheme = MaterialTheme.colorScheme
   Surface(
       onClick = onClick,
       shape = RoundedCornerShape(50.dp),
-      color = Color(0xFF1E1E1E),
+      color = colorScheme.surfaceVariant,
       modifier = modifier.height(50.dp)) {
         Box(
             modifier = Modifier.fillMaxHeight().padding(horizontal = 20.dp, vertical = 12.dp),
             contentAlignment = Alignment.Center) {
-              Text(text = text, color = Color.White, fontSize = 14.sp)
+              Text(text = text, color = colorScheme.onSurface, fontSize = 14.sp)
             }
       }
 }
@@ -562,6 +573,9 @@ private fun DeleteMenuItem(onClick: () -> Unit) {
 /** Simple delete confirmation modal with "Delete chat?" title and Cancel/Delete buttons. */
 @Composable
 private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit) {
+  val colorScheme = MaterialTheme.colorScheme
+  val textPrimary = colorScheme.onSurface
+  val textSecondary = colorScheme.onSurfaceVariant
   Box(
       modifier =
           Modifier.fillMaxSize()
@@ -570,16 +584,24 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
       contentAlignment = Alignment.Center) {
         Card(
             modifier = Modifier.width(280.dp).padding(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+            colors = CardDefaults.cardColors(containerColor = colorScheme.surface),
             shape = RoundedCornerShape(16.dp)) {
               Column(
                   modifier = Modifier.padding(24.dp),
                   horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = Localization.t("clear_chat"),
-                        color = Color.White,
+                        color = textPrimary,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold)
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = Localization.t("clear_chat_message"),
+                        color = textSecondary,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center)
 
                     Spacer(modifier = Modifier.height(24.dp))
 
@@ -590,19 +612,21 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
                               onClick = onCancel,
                               modifier = Modifier.weight(1f),
                               colors =
-                                  ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A2A)),
+                                  ButtonDefaults.buttonColors(
+                                      containerColor = colorScheme.surfaceVariant),
                               shape = RoundedCornerShape(8.dp)) {
-                                Text(Localization.t("cancel"), color = Color.White)
+                                Text(Localization.t("cancel"), color = textPrimary)
                               }
 
                           Button(
                               onClick = onConfirm,
                               modifier = Modifier.weight(1f),
-                              colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                              colors =
+                                  ButtonDefaults.buttonColors(containerColor = colorScheme.primary),
                               shape = RoundedCornerShape(8.dp)) {
                                 Text(
                                     Localization.t("delete"),
-                                    color = Color.White,
+                                    color = colorScheme.onPrimary,
                                     fontWeight = FontWeight.Bold)
                               }
                         }
@@ -617,6 +641,7 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
  */
 @Composable
 private fun ThinkingIndicator(modifier: Modifier = Modifier) {
+  val colorScheme = MaterialTheme.colorScheme
   var dots by remember { mutableStateOf(0) }
   LaunchedEffect(Unit) {
     while (true) {
@@ -628,15 +653,17 @@ private fun ThinkingIndicator(modifier: Modifier = Modifier) {
   Surface(
       modifier = modifier,
       shape = RoundedCornerShape(12.dp),
-      color = Color(0x14FFFFFF),
+      color = colorScheme.surfaceVariant.copy(alpha = 0.6f),
       tonalElevation = 0.dp) {
         Row(
             Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically) {
               CircularProgressIndicator(
-                  strokeWidth = 2.dp, modifier = Modifier.size(16.dp), color = Color.Gray)
+                  strokeWidth = 2.dp,
+                  modifier = Modifier.size(16.dp),
+                  color = colorScheme.onSurfaceVariant)
               Spacer(Modifier.width(8.dp))
-              Text(text = text, color = Color.LightGray, fontSize = 13.sp)
+              Text(text = text, color = colorScheme.onSurfaceVariant, fontSize = 13.sp)
             }
       }
 }
@@ -647,11 +674,9 @@ private fun ThinkingIndicator(modifier: Modifier = Modifier) {
  * - Disabled when the draft is blank or a send is in progress.
  */
 @Composable
-private fun BubbleSendButton(
-    enabled: Boolean,
-    isSending: Boolean,
-    onClick: () -> Unit,
-) {
+private fun BubbleSendButton(enabled: Boolean, isSending: Boolean, onClick: () -> Unit) {
+  val colorScheme = MaterialTheme.colorScheme
+  val accent = colorScheme.primary
   val size = 40.dp
   val interaction = remember { MutableInteractionSource() }
 
@@ -659,9 +684,9 @@ private fun BubbleSendButton(
       animateColorAsState(
           targetValue =
               when {
-                isSending -> Color(0xFFC62828)
-                enabled -> Color(0xFFE53935)
-                else -> Color(0xFF3C3C3C)
+                isSending -> accent.copy(alpha = 0.85f)
+                enabled -> accent
+                else -> colorScheme.onSurface.copy(alpha = 0.2f)
               },
           label = "bubble-color")
 
@@ -685,7 +710,7 @@ private fun BubbleSendButton(
         contentAlignment = Alignment.Center) {
           if (isSending) {
             CircularProgressIndicator(
-                strokeWidth = 2.dp, modifier = Modifier.size(18.dp), color = Color.White)
+                strokeWidth = 2.dp, modifier = Modifier.size(18.dp), color = colorScheme.onPrimary)
           } else {
             val icon =
                 try {
@@ -696,7 +721,9 @@ private fun BubbleSendButton(
             Crossfade(targetState = enabled, label = "send-button-state") { canSend ->
               Icon(
                   imageVector = icon,
-                  tint = if (canSend) Color.White else Color.White.copy(alpha = 0.35f),
+                  tint =
+                      if (canSend) colorScheme.onPrimary
+                      else colorScheme.onSurface.copy(alpha = 0.4f),
                   contentDescription = Localization.t("send"),
                   modifier = Modifier.size(18.dp))
             }
@@ -711,6 +738,7 @@ private fun BubbleSendButton(
  */
 @Composable
 internal fun AnimatedIntroTitle(modifier: Modifier = Modifier) {
+  val colorScheme = MaterialTheme.colorScheme
   val suggestions = remember {
     listOf(
         Localization.t("intro_suggestion_1"),
@@ -737,7 +765,7 @@ internal fun AnimatedIntroTitle(modifier: Modifier = Modifier) {
         // Title: "Ask Euler Anything" in deep burgundy/plum
         Text(
             text = Localization.t("ask_euler_anything"),
-            color = Color(0xFF8B0000), // Deep burgundy red
+            color = colorScheme.primary,
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
@@ -763,7 +791,7 @@ internal fun AnimatedIntroTitle(modifier: Modifier = Modifier) {
               label = "suggestion-transition") { index ->
                 Text(
                     text = suggestions[index],
-                    color = Color.White,
+                    color = colorScheme.onBackground,
                     fontSize = 16.sp,
                     textAlign = TextAlign.Center)
               }
@@ -779,11 +807,12 @@ private fun SourceCard(
     retrievedAt: Long,
     onVisit: () -> Unit
 ) {
+  val colorScheme = MaterialTheme.colorScheme
   Column(
       modifier =
           Modifier.fillMaxWidth()
               .clip(RoundedCornerShape(10.dp))
-              .background(Color(0xFF1C1C1E))
+              .background(colorScheme.surfaceVariant)
               .padding(horizontal = 12.dp, vertical = 6.dp)) {
         // Top line: “Retrieved from EPFL.ch Website”
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -795,7 +824,7 @@ private fun SourceCard(
           Spacer(Modifier.width(4.dp))
           Text(
               text = "Retrieved from  $siteLabel",
-              color = Color(0xFFBDBDBD),
+              color = colorScheme.onSurfaceVariant,
               style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp))
         }
 
@@ -805,7 +834,7 @@ private fun SourceCard(
           // Title (ellipsized to one line)
           Text(
               text = url,
-              color = Color.White,
+              color = colorScheme.onSurface,
               style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
               maxLines = 1,
               overflow = TextOverflow.Ellipsis,
@@ -817,14 +846,14 @@ private fun SourceCard(
               onClick = onVisit,
               shape = RoundedCornerShape(6.dp),
               contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-              colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))) {
-                Text("Visit")
+              colors = ButtonDefaults.buttonColors(containerColor = colorScheme.primary)) {
+                Text("Visit", color = colorScheme.onPrimary)
                 Spacer(Modifier.width(6.dp))
                 Icon(
                     imageVector = androidx.compose.material.icons.Icons.Outlined.OpenInNew,
                     contentDescription = null,
                     modifier = Modifier.size(10.dp),
-                    tint = Color.White)
+                    tint = colorScheme.onPrimary)
               }
         }
 
@@ -841,7 +870,7 @@ private fun SourceCard(
             }
         Text(
             text = "Retrieved on $dateStr",
-            color = Color.Gray,
+            color = colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp))
       }
 }

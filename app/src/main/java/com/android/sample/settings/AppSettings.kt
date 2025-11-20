@@ -1,6 +1,7 @@
 package com.android.sample.settings
 
 import android.content.Context
+import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -27,6 +28,7 @@ object AppSettings {
 
   // DataStore key
   private val LANGUAGE_KEY = stringPreferencesKey("language")
+  private val APPEARANCE_KEY = stringPreferencesKey("appearance_mode")
 
   // Observable state using Compose's mutableStateOf - use internal state holder
   private val _languageState = mutableStateOf(Language.EN)
@@ -34,6 +36,16 @@ object AppSettings {
   // Public read-only access to language
   val language: Language
     get() = _languageState.value
+
+  val languageState: State<Language>
+    get() = _languageState
+
+  private val _appearanceState = mutableStateOf(AppearanceMode.SYSTEM)
+  val appearanceMode: AppearanceMode
+    get() = _appearanceState.value
+
+  val appearanceState: State<AppearanceMode>
+    get() = _appearanceState
 
   private var dataStore: DataStore<Preferences>? = null
 
@@ -61,6 +73,8 @@ object AppSettings {
         ?.map { preferences ->
           val languageCode = preferences[LANGUAGE_KEY] ?: Language.EN.code
           _languageState.value = Language.fromCode(languageCode)
+          val appearanceValue = preferences[APPEARANCE_KEY]
+          _appearanceState.value = AppearanceMode.fromPreference(appearanceValue)
         }
         ?.first()
   }
@@ -69,6 +83,14 @@ object AppSettings {
   fun setLanguage(value: Language) {
     _languageState.value = value
     scope.launch { dataStore?.edit { preferences -> preferences[LANGUAGE_KEY] = value.code } }
+  }
+
+  /** Update the appearance mode and persist to disk. */
+  fun setAppearanceMode(value: AppearanceMode) {
+    _appearanceState.value = value
+    scope.launch {
+      dataStore?.edit { preferences -> preferences[APPEARANCE_KEY] = value.prefValue }
+    }
   }
 
   /**
