@@ -1,8 +1,10 @@
 package com.android.sample.home
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +24,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
@@ -31,6 +35,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,6 +74,9 @@ object DrawerTags {
   const val RecentsSection = "drawer_recents"
   const val ViewAllRow = "drawer_view_all"
   const val UserSettings = "drawer_user_settings"
+  const val DeleteButton = "drawer_delete_button"
+  const val CancelButton = "drawer_cancel_button"
+  const val ConversationRow = "drawer_conversation_row"
 }
 
 /**
@@ -98,8 +106,9 @@ fun DrawerContentPreviewable() {
  * @param onProfileClick Called when the profile avatar/name is tapped in non-guest mode.
  * @param onProfileDisabledClick Called when the profile row is tapped while in guest mode.
  * @param onClose Unused for now, reserved for a “close drawer” action if needed later.
- * @param onNewChat Called when the “New chat” row is pressed.
+ * @param onNewChat Called when the "New chat" row is pressed.
  * @param onPickConversation Called when a conversation entry is selected.
+ * @param onDeleteConversations Called when conversations should be deleted (with their IDs).
  */
 @Composable
 fun DrawerContent(
@@ -111,10 +120,23 @@ fun DrawerContent(
     onProfileDisabledClick: () -> Unit = {},
     onClose: () -> Unit = {},
     onNewChat: () -> Unit = {},
-    onPickConversation: (String) -> Unit = {}
+    onPickConversation: (String) -> Unit = {},
+    onDeleteConversations: (List<String>) -> Unit = {}
 ) {
   // Controls RECENTS vs ALL CHATS; reset every time the drawer is reopened
   var showAllChats by remember(ui.isDrawerOpen) { mutableStateOf(false) }
+  
+  // Selection mode state
+  var selectedConversationIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+  var isSelectionMode by remember { mutableStateOf(false) }
+  
+  // Reset selection when drawer closes
+  LaunchedEffect(ui.isDrawerOpen) {
+    if (!ui.isDrawerOpen) {
+      selectedConversationIds = emptySet()
+      isSelectionMode = false
+    }
+  }
 
   Column(
       modifier =
@@ -140,8 +162,42 @@ fun DrawerContent(
             showAllChats = showAllChats,
             onShowAllChats = { showAllChats = true },
             onPickConversation = onPickConversation,
+            isSelectionMode = isSelectionMode,
+            selectedConversationIds = selectedConversationIds,
+            onToggleSelection = { id ->
+              selectedConversationIds = if (selectedConversationIds.contains(id)) {
+                val newSet = selectedConversationIds - id
+                if (newSet.isEmpty()) {
+                  isSelectionMode = false
+                }
+                newSet
+              } else {
+                selectedConversationIds + id
+              }
+            },
+            onLongPressConversation = { id ->
+              isSelectionMode = true
+              selectedConversationIds = setOf(id)
+            },
             modifier = Modifier.weight(1f),
         )
+        
+        // Selection mode actions
+        if (isSelectionMode) {
+          Spacer(modifier = Modifier.height(12.dp))
+          DrawerSelectionActions(
+              selectedCount = selectedConversationIds.size,
+              onDelete = {
+                onDeleteConversations(selectedConversationIds.toList())
+                selectedConversationIds = emptySet()
+                isSelectionMode = false
+              },
+              onCancel = {
+                selectedConversationIds = emptySet()
+                isSelectionMode = false
+              }
+          )
+        }
 
         DrawerFooter(
             isGuest = ui.isGuest,
@@ -248,8 +304,12 @@ private fun DrawerConnectorsRow(onSettingsClick: () -> Unit) {
  *
  * @param ui Current [HomeUiState] providing the conversations list.
  * @param showAllChats Whether ALL CHATS mode is currently active.
- * @param onShowAllChats Called when the user taps the “View all chats” row.
+ * @param onShowAllChats Called when the user taps the "View all chats" row.
  * @param onPickConversation Called when a conversation row is tapped.
+ * @param isSelectionMode Whether selection mode is active.
+ * @param selectedConversationIds Set of selected conversation IDs.
+ * @param onToggleSelection Called when a conversation's selection should be toggled.
+ * @param onLongPressConversation Called when a conversation is long-pressed.
  * @param modifier Modifier applied to the root column (e.g. weight + padding).
  */
 @Composable
@@ -258,6 +318,10 @@ private fun DrawerConversationsSection(
     showAllChats: Boolean,
     onShowAllChats: () -> Unit,
     onPickConversation: (String) -> Unit,
+    isSelectionMode: Boolean,
+    selectedConversationIds: Set<String>,
+    onToggleSelection: (String) -> Unit,
+    onLongPressConversation: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
   val scrollState = rememberScrollState()
@@ -271,6 +335,10 @@ private fun DrawerConversationsSection(
           showAllChats = showAllChats,
           onShowAllChats = onShowAllChats,
           onPickConversation = onPickConversation,
+          isSelectionMode = isSelectionMode,
+          selectedConversationIds = selectedConversationIds,
+          onToggleSelection = onToggleSelection,
+          onLongPressConversation = onLongPressConversation,
       )
     }
   }
@@ -307,8 +375,12 @@ private fun DrawerConversationsEmptyState() {
  *
  * @param ui Current [HomeUiState] providing the ordered conversations.
  * @param showAllChats True when the user has expanded to "ALL CHATS".
- * @param onShowAllChats Called when the user taps the “View all chats” row.
+ * @param onShowAllChats Called when the user taps the "View all chats" row.
  * @param onPickConversation Invoked when a conversation row is selected.
+ * @param isSelectionMode Whether selection mode is active.
+ * @param selectedConversationIds Set of selected conversation IDs.
+ * @param onToggleSelection Called when a conversation's selection should be toggled.
+ * @param onLongPressConversation Called when a conversation is long-pressed.
  */
 @Composable
 private fun DrawerConversationsList(
@@ -316,6 +388,10 @@ private fun DrawerConversationsList(
     showAllChats: Boolean,
     onShowAllChats: () -> Unit,
     onPickConversation: (String) -> Unit,
+    isSelectionMode: Boolean,
+    selectedConversationIds: Set<String>,
+    onToggleSelection: (String) -> Unit,
+    onLongPressConversation: (String) -> Unit,
 ) {
   val hasMoreThanLimit = ui.conversations.size > RECENT_CONVERSATIONS_LIMIT
   val isShowingAll = !hasMoreThanLimit || showAllChats
@@ -337,10 +413,26 @@ private fun DrawerConversationsList(
 
   Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
     displayedConversations.forEach { conv ->
+      val isSelected = if (isSelectionMode) {
+        selectedConversationIds.contains(conv.id)
+      } else {
+        conv.id == ui.currentConversationId
+      }
       RecentRow(
           title = conv.title.ifBlank { Localization.t("untitled_conversation") },
-          selected = conv.id == ui.currentConversationId,
-          onClick = { onPickConversation(conv.id) })
+          selected = isSelected,
+          isSelectionMode = isSelectionMode,
+          isItemSelected = selectedConversationIds.contains(conv.id),
+          onClick = {
+            if (isSelectionMode) {
+              onToggleSelection(conv.id)
+            } else {
+              onPickConversation(conv.id)
+            }
+          },
+          onLongClick = {
+            onLongPressConversation(conv.id)
+          })
     }
 
     if (hasMoreThanLimit && !showAllChats) {
@@ -461,20 +553,39 @@ private fun formatUserName(raw: String): String {
  * Single conversation row in the drawer.
  *
  * @param title Conversation title (already fallback-handled upstream).
- * @param selected Whether this row represents the currently selected conversation.
+ * @param selected Whether this row represents the currently selected conversation (in normal mode).
+ * @param isSelectionMode Whether selection mode is active.
+ * @param isItemSelected Whether this item is selected in selection mode.
  * @param onClick Invoked when the row is tapped.
+ * @param onLongClick Invoked when the row is long-pressed.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun RecentRow(title: String, selected: Boolean = false, onClick: () -> Unit = {}) {
-  val bg = if (selected) EulerRecentRowSelectedBg else Color.Transparent
+private fun RecentRow(
+    title: String,
+    selected: Boolean = false,
+    isSelectionMode: Boolean = false,
+    isItemSelected: Boolean = false,
+    onClick: () -> Unit = {},
+    onLongClick: () -> Unit = {}
+) {
+  val bg = when {
+    isSelectionMode && isItemSelected -> EulerRecentRowSelectedBg
+    !isSelectionMode && selected -> EulerRecentRowSelectedBg
+    else -> Color.Transparent
+  }
   Surface(
       color = bg,
       shape = RoundedCornerShape(8.dp),
       modifier =
           Modifier.fillMaxWidth()
               .clip(RoundedCornerShape(8.dp))
-              .clickable { onClick() }
-              .padding(vertical = 6.dp, horizontal = 2.dp)) {
+              .combinedClickable(
+                  onClick = onClick,
+                  onLongClick = onLongClick
+              )
+              .padding(vertical = 6.dp, horizontal = 2.dp)
+              .testTag(DrawerTags.ConversationRow)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
           Box(
               modifier =
@@ -482,11 +593,19 @@ private fun RecentRow(title: String, selected: Boolean = false, onClick: () -> U
                       .clip(RoundedCornerShape(6.dp))
                       .background(EulerRecentRowIconBackground),
               contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Outlined.ChatBubbleOutline,
-                    contentDescription = null,
-                    tint = EulerDrawerSectionLabel,
-                    modifier = Modifier.size(15.dp))
+                if (isSelectionMode && isItemSelected) {
+                  Icon(
+                      imageVector = Icons.Filled.Check,
+                      contentDescription = null,
+                      tint = Color.White,
+                      modifier = Modifier.size(15.dp))
+                } else {
+                  Icon(
+                      imageVector = Icons.Outlined.ChatBubbleOutline,
+                      contentDescription = null,
+                      tint = EulerDrawerSectionLabel,
+                      modifier = Modifier.size(15.dp))
+                }
               }
           Spacer(Modifier.width(12.dp))
           Text(
@@ -497,6 +616,72 @@ private fun RecentRow(title: String, selected: Boolean = false, onClick: () -> U
               overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         }
       }
+}
+
+/**
+ * Selection mode actions bar showing delete and cancel buttons.
+ */
+@Composable
+private fun DrawerSelectionActions(
+    selectedCount: Int,
+    onDelete: () -> Unit,
+    onCancel: () -> Unit
+) {
+  Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.spacedBy(12.dp),
+      verticalAlignment = Alignment.CenterVertically
+  ) {
+    Surface(
+        color = Color(0xFFE53935),
+        shape = RoundedCornerShape(8.dp),
+        modifier =
+            Modifier.weight(1f)
+                .clickable { onDelete() }
+                .padding(vertical = 12.dp)
+                .testTag(DrawerTags.DeleteButton)
+    ) {
+      Row(
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+          horizontalArrangement = Arrangement.Center,
+          verticalAlignment = Alignment.CenterVertically
+      ) {
+        Icon(
+            imageVector = Icons.Filled.Delete,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = if (selectedCount == 1) "Delete" else "Delete ($selectedCount)",
+            color = Color.White,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium)
+      }
+    }
+    
+    Surface(
+        color = Color.Transparent,
+        shape = RoundedCornerShape(8.dp),
+        modifier =
+            Modifier.weight(1f)
+                .clickable { onCancel() }
+                .padding(vertical = 12.dp)
+                .testTag(DrawerTags.CancelButton)
+    ) {
+      Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.Center,
+          verticalAlignment = Alignment.CenterVertically
+      ) {
+        Text(
+            text = "Cancel",
+            color = Color.White,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium)
+      }
+    }
+  }
 }
 
 /** Preview for the drawer in isolation with default state. */

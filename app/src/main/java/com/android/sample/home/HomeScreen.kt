@@ -186,6 +186,9 @@ fun HomeScreen(
                 drawerState.close()
                 if (ui.isDrawerOpen) viewModel.toggleDrawer()
               }
+            },
+            onDeleteConversations = { ids ->
+              viewModel.deleteConversations(ids)
             })
       }) {
         Scaffold(

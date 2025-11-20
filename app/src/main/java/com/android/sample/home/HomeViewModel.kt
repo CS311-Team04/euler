@@ -851,6 +851,51 @@ class HomeViewModel(
     }
   }
 
+  /**
+   * Delete multiple conversations from Firebase.
+   * 
+   * This function deletes each conversation ID from Firestore and updates local state.
+   * The conversationsFlow listener will automatically refresh the UI after deletion.
+   * 
+   * @param ids List of conversation IDs to delete.
+   */
+  fun deleteConversations(ids: List<String>) {
+    if (ids.isEmpty()) return
+    if (isGuest()) {
+      // Guest mode: no Firebase, just clear local state if current conversation is deleted
+      val currentId = _uiState.value.currentConversationId
+      if (currentId != null && ids.contains(currentId)) {
+        startLocalNewChat()
+      }
+      return
+    }
+    Log.d(TAG, "deleteConversations(): deleting ${ids.size} conversations")
+    viewModelScope.launch(exceptionHandler) {
+      try {
+        // Delete each conversation from Firebase
+        ids.forEach { id ->
+          try {
+            repo.deleteConversation(id)
+            Log.d(TAG, "deleteConversations(): deleted conversation $id")
+          } catch (e: Exception) {
+            Log.e(TAG, "deleteConversations(): failed to delete conversation $id", e)
+            // Continue with other deletions even if one fails
+          }
+        }
+        
+        // If the current conversation was deleted, start a new local chat
+        val currentId = _uiState.value.currentConversationId
+        if (currentId != null && ids.contains(currentId)) {
+          startLocalNewChat()
+        }
+      } catch (e: AuthNotReadyException) {
+        Log.e(TAG, "deleteConversations(): auth not ready", e)
+      } catch (e: Exception) {
+        Log.e(TAG, "deleteConversations(): unexpected error", e)
+      }
+    }
+  }
+
   // ============ BACKEND CHAT ============
 
   // mapping MessageDTO -> UI
