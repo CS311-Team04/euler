@@ -48,7 +48,7 @@ class DrawerContentTest {
     composeRule.onNodeWithText("Project deadline query").assertIsDisplayed()
     composeRule.onNodeWithText("Course registration info").assertIsDisplayed()
 
-    composeRule.onNodeWithText("View all chats").assertIsDisplayed()
+    composeRule.onNodeWithTag(DrawerTags.ViewAllRow).assertIsDisplayed()
   }
 
   @Test
