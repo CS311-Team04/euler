@@ -1,18 +1,26 @@
 package com.android.sample.VoiceChat
 
 import android.Manifest
+import android.content.Context
 import androidx.compose.runtime.remember
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.test.core.app.ApplicationProvider
 import com.android.sample.VoiceChat.Backend.VoiceChatViewModel
 import com.android.sample.VoiceChat.UI.VoiceScreen
 import com.android.sample.llm.FakeLlmClient
 import com.android.sample.speech.SpeechPlayback
 import com.android.sample.util.MainDispatcherRule
+import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import org.junit.After
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -22,11 +30,32 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
+@OptIn(ExperimentalCoroutinesApi::class)
 class VoiceScreenInteractionTest {
 
   @get:Rule val composeTestRule = createComposeRule()
   @get:Rule
   val dispatcherRule = MainDispatcherRule(kotlinx.coroutines.test.UnconfinedTestDispatcher())
+
+  @Before
+  fun setUpFirebase() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    if (FirebaseApp.getApps(context).isEmpty()) {
+      FirebaseApp.initializeApp(
+          context,
+          FirebaseOptions.Builder()
+              .setApplicationId("1:1234567890:android:test")
+              .setProjectId("test-project")
+              .setApiKey("fake-api-key")
+              .build())
+    }
+    FirebaseAuth.getInstance().signOut()
+  }
+
+  @After
+  fun tearDownFirebase() {
+    FirebaseAuth.getInstance().signOut()
+  }
 
   private fun createVoiceViewModel(): VoiceChatViewModel =
       VoiceChatViewModel(FakeLlmClient(), dispatcherRule.dispatcher)

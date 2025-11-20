@@ -1,20 +1,52 @@
 package com.android.sample.VoiceChat.Backend
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import com.android.sample.llm.FakeLlmClient
 import com.android.sample.util.MainDispatcherRule
+import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [31])
 @OptIn(ExperimentalCoroutinesApi::class)
 class VoiceChatViewModelTest {
 
   @get:Rule val mainDispatcherRule = MainDispatcherRule()
   private val testDispatcher
     get() = mainDispatcherRule.dispatcher
+
+  @Before
+  fun setUpFirebase() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    if (FirebaseApp.getApps(context).isEmpty()) {
+      FirebaseApp.initializeApp(
+          context,
+          FirebaseOptions.Builder()
+              .setApplicationId("1:1234567890:android:test")
+              .setProjectId("test-project")
+              .setApiKey("fake-api-key")
+              .build())
+    }
+    FirebaseAuth.getInstance().signOut()
+  }
+
+  @After
+  fun tearDownFirebase() {
+    FirebaseAuth.getInstance().signOut()
+  }
 
   @Test
   fun stopAll_resets_state() {
