@@ -43,6 +43,30 @@ class ProfileFormManager(
   val roleOptions: List<String> =
       listOf("Student", "PhD", "Post-Doc", "Teacher", "Administration", "Staff")
 
+  companion object {
+    val facultyToSections: Map<String, List<String>> =
+        mapOf(
+            "ENAC — School of Architecture, Civil and Environmental Engineering" to
+                listOf(
+                    "Architecture", "Civil Engineering", "Environmental Sciences and Engineering"),
+            "SB — School of Basic Sciences" to listOf("Mathematics", "Physics", "Chemistry"),
+            "STI — School of Engineering" to
+                listOf(
+                    "Mechanical Engineering",
+                    "Microengineering",
+                    "Materials Science and Engineering",
+                    "Electrical Engineering"),
+            "IC — School of Computer and Communication Sciences" to
+                listOf("Computer Science", "Communication Systems"),
+            "SV — School of Life Sciences" to listOf("Life Sciences Engineering"),
+            "CDH — College of Humanities" to emptyList())
+  }
+
+  val facultyOptions: List<String> = facultyToSections.keys.toList()
+
+  val sectionOptions: List<String>
+    get() = facultyToSections[faculty] ?: emptyList()
+
   init {
     applyInitial(defaultAuthEmail, initialProfile)
   }
@@ -56,7 +80,6 @@ class ProfileFormManager(
     username = profile?.preferredName.orEmpty()
     role = profile?.roleDescription.orEmpty()
     faculty = profile?.faculty.orEmpty()
-    section = profile?.section.orEmpty()
     phone = profile?.phone.orEmpty()
 
     val resolvedEmail =
@@ -66,6 +89,16 @@ class ProfileFormManager(
           else -> ""
         }
     email = resolvedEmail
+
+    // Validate section against faculty
+    val savedSection = profile?.section.orEmpty()
+    val availableSections = facultyToSections[faculty] ?: emptyList()
+    section =
+        if (savedSection.isNotBlank() && savedSection in availableSections) {
+          savedSection
+        } else {
+          availableSections.firstOrNull() ?: ""
+        }
 
     isFullNameLocked = fullName.isNotBlank()
     isEmailLocked = resolvedEmail.isNotBlank()
@@ -87,6 +120,11 @@ class ProfileFormManager(
 
   fun updateFaculty(value: String) {
     faculty = value
+    // Reset section if it's not valid for the new faculty
+    val availableSections = facultyToSections[value] ?: emptyList()
+    if (section !in availableSections) {
+      section = availableSections.firstOrNull() ?: ""
+    }
   }
 
   fun updateSection(value: String) {

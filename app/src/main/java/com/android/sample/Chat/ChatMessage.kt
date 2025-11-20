@@ -38,6 +38,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.android.sample.ui.theme.EulerAudioButtonLoadingColor
+import com.android.sample.ui.theme.EulerAudioButtonTint
+import com.android.sample.ui.theme.EulerAudioButtonTintSemiTransparent
+import com.android.sample.ui.theme.EulerThinkingCursorColor
 
 /**
  * Renders a single chat message as either:
@@ -120,7 +124,8 @@ fun ChatMessage(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically) {
-                  AudioPlaybackButton(state = audioState, tint = Color.White.copy(alpha = 0.75f))
+                  AudioPlaybackButton(
+                      state = audioState, tint = EulerAudioButtonTintSemiTransparent)
                 }
           }
         }
@@ -162,14 +167,14 @@ data class MessageAudioState(
 private fun AudioPlaybackButton(
     state: MessageAudioState,
     modifier: Modifier = Modifier.size(24.dp),
-    tint: Color = Color.White
+    tint: Color = EulerAudioButtonTint
 ) {
   when {
     state.isLoading -> {
       CircularProgressIndicator(
           modifier = Modifier.size(14.dp).testTag("chat_audio_btn_loading"),
           strokeWidth = 2.dp,
-          color = Color.LightGray)
+          color = EulerAudioButtonLoadingColor)
     }
     state.isPlaying -> {
       IconButton(modifier = modifier.testTag("chat_audio_btn_stop"), onClick = state.onStop) {

@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.speech.tts.Voice
 import androidx.test.core.app.ApplicationProvider
 import io.mockk.CapturingSlot
 import io.mockk.every
@@ -244,6 +245,8 @@ class TextToSpeechHelperTest {
   fun setupEqualizer_usesFactory_andConfiguresBands() {
     val mockTts = mockk<TextToSpeech>(relaxed = true)
     every { mockTts.setOnUtteranceProgressListener(any()) } returns TextToSpeech.SUCCESS
+    every { mockTts.voices } returns emptySet()
+    every { mockTts.setVoice(any()) } returns TextToSpeech.SUCCESS
     val mockEq = mockk<Equalizer>(relaxed = true)
     every { mockEq.bandLevelRange } returns shortArrayOf(-600, 600)
     every { mockEq.numberOfBands } returns 3.toShort()
@@ -274,6 +277,91 @@ class TextToSpeechHelperTest {
     assertSame(mockEq, helper.getField("equalizer"))
   }
 
+  @Test
+  fun configureEngine_appliesPremiumVoiceWhenAvailable() {
+    val voice = mockk<Voice>()
+    every { voice.locale } returns Locale.FRENCH
+    every { voice.features } returns setOf("com.google.android.tts.feature.neural_network")
+    every { voice.quality } returns Voice.QUALITY_HIGH
+    every { voice.latency } returns Voice.LATENCY_NORMAL
+    every { voice.name } returns "fr-fr-premium"
+
+    val tts = mockk<TextToSpeech>(relaxed = true)
+    every { tts.voices } returns setOf(voice)
+    every { tts.setVoice(voice) } returns TextToSpeech.SUCCESS
+    every { tts.setOnUtteranceProgressListener(any()) } returns TextToSpeech.SUCCESS
+    every { tts.setLanguage(any()) } returns TextToSpeech.LANG_AVAILABLE
+    every { tts.setSpeechRate(any()) } returns TextToSpeech.SUCCESS
+    every { tts.setPitch(any()) } returns TextToSpeech.SUCCESS
+    every { tts.setAudioAttributes(any()) } returns TextToSpeech.SUCCESS
+    every { tts.stop() } returns TextToSpeech.SUCCESS
+    every { tts.shutdown() } answers {}
+    every { tts.speak(any(), any(), any<Bundle>(), any()) } returns TextToSpeech.SUCCESS
+
+    val harness = createHarness(tts = tts)
+    every { tts.voices } returns setOf(voice)
+
+    harness.initListener.onInit(TextToSpeech.SUCCESS)
+
+    verify { tts.setVoice(voice) }
+  }
+
+  @Test
+  fun speak_adjustsProsodyForQuestion() {
+    val harness = createHarness()
+    val helper = harness.helper
+    helper.updateSpeechStyle(
+        TextToSpeechHelper.SpeechStyle(
+            baseRate = 0.9f,
+            minRate = 0.85f,
+            maxRate = 1.1f,
+            questionPitchBoost = 0.1f,
+            questionTempoBoost = 0.05f,
+        ))
+    harness.initListener.onInit(TextToSpeech.SUCCESS)
+    helper.setBooleanField("isReady", true)
+
+    val rates = mutableListOf<Float>()
+    val pitches = mutableListOf<Float>()
+    every { harness.tts.setSpeechRate(capture(rates)) } returns TextToSpeech.SUCCESS
+    every { harness.tts.setPitch(capture(pitches)) } returns TextToSpeech.SUCCESS
+
+    val pending = pendingSpeech("Are we on track?", "utt")
+    helper.invokeSpeakInternal(pending)
+
+    assertTrue(rates.last() > 0.9f)
+    assertTrue(pitches.last() > 0.9f)
+  }
+
+  @Test
+  fun speak_slowsDownForLongParagraph() {
+    val harness = createHarness()
+    val helper = harness.helper
+    helper.updateSpeechStyle(
+        TextToSpeechHelper.SpeechStyle(
+            baseRate = 0.95f,
+            minRate = 0.8f,
+            maxRate = 1.05f,
+            mediumSentenceThreshold = 12,
+            mediumSentenceSlowdown = 0.05f,
+            longSentenceThreshold = 20,
+            longSentenceSlowdown = 0.09f,
+        ))
+    harness.initListener.onInit(TextToSpeech.SUCCESS)
+    helper.setBooleanField("isReady", true)
+
+    val rates = mutableListOf<Float>()
+    every { harness.tts.setSpeechRate(capture(rates)) } returns TextToSpeech.SUCCESS
+
+    val text =
+        "La voix doit garder un rythme naturel tout en restant claire, " +
+            "même lorsque la réponse contient plusieurs propositions et nuances."
+    val pending = pendingSpeech(text, "utt-long")
+    helper.invokeSpeakInternal(pending)
+
+    assertTrue(rates.last() < 0.95f)
+  }
+
   private data class Harness(
       val helper: TextToSpeechHelper,
       val tts: TextToSpeech,
@@ -297,6 +385,8 @@ class TextToSpeechHelperTest {
     every { tts.stop() } returns TextToSpeech.SUCCESS
     every { tts.shutdown() } answers {}
     every { tts.speak(any(), any(), any<Bundle>(), any()) } returns TextToSpeech.SUCCESS
+    every { tts.voices } returns emptySet()
+    every { tts.setVoice(any()) } returns TextToSpeech.SUCCESS
 
     var listener: TextToSpeech.OnInitListener? = null
     val helper =

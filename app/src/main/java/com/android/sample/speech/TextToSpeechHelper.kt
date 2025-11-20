@@ -6,14 +6,16 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.audiofx.Equalizer
 import android.media.audiofx.LoudnessEnhancer
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.speech.tts.Voice
+import android.util.Log
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicReference
 
 /** Abstraction so UI/test code can provide custom playback implementations if needed. */
 interface SpeechPlayback {
@@ -97,6 +99,7 @@ class TextToSpeechHelper(
   private var loudnessEnhancer: LoudnessEnhancer? = null
   private var enhancerSessionId: Int = AudioManager.ERROR
   private var equalizer: Equalizer? = null
+  private val speechStyle = AtomicReference(SpeechStyle())
 
   private data class PendingSpeech(
       val text: String,
@@ -269,14 +272,10 @@ class TextToSpeechHelper(
     }
     currentUtteranceId = request.utteranceId
     callbacks[request.utteranceId] = request.callbacks
-    val params =
-        Bundle().apply {
-          putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
-          if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
-            @Suppress("DEPRECATION")
-            putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC)
-          }
-        }
+    val prosody = computeProsody(request.text)
+    textToSpeech.setSpeechRate(prosody.rate)
+    textToSpeech.setPitch(prosody.pitch)
+    val params = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f) }
     val result =
         textToSpeech.speak(request.text, TextToSpeech.QUEUE_FLUSH, params, request.utteranceId)
     if (result != TextToSpeech.SUCCESS) {
@@ -320,34 +319,56 @@ class TextToSpeechHelper(
 
   /** Applies common attributes (usage, speech rate, pitch) and primes audio effects. */
   private fun configureEngine() {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-      textToSpeech.setAudioAttributes(audioAttributes)
-    }
-    textToSpeech.setSpeechRate(DEFAULT_SPEECH_RATE)
-    textToSpeech.setPitch(DEFAULT_PITCH)
+    textToSpeech.setAudioAttributes(audioAttributes)
+    val style = speechStyle.get()
+    textToSpeech.setSpeechRate(style.baseRate)
+    textToSpeech.setPitch(style.basePitch)
+    applyPreferredVoice()
     prepareEnhancer()
+  }
+
+  private fun applyPreferredVoice() {
+    val availableVoices =
+        runCatching { textToSpeech.voices?.toSet() }
+            .onFailure { error -> Log.w(TAG, "Unable to query available voices", error) }
+            .getOrNull() ?: return
+    val selected = selectPreferredVoice(availableVoices) ?: return
+    val result = textToSpeech.setVoice(selected)
+    if (result != TextToSpeech.SUCCESS) {
+      Log.w(TAG, "Failed to apply preferred voice ${selected.name} (code=$result)")
+    } else {
+      Log.d(TAG, "Applied premium voice ${selected.name} (${selected.locale})")
+    }
+  }
+
+  private fun selectPreferredVoice(voices: Set<Voice>): Voice? {
+    if (voices.isEmpty()) return null
+    val languageMatches =
+        voices.filter { voice -> voice.locale?.language == preferredLocale.language }
+    val candidates = if (languageMatches.isNotEmpty()) languageMatches else voices.toList()
+
+    val prioritized =
+        candidates.sortedWith(
+            compareByDescending<Voice> { voice ->
+                  val features = voice.features ?: emptySet()
+                  if (features.contains(FEATURE_NEURAL_NETWORK)) 2 else 0
+                }
+                .thenByDescending { it.quality }
+                .thenBy { it.latency })
+    return prioritized.firstOrNull()
   }
 
   /** Requests exclusive audio focus so system ducking does not reduce TTS volume mid-utterance. */
   private fun requestAudioFocus(force: Boolean = false): Boolean {
     if (hasAudioFocus && !force) return true
-    val granted =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-          val request =
-              AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                  .setAudioAttributes(audioAttributes)
-                  .setOnAudioFocusChangeListener(audioFocusChangeListener, mainHandler)
-                  .setWillPauseWhenDucked(false)
-                  .build()
-          audioFocusRequest = request
-          audioManager.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-        } else {
-          audioManager.requestAudioFocus(
-              audioFocusChangeListener,
-              AudioManager.STREAM_MUSIC,
-              AudioManager.AUDIOFOCUS_GAIN,
-          ) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-        }
+    val request =
+        AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+            .setAudioAttributes(audioAttributes)
+            .setOnAudioFocusChangeListener(audioFocusChangeListener, mainHandler)
+            .setWillPauseWhenDucked(false)
+            .build()
+    audioFocusRequest = request
+    val granted = audioManager.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
     hasAudioFocus = granted
     return granted
   }
@@ -355,17 +376,12 @@ class TextToSpeechHelper(
   /** Releases audio focus (if held) once playback and callbacks conclude. */
   private fun abandonAudioFocus() {
     hasAudioFocus = false
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
-      audioFocusRequest = null
-    } else {
-      audioManager.abandonAudioFocus(audioFocusChangeListener)
-    }
+    audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+    audioFocusRequest = null
   }
 
   /** Lazily configures `LoudnessEnhancer` and the companion equalizer for the active session ID. */
   private fun prepareEnhancer() {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) return
     val sessionId = resolveAudioSessionId()
     if (sessionId == AudioManager.ERROR || sessionId <= 0) return
     if (enhancerSessionId == sessionId) return
@@ -437,10 +453,82 @@ class TextToSpeechHelper(
   }
 
   companion object {
-    private const val DEFAULT_SPEECH_RATE = 0.95f
-    private const val DEFAULT_PITCH = 1.0f
+    private const val TAG = "TextToSpeechHelper"
     private const val ENHANCER_GAIN_MB = 1800
     private const val TREBLE_CUTOFF_HZ = 6_500
     private const val BASS_CUTOFF_HZ = 180
+    private const val FEATURE_NEURAL_NETWORK = "com.google.android.tts.feature.neural_network"
+  }
+
+  data class SpeechStyle(
+      // Base rate of 1.4f (40% faster than normal) chosen for improved speech clarity
+      // and reduced robotic feel. Can be adjusted via updateSpeechStyle() if needed.
+      val baseRate: Float = 1.4f,
+      val minRate: Float = 1.0f,
+      val maxRate: Float = 1.5f,
+      val shortSentenceThreshold: Int = 8,
+      val mediumSentenceThreshold: Int = 18,
+      val longSentenceThreshold: Int = 40,
+      val shortSentenceBoost: Float = 0.03f,
+      val mediumSentenceSlowdown: Float = 0.04f,
+      val longSentenceSlowdown: Float = 0.08f,
+      val commaSlowdown: Float = 0.02f,
+      val questionTempoBoost: Float = 0.02f,
+      val basePitch: Float = 1.03f,
+      val minPitch: Float = 0.92f,
+      val maxPitch: Float = 1.18f,
+      val questionPitchBoost: Float = 0.08f,
+      val exclamationPitchBoost: Float = 0.05f,
+  )
+
+  fun updateSpeechStyle(style: SpeechStyle) {
+    speechStyle.set(style)
+    textToSpeech.setSpeechRate(style.baseRate)
+    textToSpeech.setPitch(style.basePitch)
+  }
+
+  private data class Prosody(val rate: Float, val pitch: Float)
+
+  private fun computeProsody(text: String): Prosody {
+    val style = speechStyle.get()
+    val trimmed = text.trim()
+    if (trimmed.isEmpty()) {
+      return Prosody(style.baseRate, style.basePitch)
+    }
+
+    val wordCount = trimmed.split(Regex("\\s+")).count { it.isNotBlank() }
+    var rate = style.baseRate
+    var pitch = style.basePitch
+
+    when {
+      wordCount >= style.longSentenceThreshold -> {
+        rate -= style.longSentenceSlowdown
+      }
+      wordCount >= style.mediumSentenceThreshold -> {
+        rate -= style.mediumSentenceSlowdown
+      }
+      wordCount <= style.shortSentenceThreshold -> {
+        rate += style.shortSentenceBoost
+      }
+    }
+
+    if (trimmed.contains(",")) {
+      rate -= style.commaSlowdown
+    }
+
+    when {
+      trimmed.endsWith("?") -> {
+        pitch += style.questionPitchBoost
+        rate += style.questionTempoBoost
+      }
+      trimmed.endsWith("!") -> {
+        pitch += style.exclamationPitchBoost
+      }
+    }
+
+    rate = rate.coerceIn(style.minRate, style.maxRate)
+    val boundedPitch = pitch.coerceIn(style.minPitch, style.maxPitch)
+
+    return Prosody(rate = rate, pitch = boundedPitch)
   }
 }

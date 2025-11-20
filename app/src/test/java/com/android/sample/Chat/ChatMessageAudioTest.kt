@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.android.sample.ui.theme.SampleAppTheme
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -24,7 +25,9 @@ class ChatMessageAudioTest {
 
   @Test
   fun audioButton_hidden_whenStateNull() {
-    composeRule.setContent { ChatMessage(message = aiMessage, audioState = null) }
+    composeRule.setContent {
+      SampleAppTheme { ChatMessage(message = aiMessage, audioState = null) }
+    }
 
     assertTrue(composeRule.onAllNodesWithTag("chat_audio_btn_play").fetchSemanticsNodes().isEmpty())
     assertTrue(composeRule.onAllNodesWithTag("chat_audio_btn_stop").fetchSemanticsNodes().isEmpty())
@@ -39,7 +42,9 @@ class ChatMessageAudioTest {
         MessageAudioState(
             isLoading = false, isPlaying = false, onPlay = { played = true }, onStop = {})
 
-    composeRule.setContent { ChatMessage(message = aiMessage, audioState = state) }
+    composeRule.setContent {
+      SampleAppTheme { ChatMessage(message = aiMessage, audioState = state) }
+    }
 
     assertFalse(
         composeRule.onAllNodesWithTag("chat_audio_btn_play").fetchSemanticsNodes().isEmpty())
@@ -51,7 +56,9 @@ class ChatMessageAudioTest {
   fun audioButton_showsLoadingIndicator() {
     val state = MessageAudioState(isLoading = true, isPlaying = false, onPlay = {}, onStop = {})
 
-    composeRule.setContent { ChatMessage(message = aiMessage, audioState = state) }
+    composeRule.setContent {
+      SampleAppTheme { ChatMessage(message = aiMessage, audioState = state) }
+    }
 
     assertFalse(
         composeRule.onAllNodesWithTag("chat_audio_btn_loading").fetchSemanticsNodes().isEmpty())
@@ -64,7 +71,9 @@ class ChatMessageAudioTest {
   fun audioButton_showsStopWhenPlaying() {
     val state = MessageAudioState(isLoading = false, isPlaying = true, onPlay = {}, onStop = {})
 
-    composeRule.setContent { ChatMessage(message = aiMessage, audioState = state) }
+    composeRule.setContent {
+      SampleAppTheme { ChatMessage(message = aiMessage, audioState = state) }
+    }
 
     assertFalse(
         composeRule.onAllNodesWithTag("chat_audio_btn_stop").fetchSemanticsNodes().isEmpty())
