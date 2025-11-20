@@ -50,15 +50,12 @@ import androidx.compose.ui.unit.sp
 import com.android.sample.R
 import com.android.sample.settings.Localization
 import com.android.sample.ui.theme.EulerDrawerAvatarBackground
-import com.android.sample.ui.theme.EulerDrawerBackground
 import com.android.sample.ui.theme.EulerDrawerDivider
 import com.android.sample.ui.theme.EulerDrawerEmptyText
 import com.android.sample.ui.theme.EulerDrawerMutedIcon
 import com.android.sample.ui.theme.EulerDrawerSectionLabel
 import com.android.sample.ui.theme.EulerNewChatCircleRed
 import com.android.sample.ui.theme.EulerNewChatTextRed
-import com.android.sample.ui.theme.EulerRecentRowIconBackground
-import com.android.sample.ui.theme.EulerRecentRowSelectedBg
 import java.util.Locale
 
 /** Test tags used to find drawer elements in UI tests. */
@@ -214,6 +211,10 @@ private fun DrawerNewChatRow(onNewChat: () -> Unit) {
  */
 @Composable
 private fun DrawerConnectorsRow(onSettingsClick: () -> Unit) {
+  val colorScheme = MaterialTheme.colorScheme
+  val primaryTextColor = colorScheme.onSurface
+  val mutedIconColor = colorScheme.onSurfaceVariant
+
   Surface(
       color = Color.Transparent,
       modifier =
@@ -226,18 +227,18 @@ private fun DrawerConnectorsRow(onSettingsClick: () -> Unit) {
           Icon(
               Icons.Filled.Link,
               contentDescription = Localization.t("connectors"),
-              tint = EulerDrawerMutedIcon)
+              tint = mutedIconColor)
           Spacer(Modifier.width(12.dp))
           Text(
               Localization.t("connectors"),
-              color = Color.White,
+              color = primaryTextColor,
               fontSize = 16.sp,
               fontWeight = FontWeight.Normal)
           Spacer(Modifier.weight(1f))
           Icon(
               imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
               contentDescription = null,
-              tint = EulerDrawerMutedIcon)
+              tint = mutedIconColor)
         }
       }
 }
@@ -366,6 +367,8 @@ private fun DrawerConversationsList(
  */
 @Composable
 private fun ViewAllChatsRow(onShowAllChats: () -> Unit) {
+  val primaryTextColor = MaterialTheme.colorScheme.onSurface
+
   Surface(
       color = Color.Transparent,
       modifier =
@@ -377,7 +380,7 @@ private fun ViewAllChatsRow(onShowAllChats: () -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
           Text(
               Localization.t("view_all_chats"),
-              color = Color.White,
+              color = primaryTextColor,
               fontSize = 16.sp,
               fontWeight = FontWeight.Normal)
           Spacer(Modifier.weight(1f))
@@ -401,6 +404,9 @@ private fun DrawerFooter(
     onProfileDisabledClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
+  val colorScheme = MaterialTheme.colorScheme
+  val primaryTextColor = colorScheme.onSurface
+
   Surface(color = EulerDrawerDivider, modifier = Modifier.fillMaxWidth().height(1.dp)) {}
   Spacer(Modifier.height(12.dp))
 
@@ -428,14 +434,14 @@ private fun DrawerFooter(
         Spacer(Modifier.width(12.dp))
         Text(
             displayName,
-            color = Color.White,
+            color = primaryTextColor,
             fontSize = 16.sp,
             fontWeight = FontWeight.Normal,
             modifier = Modifier.weight(1f).clickable { onProfile() })
         Icon(
             Icons.Filled.Settings,
             contentDescription = Localization.t("settings"),
-            tint = Color.White,
+            tint = primaryTextColor,
             modifier =
                 Modifier.size(20.dp)
                     .clickable { onSettingsClick() }
