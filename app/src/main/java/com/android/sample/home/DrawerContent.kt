@@ -656,16 +656,17 @@ private fun RecentRow(
     onClick: () -> Unit = {},
     onLongClick: () -> Unit = {}
 ) {
-    val colorScheme = MaterialTheme.colorScheme
-    val bg = when {
+  val colorScheme = MaterialTheme.colorScheme
+  val bg =
+      when {
         isSelectionMode && isItemSelected -> colorScheme.onSurface.copy(alpha = 0.08f)
         !isSelectionMode && selected -> colorScheme.onSurface.copy(alpha = 0.08f)
         else -> Color.Transparent
-    }
+      }
 
-    val iconBackground = colorScheme.surfaceVariant
-    val iconTint = colorScheme.onSurfaceVariant
-    val textColor = colorScheme.onSurface
+  val iconBackground = colorScheme.surfaceVariant
+  val iconTint = colorScheme.onSurfaceVariant
+  val textColor = colorScheme.onSurface
   Surface(
       color = bg,
       shape = RoundedCornerShape(8.dp),
@@ -680,21 +681,21 @@ private fun RecentRow(
               modifier =
                   Modifier.size(24.dp).clip(RoundedCornerShape(6.dp)).background(iconBackground),
               contentAlignment = Alignment.Center) {
-if (isSelectionMode && isItemSelected) {
-                    Icon(
-                        imageVector = Icons.Filled.Check,
-                        contentDescription = null,
-                        // J'utilise iconTint (défini dans 'main') au lieu de Color.White
-                        // pour que l'icône soit visible sur le fond clair.
-                        tint = iconTint, 
-                        modifier = Modifier.size(15.dp))
+                if (isSelectionMode && isItemSelected) {
+                  Icon(
+                      imageVector = Icons.Filled.Check,
+                      contentDescription = null,
+                      // J'utilise iconTint (défini dans 'main') au lieu de Color.White
+                      // pour que l'icône soit visible sur le fond clair.
+                      tint = iconTint,
+                      modifier = Modifier.size(15.dp))
                 } else {
-                    Icon(
-                        imageVector = Icons.Outlined.ChatBubbleOutline,
-                        contentDescription = null,
-                        // Utilisation de la couleur du thème 'main'
-                        tint = iconTint, 
-                        modifier = Modifier.size(15.dp))
+                  Icon(
+                      imageVector = Icons.Outlined.ChatBubbleOutline,
+                      contentDescription = null,
+                      // Utilisation de la couleur du thème 'main'
+                      tint = iconTint,
+                      modifier = Modifier.size(15.dp))
                 }
               }
           Spacer(Modifier.width(12.dp))
