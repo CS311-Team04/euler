@@ -1,9 +1,16 @@
 package com.android.sample.llm
 
 import com.android.sample.BuildConfig
-import java.util.regex.Pattern
+import com.google.gson.Gson
+import com.google.gson.JsonElement
+import com.google.gson.JsonObject
+import com.google.gson.JsonParseException
+import java.net.InetAddress
+import java.net.UnknownHostException
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -21,9 +28,10 @@ class HttpLlmClient(
     private val endpoint: String = BuildConfig.LLM_HTTP_ENDPOINT,
     private val apiKey: String = BuildConfig.LLM_HTTP_API_KEY,
     private val client: OkHttpClient = OkHttpClient(),
+    private val gson: Gson = Gson(),
 ) : LlmClient {
 
-  private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
+  private val jsonMediaType = CONTENT_TYPE_JSON.toMediaType()
 
   /** Performs a blocking HTTP call on [Dispatchers.IO] and returns the non-empty `reply` field. */
   override suspend fun generateReply(prompt: String): BotReply =
@@ -31,33 +39,20 @@ class HttpLlmClient(
         if (endpoint.isBlank()) {
           throw IllegalStateException("LLM HTTP endpoint not configured")
         }
+        validateEndpoint(endpoint)
 
-        val escapedPrompt = buildString {
-          prompt.forEach { char ->
-            when (char) {
-              '\\' -> append("\\\\")
-              '"' -> append("\\\"")
-              '\n' -> append("\\n")
-              '\r' -> append("\\r")
-              '\t' -> append("\\t")
-              '\b' -> append("\\b")
-              '\u000C' -> append("\\f")
-              else -> append(char)
-            }
-          }
-        }
-        val payloadString = """{"question":"$escapedPrompt"}"""
+        val payloadString = gson.toJson(mapOf(JSON_KEY_QUESTION to prompt))
         val payload = payloadString.toRequestBody(jsonMediaType)
 
         val builder =
             Request.Builder()
                 .url(endpoint)
                 .post(payload)
-                .addHeader("Content-Type", "application/json")
+                .addHeader(HEADER_CONTENT_TYPE, CONTENT_TYPE_JSON)
 
         if (apiKey.isNotBlank()) {
           // adapt header if your backend expects a different header (e.g. "x-api-key")
-          builder.addHeader("Authorization", "Bearer $apiKey")
+          builder.addHeader(HEADER_AUTHORIZATION, "$AUTH_SCHEME_BEARER $apiKey")
         }
 
         val request = builder.build()
@@ -68,42 +63,97 @@ class HttpLlmClient(
           }
           val body =
               response.body?.string() ?: throw IllegalStateException("Empty LLM HTTP response")
-          return@withContext parseBotReply(body)
+          return@withContext parseBotReply(body, gson)
         }
       }
+
+  private fun validateEndpoint(endpoint: String) {
+    val url =
+        endpoint.toHttpUrlOrNull()
+            ?: throw IllegalStateException("Invalid LLM HTTP endpoint URL: $endpoint")
+    if (url.isHttps) return
+    if (url.scheme.equals("http", ignoreCase = true) && isAllowedLocalHost(url.host)) return
+    // In debug builds, allow HTTP for private IP ranges (common in CI/test environments)
+    if (BuildConfig.DEBUG && isPrivateIpAddress(url.host)) {
+      return
+    }
+    throw IllegalStateException("LLM HTTP endpoint must use HTTPS (was $endpoint)")
+  }
+
+  private fun isPrivateIpAddress(host: String?): Boolean {
+    if (host.isNullOrBlank()) return false
+    return try {
+      val address = InetAddress.getByName(host)
+      address.isAnyLocalAddress ||
+          address.isLoopbackAddress ||
+          address.isLinkLocalAddress ||
+          address.isSiteLocalAddress
+    } catch (_: UnknownHostException) {
+      false
+    }
+  }
+
+  /**
+   * Checks if the given host is an allowed localhost/loopback address. This function validates
+   * hosts without hardcoding IP addresses to comply with SonarQube rules.
+   *
+   * @param host The hostname or IP address to validate
+   * @return true if the host is a valid localhost/loopback address, false otherwise
+   */
+  private fun isAllowedLocalHost(host: String?): Boolean {
+    if (host.isNullOrBlank()) return false
+    // Normalize hostname to lowercase for case-insensitive comparison
+    val normalized = host.lowercase(Locale.US)
+    // Check common localhost identifier (no hardcoded IP addresses)
+    // The subsequent InetAddress check handles loopback detection dynamically
+    if (normalized == LOCALHOST) return true
+    return try {
+      // Resolve the hostname to an InetAddress for dynamic detection
+      val address = InetAddress.getByName(host)
+      // Accept only loopback addresses (127.0.0.0/8) in production builds.
+      // Private IP ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16) are only
+      // allowed in DEBUG builds via isPrivateIpAddress() check at lines 76-79.
+      // This dynamically detects loopback without hardcoding IP addresses.
+      address.isLoopbackAddress
+    } catch (_: UnknownHostException) {
+      // If hostname resolution fails, it's not a valid localhost address
+      false
+    }
+  }
 }
 
-internal fun parseBotReply(body: String): BotReply {
+internal fun parseBotReply(body: String, gson: Gson): BotReply {
   if (body.isBlank()) {
     throw IllegalStateException("Empty LLM HTTP response")
   }
-  val replyText =
-      REPLY_REGEX.find(body)?.groupValues?.getOrNull(1)?.let(::unescapeJsonString)?.trim()?.takeIf {
-        it.isNotEmpty()
-      } ?: throw IllegalStateException("Empty LLM reply")
+  val json: JsonObject =
+      try {
+        gson.fromJson(body, JsonObject::class.java)
+      } catch (error: JsonParseException) {
+        throw IllegalStateException("Invalid LLM HTTP response", error)
+      } ?: throw IllegalStateException("Invalid LLM HTTP response")
 
-  val url =
-      PRIMARY_URL_REGEX.find(body)
-          ?.groupValues
-          ?.getOrNull(1)
-          ?.let(::unescapeJsonString)
-          ?.trim()
-          ?.takeIf { it.isNotEmpty() }
+  val replyText =
+      json.getTrimmedString(JSON_KEY_REPLY) ?: throw IllegalStateException("Empty LLM reply")
+  val url = json.getTrimmedString(JSON_KEY_PRIMARY_URL)
   return BotReply(replyText, url)
 }
 
-private fun unescapeJsonString(raw: String): String =
-    raw.replace("\\\"", "\"")
-        .replace("\\\\", "\\")
-        .replace("\\n", "\n")
-        .replace("\\r", "\r")
-        .replace("\\t", "\t")
+private fun JsonObject.getTrimmedString(key: String): String? {
+  val element: JsonElement = get(key) ?: return null
+  if (element.isJsonNull || !element.isJsonPrimitive) return null
+  val primitive = element.asJsonPrimitive
+  if (!primitive.isString) return null
+  val value = primitive.asString.trim()
+  return value.takeIf { it.isNotEmpty() }
+}
 
-private val REPLY_REGEX =
-    Pattern.compile("\"reply\"\\s*:\\s*\"([^\"]*)\"", Pattern.DOTALL or Pattern.CASE_INSENSITIVE)
-        .toRegex()
-
-private val PRIMARY_URL_REGEX =
-    Pattern.compile(
-            "\"primary_url\"\\s*:\\s*\"([^\"]*)\"", Pattern.DOTALL or Pattern.CASE_INSENSITIVE)
-        .toRegex()
+private const val HEADER_CONTENT_TYPE = "Content-Type"
+private const val HEADER_AUTHORIZATION = "Authorization"
+private const val AUTH_SCHEME_BEARER = "Bearer"
+private const val CONTENT_TYPE_JSON = "application/json; charset=utf-8"
+private const val JSON_KEY_QUESTION = "question"
+private const val JSON_KEY_REPLY = "reply"
+private const val JSON_KEY_PRIMARY_URL = "primary_url"
+// Standard localhost identifier - safe loopback address (RFC 5735)
+private const val LOCALHOST = "localhost"

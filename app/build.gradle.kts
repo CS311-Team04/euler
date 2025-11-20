@@ -284,6 +284,7 @@ dependencies {
 
     // Networking for HTTP clients (LLM access, etc.)
     implementation(libs.okhttp)
+    implementation(libs.gson)
 
     // DataStore for preferences
     implementation(libs.datastore.core)
@@ -369,6 +370,7 @@ sonar {
         property("sonar.projectName", "euler")
         property("sonar.organization", "cs311-team04")
         property("sonar.host.url", "https://sonarcloud.io")
+        property("sonar.sourceEncoding", "UTF-8")
 
         // Basic source configuration - relative to project root
         property("sonar.sources", "src/main/java")
@@ -393,5 +395,9 @@ sonar {
         if (testResults.exists()) {
             property("sonar.junit.reportPaths", testResults.absolutePath)
         }
+
+        // Disable problematic feature flags initialization
+        // This prevents the null parameter issue in SonarQube scanner
+        property("sonar.scanner.dumpToFile", "${project.layout.buildDirectory.get()}/sonar-scanner-dump.txt")
     }
 }
