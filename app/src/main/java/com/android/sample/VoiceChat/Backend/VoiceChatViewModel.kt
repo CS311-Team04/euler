@@ -112,78 +112,103 @@ class VoiceChatViewModel(
     currentGenerationJob?.cancel()
     currentGenerationJob =
         viewModelScope.launch {
-          _uiState.update {
-            it.copy(
-                lastTranscript = cleaned,
-                isGenerating = true,
-                isSpeaking = false,
-                lastError = null,
-            )
-          }
-
+          updateStateForNewUtterance(cleaned)
           try {
-            // Ensure we have a conversation (create on first message if signed in)
-            val cid =
-                if (isGuest()) {
-                  null // Guest mode: no Firestore persistence
-                } else {
-                  currentConversationId
-                      ?: run {
-                        // Create new conversation on first message (same pattern as text mode)
-                        val quickTitle = localTitleFrom(cleaned)
-                        val newId = repo.startNewConversation(quickTitle)
-                        currentConversationId = newId
-                        Log.d(TAG, "Created new voice conversation: $newId with title: $quickTitle")
-                        newId
-                      }
-                }
-
-            // Persist user message immediately (if signed in)
-            if (cid != null) {
-              try {
-                repo.appendMessage(cid, "user", cleaned)
-                Log.d(TAG, "Persisted user message to conversation: $cid")
-              } catch (e: Exception) {
-                Log.w(TAG, "Failed to persist user message: ${e.message}")
-              }
-            }
-
-            // Generate AI reply
-            val reply = withContext(ioDispatcher) { llmClient.generateReply(cleaned) }
-            val spokenText = sanitizeForSpeech(reply.reply)
-            val request =
-                SpeechRequest(text = spokenText, utteranceId = UUID.randomUUID().toString())
-
-            _uiState.update {
-              it.copy(lastAiReply = reply.reply, isGenerating = false, lastError = null)
-            }
-
-            // Persist AI message (if signed in)
-            if (cid != null) {
-              try {
-                repo.appendMessage(cid, "assistant", reply.reply)
-                Log.d(TAG, "Persisted assistant message to conversation: $cid")
-              } catch (e: Exception) {
-                Log.w(TAG, "Failed to persist assistant message: ${e.message}")
-              }
-            }
-
-            if (!_speechRequests.tryEmit(request)) {
-              _speechRequests.emit(request)
-            }
+            val cid = ensureConversationExists(cleaned)
+            persistUserMessage(cid, cleaned)
+            val reply = generateAiReply(cleaned)
+            updateStateWithReply(reply.reply)
+            persistAiMessage(cid, reply.reply)
+            emitSpeechRequest(reply.reply)
           } catch (cancelled: CancellationException) {
             throw cancelled
           } catch (t: Throwable) {
-            Log.e(TAG, "LLM generation failed", t)
-            _uiState.update {
-              it.copy(
-                  isGenerating = false,
-                  isSpeaking = false,
-                  lastError = t.message ?: "Unable to generate response",
-              )
-            }
+            handleGenerationError(t)
           }
         }
+  }
+
+  /** Updates UI state when starting to process a new user utterance. */
+  private fun updateStateForNewUtterance(cleaned: String) {
+    _uiState.update {
+      it.copy(
+          lastTranscript = cleaned,
+          isGenerating = true,
+          isSpeaking = false,
+          lastError = null,
+      )
+    }
+  }
+
+  /**
+   * Ensures a conversation exists for the current session. Returns conversation ID if signed in,
+   * null if guest mode.
+   */
+  private suspend fun ensureConversationExists(cleaned: String): String? {
+    if (isGuest()) {
+      return null // Guest mode: no Firestore persistence
+    }
+    return currentConversationId
+        ?: run {
+          // Create new conversation on first message (same pattern as text mode)
+          val quickTitle = localTitleFrom(cleaned)
+          val newId = repo.startNewConversation(quickTitle)
+          currentConversationId = newId
+          Log.d(TAG, "Created new voice conversation: $newId with title: $quickTitle")
+          newId
+        }
+  }
+
+  /** Persists user message to Firestore if conversation ID exists. */
+  private suspend fun persistUserMessage(cid: String?, message: String) {
+    if (cid == null) return
+    try {
+      repo.appendMessage(cid, "user", message)
+      Log.d(TAG, "Persisted user message to conversation: $cid")
+    } catch (e: Exception) {
+      Log.w(TAG, "Failed to persist user message: ${e.message}")
+    }
+  }
+
+  /** Generates AI reply using the LLM client. */
+  private suspend fun generateAiReply(cleaned: String) =
+      withContext(ioDispatcher) { llmClient.generateReply(cleaned) }
+
+  /** Updates UI state with the AI reply. */
+  private fun updateStateWithReply(reply: String) {
+    _uiState.update { it.copy(lastAiReply = reply, isGenerating = false, lastError = null) }
+  }
+
+  /** Persists AI message to Firestore if conversation ID exists. */
+  private suspend fun persistAiMessage(cid: String?, reply: String) {
+    if (cid == null) return
+    try {
+      repo.appendMessage(cid, "assistant", reply)
+      Log.d(TAG, "Persisted assistant message to conversation: $cid")
+    } catch (e: Exception) {
+      Log.w(TAG, "Failed to persist assistant message: ${e.message}")
+    }
+  }
+
+  /** Emits a speech request for TTS playback. */
+  private suspend fun emitSpeechRequest(reply: String) {
+    val spokenText = sanitizeForSpeech(reply)
+    val request = SpeechRequest(text = spokenText, utteranceId = UUID.randomUUID().toString())
+    if (!_speechRequests.tryEmit(request)) {
+      _speechRequests.emit(request)
+    }
+  }
+
+  /** Handles errors during LLM generation and updates UI state accordingly. */
+  private fun handleGenerationError(t: Throwable) {
+    Log.e(TAG, "LLM generation failed", t)
+    _uiState.update {
+      it.copy(
+          isGenerating = false,
+          isSpeaking = false,
+          lastError = t.message ?: "Unable to generate response",
+      )
+    }
   }
 
   /** Allows other components (STT/TTS) to bubble a recoverable error into the UI banner. */
