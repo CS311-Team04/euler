@@ -2,12 +2,15 @@ package com.android.sample.VoiceChat.Backend
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import com.android.sample.conversations.ConversationRepository
 import com.android.sample.llm.FakeLlmClient
 import com.android.sample.util.MainDispatcherRule
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -16,6 +19,12 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.kotlin.any
+import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
@@ -267,4 +276,250 @@ class VoiceChatViewModelTest {
         val state = viewModel.uiState.value
         assertNull("lastError should be cleared", state.lastError)
       }
+
+  @Test
+  fun initializeConversation_resets_conversationId() {
+    // Test initializeConversation resets currentConversationId to null
+    val viewModel = VoiceChatViewModel(FakeLlmClient(), testDispatcher)
+
+    // Set a conversation ID using reflection
+    val field = VoiceChatViewModel::class.java.getDeclaredField("currentConversationId")
+    field.isAccessible = true
+    field.set(viewModel, "test-conversation-id")
+
+    // Initialize should reset it
+    viewModel.initializeConversation()
+
+    val conversationId = field.get(viewModel) as String?
+    assertNull("conversationId should be reset to null", conversationId)
+  }
+
+  @Test
+  fun initializeConversation_handles_guest_mode() {
+    // Test initializeConversation logs correctly in guest mode
+    val viewModel = VoiceChatViewModel(FakeLlmClient(), testDispatcher)
+    // Guest mode: no user signed in (default after setUpFirebase signs out)
+    viewModel.initializeConversation()
+    // Should not crash - verify by checking it completes
+    assertTrue("Should handle guest mode", true)
+  }
+
+  @Test
+  fun handleUserUtterance_creates_conversation_when_signed_in() =
+      runTest(testDispatcher) {
+        // Test handleUserUtterance creates conversation on first message when signed in
+        val auth = mock<FirebaseAuth>()
+        val user = mock<FirebaseUser>()
+        val repo = mock<ConversationRepository>()
+
+        whenever(auth.currentUser).thenReturn(user)
+        runBlocking {
+          whenever(repo.startNewConversation(any())).thenReturn("new-conv-id")
+          whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+        }
+
+        val viewModel =
+            VoiceChatViewModel(FakeLlmClient().apply { nextReply = "AI Reply" }, testDispatcher)
+        viewModel.setPrivateField("auth", auth)
+        viewModel.setPrivateField("repo", repo)
+
+        viewModel.handleUserUtterance("Hello Euler")
+
+        advanceUntilIdle()
+
+        // Verify conversation was created
+        runBlocking { verify(repo).startNewConversation(any()) }
+        // Verify user message was persisted
+        runBlocking { verify(repo).appendMessage("new-conv-id", "user", "Hello Euler") }
+        // Verify AI message was persisted
+        runBlocking { verify(repo).appendMessage("new-conv-id", "assistant", "AI Reply") }
+      }
+
+  @Test
+  fun handleUserUtterance_persists_user_message() =
+      runTest(testDispatcher) {
+        // Test handleUserUtterance persists user message to Firestore
+        val auth = mock<FirebaseAuth>()
+        val user = mock<FirebaseUser>()
+        val repo = mock<ConversationRepository>()
+
+        whenever(auth.currentUser).thenReturn(user)
+        runBlocking {
+          whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+          whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+        }
+
+        val viewModel =
+            VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Response" }, testDispatcher)
+        viewModel.setPrivateField("auth", auth)
+        viewModel.setPrivateField("repo", repo)
+
+        viewModel.handleUserUtterance("What is EPFL?")
+
+        advanceUntilIdle()
+
+        // Verify user message was persisted with correct parameters
+        runBlocking { verify(repo).appendMessage("conv-123", "user", "What is EPFL?") }
+      }
+
+  @Test
+  fun handleUserUtterance_persists_ai_message() =
+      runTest(testDispatcher) {
+        // Test handleUserUtterance persists AI message to Firestore
+        val auth = mock<FirebaseAuth>()
+        val user = mock<FirebaseUser>()
+        val repo = mock<ConversationRepository>()
+
+        whenever(auth.currentUser).thenReturn(user)
+        runBlocking {
+          whenever(repo.startNewConversation(any())).thenReturn("conv-456")
+          whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+        }
+
+        val aiReply = "EPFL is a university in Switzerland"
+        val viewModel =
+            VoiceChatViewModel(FakeLlmClient().apply { nextReply = aiReply }, testDispatcher)
+        viewModel.setPrivateField("auth", auth)
+        viewModel.setPrivateField("repo", repo)
+
+        viewModel.handleUserUtterance("Tell me about EPFL")
+
+        advanceUntilIdle()
+
+        // Verify AI message was persisted with correct parameters
+        runBlocking { verify(repo).appendMessage("conv-456", "assistant", aiReply) }
+      }
+
+  @Test
+  fun handleUserUtterance_does_not_persist_in_guest_mode() =
+      runTest(testDispatcher) {
+        // Test handleUserUtterance does not persist messages in guest mode
+        val auth = mock<FirebaseAuth>()
+        val repo = mock<ConversationRepository>()
+
+        whenever(auth.currentUser).thenReturn(null) // Guest mode
+
+        val viewModel =
+            VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" }, testDispatcher)
+        viewModel.setPrivateField("auth", auth)
+        viewModel.setPrivateField("repo", repo)
+
+        viewModel.handleUserUtterance("Hello")
+
+        advanceUntilIdle()
+
+        // Verify no conversation was created
+        runBlocking { verify(repo, never()).startNewConversation(any()) }
+        // Verify no messages were persisted
+        runBlocking { verify(repo, never()).appendMessage(any(), any(), any()) }
+      }
+
+  @Test
+  fun handleUserUtterance_creates_title_from_first_message() =
+      runTest(testDispatcher) {
+        // Test handleUserUtterance creates title from first message using localTitleFrom
+        val auth = mock<FirebaseAuth>()
+        val user = mock<FirebaseUser>()
+        val repo = mock<ConversationRepository>()
+
+        whenever(auth.currentUser).thenReturn(user)
+        runBlocking {
+          whenever(repo.startNewConversation(any())).thenReturn("conv-789")
+          whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+        }
+
+        val viewModel =
+            VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" }, testDispatcher)
+        viewModel.setPrivateField("auth", auth)
+        viewModel.setPrivateField("repo", repo)
+
+        val firstMessage = "What is the schedule for tomorrow?"
+        viewModel.handleUserUtterance(firstMessage)
+
+        advanceUntilIdle()
+
+        // Verify conversation was created with a title derived from the message
+        runBlocking {
+          verify(repo).startNewConversation(any())
+          // The title should be a shortened version of the first message
+          val titleCaptor = argumentCaptor<String>()
+          verify(repo).startNewConversation(titleCaptor.capture())
+          val capturedTitle = titleCaptor.firstValue
+          assertTrue("Title should be derived from message", capturedTitle.isNotBlank())
+          assertTrue(
+              "Title should be shorter than original", capturedTitle.length <= firstMessage.length)
+        }
+      }
+
+  @Test
+  fun handleUserUtterance_reuses_existing_conversation() =
+      runTest(testDispatcher) {
+        // Test handleUserUtterance reuses existing conversation on subsequent messages
+        val auth = mock<FirebaseAuth>()
+        val user = mock<FirebaseUser>()
+        val repo = mock<ConversationRepository>()
+
+        whenever(auth.currentUser).thenReturn(user)
+        runBlocking { whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit) }
+
+        val viewModel =
+            VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" }, testDispatcher)
+        viewModel.setPrivateField("auth", auth)
+        viewModel.setPrivateField("repo", repo)
+
+        // Set existing conversation ID
+        val existingConvId = "existing-conv-123"
+        val field = VoiceChatViewModel::class.java.getDeclaredField("currentConversationId")
+        field.isAccessible = true
+        field.set(viewModel, existingConvId)
+
+        viewModel.handleUserUtterance("Second message")
+
+        advanceUntilIdle()
+
+        // Verify conversation was NOT created again
+        runBlocking { verify(repo, never()).startNewConversation(any()) }
+        // Verify message was persisted to existing conversation
+        runBlocking {
+          verify(repo).appendMessage(existingConvId, "user", "Second message")
+          verify(repo).appendMessage(existingConvId, "assistant", "Reply")
+        }
+      }
+
+  @Test
+  fun handleUserUtterance_handles_persistence_errors_gracefully() =
+      runTest(testDispatcher) {
+        // Test handleUserUtterance handles Firestore persistence errors gracefully
+        val auth = mock<FirebaseAuth>()
+        val user = mock<FirebaseUser>()
+        val repo = mock<ConversationRepository>()
+
+        whenever(auth.currentUser).thenReturn(user)
+        runBlocking {
+          whenever(repo.startNewConversation(any())).thenReturn("conv-error")
+          whenever(repo.appendMessage(any(), any(), any()))
+              .thenThrow(RuntimeException("Firestore error"))
+        }
+
+        val viewModel =
+            VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" }, testDispatcher)
+        viewModel.setPrivateField("auth", auth)
+        viewModel.setPrivateField("repo", repo)
+
+        viewModel.handleUserUtterance("Test message")
+
+        advanceUntilIdle()
+
+        // Should not crash - error should be logged but processing should continue
+        val state = viewModel.uiState.value
+        assertNotNull("Should have AI reply", state.lastAiReply)
+        assertEquals("Should have correct reply", "Reply", state.lastAiReply)
+      }
+
+  // Helper function to set private fields using reflection
+  private fun VoiceChatViewModel.setPrivateField(name: String, value: Any?) {
+    val field = VoiceChatViewModel::class.java.getDeclaredField(name)
+    field.isAccessible = true
+    field.set(this, value)
+  }
 }
