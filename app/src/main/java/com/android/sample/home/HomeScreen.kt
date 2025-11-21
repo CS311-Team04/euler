@@ -55,6 +55,7 @@ import com.android.sample.settings.Localization
 import com.android.sample.speech.SpeechPlayback
 import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.ui.components.GuestProfileWarningModal
+import com.android.sample.ui.theme.EulerRed
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -604,7 +605,7 @@ private fun ChatInputBar(
                             onClick = onSendClick,
                             modifier = Modifier.fillMaxSize().testTag(HomeTags.SendBtn),
                             shape = CircleShape,
-                            color = Color(0xFFFF0000),
+                            color = EulerRed,
                             tonalElevation = 0.dp,
                             shadowElevation = 0.dp) {
                               Box(
