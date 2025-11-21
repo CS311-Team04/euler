@@ -497,7 +497,7 @@ export async function answerWithRagCore({
   const reply = rawReply.replace(/\s*USED_CONTEXT=(YES|NO)\s*$/i, "").trim();
 
   // Only expose a URL when BOTH gates pass: we have chosen context and the model says it used it
-  const primary_url = (chosen.length > 0 && usedContextByModel) ? (chosen[0]?.url ?? null) : null;
+  const primary_url = (chosen.length > 0 || usedContextByModel) ? (chosen[0]?.url ?? null) : null;
 
   return {
     reply,
