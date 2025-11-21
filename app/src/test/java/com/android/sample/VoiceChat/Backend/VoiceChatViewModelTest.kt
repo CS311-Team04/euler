@@ -21,6 +21,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
@@ -514,6 +515,127 @@ class VoiceChatViewModelTest {
         val state = viewModel.uiState.value
         assertNotNull("Should have AI reply", state.lastAiReply)
         assertEquals("Should have correct reply", "Reply", state.lastAiReply)
+      }
+
+  @Test
+  fun handleUserUtterance_handles_llm_generation_error() =
+      runTest(testDispatcher) {
+        // Test handleGenerationError updates state correctly on LLM failure
+        val errorMessage = "Network error"
+        val viewModel =
+            VoiceChatViewModel(
+                FakeLlmClient().apply { failure = RuntimeException(errorMessage) }, testDispatcher)
+
+        viewModel.handleUserUtterance("Test")
+
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse("isGenerating should be false after error", state.isGenerating)
+        assertFalse("isSpeaking should be false after error", state.isSpeaking)
+        assertNotNull("lastError should be set", state.lastError)
+        assertEquals("Error message should match", errorMessage, state.lastError)
+      }
+
+  @Test
+  fun handleUserUtterance_handles_llm_generation_error_with_null_message() =
+      runTest(testDispatcher) {
+        // Test handleGenerationError handles null error message
+        val viewModel =
+            VoiceChatViewModel(
+                FakeLlmClient().apply { failure = RuntimeException() }, testDispatcher)
+
+        viewModel.handleUserUtterance("Test")
+
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse("isGenerating should be false after error", state.isGenerating)
+        assertFalse("isSpeaking should be false after error", state.isSpeaking)
+        assertNotNull("lastError should have default message", state.lastError)
+        assertEquals(
+            "Error message should be default", "Unable to generate response", state.lastError)
+      }
+
+  @Test
+  fun handleUserUtterance_updates_state_with_reply() =
+      runTest(testDispatcher) {
+        // Test updateStateWithReply updates state correctly
+        val aiReply = "This is the AI response"
+        val viewModel =
+            VoiceChatViewModel(FakeLlmClient().apply { nextReply = aiReply }, testDispatcher)
+
+        viewModel.handleUserUtterance("Question")
+
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("lastAiReply should be set", aiReply, state.lastAiReply)
+        assertFalse("isGenerating should be false after reply", state.isGenerating)
+        assertNull("lastError should be null after successful reply", state.lastError)
+      }
+
+  @Test
+  fun handleUserUtterance_persist_user_message_handles_error() =
+      runTest(testDispatcher) {
+        // Test persistUserMessage handles errors gracefully
+        val auth = mock<FirebaseAuth>()
+        val user = mock<FirebaseUser>()
+        val repo = mock<ConversationRepository>()
+
+        whenever(auth.currentUser).thenReturn(user)
+        runBlocking {
+          whenever(repo.startNewConversation(any())).thenReturn("conv-id")
+          whenever(repo.appendMessage(eq("conv-id"), eq("user"), eq("Test")))
+              .thenThrow(RuntimeException("Persistence error"))
+          whenever(repo.appendMessage(eq("conv-id"), eq("assistant"), any())).thenReturn(Unit)
+        }
+
+        val viewModel =
+            VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" }, testDispatcher)
+        viewModel.setPrivateField("auth", auth)
+        viewModel.setPrivateField("repo", repo)
+
+        viewModel.handleUserUtterance("Test")
+
+        advanceUntilIdle()
+
+        // Should not crash - error should be logged but processing should continue
+        val state = viewModel.uiState.value
+        assertNotNull("Should have AI reply", state.lastAiReply)
+        // AI message should still be persisted even if user message failed
+        runBlocking { verify(repo).appendMessage("conv-id", "assistant", "Reply") }
+      }
+
+  @Test
+  fun handleUserUtterance_persist_ai_message_handles_error() =
+      runTest(testDispatcher) {
+        // Test persistAiMessage handles errors gracefully
+        val auth = mock<FirebaseAuth>()
+        val user = mock<FirebaseUser>()
+        val repo = mock<ConversationRepository>()
+
+        whenever(auth.currentUser).thenReturn(user)
+        runBlocking {
+          whenever(repo.startNewConversation(any())).thenReturn("conv-id")
+          whenever(repo.appendMessage(eq("conv-id"), eq("user"), eq("Test"))).thenReturn(Unit)
+          whenever(repo.appendMessage(eq("conv-id"), eq("assistant"), eq("Reply")))
+              .thenThrow(RuntimeException("Persistence error"))
+        }
+
+        val viewModel =
+            VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" }, testDispatcher)
+        viewModel.setPrivateField("auth", auth)
+        viewModel.setPrivateField("repo", repo)
+
+        viewModel.handleUserUtterance("Test")
+
+        advanceUntilIdle()
+
+        // Should not crash - error should be logged but processing should continue
+        val state = viewModel.uiState.value
+        assertEquals("Should have AI reply", "Reply", state.lastAiReply)
+        // Note: Speech request emission is tested indirectly through integration tests
       }
 
   // Helper function to set private fields using reflection

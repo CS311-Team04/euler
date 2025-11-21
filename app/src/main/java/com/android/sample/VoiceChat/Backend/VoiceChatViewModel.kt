@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * Coordinates speech-to-text transcripts with the custom LLM and delegates playback to the UI.
@@ -171,8 +170,7 @@ class VoiceChatViewModel(
   }
 
   /** Generates AI reply using the LLM client. */
-  private suspend fun generateAiReply(cleaned: String) =
-      withContext(ioDispatcher) { llmClient.generateReply(cleaned) }
+  private suspend fun generateAiReply(cleaned: String) = llmClient.generateReply(cleaned)
 
   /** Updates UI state with the AI reply. */
   private fun updateStateWithReply(reply: String) {
