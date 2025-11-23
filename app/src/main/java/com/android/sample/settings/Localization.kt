@@ -46,6 +46,13 @@ object Localization {
           "close" to "Close",
           "info" to "Info",
           "by_epfl" to "BY EPFL",
+          "connected" to "Connected",
+          "not_connected" to "Not connected",
+          "connect" to "Connect",
+          "disconnect" to "Disconnect",
+          "disconnect_confirm_title" to "Disconnect?",
+          "disconnect_confirm_message" to "Are you sure you want to disconnect %s?",
+          "cancel" to "Cancel",
 
           // Home Screen - Navigation
           "menu" to "Menu",
@@ -117,6 +124,13 @@ object Localization {
           "close" to "Fermer",
           "info" to "Info",
           "by_epfl" to "PAR EPFL",
+          "connected" to "Connecté",
+          "not_connected" to "Non connecté",
+          "connect" to "Connecter",
+          "disconnect" to "Déconnecter",
+          "disconnect_confirm_title" to "Déconnecter?",
+          "disconnect_confirm_message" to "Êtes-vous sûr de vouloir déconnecter %s?",
+          "cancel" to "Annuler",
 
           // Home Screen - Navigation
           "menu" to "Menu",
@@ -189,6 +203,13 @@ object Localization {
           "close" to "Schließen",
           "info" to "Info",
           "by_epfl" to "VON EPFL",
+          "connected" to "Verbunden",
+          "not_connected" to "Nicht verbunden",
+          "connect" to "Verbinden",
+          "disconnect" to "Trennen",
+          "disconnect_confirm_title" to "Trennen?",
+          "disconnect_confirm_message" to "Möchten Sie %s wirklich trennen?",
+          "cancel" to "Abbrechen",
 
           // Home Screen - Navigation
           "menu" to "Menü",
@@ -261,6 +282,13 @@ object Localization {
           "close" to "Cerrar",
           "info" to "Info",
           "by_epfl" to "POR EPFL",
+          "connected" to "Conectado",
+          "not_connected" to "No conectado",
+          "connect" to "Conectar",
+          "disconnect" to "Desconectar",
+          "disconnect_confirm_title" to "¿Desconectar?",
+          "disconnect_confirm_message" to "¿Está seguro de que desea desconectar %s?",
+          "cancel" to "Cancelar",
 
           // Home Screen - Navigation
           "menu" to "Menú",
@@ -333,6 +361,13 @@ object Localization {
           "close" to "Chiudi",
           "info" to "Info",
           "by_epfl" to "DA EPFL",
+          "connected" to "Connesso",
+          "not_connected" to "Non connesso",
+          "connect" to "Connetti",
+          "disconnect" to "Disconnetti",
+          "disconnect_confirm_title" to "Disconnettere?",
+          "disconnect_confirm_message" to "Sei sicuro di voler disconnettere %s?",
+          "cancel" to "Annulla",
 
           // Home Screen - Navigation
           "menu" to "Menu",
@@ -405,6 +440,13 @@ object Localization {
           "close" to "Fechar",
           "info" to "Info",
           "by_epfl" to "POR EPFL",
+          "connected" to "Conectado",
+          "not_connected" to "Não conectado",
+          "connect" to "Conectar",
+          "disconnect" to "Desconectar",
+          "disconnect_confirm_title" to "Desconectar?",
+          "disconnect_confirm_message" to "Tem certeza de que deseja desconectar %s?",
+          "cancel" to "Cancelar",
 
           // Home Screen - Navigation
           "menu" to "Menu",
@@ -477,6 +519,13 @@ object Localization {
           "close" to "关闭",
           "info" to "信息",
           "by_epfl" to "由 EPFL 提供",
+          "connected" to "已连接",
+          "not_connected" to "未连接",
+          "connect" to "连接",
+          "disconnect" to "断开连接",
+          "disconnect_confirm_title" to "断开连接?",
+          "disconnect_confirm_message" to "您确定要断开 %s 的连接吗?",
+          "cancel" to "取消",
 
           // Home Screen - Navigation
           "menu" to "菜单",

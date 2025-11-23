@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.android.sample.conversations.Conversation
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -54,13 +55,46 @@ class DrawerContentTest {
   }
 
   @Test
-  fun connectors_click_invokes_settings_callback() {
-    var settingsClicked = false
+  fun connectors_click_invokes_connectors_callback() {
+    var connectorsClicked = false
     composeRule.setContent {
-      MaterialTheme { DrawerContent(onSettingsClick = { settingsClicked = true }) }
+      MaterialTheme { DrawerContent(onConnectorsClick = { connectorsClicked = true }) }
     }
     composeRule.onNodeWithTag(DrawerTags.ConnectorsRow).performClick()
-    assertTrue(settingsClicked)
+    assertTrue(connectorsClicked)
+  }
+
+  @Test
+  fun connectors_row_displays_correct_text() {
+    composeRule.setContent { MaterialTheme { DrawerContent() } }
+    composeRule.onNodeWithText("Connectors").assertIsDisplayed()
+    composeRule.onNodeWithTag(DrawerTags.ConnectorsRow).assertIsDisplayed()
+  }
+
+  @Test
+  fun connectors_row_is_clickable() {
+    var clicked = false
+    composeRule.setContent {
+      MaterialTheme { DrawerContent(onConnectorsClick = { clicked = true }) }
+    }
+    composeRule.onNodeWithTag(DrawerTags.ConnectorsRow).performClick()
+    assertTrue(clicked)
+  }
+
+  @Test
+  fun connectors_callback_is_separate_from_settings_callback() {
+    var connectorsClicked = false
+    var settingsClicked = false
+    composeRule.setContent {
+      MaterialTheme {
+        DrawerContent(
+            onConnectorsClick = { connectorsClicked = true },
+            onSettingsClick = { settingsClicked = true })
+      }
+    }
+    composeRule.onNodeWithTag(DrawerTags.ConnectorsRow).performClick()
+    assertTrue(connectorsClicked)
+    assertFalse(settingsClicked)
   }
 
   @Test
