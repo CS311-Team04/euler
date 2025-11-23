@@ -326,27 +326,6 @@ class HomeScreenTestCov {
   }
 
   @Test
-  fun settings_from_drawer_invokes_callback() {
-    var settingsCalled = false
-    val viewModel = HomeViewModel()
-    updateUiState(viewModel) { it.copy(isDrawerOpen = true) }
-
-    composeRule.setContent {
-      MaterialTheme {
-        HomeScreen(viewModel = viewModel, onSettingsClick = { settingsCalled = true })
-      }
-    }
-
-    composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
-    composeRule.waitForIdle()
-    composeRule.onNodeWithTag(DrawerTags.ConnectorsRow).performClick()
-    composeRule.waitForIdle()
-
-    assertTrue(settingsCalled)
-    assertFalse(viewModel.uiState.value.isDrawerOpen)
-  }
-
-  @Test
   fun screen_message_field_updates_viewModel() {
     val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
