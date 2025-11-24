@@ -21,9 +21,13 @@ tools/epfl_scraper/data/
 
 # macOS
 .DS_Store
+/build
 /.gradle
 /.idea
-/.github
+# Allow workflow configs to live in repo
+!/.github
+!/.github/workflows
+!/.github/workflows/*.yml
 /build
 local.properties
 
