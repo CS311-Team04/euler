@@ -30,27 +30,9 @@ global.console = {
   // error: jest.fn(),
 };
 
-// Mock Firebase Admin initialization globally
-jest.mock('firebase-admin', () => {
-  const actualAdmin = jest.requireActual('firebase-admin') as any;
-  
-  return {
-    ...actualAdmin,
-    apps: [],
-    initializeApp: jest.fn(),
-    firestore: jest.fn(() => ({
-      collection: jest.fn(() => ({
-        doc: jest.fn(() => ({
-          get: jest.fn(),
-          set: jest.fn(),
-          update: jest.fn(),
-          delete: jest.fn(),
-          collection: jest.fn()
-        }))
-      }))
-    }))
-  };
-});
+// Firebase Admin is NOT mocked globally
+// Integration tests need real admin to connect to emulator
+// Unit tests that need mocks should mock firebase-admin locally
 
 // Reset all mocks after each test
 afterEach(() => {
