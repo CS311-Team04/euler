@@ -51,3 +51,58 @@ val EulerAudioButtonTint: Color = Color.White
 val EulerAudioButtonTintSemiTransparent: Color = Color.White.copy(alpha = 0.75f)
 val EulerAudioButtonLoadingColor: Color = Color.LightGray
 val EulerThinkingCursorColor: Color = Color.White
+
+// Connectors Screen colors
+
+// Premium background
+val ConnectorsBackground = DarkBackground // #0F0F0F (Remplace #0D0D0D)
+
+// Light mode colors for Connectors
+val ConnectorsLightBackground = LightBackground // White background
+val ConnectorsLightTextPrimary = LightOnBackground // Dark text
+val ConnectorsLightTextSecondary = LightOnSurfaceVariant.copy(alpha = 0.7f) // Gray text 70%
+val ConnectorsLightTextSecondary50 = LightOnSurfaceVariant.copy(alpha = 0.5f) // Gray text 50%
+val ConnectorsLightGlassBackground = LightSurface // Light gray surface
+val ConnectorsLightGlassBorder = LightOutline.copy(alpha = 0.2f) // Light border
+val ConnectorsLightOnPrimary = Color.White // White text on colored buttons
+val ConnectorsLightSurface = LightSurface // Light surface
+
+// Dark mode colors for Connectors (glassmorphism)
+val ConnectorsDarkGlassBackground = LightBackground.copy(alpha = 0.04f)
+val ConnectorsDarkGlassBorder = LightBackground.copy(alpha = 0.08f)
+val ConnectorsDarkTextSecondary = LightBackground.copy(alpha = 0.70f)
+val ConnectorsDarkTextSecondary50 = LightBackground.copy(alpha = 0.50f)
+
+// Status colors
+val EulerGreen = Color(0xFF39D98A)
+val EulerGreenTransparent = EulerGreen.copy(alpha = 0.20f)
+
+// Accent
+val EulerAccentRed = EulerRed // alias pour Connectors UI
+
+// Muted grays (brand-safe)
+val EulerGrayDark = Color(0XFF424242) // ex #757575
+val textConnectors = Color.Gray.copy(alpha = 0.3f) // ex #9E9E9E
+val textConnectorsLight = Color.Gray.copy(alpha = 0.5f)
+
+// Shadow colors
+val EulerShadowSpot = Color.Black.copy(alpha = 0.15f)
+val EulerShadowAmbient = Color.Black.copy(alpha = 0.08f)
+
+// Light mode shadow colors (lighter shadows for better visibility)
+val LightShadowSpot = Color.Black.copy(alpha = 0.08f)
+val LightShadowAmbient = Color.Black.copy(alpha = 0.04f)
+
+// Moodle brand colors
+val MoodleOrange = Color(0xFFFF9800)
+val MoodleYellow = Color(0xFFFFC107)
+// Moodle grayscale for disconnected state
+val MoodleGray1 = Color(0xFF757575)
+val MoodleGray2 = Color(0xFF9E9E9E)
+
+// ED logo
+val ed1 = Color(0xFF6B46C1)
+val ed2 = Color(0xFFEC4899)
+
+// IS-Academia brand colors
+val isAcademiaR = Color(0xFFC62828)
