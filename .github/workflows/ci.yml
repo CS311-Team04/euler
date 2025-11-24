@@ -11,7 +11,8 @@ on:
       - synchronize
       - reopened
 
-# Annule les anciens runs si tu push plusieurs fois sur la même PR
+# Ensure that only one run of this workflow is active per branch/PR.
+# If a new commit is pushed, the previous run for that ref is cancelled.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -22,15 +23,18 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
+      # Checkout repository source code
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Install JDK 17 for Gradle/Android
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
           java-version: "17"
 
+      # Cache Gradle dependencies to speed up subsequent runs
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
@@ -40,12 +44,15 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-gradle-
 
+      # Make sure gradlew is executable
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
+      # Run formatting check and Android Lint
       - name: KTFmt Check and Lint
         run: ./gradlew ktfmtCheck lint --parallel --build-cache
 
+      # Upload lint reports so they can be inspected from the CI run
       - name: Upload lint report
         uses: actions/upload-artifact@v4
         with:
@@ -56,18 +63,22 @@ jobs:
     name: Unit tests + coverage
     runs-on: ubuntu-24.04
     env:
+      # Increase max heap size for Gradle / JVM
       _JAVA_OPTIONS: "-Xmx4g"
 
     steps:
+      # Checkout repository source code
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Install JDK 17
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
           java-version: "17"
 
+      # Reuse Gradle cache (same config as in static-checks)
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
@@ -77,15 +88,16 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-gradle-
 
+      # Ensure gradlew is executable
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
-      # ⚠️ Si ton projet utilise une autre variante, adapte :
-      # ex: testResOverrideDebugUnitTest au lieu de testDebugUnitTest
+      # Run unit tests and generate Jacoco coverage report in one Gradle invocation
       - name: Run unit tests + Jacoco
         run: |
           ./gradlew testDebugUnitTest jacocoTestReport --parallel --build-cache
 
+      # Expose the Jacoco report as an artifact for later use (e.g. by Sonar)
       - name: Upload Jacoco report
         uses: actions/upload-artifact@v4
         with:
@@ -94,24 +106,28 @@ jobs:
 
   sonar:
     name: SonarCloud analysis
+    # Wait for both static checks and unit tests to complete
     needs: [static-checks, unit-tests]
     runs-on: ubuntu-24.04
     env:
       _JAVA_OPTIONS: "-Xmx4g"
 
     steps:
+      # Checkout full git history and submodules for better Sonar analysis
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          fetch-depth: 0 # pour un meilleur contexte pour Sonar
+          fetch-depth: 0 # required for proper blame/coverage mapping in Sonar
 
+      # Install JDK 17
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
           java-version: "17"
 
+      # Reuse Gradle cache again for the sonar step
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
@@ -121,6 +137,7 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-gradle-
 
+      # Cache SonarQube scanner dependencies
       - name: Cache SonarQube packages
         uses: actions/cache@v4
         with:
@@ -128,23 +145,27 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
+      # Ensure gradlew is executable
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
+      # Download lint reports generated in the static-checks job
       - name: Download lint report
         uses: actions/download-artifact@v4
         with:
           name: lint-report
           path: app/build/reports/
 
+      # Download Jacoco coverage report generated in the unit-tests job
       - name: Download Jacoco report
         uses: actions/download-artifact@v4
         with:
           name: jacoco-test-report
           path: app/build/reports/jacoco/jacocoTestReport
 
+      # Run SonarCloud analysis using the existing reports and project config
       - name: Upload report to SonarCloud
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # required for PR decoration
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}     # SonarCloud authentication
         run: ./gradlew sonar --parallel --build-cache --stacktrace --info
