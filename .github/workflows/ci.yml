@@ -17,6 +17,8 @@ jobs:
     name: CI
     # Execute the CI on the course's runners
     runs-on: ubuntu-latest
+    env:
+      _JAVA_OPTIONS: "-Xmx4g"
 
     steps:
       # First step : Checkout the repository on the runner
