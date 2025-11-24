@@ -16,11 +16,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.android.sample.settings.AppSettings
 import com.android.sample.settings.AppearanceMode
 import com.android.sample.settings.Localization
+import com.android.sample.settings.connectors.ConnectorsDimensions as Dimens
 import com.android.sample.ui.theme.ConnectorsLightSurface
 import com.android.sample.ui.theme.DarkSurface
 import com.android.sample.ui.theme.containerColor
@@ -86,46 +85,50 @@ fun ConnectorsScreen(onBackClick: () -> Unit = {}, onConnectorClick: (String) ->
     Column(modifier = Modifier.fillMaxSize()) {
       // Premium top bar
       Row(
-          modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 28.dp),
+          modifier =
+              Modifier.fillMaxWidth()
+                  .padding(
+                      horizontal = Dimens.ScreenHorizontalPadding,
+                      vertical = Dimens.ScreenTopPadding),
           verticalAlignment = Alignment.CenterVertically) {
             IconButton(
                 onClick = onBackClick,
-                modifier = Modifier.size(40.dp),
+                modifier = Modifier.size(Dimens.TopBarIconButtonSize),
                 colors =
                     IconButtonDefaults.iconButtonColors(
                         containerColor = containerColor, contentColor = colors.textPrimary)) {
                   Icon(
                       imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                       contentDescription = Localization.t("close"),
-                      modifier = Modifier.size(22.dp),
+                      modifier = Modifier.size(Dimens.TopBarIconSize),
                       tint = colors.textPrimary)
                 }
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(Dimens.TopBarSpacerWidth))
             Column(modifier = Modifier.weight(1f)) {
               Text(
                   text = Localization.t("connectors"),
                   color = colors.textPrimary,
-                  fontSize = 28.sp,
+                  fontSize = Dimens.TopBarTitleFontSize,
                   fontWeight = FontWeight.SemiBold,
-                  letterSpacing = (-0.5).sp)
-              Spacer(modifier = Modifier.height(6.dp))
+                  letterSpacing = Dimens.TopBarTitleLetterSpacing)
+              Spacer(modifier = Modifier.height(Dimens.TopBarSubtitleSpacer))
               Text(
                   text = "Connect your academic services",
                   color = colors.textSecondary,
-                  fontSize = 14.sp,
+                  fontSize = Dimens.TopBarSubtitleFontSize,
                   fontWeight = FontWeight.Normal)
             }
           }
 
-      Spacer(modifier = Modifier.height(4.dp))
+      Spacer(modifier = Modifier.height(Dimens.ScreenContentSpacing))
 
       // Premium grid - 2x2 with exact spacing (18dp)
       LazyVerticalGrid(
           columns = GridCells.Fixed(2),
-          modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-          horizontalArrangement = Arrangement.spacedBy(18.dp),
-          verticalArrangement = Arrangement.spacedBy(18.dp),
-          contentPadding = PaddingValues(bottom = 32.dp)) {
+          modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.ScreenHorizontalPadding),
+          horizontalArrangement = Arrangement.spacedBy(Dimens.GridSpacing),
+          verticalArrangement = Arrangement.spacedBy(Dimens.GridSpacing),
+          contentPadding = PaddingValues(bottom = Dimens.GridBottomPadding)) {
             items(connectors) { connector ->
               ConnectorCard(
                   connector = connector,
@@ -156,10 +159,11 @@ fun ConnectorsScreen(onBackClick: () -> Unit = {}, onConnectorClick: (String) ->
     Text(
         text = Localization.t("by_epfl"),
         color = colors.textSecondary50,
-        fontSize = 11.sp,
+        fontSize = Dimens.FooterFontSize,
         fontWeight = FontWeight.Light,
-        letterSpacing = 1.sp,
-        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
+        letterSpacing = Dimens.FooterLetterSpacing,
+        modifier =
+            Modifier.align(Alignment.BottomCenter).padding(bottom = Dimens.ScreenBottomPadding),
         textAlign = TextAlign.Center)
 
     // Disconnect confirmation dialog
@@ -202,7 +206,7 @@ private fun DisconnectConfirmationDialog(
         Text(
             text = Localization.t("disconnect_confirm_title"),
             color = colors.textPrimary,
-            fontSize = 18.sp,
+            fontSize = Dimens.DialogTitleFontSize,
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth())
@@ -211,33 +215,34 @@ private fun DisconnectConfirmationDialog(
         Text(
             text = Localization.t("disconnect_confirm_message").replace("%s", connectorName),
             color = colors.textSecondary,
-            fontSize = 14.sp,
+            fontSize = Dimens.DialogTextFontSize,
             textAlign = TextAlign.Center,
-            lineHeight = 20.sp)
+            lineHeight = Dimens.DialogTextLineHeight)
       },
       confirmButton = {
         Button(
             onClick = onConfirm,
             colors = ButtonDefaults.buttonColors(containerColor = colors.accentRed),
-            shape = RoundedCornerShape(10.dp)) {
+            shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
               Text(
                   Localization.t("disconnect"),
                   color = colors.onPrimaryColor,
-                  fontSize = 14.sp,
+                  fontSize = Dimens.DialogTextFontSize,
                   fontWeight = FontWeight.SemiBold)
             }
       },
       dismissButton = {
-        TextButton(onClick = onDismiss, shape = RoundedCornerShape(10.dp)) {
-          Text(
-              Localization.t("cancel"),
-              color = colors.textPrimary,
-              fontSize = 14.sp,
-              fontWeight = FontWeight.Medium)
-        }
+        TextButton(
+            onClick = onDismiss, shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
+              Text(
+                  Localization.t("cancel"),
+                  color = colors.textPrimary,
+                  fontSize = Dimens.DialogTextFontSize,
+                  fontWeight = FontWeight.Medium)
+            }
       },
       containerColor = surfaceColor,
-      shape = RoundedCornerShape(20.dp))
+      shape = RoundedCornerShape(Dimens.DialogCornerRadius))
 }
 
 @Preview(showBackground = true, backgroundColor = previewBgColor)

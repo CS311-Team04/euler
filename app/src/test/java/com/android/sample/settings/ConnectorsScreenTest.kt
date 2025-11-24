@@ -274,11 +274,13 @@ class ConnectorsScreenTest {
   @Test
   fun `screen respects appearance mode SYSTEM`() = runTest {
     AppSettings.setAppearanceMode(AppearanceMode.SYSTEM)
+    advanceUntilIdle()
+
     composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
     composeRule.waitForIdle()
     advanceUntilIdle()
 
-    composeRule.onNodeWithText("Connectors").assertIsDisplayed()
+    composeRule.runOnIdle { composeRule.onNodeWithText("Connectors").assertIsDisplayed() }
   }
 
   @Test
@@ -358,21 +360,13 @@ class ConnectorsScreenTest {
   @Test
   fun `screen uses correct theme colors in light mode`() = runTest {
     AppSettings.setAppearanceMode(AppearanceMode.LIGHT)
+    advanceUntilIdle()
+
     composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
     composeRule.waitForIdle()
     advanceUntilIdle()
 
-    composeRule.onNodeWithText("Connectors").assertIsDisplayed()
-  }
-
-  @Test
-  fun `screen uses system theme when appearance mode is SYSTEM`() = runTest {
-    AppSettings.setAppearanceMode(AppearanceMode.SYSTEM)
-    composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
-    composeRule.waitForIdle()
-    advanceUntilIdle()
-
-    composeRule.onNodeWithText("Connectors").assertIsDisplayed()
+    composeRule.runOnIdle { composeRule.onNodeWithText("Connectors").assertIsDisplayed() }
   }
 
   @Test

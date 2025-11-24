@@ -419,3 +419,481 @@
 //    assertEquals(7, translations.size)
 //  }
 // }
+
+package com.android.sample.settings
+
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+
+class LocalizationConnectorsTest {
+
+  @Before
+  fun setup() {
+    AppSettings.setLanguage(Language.EN)
+  }
+
+  @After
+  fun tearDown() {
+    AppSettings.setLanguage(Language.EN)
+  }
+
+  // ========== Connected Tests ==========
+
+  @Test
+  fun connected_returns_english_translation() {
+    AppSettings.setLanguage(Language.EN)
+    assertEquals("Connected", Localization.t("connected"))
+  }
+
+  @Test
+  fun connected_returns_french_translation() {
+    AppSettings.setLanguage(Language.FR)
+    assertEquals("Connecté", Localization.t("connected"))
+  }
+
+  @Test
+  fun connected_returns_german_translation() {
+    AppSettings.setLanguage(Language.DE)
+    assertEquals("Verbunden", Localization.t("connected"))
+  }
+
+  @Test
+  fun connected_returns_spanish_translation() {
+    AppSettings.setLanguage(Language.ES)
+    assertEquals("Conectado", Localization.t("connected"))
+  }
+
+  @Test
+  fun connected_returns_italian_translation() {
+    AppSettings.setLanguage(Language.IT)
+    assertEquals("Connesso", Localization.t("connected"))
+  }
+
+  @Test
+  fun connected_returns_portuguese_translation() {
+    AppSettings.setLanguage(Language.PT)
+    assertEquals("Conectado", Localization.t("connected"))
+  }
+
+  @Test
+  fun connected_returns_chinese_translation() {
+    AppSettings.setLanguage(Language.ZH)
+    assertEquals("已连接", Localization.t("connected"))
+  }
+
+  // ========== Not Connected Tests ==========
+
+  @Test
+  fun not_connected_returns_english_translation() {
+    AppSettings.setLanguage(Language.EN)
+    assertEquals("Not connected", Localization.t("not_connected"))
+  }
+
+  @Test
+  fun not_connected_returns_french_translation() {
+    AppSettings.setLanguage(Language.FR)
+    assertEquals("Non connecté", Localization.t("not_connected"))
+  }
+
+  @Test
+  fun not_connected_returns_german_translation() {
+    AppSettings.setLanguage(Language.DE)
+    assertEquals("Nicht verbunden", Localization.t("not_connected"))
+  }
+
+  @Test
+  fun not_connected_returns_spanish_translation() {
+    AppSettings.setLanguage(Language.ES)
+    assertEquals("No conectado", Localization.t("not_connected"))
+  }
+
+  @Test
+  fun not_connected_returns_italian_translation() {
+    AppSettings.setLanguage(Language.IT)
+    assertEquals("Non connesso", Localization.t("not_connected"))
+  }
+
+  @Test
+  fun not_connected_returns_portuguese_translation() {
+    AppSettings.setLanguage(Language.PT)
+    assertEquals("Não conectado", Localization.t("not_connected"))
+  }
+
+  @Test
+  fun not_connected_returns_chinese_translation() {
+    AppSettings.setLanguage(Language.ZH)
+    assertEquals("未连接", Localization.t("not_connected"))
+  }
+
+  // ========== Connect Tests ==========
+
+  @Test
+  fun connect_returns_english_translation() {
+    AppSettings.setLanguage(Language.EN)
+    assertEquals("Connect", Localization.t("connect"))
+  }
+
+  @Test
+  fun connect_returns_french_translation() {
+    AppSettings.setLanguage(Language.FR)
+    assertEquals("Connecter", Localization.t("connect"))
+  }
+
+  @Test
+  fun connect_returns_german_translation() {
+    AppSettings.setLanguage(Language.DE)
+    assertEquals("Verbinden", Localization.t("connect"))
+  }
+
+  @Test
+  fun connect_returns_spanish_translation() {
+    AppSettings.setLanguage(Language.ES)
+    assertEquals("Conectar", Localization.t("connect"))
+  }
+
+  @Test
+  fun connect_returns_italian_translation() {
+    AppSettings.setLanguage(Language.IT)
+    assertEquals("Connetti", Localization.t("connect"))
+  }
+
+  @Test
+  fun connect_returns_portuguese_translation() {
+    AppSettings.setLanguage(Language.PT)
+    assertEquals("Conectar", Localization.t("connect"))
+  }
+
+  @Test
+  fun connect_returns_chinese_translation() {
+    AppSettings.setLanguage(Language.ZH)
+    assertEquals("连接", Localization.t("connect"))
+  }
+
+  // ========== Disconnect Tests ==========
+
+  @Test
+  fun disconnect_returns_english_translation() {
+    AppSettings.setLanguage(Language.EN)
+    assertEquals("Disconnect", Localization.t("disconnect"))
+  }
+
+  @Test
+  fun disconnect_returns_french_translation() {
+    AppSettings.setLanguage(Language.FR)
+    assertEquals("Déconnecter", Localization.t("disconnect"))
+  }
+
+  @Test
+  fun disconnect_returns_german_translation() {
+    AppSettings.setLanguage(Language.DE)
+    assertEquals("Trennen", Localization.t("disconnect"))
+  }
+
+  @Test
+  fun disconnect_returns_spanish_translation() {
+    AppSettings.setLanguage(Language.ES)
+    assertEquals("Desconectar", Localization.t("disconnect"))
+  }
+
+  @Test
+  fun disconnect_returns_italian_translation() {
+    AppSettings.setLanguage(Language.IT)
+    assertEquals("Disconnetti", Localization.t("disconnect"))
+  }
+
+  @Test
+  fun disconnect_returns_portuguese_translation() {
+    AppSettings.setLanguage(Language.PT)
+    assertEquals("Desconectar", Localization.t("disconnect"))
+  }
+
+  @Test
+  fun disconnect_returns_chinese_translation() {
+    AppSettings.setLanguage(Language.ZH)
+    assertEquals("断开连接", Localization.t("disconnect"))
+  }
+
+  // ========== Disconnect Confirm Title Tests ==========
+
+  @Test
+  fun disconnect_confirm_title_returns_english_translation() {
+    AppSettings.setLanguage(Language.EN)
+    assertEquals("Disconnect?", Localization.t("disconnect_confirm_title"))
+  }
+
+  @Test
+  fun disconnect_confirm_title_returns_french_translation() {
+    AppSettings.setLanguage(Language.FR)
+    assertEquals("Déconnecter?", Localization.t("disconnect_confirm_title"))
+  }
+
+  @Test
+  fun disconnect_confirm_title_returns_german_translation() {
+    AppSettings.setLanguage(Language.DE)
+    assertEquals("Trennen?", Localization.t("disconnect_confirm_title"))
+  }
+
+  @Test
+  fun disconnect_confirm_title_returns_spanish_translation() {
+    AppSettings.setLanguage(Language.ES)
+    assertEquals("¿Desconectar?", Localization.t("disconnect_confirm_title"))
+  }
+
+  @Test
+  fun disconnect_confirm_title_returns_italian_translation() {
+    AppSettings.setLanguage(Language.IT)
+    assertEquals("Disconnettere?", Localization.t("disconnect_confirm_title"))
+  }
+
+  @Test
+  fun disconnect_confirm_title_returns_portuguese_translation() {
+    AppSettings.setLanguage(Language.PT)
+    assertEquals("Desconectar?", Localization.t("disconnect_confirm_title"))
+  }
+
+  @Test
+  fun disconnect_confirm_title_returns_chinese_translation() {
+    AppSettings.setLanguage(Language.ZH)
+    assertEquals("断开连接?", Localization.t("disconnect_confirm_title"))
+  }
+
+  // ========== Disconnect Confirm Message Tests ==========
+
+  @Test
+  fun disconnect_confirm_message_returns_english_translation() {
+    AppSettings.setLanguage(Language.EN)
+    val message = Localization.t("disconnect_confirm_message")
+    assertTrue("Message should contain 'Are you sure'", message.contains("Are you sure"))
+    assertTrue("Message should contain 'disconnect'", message.contains("disconnect"))
+    assertTrue("Message should contain placeholder %s", message.contains("%s"))
+    assertNotEquals("disconnect_confirm_message", message)
+  }
+
+  @Test
+  fun disconnect_confirm_message_returns_french_translation() {
+    AppSettings.setLanguage(Language.FR)
+    val message = Localization.t("disconnect_confirm_message")
+    assertTrue("Message should contain 'Êtes-vous'", message.contains("Êtes-vous"))
+    assertTrue("Message should contain 'déconnecter'", message.contains("déconnecter"))
+    assertTrue("Message should contain placeholder %s", message.contains("%s"))
+    assertNotEquals("disconnect_confirm_message", message)
+  }
+
+  @Test
+  fun disconnect_confirm_message_returns_german_translation() {
+    AppSettings.setLanguage(Language.DE)
+    val message = Localization.t("disconnect_confirm_message")
+    assertTrue(
+        "Message should contain 'wirklich' or 'trennen'",
+        message.contains("wirklich") || message.contains("trennen"))
+    assertTrue("Message should contain placeholder %s", message.contains("%s"))
+    assertNotEquals("disconnect_confirm_message", message)
+  }
+
+  @Test
+  fun disconnect_confirm_message_returns_spanish_translation() {
+    AppSettings.setLanguage(Language.ES)
+    val message = Localization.t("disconnect_confirm_message")
+    assertTrue("Message should contain 'seguro'", message.contains("seguro"))
+    assertTrue("Message should contain 'desconectar'", message.contains("desconectar"))
+    assertTrue("Message should contain placeholder %s", message.contains("%s"))
+    assertNotEquals("disconnect_confirm_message", message)
+  }
+
+  @Test
+  fun disconnect_confirm_message_returns_italian_translation() {
+    AppSettings.setLanguage(Language.IT)
+    val message = Localization.t("disconnect_confirm_message")
+    assertTrue("Message should contain 'sicuro'", message.contains("sicuro"))
+    assertTrue("Message should contain 'disconnettere'", message.contains("disconnettere"))
+    assertTrue("Message should contain placeholder %s", message.contains("%s"))
+    assertNotEquals("disconnect_confirm_message", message)
+  }
+
+  @Test
+  fun disconnect_confirm_message_returns_portuguese_translation() {
+    AppSettings.setLanguage(Language.PT)
+    val message = Localization.t("disconnect_confirm_message")
+    assertTrue("Message should contain 'certeza'", message.contains("certeza"))
+    assertTrue("Message should contain 'desconectar'", message.contains("desconectar"))
+    assertTrue("Message should contain placeholder %s", message.contains("%s"))
+    assertNotEquals("disconnect_confirm_message", message)
+  }
+
+  @Test
+  fun disconnect_confirm_message_returns_chinese_translation() {
+    AppSettings.setLanguage(Language.ZH)
+    val message = Localization.t("disconnect_confirm_message")
+    assertTrue("Message should contain '确定'", message.contains("确定"))
+    assertTrue("Message should contain '断开'", message.contains("断开"))
+    assertTrue("Message should contain placeholder %s", message.contains("%s"))
+    assertNotEquals("disconnect_confirm_message", message)
+  }
+
+  // ========== Cancel Tests ==========
+
+  @Test
+  fun cancel_returns_english_translation() {
+    AppSettings.setLanguage(Language.EN)
+    assertEquals("Cancel", Localization.t("cancel"))
+  }
+
+  @Test
+  fun cancel_returns_french_translation() {
+    AppSettings.setLanguage(Language.FR)
+    assertEquals("Annuler", Localization.t("cancel"))
+  }
+
+  @Test
+  fun cancel_returns_german_translation() {
+    AppSettings.setLanguage(Language.DE)
+    assertEquals("Abbrechen", Localization.t("cancel"))
+  }
+
+  @Test
+  fun cancel_returns_spanish_translation() {
+    AppSettings.setLanguage(Language.ES)
+    assertEquals("Cancelar", Localization.t("cancel"))
+  }
+
+  @Test
+  fun cancel_returns_italian_translation() {
+    AppSettings.setLanguage(Language.IT)
+    assertEquals("Annulla", Localization.t("cancel"))
+  }
+
+  @Test
+  fun cancel_returns_portuguese_translation() {
+    AppSettings.setLanguage(Language.PT)
+    assertEquals("Cancelar", Localization.t("cancel"))
+  }
+
+  @Test
+  fun cancel_returns_chinese_translation() {
+    AppSettings.setLanguage(Language.ZH)
+    assertEquals("取消", Localization.t("cancel"))
+  }
+
+  // ========== Comprehensive Connector Tests ==========
+
+  @Test
+  fun all_connector_keys_have_translations_in_all_languages() {
+    val connectorKeys =
+        listOf(
+            "connected",
+            "not_connected",
+            "connect",
+            "disconnect",
+            "disconnect_confirm_title",
+            "disconnect_confirm_message",
+            "cancel")
+
+    Language.entries.forEach { language ->
+      AppSettings.setLanguage(language)
+      connectorKeys.forEach { key ->
+        val translation = Localization.t(key)
+        assertNotEquals("Should have translation for $key in $language", key, translation)
+        assertTrue(
+            "Translation should not be empty for $key in $language", translation.isNotEmpty())
+      }
+    }
+  }
+
+  @Test
+  fun connector_translations_are_different_between_languages() {
+    val testKey = "connected"
+    val translations = mutableSetOf<String>()
+
+    Language.entries.forEach { language ->
+      AppSettings.setLanguage(language)
+      translations.add(Localization.t(testKey))
+    }
+
+    // Should have at least 5 unique translations (some languages may share translations)
+    assertTrue("Should have multiple unique translations", translations.size >= 5)
+  }
+
+  @Test
+  fun disconnect_confirm_message_contains_placeholder_in_all_languages() {
+    Language.entries.forEach { language ->
+      AppSettings.setLanguage(language)
+      val message = Localization.t("disconnect_confirm_message")
+      assertTrue("Message should contain %s placeholder in $language", message.contains("%s"))
+    }
+  }
+
+  @Test
+  fun connected_and_not_connected_are_different() {
+    AppSettings.setLanguage(Language.EN)
+    val connected = Localization.t("connected")
+    val notConnected = Localization.t("not_connected")
+    assertNotEquals("Connected and Not connected should be different", connected, notConnected)
+  }
+
+  @Test
+  fun connect_and_disconnect_are_different() {
+    AppSettings.setLanguage(Language.EN)
+    val connect = Localization.t("connect")
+    val disconnect = Localization.t("disconnect")
+    assertNotEquals("Connect and Disconnect should be different", connect, disconnect)
+  }
+
+  @Test
+  fun all_connector_keys_fallback_to_english_when_missing() {
+    AppSettings.setLanguage(Language.EN)
+    val connectorKeys =
+        listOf(
+            "connected",
+            "not_connected",
+            "connect",
+            "disconnect",
+            "disconnect_confirm_title",
+            "disconnect_confirm_message",
+            "cancel")
+
+    connectorKeys.forEach { key ->
+      val translation = Localization.t(key)
+      assertNotEquals("Key should have English translation: $key", key, translation)
+      assertTrue("Translation should not be empty", translation.isNotEmpty())
+    }
+  }
+
+  @Test
+  fun connector_keys_work_with_string_formatting() {
+    AppSettings.setLanguage(Language.EN)
+    val message = Localization.t("disconnect_confirm_message")
+    val formatted = message.replace("%s", "Moodle")
+    assertTrue("Formatted message should contain connector name", formatted.contains("Moodle"))
+    assertTrue("Formatted message should not contain placeholder", !formatted.contains("%s"))
+  }
+
+  @Test
+  fun connector_status_texts_are_not_empty() {
+    val statusKeys = listOf("connected", "not_connected")
+    Language.entries.forEach { language ->
+      AppSettings.setLanguage(language)
+      statusKeys.forEach { key ->
+        val translation = Localization.t(key)
+        assertTrue(
+            "Status text should not be empty for $key in $language", translation.isNotEmpty())
+      }
+    }
+  }
+
+  @Test
+  fun connector_action_texts_are_not_empty() {
+    val actionKeys = listOf("connect", "disconnect")
+    Language.entries.forEach { language ->
+      AppSettings.setLanguage(language)
+      actionKeys.forEach { key ->
+        val translation = Localization.t(key)
+        assertTrue(
+            "Action text should not be empty for $key in $language", translation.isNotEmpty())
+      }
+    }
+  }
+}

@@ -13,9 +13,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.android.sample.R
+import com.android.sample.settings.connectors.ConnectorsDimensions as Dimens
 import com.android.sample.ui.theme.ConnectorsLightSurface
 import com.android.sample.ui.theme.DarkSurface
 import com.android.sample.ui.theme.EulerGrayDark
@@ -42,7 +41,7 @@ fun ConnectorLogo(connectorId: String, isConnected: Boolean = true) {
     "ed" -> EdLogo(isConnected = isConnected)
     "epfl_campus" -> EPFLLogo(isConnected = isConnected)
     "is_academia" -> ISAcademiaLogo(isConnected = isConnected)
-    else -> Box(modifier = Modifier.size(40.dp).background(textConnectors))
+    else -> Box(modifier = Modifier.size(Dimens.LogoSize).background(textConnectors))
   }
 }
 
@@ -61,38 +60,46 @@ fun MoodleLogo(isConnected: Boolean) {
       }
 
   Box(
-      modifier = Modifier.size(40.dp).background(backgroundColor, RoundedCornerShape(8.dp)),
+      modifier =
+          Modifier.size(Dimens.LogoSize)
+              .background(backgroundColor, RoundedCornerShape(Dimens.LogoCornerRadius)),
       contentAlignment = Alignment.Center) {
-        Box(modifier = Modifier.padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
-          // Graduation cap on top of "m"
-          Column(
-              horizontalAlignment = Alignment.CenterHorizontally,
-              verticalArrangement = Arrangement.Center) {
-                // Graduation cap
-                Box(
-                    modifier =
-                        Modifier.width(14.dp)
-                            .height(6.dp)
-                            .background(EulerGrayDark, RoundedCornerShape(2.dp))
-                            .offset(y = (-3).dp),
-                    contentAlignment = Alignment.TopCenter) {
-                      // Tassel
-                      Box(
-                          modifier =
-                              Modifier.width(1.5.dp)
-                                  .height(8.dp)
-                                  .background(EulerGrayDark)
-                                  .offset(x = 0.dp, y = 6.dp))
-                    }
-                // Letter "m"
-                Text(
-                    text = "m",
-                    color = LightBackground,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.offset(y = (-6).dp))
-              }
-        }
+        Box(
+            modifier = Modifier.padding(horizontal = Dimens.LogoPadding),
+            contentAlignment = Alignment.Center) {
+              // Graduation cap on top of "m"
+              Column(
+                  horizontalAlignment = Alignment.CenterHorizontally,
+                  verticalArrangement = Arrangement.Center) {
+                    // Graduation cap
+                    Box(
+                        modifier =
+                            Modifier.width(Dimens.MoodleGraduationCapWidth)
+                                .height(Dimens.MoodleGraduationCapHeight)
+                                .background(
+                                    EulerGrayDark,
+                                    RoundedCornerShape(Dimens.MoodleGraduationCapCornerRadius))
+                                .offset(y = Dimens.MoodleGraduationCapOffsetY),
+                        contentAlignment = Alignment.TopCenter) {
+                          // Tassel
+                          Box(
+                              modifier =
+                                  Modifier.width(Dimens.MoodleTasselWidth)
+                                      .height(Dimens.MoodleTasselHeight)
+                                      .background(EulerGrayDark)
+                                      .offset(
+                                          x = Dimens.MoodleTasselOffsetX,
+                                          y = Dimens.MoodleTasselOffsetY))
+                        }
+                    // Letter "m"
+                    Text(
+                        text = "m",
+                        color = LightBackground,
+                        fontSize = Dimens.MoodleTextFontSize,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.offset(y = Dimens.MoodleTextOffsetY))
+                  }
+            }
       }
 }
 
@@ -111,14 +118,16 @@ fun EdLogo(isConnected: Boolean) {
       }
 
   Box(
-      modifier = Modifier.size(40.dp).background(backgroundColor, RoundedCornerShape(8.dp)),
+      modifier =
+          Modifier.size(Dimens.LogoSize)
+              .background(backgroundColor, RoundedCornerShape(Dimens.LogoCornerRadius)),
       contentAlignment = Alignment.Center) {
         Text(
             text = "ed",
             color = LightBackground,
-            fontSize = 24.sp,
+            fontSize = Dimens.EdTextFontSize,
             fontWeight = FontWeight.Bold,
-            letterSpacing = (-3).sp) // Letters overlap slightly
+            letterSpacing = Dimens.EdTextLetterSpacing) // Letters overlap slightly
   }
 }
 
@@ -141,16 +150,16 @@ fun EPFLLogo(isConnected: Boolean) {
     Image(
         painter = painterResource(id = logoResId),
         contentDescription = null,
-        modifier = Modifier.size(40.dp),
+        modifier = Modifier.size(Dimens.LogoSize),
         contentScale = ContentScale.Fit)
   } else {
 
     Text(
         text = "EPFL",
         color = if (isConnected) EulerNewChatCircleRed else MoodleGray1,
-        fontSize = 16.sp,
+        fontSize = Dimens.EPFLTextFontSize,
         fontWeight = FontWeight.Bold,
-        letterSpacing = 2.sp)
+        letterSpacing = Dimens.EPFLTextLetterSpacing)
   }
 }
 
@@ -168,12 +177,14 @@ fun ISAcademiaLogo(isConnected: Boolean) {
   val surfaceColor = if (isDark) DarkSurface else ConnectorsLightSurface
 
   Box(
-      modifier = Modifier.size(40.dp, 28.dp).background(surfaceColor, RoundedCornerShape(8.dp)),
+      modifier =
+          Modifier.size(Dimens.LogoSize, Dimens.ISAcademiaHeight)
+              .background(surfaceColor, RoundedCornerShape(Dimens.LogoCornerRadius)),
       contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(horizontal = 6.dp)) {
+            modifier = Modifier.padding(horizontal = Dimens.ISAcademiaPadding)) {
               // "IS academia" text
               Row(
                   verticalAlignment = Alignment.CenterVertically,
@@ -181,21 +192,21 @@ fun ISAcademiaLogo(isConnected: Boolean) {
                     Text(
                         text = "IS",
                         color = isColor,
-                        fontSize = 12.sp,
+                        fontSize = Dimens.ISAcademiaTextFontSize,
                         fontWeight = FontWeight.Bold)
                     Text(
                         text = "academia",
                         color = academiaColor,
-                        fontSize = 12.sp,
+                        fontSize = Dimens.ISAcademiaTextFontSize,
                         fontWeight = FontWeight.Bold)
                   }
               // Underline
               Box(
                   modifier =
-                      Modifier.width(35.dp)
-                          .height(1.dp)
+                      Modifier.width(Dimens.ISAcademiaUnderlineWidth)
+                          .height(Dimens.ISAcademiaUnderlineHeight)
                           .background(underlineColor)
-                          .offset(y = (-1).dp))
+                          .offset(y = Dimens.ISAcademiaUnderlineOffsetY))
             }
       }
 }

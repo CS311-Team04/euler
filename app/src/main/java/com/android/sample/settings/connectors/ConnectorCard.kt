@@ -10,9 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.android.sample.settings.Localization
+import com.android.sample.settings.connectors.ConnectorsDimensions as Dimens
 
 /** Premium connector card with glassmorphism effect */
 @Composable
@@ -23,53 +22,53 @@ fun ConnectorCard(
     isDark: Boolean
 ) {
 
-  Box(modifier = Modifier.fillMaxWidth().aspectRatio(0.95f)) {
+  Box(modifier = Modifier.fillMaxWidth().aspectRatio(Dimens.CardAspectRatio)) {
     Surface(
         onClick = onConnectClick,
         modifier =
             Modifier.fillMaxSize()
                 .shadow(
-                    elevation = if (isDark) 0.dp else 2.dp, // Add elevation in light mode
-                    shape = RoundedCornerShape(22.dp),
+                    elevation = if (isDark) Dimens.CardElevationDark else Dimens.CardElevationLight,
+                    shape = RoundedCornerShape(Dimens.CardCornerRadius),
                     spotColor = colors.shadowSpot,
                     ambientColor = colors.shadowAmbient),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(Dimens.CardCornerRadius),
         color = colors.glassBackground,
-        border = BorderStroke(width = 1.dp, color = colors.glassBorder)) {
+        border = BorderStroke(width = Dimens.CardBorderWidth, color = colors.glassBorder)) {
           Column(
-              modifier = Modifier.fillMaxSize().padding(24.dp),
-              verticalArrangement = Arrangement.spacedBy(0.dp),
+              modifier = Modifier.fillMaxSize().padding(Dimens.CardPadding),
+              verticalArrangement = Arrangement.spacedBy(Dimens.CardContentSpacing),
               horizontalAlignment = Alignment.CenterHorizontally) {
                 // Logo petit et compact
                 Box(
-                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                    modifier = Modifier.fillMaxWidth().height(Dimens.CardLogoHeight),
                     contentAlignment = Alignment.Center) {
                       ConnectorLogo(connectorId = connector.id, isConnected = connector.isConnected)
                     }
 
-                Spacer(modifier = Modifier.height(22.dp))
+                Spacer(modifier = Modifier.height(Dimens.CardLogoSpacer))
 
                 // Title - Inter-style: SemiBold 18sp
                 Text(
                     text = connector.name,
                     color = colors.textPrimary,
-                    fontSize = 18.sp,
+                    fontSize = Dimens.CardTitleFontSize,
                     fontWeight = FontWeight.SemiBold,
-                    letterSpacing = (-0.3).sp,
+                    letterSpacing = Dimens.CardTitleLetterSpacing,
                     maxLines = 1,
                     textAlign = TextAlign.Center)
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(Dimens.CardTitleSubtitleSpacer))
 
                 // Subtitle - Normal 13sp, 70% opacity
                 Text(
                     text = connector.description,
                     color = colors.textSecondary,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp,
+                    fontSize = Dimens.CardSubtitleFontSize,
+                    lineHeight = Dimens.CardSubtitleLineHeight,
                     maxLines = 2,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 4.dp))
+                    modifier = Modifier.padding(horizontal = Dimens.CardSubtitlePadding))
 
                 Spacer(modifier = Modifier.weight(1f))
 
@@ -82,17 +81,17 @@ fun ConnectorCard(
                           Localization.t("not_connected")
                         },
                     color = if (connector.isConnected) colors.connectedGreen else colors.accentRed,
-                    fontSize = 12.sp,
+                    fontSize = Dimens.CardStatusFontSize,
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center)
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(Dimens.CardStatusButtonSpacer))
 
                 // Action button - premium style
                 Surface(
                     onClick = onConnectClick,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(Dimens.ButtonCornerRadius),
                     color =
                         if (connector.isConnected) {
                           colors.connectedGreenBackground
@@ -102,7 +101,9 @@ fun ConnectorCard(
                     contentColor =
                         if (connector.isConnected) colors.textPrimary else colors.onPrimaryColor) {
                       Box(
-                          modifier = Modifier.fillMaxWidth().padding(vertical = 13.dp),
+                          modifier =
+                              Modifier.fillMaxWidth()
+                                  .padding(vertical = Dimens.ButtonVerticalPadding),
                           contentAlignment = Alignment.Center) {
                             Text(
                                 text =
@@ -114,9 +115,9 @@ fun ConnectorCard(
                                 color =
                                     if (connector.isConnected) colors.textPrimary
                                     else colors.onPrimaryColor,
-                                fontSize = 14.sp,
+                                fontSize = Dimens.ButtonTextFontSize,
                                 fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 0.1.sp)
+                                letterSpacing = Dimens.ButtonTextLetterSpacing)
                           }
                     }
               }
