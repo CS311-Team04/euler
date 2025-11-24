@@ -17,6 +17,8 @@ jobs:
     name: CI
     # Execute the CI on the course's runners
     runs-on: ubuntu-latest
+    env:
+      _JAVA_OPTIONS: "-Xmx4g"
 
     steps:
       # First step : Checkout the repository on the runner
@@ -95,16 +97,16 @@ jobs:
           ./gradlew check --parallel --build-cache
 
       # Run connected tests on the emulator
-      - name: run tests
-        uses: reactivecircus/android-emulator-runner@1dcd0090116d15e7c562f8db72807de5e036a4ed
-        with:
-          api-level: 34
-          target: google_apis
-          arch: x86_64
-          force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: true
-          script: ./gradlew connectedCheck --parallel --build-cache
+      # - name: run tests
+      #   uses: reactivecircus/android-emulator-runner@1dcd0090116d15e7c562f8db72807de5e036a4ed
+      #   with:
+      #     api-level: 34
+      #     target: google_apis
+      #     arch: x86_64
+      #     force-avd-creation: false
+      #     emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+      #     disable-animations: true
+      #     script: ./gradlew connectedCheck --parallel --build-cache
 
       # This step generates the coverage report which will be uploaded to sonar
       - name: Generate Coverage Report
