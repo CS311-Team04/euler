@@ -92,10 +92,10 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
-      # Run unit tests and generate Jacoco coverage report in one Gradle invocation
-      - name: Run unit tests + Jacoco
+      # Run assembleDebug, unit tests and generate Jacoco coverage report in one Gradle invocation
+      - name: Build debug APK + run unit tests + Jacoco
         run: |
-          ./gradlew testDebugUnitTest jacocoTestReport --parallel --build-cache
+            ./gradlew assembleDebug testDebugUnitTest jacocoTestReport --parallel --build-cache
 
       # Expose the Jacoco report as an artifact for later use (e.g. by Sonar)
       - name: Upload Jacoco report
