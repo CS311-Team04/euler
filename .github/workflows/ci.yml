@@ -1,6 +1,5 @@
 name: CI - Test Runner
 
-# Run the workflow when commits are pushed on main or when a PR is modified
 on:
   push:
     branches:
@@ -12,29 +11,19 @@ on:
       - synchronize
       - reopened
 
+# Annule les anciens runs si tu push plusieurs fois sur la même PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  ci:
-    name: CI
-    # Execute the CI on the course's runners
-    runs-on: ubuntu-latest
-    env:
-      _JAVA_OPTIONS: "-Xmx4g"
+  static-checks:
+    name: Static checks (ktfmt + lint)
+    runs-on: ubuntu-24.04
 
     steps:
-      # First step : Checkout the repository on the runner
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of Sonar analysis (if we use Sonar Later)
-
-
-      # Kernel-based Virtual Machine (KVM) is an open source virtualization technology built into Linux. Enabling it allows the Android emulator to run faster.
-      - name: Enable KVM group perms
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
 
       - name: Setup JDK
         uses: actions/setup-java@v4
@@ -42,76 +31,95 @@ jobs:
           distribution: "temurin"
           java-version: "17"
 
-      # Caching is a very useful part of a CI, as a workflow is executed in a clean environment every time,
-      # this means that one would need to re-download and re-process gradle files for every run. Which is very time consuming.
-      #
-      # To avoid that, we cache the the gradle folder to reuse it later.
-      - name: Cache Gradle packages
+      - name: Cache Gradle
         uses: actions/cache@v4
-        with:
-          path: ~/.gradle/caches
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
-          restore-keys: ${{ runner.os }}-gradle
-
-      # Cache the Emulator, if the cache does not hit, create the emulator
-      - name: AVD cache
-        uses: actions/cache@v4
-        id: avd-cache
         with:
           path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: avd-34
-
-      - name: create AVD and generate snapshot for caching
-        if: steps.avd-cache.outputs.cache-hit != 'true'
-        uses: reactivecircus/android-emulator-runner@1dcd0090116d15e7c562f8db72807de5e036a4ed
-        with:
-          api-level: 34
-          target: google_apis
-          arch: x86_64
-          force-avd-creation: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: false
-          script: echo "Generated AVD snapshot for caching."
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle-
 
       - name: Grant execute permission for gradlew
-        run: |
-          chmod +x ./gradlew
+        run: chmod +x ./gradlew
 
-      # Check formatting
-      - name: KTFmt Check
-        run: |
-          ./gradlew ktfmtCheck
+      - name: KTFmt Check and Lint
+        run: ./gradlew ktfmtCheck lint --parallel --build-cache
 
-      # This step runs gradle commands to build the application
-      - name: Assemble
-        run: |
-          # To run the CI with debug information, add --info
-          ./gradlew assemble lint --parallel --build-cache
+      - name: Upload lint report
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: app/build/reports/lint-*
 
-      # Run Unit tests
-      - name: Run tests
-        run: |
-          # To run the CI with debug information, add --info
-          ./gradlew check --parallel --build-cache
+  unit-tests:
+    name: Unit tests + coverage
+    runs-on: ubuntu-24.04
+    env:
+      _JAVA_OPTIONS: "-Xmx4g"
 
-      # Run connected tests on the emulator
-      # - name: run tests
-      #   uses: reactivecircus/android-emulator-runner@1dcd0090116d15e7c562f8db72807de5e036a4ed
-      #   with:
-      #     api-level: 34
-      #     target: google_apis
-      #     arch: x86_64
-      #     force-avd-creation: false
-      #     emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-      #     disable-animations: true
-      #     script: ./gradlew connectedCheck --parallel --build-cache
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      # This step generates the coverage report which will be uploaded to sonar
-      - name: Generate Coverage Report
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle-
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      # ⚠️ Si ton projet utilise une autre variante, adapte :
+      # ex: testResOverrideDebugUnitTest au lieu de testDebugUnitTest
+      - name: Run unit tests + Jacoco
         run: |
-          ./gradlew jacocoTestReport
+          ./gradlew testDebugUnitTest jacocoTestReport --parallel --build-cache
+
+      - name: Upload Jacoco report
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-test-report
+          path: app/build/reports/jacoco/jacocoTestReport
+
+  sonar:
+    name: SonarCloud analysis
+    needs: [static-checks, unit-tests]
+    runs-on: ubuntu-24.04
+    env:
+      _JAVA_OPTIONS: "-Xmx4g"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0 # pour un meilleur contexte pour Sonar
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle-
 
       - name: Cache SonarQube packages
         uses: actions/cache@v4
@@ -120,7 +128,21 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
-      # Upload the various reports to sonar
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Download lint report
+        uses: actions/download-artifact@v4
+        with:
+          name: lint-report
+          path: app/build/reports/
+
+      - name: Download Jacoco report
+        uses: actions/download-artifact@v4
+        with:
+          name: jacoco-test-report
+          path: app/build/reports/jacoco/jacocoTestReport
+
       - name: Upload report to SonarCloud
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

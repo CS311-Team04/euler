@@ -23,7 +23,6 @@ tools/epfl_scraper/data/
 .DS_Store
 /.gradle
 /.idea
-/.github
 /build
 local.properties
 
