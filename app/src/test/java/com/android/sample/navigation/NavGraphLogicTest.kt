@@ -601,7 +601,9 @@ class NavGraphComposeTest {
 
       composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
       composeRule.waitForIdle()
-      composeRule.onNodeWithTag(DrawerTags.ConnectorsRow).performClick()
+      // Use UserSettings tag to navigate to Settings screen (ConnectorsRow navigates to Connectors
+      // screen)
+      composeRule.onNodeWithTag(DrawerTags.UserSettings).performClick()
       composeRule.waitForIdle()
 
       composeRule.onNodeWithText("Settings").assertIsDisplayed()
@@ -695,13 +697,21 @@ class NavGraphComposeTest {
 
       composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
       composeRule.waitForIdle()
-      composeRule.onNodeWithTag(DrawerTags.ConnectorsRow).performClick()
+      // Use UserSettings tag to navigate to Settings screen (not ConnectorsRow which goes to
+      // Connectors)
+      composeRule.onNodeWithTag(DrawerTags.UserSettings).performClick()
+      composeRule.waitForIdle()
 
+      // Wait for Settings screen to be loaded and Log out button to be available
       composeRule.waitUntil(timeoutMillis = TimeUnit.SECONDS.toMillis(6)) {
         composeRule.onAllNodesWithText("Log out").fetchSemanticsNodes().isNotEmpty()
       }
       composeRule.onNodeWithText("Log out").assertIsDisplayed().performClick()
 
+      // Wait for sign out to complete and navigation to happen
+      composeRule.waitForIdle()
+
+      // Wait for the SignIn screen to be fully loaded
       composeRule.waitUntil(timeoutMillis = TimeUnit.SECONDS.toMillis(6)) {
         composeRule
             .onAllNodesWithText("Continue with Microsoft Entra ID")

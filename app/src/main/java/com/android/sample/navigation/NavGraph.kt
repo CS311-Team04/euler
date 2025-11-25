@@ -27,6 +27,7 @@ import com.android.sample.home.HomeScreen
 import com.android.sample.home.HomeViewModel
 import com.android.sample.settings.ProfilePage
 import com.android.sample.settings.SettingsPage
+import com.android.sample.settings.connectors.ConnectorsScreen
 import com.android.sample.sign_in.AuthViewModel
 import com.android.sample.speech.SpeechPlayback
 import com.android.sample.speech.SpeechToTextHelper
@@ -40,6 +41,7 @@ object Routes {
   const val Settings = "settings"
   const val Profile = "profile"
   const val VoiceChat = "voice_chat"
+  const val Connectors = "connectors"
 }
 
 @VisibleForTesting internal var appNavControllerObserver: ((NavHostController) -> Unit)? = null
@@ -144,6 +146,11 @@ internal fun navigateToProfile(navigate: NavigateAction) {
 @VisibleForTesting
 internal fun navigateToVoiceChat(navigate: NavigateAction) {
   navigate(Routes.VoiceChat) {}
+}
+
+@VisibleForTesting
+internal fun navigateToConnectors(navigate: NavigateAction) {
+  navigate(Routes.Connectors) {}
 }
 
 @VisibleForTesting
@@ -259,6 +266,9 @@ fun AppNav(
                   }
                 },
                 onSettingsClick = { nav.navigate(Routes.Settings) },
+                onConnectorsClick = {
+                  navigateToConnectors { route, builder -> nav.navigate(route) { builder(this) } }
+                },
                 onProfileClick = {
                   if (homeUiState.isGuest) {
                     homeViewModel.showGuestProfileWarning()
@@ -294,6 +304,9 @@ fun AppNav(
                 },
                 onSettingsClick = {
                   navigateToSettings { route, builder -> nav.navigate(route) { builder(this) } }
+                },
+                onConnectorsClick = {
+                  navigateToConnectors { route, builder -> nav.navigate(route) { builder(this) } }
                 },
                 onProfileClick = {
                   handleProfileClick(
@@ -345,7 +358,9 @@ fun AppNav(
                 isProfileEnabled = !homeUiState.isGuest,
                 showProfileWarning = homeUiState.showGuestProfileWarning,
                 onDismissProfileWarning = { homeViewModel.hideGuestProfileWarning() },
-                onConnectorsClick = { nav.navigate(Routes.Settings) })
+                onConnectorsClick = {
+                  navigateToConnectors { route, builder -> nav.navigate(route) { builder(this) } }
+                })
           }
 
           composable(Routes.Profile) {
@@ -366,6 +381,17 @@ fun AppNav(
                   initialProfile = homeUiState.profile)
             }
           }
+          // Connectors Screen
+          composable(Routes.Connectors) {
+            ConnectorsScreen(
+                onBackClick = { nav.popBackStack() },
+                onConnectorClick = { connectorId ->
+                  // For now, just a placeholder. In the future, this will trigger the connection
+                  // flow
+                  android.util.Log.d("NavGraph", "Connector clicked: $connectorId")
+                })
+          }
+
           // Voice Chat Screen
           composable(Routes.VoiceChat) {
             VoiceScreen(

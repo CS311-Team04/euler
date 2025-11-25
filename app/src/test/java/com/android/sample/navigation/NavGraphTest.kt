@@ -234,6 +234,23 @@ class NavGraphTest {
     // Whitespace is not empty, so should return it
     assertEquals("   ", result)
   }
+
+  @Test
+  fun navigateToConnectors_sets_correct_route() {
+    var capturedRoute: String? = null
+    navigateToConnectors { route, _ -> capturedRoute = route }
+    assertEquals(Routes.Connectors, capturedRoute)
+  }
+
+  @Test
+  fun Routes_Connectors_constant_is_defined() {
+    assertEquals("connectors", Routes.Connectors)
+  }
+
+  @Test
+  fun Routes_Connectors_constant_is_not_empty() {
+    assertTrue(Routes.Connectors.isNotEmpty())
+  }
 }
 
 class NavGraphNavigationHelpersTest {
@@ -307,6 +324,15 @@ class NavGraphNavigationHelpersTest {
     val invocation = recordNavigation { navigateSettingsBack(it) }
     assertEquals(Routes.HomeWithDrawer, invocation.route)
     assertEquals(false, invocation.inclusive)
+    assertFalse(invocation.restoreState)
+    assertFalse(invocation.launchSingleTop)
+  }
+
+  @Test
+  fun navigateToConnectors_sets_expected_flags() {
+    val invocation = recordNavigation { navigateToConnectors(it) }
+    assertEquals(Routes.Connectors, invocation.route)
+    // navigateToConnectors uses default empty builder, so no special flags
     assertFalse(invocation.restoreState)
     assertFalse(invocation.launchSingleTop)
   }

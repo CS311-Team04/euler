@@ -97,6 +97,7 @@ fun HomeScreen(
     onSendMessage: (String) -> Unit = {},
     onSignOut: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onConnectorsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onVoiceChatClick: () -> Unit = {},
     openDrawerOnStart: Boolean = false,
@@ -163,6 +164,11 @@ fun HomeScreen(
               scope.launch { drawerState.close() }
               if (ui.isDrawerOpen) viewModel.toggleDrawer()
               onSettingsClick()
+            },
+            onConnectorsClick = {
+              scope.launch { drawerState.close() }
+              if (ui.isDrawerOpen) viewModel.toggleDrawer()
+              onConnectorsClick()
             },
             onProfileClick = {
               scope.launch { drawerState.close() }
