@@ -10,6 +10,7 @@ import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
 import com.android.sample.conversations.AuthNotReadyException
 import com.android.sample.conversations.ConversationRepository
+import com.android.sample.conversations.ConversationTitleFormatter
 import com.android.sample.conversations.MessageDTO
 import com.android.sample.llm.FirebaseFunctionsLlmClient
 import com.android.sample.llm.LlmClient
@@ -454,7 +455,7 @@ class HomeViewModel(
         val cid =
             _uiState.value.currentConversationId
                 ?: run {
-                  val quickTitle = localTitleFrom(msg)
+                  val quickTitle = ConversationTitleFormatter.localTitleFrom(msg)
                   val newId = repo.startNewConversation(quickTitle)
                   _uiState.update { it.copy(currentConversationId = newId) }
                   isInLocalNewChat = false
@@ -695,24 +696,22 @@ class HomeViewModel(
           type = if (this.role == "user") ChatType.USER else ChatType.AI)
 
   /** Make a short provisional title from the first prompt. */
-  private fun localTitleFrom(question: String, maxLen: Int = 60, maxWords: Int = 8): String {
-    val cleaned = question.replace(Regex("\\s+"), " ").trim()
-    val head = cleaned.split(" ").filter { it.isNotBlank() }.take(maxWords).joinToString(" ")
-    return (if (head.length <= maxLen) head else head.take(maxLen)).trim()
-  }
 
-  /** Ask `generateTitleFn` for a better title; fallback to [localTitleFrom] on errors. */
+  /**
+   * Ask `generateTitleFn` for a better title; fallback to
+   * [ConversationTitleFormatter.localTitleFrom] on errors.
+   */
   private suspend fun fetchTitle(question: String): String {
     return try {
       val res =
           functions.getHttpsCallable("generateTitleFn").call(mapOf("question" to question)).await()
       val t = (res.getData() as? Map<*, *>)?.get("title") as? String
-      (t?.takeIf { it.isNotBlank() } ?: localTitleFrom(question)).also {
+      (t?.takeIf { it.isNotBlank() } ?: ConversationTitleFormatter.localTitleFrom(question)).also {
         Log.d(TAG, "fetchTitle(): generated='$it'")
       }
     } catch (_: Exception) {
       Log.d(TAG, "fetchTitle(): fallback to local extraction")
-      localTitleFrom(question)
+      ConversationTitleFormatter.localTitleFrom(question)
     }
   }
 

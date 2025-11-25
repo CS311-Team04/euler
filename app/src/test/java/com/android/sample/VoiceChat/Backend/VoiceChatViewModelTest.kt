@@ -10,7 +10,6 @@ import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -301,8 +300,12 @@ class VoiceChatViewModelTest {
     val viewModel = VoiceChatViewModel(FakeLlmClient(), testDispatcher)
     // Guest mode: no user signed in (default after setUpFirebase signs out)
     viewModel.initializeConversation()
-    // Should not crash - verify by checking it completes
-    assertTrue("Should handle guest mode", true)
+
+    // Verify that currentConversationId is null in guest mode (expected behavior)
+    val field = VoiceChatViewModel::class.java.getDeclaredField("currentConversationId")
+    field.isAccessible = true
+    val conversationId = field.get(viewModel) as String?
+    assertNull("currentConversationId should be null in guest mode", conversationId)
   }
 
   @Test
@@ -314,10 +317,8 @@ class VoiceChatViewModelTest {
         val repo = mock<ConversationRepository>()
 
         whenever(auth.currentUser).thenReturn(user)
-        runBlocking {
-          whenever(repo.startNewConversation(any())).thenReturn("new-conv-id")
-          whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
-        }
+        whenever(repo.startNewConversation(any())).thenReturn("new-conv-id")
+        whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
 
         val viewModel =
             VoiceChatViewModel(FakeLlmClient().apply { nextReply = "AI Reply" }, testDispatcher)
@@ -329,11 +330,11 @@ class VoiceChatViewModelTest {
         advanceUntilIdle()
 
         // Verify conversation was created
-        runBlocking { verify(repo).startNewConversation(any()) }
+        verify(repo).startNewConversation(any())
         // Verify user message was persisted
-        runBlocking { verify(repo).appendMessage("new-conv-id", "user", "Hello Euler") }
+        verify(repo).appendMessage("new-conv-id", "user", "Hello Euler")
         // Verify AI message was persisted
-        runBlocking { verify(repo).appendMessage("new-conv-id", "assistant", "AI Reply") }
+        verify(repo).appendMessage("new-conv-id", "assistant", "AI Reply")
       }
 
   @Test
@@ -345,10 +346,8 @@ class VoiceChatViewModelTest {
         val repo = mock<ConversationRepository>()
 
         whenever(auth.currentUser).thenReturn(user)
-        runBlocking {
-          whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-          whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
-        }
+        whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+        whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
 
         val viewModel =
             VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Response" }, testDispatcher)
@@ -360,7 +359,7 @@ class VoiceChatViewModelTest {
         advanceUntilIdle()
 
         // Verify user message was persisted with correct parameters
-        runBlocking { verify(repo).appendMessage("conv-123", "user", "What is EPFL?") }
+        verify(repo).appendMessage("conv-123", "user", "What is EPFL?")
       }
 
   @Test
@@ -372,10 +371,8 @@ class VoiceChatViewModelTest {
         val repo = mock<ConversationRepository>()
 
         whenever(auth.currentUser).thenReturn(user)
-        runBlocking {
-          whenever(repo.startNewConversation(any())).thenReturn("conv-456")
-          whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
-        }
+        whenever(repo.startNewConversation(any())).thenReturn("conv-456")
+        whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
 
         val aiReply = "EPFL is a university in Switzerland"
         val viewModel =
@@ -388,7 +385,7 @@ class VoiceChatViewModelTest {
         advanceUntilIdle()
 
         // Verify AI message was persisted with correct parameters
-        runBlocking { verify(repo).appendMessage("conv-456", "assistant", aiReply) }
+        verify(repo).appendMessage("conv-456", "assistant", aiReply)
       }
 
   @Test
@@ -410,9 +407,9 @@ class VoiceChatViewModelTest {
         advanceUntilIdle()
 
         // Verify no conversation was created
-        runBlocking { verify(repo, never()).startNewConversation(any()) }
+        verify(repo, never()).startNewConversation(any())
         // Verify no messages were persisted
-        runBlocking { verify(repo, never()).appendMessage(any(), any(), any()) }
+        verify(repo, never()).appendMessage(any(), any(), any())
       }
 
   @Test
@@ -424,10 +421,8 @@ class VoiceChatViewModelTest {
         val repo = mock<ConversationRepository>()
 
         whenever(auth.currentUser).thenReturn(user)
-        runBlocking {
-          whenever(repo.startNewConversation(any())).thenReturn("conv-789")
-          whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
-        }
+        whenever(repo.startNewConversation(any())).thenReturn("conv-789")
+        whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
 
         val viewModel =
             VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" }, testDispatcher)
@@ -440,16 +435,14 @@ class VoiceChatViewModelTest {
         advanceUntilIdle()
 
         // Verify conversation was created with a title derived from the message
-        runBlocking {
-          verify(repo).startNewConversation(any())
-          // The title should be a shortened version of the first message
-          val titleCaptor = argumentCaptor<String>()
-          verify(repo).startNewConversation(titleCaptor.capture())
-          val capturedTitle = titleCaptor.firstValue
-          assertTrue("Title should be derived from message", capturedTitle.isNotBlank())
-          assertTrue(
-              "Title should be shorter than original", capturedTitle.length <= firstMessage.length)
-        }
+        verify(repo).startNewConversation(any())
+        // The title should be a shortened version of the first message
+        val titleCaptor = argumentCaptor<String>()
+        verify(repo).startNewConversation(titleCaptor.capture())
+        val capturedTitle = titleCaptor.firstValue
+        assertTrue("Title should be derived from message", capturedTitle.isNotBlank())
+        assertTrue(
+            "Title should be shorter than original", capturedTitle.length <= firstMessage.length)
       }
 
   @Test
@@ -461,7 +454,7 @@ class VoiceChatViewModelTest {
         val repo = mock<ConversationRepository>()
 
         whenever(auth.currentUser).thenReturn(user)
-        runBlocking { whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit) }
+        whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
 
         val viewModel =
             VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" }, testDispatcher)
@@ -479,12 +472,10 @@ class VoiceChatViewModelTest {
         advanceUntilIdle()
 
         // Verify conversation was NOT created again
-        runBlocking { verify(repo, never()).startNewConversation(any()) }
+        verify(repo, never()).startNewConversation(any())
         // Verify message was persisted to existing conversation
-        runBlocking {
-          verify(repo).appendMessage(existingConvId, "user", "Second message")
-          verify(repo).appendMessage(existingConvId, "assistant", "Reply")
-        }
+        verify(repo).appendMessage(existingConvId, "user", "Second message")
+        verify(repo).appendMessage(existingConvId, "assistant", "Reply")
       }
 
   @Test
@@ -496,11 +487,9 @@ class VoiceChatViewModelTest {
         val repo = mock<ConversationRepository>()
 
         whenever(auth.currentUser).thenReturn(user)
-        runBlocking {
-          whenever(repo.startNewConversation(any())).thenReturn("conv-error")
-          whenever(repo.appendMessage(any(), any(), any()))
-              .thenThrow(RuntimeException("Firestore error"))
-        }
+        whenever(repo.startNewConversation(any())).thenReturn("conv-error")
+        whenever(repo.appendMessage(any(), any(), any()))
+            .thenThrow(RuntimeException("Firestore error"))
 
         val viewModel =
             VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" }, testDispatcher)
@@ -584,12 +573,10 @@ class VoiceChatViewModelTest {
         val repo = mock<ConversationRepository>()
 
         whenever(auth.currentUser).thenReturn(user)
-        runBlocking {
-          whenever(repo.startNewConversation(any())).thenReturn("conv-id")
-          whenever(repo.appendMessage(eq("conv-id"), eq("user"), eq("Test")))
-              .thenThrow(RuntimeException("Persistence error"))
-          whenever(repo.appendMessage(eq("conv-id"), eq("assistant"), any())).thenReturn(Unit)
-        }
+        whenever(repo.startNewConversation(any())).thenReturn("conv-id")
+        whenever(repo.appendMessage(eq("conv-id"), eq("user"), eq("Test")))
+            .thenThrow(RuntimeException("Persistence error"))
+        whenever(repo.appendMessage(eq("conv-id"), eq("assistant"), any())).thenReturn(Unit)
 
         val viewModel =
             VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" }, testDispatcher)
@@ -604,7 +591,7 @@ class VoiceChatViewModelTest {
         val state = viewModel.uiState.value
         assertNotNull("Should have AI reply", state.lastAiReply)
         // AI message should still be persisted even if user message failed
-        runBlocking { verify(repo).appendMessage("conv-id", "assistant", "Reply") }
+        verify(repo).appendMessage("conv-id", "assistant", "Reply")
       }
 
   @Test
@@ -616,12 +603,10 @@ class VoiceChatViewModelTest {
         val repo = mock<ConversationRepository>()
 
         whenever(auth.currentUser).thenReturn(user)
-        runBlocking {
-          whenever(repo.startNewConversation(any())).thenReturn("conv-id")
-          whenever(repo.appendMessage(eq("conv-id"), eq("user"), eq("Test"))).thenReturn(Unit)
-          whenever(repo.appendMessage(eq("conv-id"), eq("assistant"), eq("Reply")))
-              .thenThrow(RuntimeException("Persistence error"))
-        }
+        whenever(repo.startNewConversation(any())).thenReturn("conv-id")
+        whenever(repo.appendMessage(eq("conv-id"), eq("user"), eq("Test"))).thenReturn(Unit)
+        whenever(repo.appendMessage(eq("conv-id"), eq("assistant"), eq("Reply")))
+            .thenThrow(RuntimeException("Persistence error"))
 
         val viewModel =
             VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" }, testDispatcher)

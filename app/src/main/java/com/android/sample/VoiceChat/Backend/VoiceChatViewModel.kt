@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.sample.conversations.ConversationRepository
+import com.android.sample.conversations.ConversationTitleFormatter
 import com.android.sample.llm.FirebaseFunctionsLlmClient
 import com.android.sample.llm.LlmClient
 import com.google.firebase.auth.FirebaseAuth
@@ -64,13 +65,6 @@ class VoiceChatViewModel(
    * and keeps all messages in memory only.
    */
   private fun isGuest(): Boolean = auth.currentUser == null
-
-  /** Creates a quick provisional title from the first prompt. */
-  private fun localTitleFrom(question: String, maxLen: Int = 60, maxWords: Int = 8): String {
-    val cleaned = question.replace(Regex("\\s+"), " ").trim()
-    val head = cleaned.split(" ").filter { it.isNotBlank() }.take(maxWords).joinToString(" ")
-    return (if (head.length <= maxLen) head else head.take(maxLen)).trim()
-  }
 
   /**
    * Prepares for voice mode activation. Resets the current conversation so that a new one will be
@@ -150,7 +144,7 @@ class VoiceChatViewModel(
     return currentConversationId
         ?: run {
           // Create new conversation on first message (same pattern as text mode)
-          val quickTitle = localTitleFrom(cleaned)
+          val quickTitle = ConversationTitleFormatter.localTitleFrom(cleaned)
           val newId = repo.startNewConversation(quickTitle)
           currentConversationId = newId
           Log.d(TAG, "Created new voice conversation: $newId with title: $quickTitle")
