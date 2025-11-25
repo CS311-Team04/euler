@@ -23,19 +23,19 @@
     "test:integration:summary": "FIRESTORE_EMULATOR_HOST=localhost:8080 jest --config jest.config.js summary.integration.test.ts"
   },
   "dependencies": {
-    "dotenv": "^16.6.1",
-    "firebase-admin": "^12.7.0",
-    "firebase-functions": "^4.9.0",
-    "openai": "^4.104.0"
+    "dotenv": "16.6.1",
+    "firebase-admin": "12.7.0",
+    "firebase-functions": "4.9.0",
+    "openai": "4.104.0"
   },
   "devDependencies": {
-    "@jest/globals": "^29.7.0",
-    "@jest/test-sequencer": "^30.2.0",
-    "@types/jest": "^29.5.14",
-    "@types/node": "^20.11.0",
-    "firebase-functions-test": "^3.1.0",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.4.5",
-    "typescript": "^5.4.0"
+    "@jest/globals": "29.7.0",
+    "@jest/test-sequencer": "29.7.0",
+    "@types/jest": "29.5.14",
+    "@types/node": "20.11.0",
+    "firebase-functions-test": "3.4.1",
+    "jest": "29.7.0",
+    "ts-jest": "29.4.5",
+    "typescript": "5.4.5"
   }
 }

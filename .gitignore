@@ -37,6 +37,5 @@ firebase-debug.log
 firebase-debug.*.log
 
 # Node lockfiles (managed locally, not tracked)
-# Keep Cloud Functions lockfile for reproducible CI installs
+# Dependencies are pinned to exact versions in package.json
 package-lock.json
-!functions/package-lock.json
