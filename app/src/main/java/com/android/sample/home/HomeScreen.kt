@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
@@ -332,26 +333,42 @@ fun HomeScreen(
 
                     Spacer(Modifier.height(16.dp))
 
+                    // Offline message banner (dismissible)
+                    if (ui.showOfflineMessage) {
+                      OfflineMessageBanner(
+                          onDismiss = { viewModel.dismissOfflineMessage() },
+                          modifier = Modifier.padding(horizontal = 16.dp))
+                      Spacer(Modifier.height(12.dp))
+                    }
+
                     // Message input bar - perfectly aligned capsule design
                     ChatInputBar(
                         value = ui.messageDraft,
                         onValueChange = { viewModel.updateMessageDraft(it) },
                         placeholder = Localization.t("message_euler"),
-                        enabled = !ui.isSending,
+                        enabled = !ui.isSending && !ui.isOffline,
                         isSending = ui.isSending,
-                        canSend = ui.messageDraft.isNotBlank() && !ui.isSending,
+                        canSend = ui.messageDraft.isNotBlank() && !ui.isSending && !ui.isOffline,
                         onSendClick = {
-                          if (ui.messageDraft.isNotBlank() && !ui.isSending) {
+                          if (ui.messageDraft.isNotBlank() && !ui.isSending && !ui.isOffline) {
                             onSendMessage(ui.messageDraft)
                             viewModel.sendMessage()
                           }
                         },
                         onMicClick = {
-                          speechHelper?.startListening(
-                              onResult = { recognized -> viewModel.updateMessageDraft(recognized) })
+                          if (!ui.isOffline) {
+                            speechHelper?.startListening(
+                                onResult = { recognized ->
+                                  viewModel.updateMessageDraft(recognized)
+                                })
+                          }
                         },
-                        onVoiceModeClick = onVoiceChatClick,
-                        speechHelperAvailable = speechHelper != null,
+                        onVoiceModeClick = {
+                          if (!ui.isOffline) {
+                            onVoiceChatClick()
+                          }
+                        },
+                        speechHelperAvailable = speechHelper != null && !ui.isOffline,
                         textPrimary = textPrimary,
                         textSecondary = textSecondary,
                         surfaceVariantColor = surfaceVariantColor,
@@ -878,6 +895,34 @@ internal fun AnimatedIntroTitle(modifier: Modifier = Modifier) {
                     textAlign = TextAlign.Center)
               }
         }
+      }
+}
+
+/** Dismissible offline message banner shown at the top of the home screen when offline. */
+@Composable
+private fun OfflineMessageBanner(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+  val colorScheme = MaterialTheme.colorScheme
+  Card(
+      modifier = modifier.fillMaxWidth(),
+      colors = CardDefaults.cardColors(containerColor = colorScheme.errorContainer),
+      shape = RoundedCornerShape(12.dp)) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween) {
+              Text(
+                  text = "You're not connected to the internet. Please try again.",
+                  color = colorScheme.onErrorContainer,
+                  style = MaterialTheme.typography.bodyMedium,
+                  modifier = Modifier.weight(1f))
+              IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Dismiss",
+                    tint = colorScheme.onErrorContainer,
+                    modifier = Modifier.size(18.dp))
+              }
+            }
       }
 }
 

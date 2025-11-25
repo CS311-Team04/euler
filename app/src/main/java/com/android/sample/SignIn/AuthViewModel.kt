@@ -4,23 +4,35 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.sample.authentification.AuthProvider
 import com.android.sample.authentification.AuthUiState
+import com.android.sample.network.NetworkConnectivityMonitor
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-class AuthViewModel : ViewModel() {
+class AuthViewModel(private val networkMonitor: NetworkConnectivityMonitor? = null) : ViewModel() {
   private val _state = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
   val state: StateFlow<AuthUiState> = _state.asStateFlow()
 
   private val auth = FirebaseAuth.getInstance()
   private val firestore = FirebaseFirestore.getInstance()
 
+  private val _isOffline = MutableStateFlow(false)
+  val isOffline: StateFlow<Boolean> = _isOffline.asStateFlow()
+
   init {
     // Check if user is already signed in
     checkAuthState()
+
+    // Monitor network connectivity
+    networkMonitor?.let { monitor ->
+      viewModelScope.launch {
+        monitor.isOnline.collectLatest { isOnline -> _isOffline.value = !isOnline }
+      }
+    }
 
     // Listen for auth state changes
     auth.addAuthStateListener { firebaseAuth ->
@@ -59,11 +71,19 @@ class AuthViewModel : ViewModel() {
 
   fun onMicrosoftLoginClick() {
     if (_state.value is AuthUiState.Loading) return
+    // Check if offline before allowing sign-in
+    if (_isOffline.value || (networkMonitor?.isCurrentlyOnline() == false)) {
+      return
+    }
     _state.value = AuthUiState.Loading(AuthProvider.MICROSOFT)
   }
 
   fun onSwitchEduLoginClick() {
     if (_state.value is AuthUiState.Loading) return
+    // Check if offline before allowing sign-in
+    if (_isOffline.value || (networkMonitor?.isCurrentlyOnline() == false)) {
+      return
+    }
     startSignIn(AuthProvider.SWITCH_EDU)
   }
 

@@ -22,7 +22,9 @@ data class HomeUiState(
     val showGuestProfileWarning: Boolean = false,
     val isSending: Boolean = false,
     val conversations: List<com.android.sample.conversations.Conversation> = emptyList(),
-    val currentConversationId: String? = null
+    val currentConversationId: String? = null,
+    val isOffline: Boolean = false,
+    val showOfflineMessage: Boolean = false
 )
 
 /** Represents an EPFL system (e.g., IS-Academia, Moodle, Drive) and its connection state. */
