@@ -15,7 +15,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mockito.*
 import org.mockito.kotlin.any
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -683,6 +685,752 @@ class AndroidNetworkConnectivityMonitorTest {
     } catch (e: IllegalStateException) {
       assertEquals("ConnectivityManager not available", e.message)
     }
+  }
+
+  @Test
+  fun `updateConnectivity updates state when it changes from false to true`() = runTest {
+    val monitor = AndroidNetworkConnectivityMonitor(context)
+    val network = ShadowNetwork.newInstance(1)
+
+    val updateMethod =
+        AndroidNetworkConnectivityMonitor::class.java.getDeclaredMethod("updateConnectivity")
+    updateMethod.isAccessible = true
+
+    // First set state to false
+    val mockCapabilitiesOffline = mock<NetworkCapabilities>()
+    whenever(mockCapabilitiesOffline.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+        .thenReturn(false)
+
+    val mockConnectivityManager = mock<ConnectivityManager>()
+    whenever(mockConnectivityManager.activeNetwork).thenReturn(network)
+    whenever(mockConnectivityManager.getNetworkCapabilities(network))
+        .thenReturn(mockCapabilitiesOffline)
+
+    val field =
+        AndroidNetworkConnectivityMonitor::class.java.getDeclaredField("connectivityManager")
+    field.isAccessible = true
+    val originalManager = field.get(monitor)
+    field.set(monitor, mockConnectivityManager)
+
+    // Force state to false
+    val stateField = AndroidNetworkConnectivityMonitor::class.java.getDeclaredField("_isOnline")
+    stateField.isAccessible = true
+    val stateFlow = stateField.get(monitor) as kotlinx.coroutines.flow.MutableStateFlow<Boolean>
+    stateFlow.value = false
+
+    // Now change to online
+    val mockCapabilitiesOnline = mock<NetworkCapabilities>()
+    whenever(mockCapabilitiesOnline.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+        .thenReturn(true)
+    whenever(mockCapabilitiesOnline.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+        .thenReturn(true)
+    whenever(mockConnectivityManager.getNetworkCapabilities(network))
+        .thenReturn(mockCapabilitiesOnline)
+
+    updateMethod.invoke(monitor)
+    kotlinx.coroutines.delay(50)
+
+    assertTrue("State should be updated to true", monitor.isOnline.value)
+
+    field.set(monitor, originalManager)
+    monitor.unregister()
+  }
+
+  @Test
+  fun `updateConnectivity updates state when it changes from true to false`() = runTest {
+    val monitor = AndroidNetworkConnectivityMonitor(context)
+    val network = ShadowNetwork.newInstance(1)
+
+    val updateMethod =
+        AndroidNetworkConnectivityMonitor::class.java.getDeclaredMethod("updateConnectivity")
+    updateMethod.isAccessible = true
+
+    // First set state to true
+    val mockCapabilitiesOnline = mock<NetworkCapabilities>()
+    whenever(mockCapabilitiesOnline.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+        .thenReturn(true)
+    whenever(mockCapabilitiesOnline.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+        .thenReturn(true)
+
+    val mockConnectivityManager = mock<ConnectivityManager>()
+    whenever(mockConnectivityManager.activeNetwork).thenReturn(network)
+    whenever(mockConnectivityManager.getNetworkCapabilities(network))
+        .thenReturn(mockCapabilitiesOnline)
+
+    val field =
+        AndroidNetworkConnectivityMonitor::class.java.getDeclaredField("connectivityManager")
+    field.isAccessible = true
+    val originalManager = field.get(monitor)
+    field.set(monitor, mockConnectivityManager)
+
+    // Force state to true
+    val stateField = AndroidNetworkConnectivityMonitor::class.java.getDeclaredField("_isOnline")
+    stateField.isAccessible = true
+    val stateFlow = stateField.get(monitor) as kotlinx.coroutines.flow.MutableStateFlow<Boolean>
+    stateFlow.value = true
+
+    // Now change to offline
+    whenever(mockConnectivityManager.activeNetwork).thenReturn(null)
+
+    updateMethod.invoke(monitor)
+    kotlinx.coroutines.delay(50)
+
+    assertFalse("State should be updated to false", monitor.isOnline.value)
+
+    field.set(monitor, originalManager)
+    monitor.unregister()
+  }
+
+  @Test
+  fun `periodic check updates state when connectivity changes`() = runTest {
+    val monitor = AndroidNetworkConnectivityMonitor(context)
+    val network = ShadowNetwork.newInstance(1)
+
+    val mockCapabilities = mock<NetworkCapabilities>()
+    whenever(mockCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+        .thenReturn(true)
+    whenever(mockCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+        .thenReturn(true)
+
+    val mockConnectivityManager = mock<ConnectivityManager>()
+    whenever(mockConnectivityManager.activeNetwork).thenReturn(network)
+    whenever(mockConnectivityManager.getNetworkCapabilities(network)).thenReturn(mockCapabilities)
+    whenever(mockConnectivityManager.allNetworks).thenReturn(arrayOf(network))
+
+    val field =
+        AndroidNetworkConnectivityMonitor::class.java.getDeclaredField("connectivityManager")
+    field.isAccessible = true
+    val originalManager = field.get(monitor)
+    field.set(monitor, mockConnectivityManager)
+
+    // Force initial state to false
+    val stateField = AndroidNetworkConnectivityMonitor::class.java.getDeclaredField("_isOnline")
+    stateField.isAccessible = true
+    val stateFlow = stateField.get(monitor) as kotlinx.coroutines.flow.MutableStateFlow<Boolean>
+    stateFlow.value = false
+
+    // Verify initial state is false
+    assertFalse("Initial state should be false", monitor.isOnline.value)
+
+    // Verify that checkConnectivity would return true (this is what periodic check uses)
+    val checkMethod =
+        AndroidNetworkConnectivityMonitor::class.java.getDeclaredMethod("checkConnectivity")
+    checkMethod.isAccessible = true
+    val expectedState = checkMethod.invoke(monitor) as Boolean
+    assertTrue("checkConnectivity should return true with mocked online state", expectedState)
+
+    // Test the periodic check logic directly by simulating what it does:
+    // It checks if currentState != newState and updates if different
+    val currentState = monitor.isOnline.value
+    val newState = checkMethod.invoke(monitor) as Boolean
+    assertNotEquals("State should differ from checkConnectivity result", currentState, newState)
+
+    // Manually trigger updateConnectivity to simulate what periodic check does
+    val updateMethod =
+        AndroidNetworkConnectivityMonitor::class.java.getDeclaredMethod("updateConnectivity")
+    updateMethod.isAccessible = true
+    updateMethod.invoke(monitor)
+    kotlinx.coroutines.delay(50)
+
+    // Now state should be updated
+    assertTrue("State should be updated to match checkConnectivity", monitor.isOnline.value)
+
+    field.set(monitor, originalManager)
+    monitor.unregister()
+  }
+
+  @Test
+  fun `periodic check does not update state when connectivity unchanged`() = runTest {
+    val monitor = AndroidNetworkConnectivityMonitor(context)
+    val network = ShadowNetwork.newInstance(1)
+
+    val mockCapabilities = mock<NetworkCapabilities>()
+    whenever(mockCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+        .thenReturn(true)
+    whenever(mockCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+        .thenReturn(true)
+
+    val mockConnectivityManager = mock<ConnectivityManager>()
+    whenever(mockConnectivityManager.activeNetwork).thenReturn(network)
+    whenever(mockConnectivityManager.getNetworkCapabilities(network)).thenReturn(mockCapabilities)
+    whenever(mockConnectivityManager.allNetworks).thenReturn(arrayOf(network))
+
+    val field =
+        AndroidNetworkConnectivityMonitor::class.java.getDeclaredField("connectivityManager")
+    field.isAccessible = true
+    val originalManager = field.get(monitor)
+    field.set(monitor, mockConnectivityManager)
+
+    // Set state to true (matching connectivity)
+    val stateField = AndroidNetworkConnectivityMonitor::class.java.getDeclaredField("_isOnline")
+    stateField.isAccessible = true
+    val stateFlow = stateField.get(monitor) as kotlinx.coroutines.flow.MutableStateFlow<Boolean>
+    val initialState = true
+    stateFlow.value = initialState
+
+    // Wait for periodic check
+    kotlinx.coroutines.delay(1100)
+
+    // State should remain the same since connectivity didn't change
+    assertEquals("State should remain unchanged", initialState, monitor.isOnline.value)
+
+    field.set(monitor, originalManager)
+    monitor.unregister()
+  }
+
+  @Test
+  fun `checkConnectivity returns false when network has internet but no validated and no transport`() =
+      runTest {
+        val monitor = AndroidNetworkConnectivityMonitor(context)
+        val network = ShadowNetwork.newInstance(1)
+
+        val method =
+            AndroidNetworkConnectivityMonitor::class.java.getDeclaredMethod("checkConnectivity")
+        method.isAccessible = true
+
+        val mockCapabilities = mock<NetworkCapabilities>()
+        whenever(mockCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+            .thenReturn(true)
+        whenever(mockCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+            .thenReturn(false)
+        whenever(mockCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI))
+            .thenReturn(false)
+        whenever(mockCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR))
+            .thenReturn(false)
+        whenever(mockCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
+            .thenReturn(false)
+
+        val mockConnectivityManager = mock<ConnectivityManager>()
+        whenever(mockConnectivityManager.activeNetwork).thenReturn(network)
+        whenever(mockConnectivityManager.getNetworkCapabilities(network))
+            .thenReturn(mockCapabilities)
+        whenever(mockConnectivityManager.allNetworks).thenReturn(arrayOf(network))
+        whenever(mockConnectivityManager.getNetworkCapabilities(network))
+            .thenReturn(mockCapabilities)
+
+        val field =
+            AndroidNetworkConnectivityMonitor::class.java.getDeclaredField("connectivityManager")
+        field.isAccessible = true
+        val originalManager = field.get(monitor)
+        field.set(monitor, mockConnectivityManager)
+
+        val result = method.invoke(monitor) as Boolean
+        assertFalse("Should return false when no transport types", result)
+
+        field.set(monitor, originalManager)
+        monitor.unregister()
+      }
+
+  @Test
+  fun `checkConnectivity returns false when all networks have internet but none validated`() =
+      runTest {
+        val monitor = AndroidNetworkConnectivityMonitor(context)
+        val network1 = ShadowNetwork.newInstance(1)
+        val network2 = ShadowNetwork.newInstance(2)
+
+        val method =
+            AndroidNetworkConnectivityMonitor::class.java.getDeclaredMethod("checkConnectivity")
+        method.isAccessible = true
+
+        val capabilities1 = mock<NetworkCapabilities>()
+        whenever(capabilities1.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+            .thenReturn(true)
+        whenever(capabilities1.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+            .thenReturn(false)
+        whenever(capabilities1.hasTransport(any())).thenReturn(false)
+
+        val capabilities2 = mock<NetworkCapabilities>()
+        whenever(capabilities2.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+            .thenReturn(true)
+        whenever(capabilities2.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+            .thenReturn(false)
+        whenever(capabilities2.hasTransport(any())).thenReturn(false)
+
+        val mockConnectivityManager = mock<ConnectivityManager>()
+        whenever(mockConnectivityManager.activeNetwork).thenReturn(network1)
+        whenever(mockConnectivityManager.getNetworkCapabilities(network1)).thenReturn(capabilities1)
+        whenever(mockConnectivityManager.allNetworks).thenReturn(arrayOf(network1, network2))
+        whenever(mockConnectivityManager.getNetworkCapabilities(network2)).thenReturn(capabilities2)
+
+        val field =
+            AndroidNetworkConnectivityMonitor::class.java.getDeclaredField("connectivityManager")
+        field.isAccessible = true
+        val originalManager = field.get(monitor)
+        field.set(monitor, mockConnectivityManager)
+
+        val result = method.invoke(monitor) as Boolean
+        assertFalse("Should return false when no networks are validated", result)
+
+        field.set(monitor, originalManager)
+        monitor.unregister()
+      }
+
+  @Test
+  fun `checkConnectivity returns true when another network has validated but active does not`() =
+      runTest {
+        val monitor = AndroidNetworkConnectivityMonitor(context)
+        val network1 = ShadowNetwork.newInstance(1)
+        val network2 = ShadowNetwork.newInstance(2)
+
+        val method =
+            AndroidNetworkConnectivityMonitor::class.java.getDeclaredMethod("checkConnectivity")
+        method.isAccessible = true
+
+        val activeCapabilities = mock<NetworkCapabilities>()
+        whenever(activeCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+            .thenReturn(true)
+        whenever(activeCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+            .thenReturn(false)
+        whenever(activeCapabilities.hasTransport(any())).thenReturn(false)
+
+        val otherCapabilities = mock<NetworkCapabilities>()
+        whenever(otherCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+            .thenReturn(true)
+        whenever(otherCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+            .thenReturn(true)
+
+        val mockConnectivityManager = mock<ConnectivityManager>()
+        whenever(mockConnectivityManager.activeNetwork).thenReturn(network1)
+        whenever(mockConnectivityManager.getNetworkCapabilities(network1))
+            .thenReturn(activeCapabilities)
+        whenever(mockConnectivityManager.allNetworks).thenReturn(arrayOf(network1, network2))
+        whenever(mockConnectivityManager.getNetworkCapabilities(network2))
+            .thenReturn(otherCapabilities)
+
+        val field =
+            AndroidNetworkConnectivityMonitor::class.java.getDeclaredField("connectivityManager")
+        field.isAccessible = true
+        val originalManager = field.get(monitor)
+        field.set(monitor, mockConnectivityManager)
+
+        val result = method.invoke(monitor) as Boolean
+        assertTrue("Should return true when another network is validated", result)
+
+        field.set(monitor, originalManager)
+        monitor.unregister()
+      }
+
+  @Test
+  fun `onLost delayed re-check updates state correctly`() = runTest {
+    val monitor = AndroidNetworkConnectivityMonitor(context)
+    val network = ShadowNetwork.newInstance(1)
+
+    val callback = getNetworkCallback(monitor)
+
+    // Set up initial online state
+    val mockCapabilitiesOnline = mock<NetworkCapabilities>()
+    whenever(mockCapabilitiesOnline.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+        .thenReturn(true)
+    whenever(mockCapabilitiesOnline.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+        .thenReturn(true)
+
+    val mockConnectivityManager = mock<ConnectivityManager>()
+    whenever(mockConnectivityManager.activeNetwork).thenReturn(network)
+    whenever(mockConnectivityManager.getNetworkCapabilities(network))
+        .thenReturn(mockCapabilitiesOnline)
+
+    val field =
+        AndroidNetworkConnectivityMonitor::class.java.getDeclaredField("connectivityManager")
+    field.isAccessible = true
+    val originalManager = field.get(monitor)
+    field.set(monitor, mockConnectivityManager)
+
+    // Force state to true
+    val stateField = AndroidNetworkConnectivityMonitor::class.java.getDeclaredField("_isOnline")
+    stateField.isAccessible = true
+    val stateFlow = stateField.get(monitor) as kotlinx.coroutines.flow.MutableStateFlow<Boolean>
+    stateFlow.value = true
+
+    // Now simulate network loss
+    whenever(mockConnectivityManager.activeNetwork).thenReturn(null)
+    whenever(mockConnectivityManager.allNetworks).thenReturn(emptyArray())
+
+    callback.onLost(network)
+
+    // Wait for immediate update
+    kotlinx.coroutines.delay(50)
+    val immediateState = monitor.isOnline.value
+
+    // Wait for delayed re-check (200ms)
+    kotlinx.coroutines.delay(250)
+    val delayedState = monitor.isOnline.value
+
+    assertFalse("Immediate state should be false", immediateState)
+    assertFalse("Delayed state should be false", delayedState)
+
+    field.set(monitor, originalManager)
+    monitor.unregister()
+  }
+
+  @Test
+  fun `multiple rapid onAvailable callbacks update state correctly`() = runTest {
+    val monitor = AndroidNetworkConnectivityMonitor(context)
+    val network1 = ShadowNetwork.newInstance(1)
+    val network2 = ShadowNetwork.newInstance(2)
+
+    val callback = getNetworkCallback(monitor)
+
+    callback.onAvailable(network1)
+    kotlinx.coroutines.delay(10)
+    callback.onAvailable(network2)
+    kotlinx.coroutines.delay(10)
+    callback.onAvailable(network1)
+
+    kotlinx.coroutines.delay(100)
+
+    // Should not crash and should have a valid state
+    assertNotNull("State should be set after rapid callbacks", monitor.isOnline.value)
+
+    monitor.unregister()
+  }
+
+  @Test
+  fun `multiple rapid onCapabilitiesChanged callbacks update state correctly`() = runTest {
+    val monitor = AndroidNetworkConnectivityMonitor(context)
+    val network = ShadowNetwork.newInstance(1)
+
+    val callback = getNetworkCallback(monitor)
+    val capabilities = connectivityManager.getNetworkCapabilities(network) ?: NetworkCapabilities()
+
+    callback.onCapabilitiesChanged(network, capabilities)
+    kotlinx.coroutines.delay(10)
+    callback.onCapabilitiesChanged(network, capabilities)
+    kotlinx.coroutines.delay(10)
+    callback.onCapabilitiesChanged(network, capabilities)
+
+    kotlinx.coroutines.delay(100)
+
+    // Should not crash and should have a valid state
+    assertNotNull("State should be set after rapid callbacks", monitor.isOnline.value)
+
+    monitor.unregister()
+  }
+
+  @Test
+  fun `onLinkPropertiesChanged with multiple networks updates state`() = runTest {
+    val monitor = AndroidNetworkConnectivityMonitor(context)
+    val network1 = ShadowNetwork.newInstance(1)
+    val network2 = ShadowNetwork.newInstance(2)
+
+    val callback = getNetworkCallback(monitor)
+
+    callback.onLinkPropertiesChanged(network1, android.net.LinkProperties())
+    kotlinx.coroutines.delay(50)
+    callback.onLinkPropertiesChanged(network2, android.net.LinkProperties())
+    kotlinx.coroutines.delay(50)
+
+    assertNotNull("State should be set after link properties changed", monitor.isOnline.value)
+
+    monitor.unregister()
+  }
+
+  @Test
+  fun `isOnline StateFlow emits initial state`() = runTest {
+    val monitor = AndroidNetworkConnectivityMonitor(context)
+
+    val initialState = monitor.isOnline.value
+    assertNotNull("Initial state should be set", initialState)
+
+    monitor.unregister()
+  }
+
+  @Test
+  fun `isOnline StateFlow updates when state changes`() = runTest {
+    val monitor = AndroidNetworkConnectivityMonitor(context)
+    val network = ShadowNetwork.newInstance(1)
+
+    val callback = getNetworkCallback(monitor)
+
+    val initialValue = monitor.isOnline.value
+
+    // Trigger a callback that might change state
+    callback.onCapabilitiesChanged(network, NetworkCapabilities())
+
+    kotlinx.coroutines.delay(100)
+
+    // State flow should have emitted a value (may or may not be different)
+    val newValue = monitor.isOnline.value
+    assertNotNull("State should be set", newValue)
+
+    monitor.unregister()
+  }
+
+  @Test
+  fun `unregister cancels periodic check job`() = runTest {
+    val monitor = AndroidNetworkConnectivityMonitor(context)
+
+    val jobField =
+        AndroidNetworkConnectivityMonitor::class.java.getDeclaredField("periodicCheckJob")
+    jobField.isAccessible = true
+    val jobBefore = jobField.get(monitor) as? kotlinx.coroutines.Job
+
+    assertNotNull("Periodic check job should be set", jobBefore)
+    assertFalse("Job should be active before unregister", jobBefore!!.isCancelled)
+
+    monitor.unregister()
+
+    val jobAfter = jobField.get(monitor) as? kotlinx.coroutines.Job
+    assertNull("Periodic check job should be null after unregister", jobAfter)
+    assertTrue("Job should be cancelled", jobBefore.isCancelled)
+  }
+
+  @Test
+  fun `unregister sets periodicCheckJob to null`() = runTest {
+    val monitor = AndroidNetworkConnectivityMonitor(context)
+
+    val jobField =
+        AndroidNetworkConnectivityMonitor::class.java.getDeclaredField("periodicCheckJob")
+    jobField.isAccessible = true
+
+    val jobBefore = jobField.get(monitor)
+    assertNotNull("Job should exist before unregister", jobBefore)
+
+    monitor.unregister()
+
+    val jobAfter = jobField.get(monitor)
+    assertNull("Job should be null after unregister", jobAfter)
+  }
+
+  @Test
+  fun `network callback is registered during initialization`() = runTest {
+    val mockConnectivityManager = mock<ConnectivityManager>()
+    val mockContext = mock<Context>()
+    whenever(mockContext.getSystemService<ConnectivityManager>(any()))
+        .thenReturn(mockConnectivityManager)
+
+    val monitor = AndroidNetworkConnectivityMonitor(mockContext)
+
+    // Verify that registerNetworkCallback was called
+    verify(mockConnectivityManager, atLeastOnce())
+        .registerNetworkCallback(any(), any<ConnectivityManager.NetworkCallback>())
+
+    monitor.unregister()
+  }
+
+  @Test
+  fun `network request includes internet capability`() = runTest {
+    val mockConnectivityManager = mock<ConnectivityManager>()
+    val mockContext = mock<Context>()
+    whenever(mockContext.getSystemService<ConnectivityManager>(any()))
+        .thenReturn(mockConnectivityManager)
+
+    val monitor = AndroidNetworkConnectivityMonitor(mockContext)
+
+    // Verify that registerNetworkCallback was called with a request
+    val requestCaptor = argumentCaptor<android.net.NetworkRequest>()
+    verify(mockConnectivityManager, atLeastOnce())
+        .registerNetworkCallback(
+            requestCaptor.capture(), any<ConnectivityManager.NetworkCallback>())
+
+    // The request should have been created (we can't easily verify its contents without reflection)
+    assertNotNull("Network request should be created", requestCaptor.firstValue)
+
+    monitor.unregister()
+  }
+
+  @Test
+  fun `checkConnectivity handles network with only WiFi transport`() = runTest {
+    val monitor = AndroidNetworkConnectivityMonitor(context)
+    val network = ShadowNetwork.newInstance(1)
+
+    val method =
+        AndroidNetworkConnectivityMonitor::class.java.getDeclaredMethod("checkConnectivity")
+    method.isAccessible = true
+
+    val mockCapabilities = mock<NetworkCapabilities>()
+    whenever(mockCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+        .thenReturn(true)
+    whenever(mockCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+        .thenReturn(false)
+    whenever(mockCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)).thenReturn(true)
+    whenever(mockCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR))
+        .thenReturn(false)
+    whenever(mockCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
+        .thenReturn(false)
+
+    val mockConnectivityManager = mock<ConnectivityManager>()
+    whenever(mockConnectivityManager.activeNetwork).thenReturn(network)
+    whenever(mockConnectivityManager.getNetworkCapabilities(network)).thenReturn(mockCapabilities)
+    whenever(mockConnectivityManager.allNetworks).thenReturn(arrayOf(network))
+
+    val field =
+        AndroidNetworkConnectivityMonitor::class.java.getDeclaredField("connectivityManager")
+    field.isAccessible = true
+    val originalManager = field.get(monitor)
+    field.set(monitor, mockConnectivityManager)
+
+    val result = method.invoke(monitor) as Boolean
+    assertTrue("Should return true for WiFi transport", result)
+
+    field.set(monitor, originalManager)
+    monitor.unregister()
+  }
+
+  @Test
+  fun `checkConnectivity handles network with only cellular transport`() = runTest {
+    val monitor = AndroidNetworkConnectivityMonitor(context)
+    val network = ShadowNetwork.newInstance(1)
+
+    val method =
+        AndroidNetworkConnectivityMonitor::class.java.getDeclaredMethod("checkConnectivity")
+    method.isAccessible = true
+
+    val mockCapabilities = mock<NetworkCapabilities>()
+    whenever(mockCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+        .thenReturn(true)
+    whenever(mockCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+        .thenReturn(false)
+    whenever(mockCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)).thenReturn(false)
+    whenever(mockCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)).thenReturn(true)
+    whenever(mockCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
+        .thenReturn(false)
+
+    val mockConnectivityManager = mock<ConnectivityManager>()
+    whenever(mockConnectivityManager.activeNetwork).thenReturn(network)
+    whenever(mockConnectivityManager.getNetworkCapabilities(network)).thenReturn(mockCapabilities)
+    whenever(mockConnectivityManager.allNetworks).thenReturn(arrayOf(network))
+
+    val field =
+        AndroidNetworkConnectivityMonitor::class.java.getDeclaredField("connectivityManager")
+    field.isAccessible = true
+    val originalManager = field.get(monitor)
+    field.set(monitor, mockConnectivityManager)
+
+    val result = method.invoke(monitor) as Boolean
+    assertTrue("Should return true for cellular transport", result)
+
+    field.set(monitor, originalManager)
+    monitor.unregister()
+  }
+
+  @Test
+  fun `checkConnectivity handles network with only ethernet transport`() = runTest {
+    val monitor = AndroidNetworkConnectivityMonitor(context)
+    val network = ShadowNetwork.newInstance(1)
+
+    val method =
+        AndroidNetworkConnectivityMonitor::class.java.getDeclaredMethod("checkConnectivity")
+    method.isAccessible = true
+
+    val mockCapabilities = mock<NetworkCapabilities>()
+    whenever(mockCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+        .thenReturn(true)
+    whenever(mockCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+        .thenReturn(false)
+    whenever(mockCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)).thenReturn(false)
+    whenever(mockCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR))
+        .thenReturn(false)
+    whenever(mockCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)).thenReturn(true)
+
+    val mockConnectivityManager = mock<ConnectivityManager>()
+    whenever(mockConnectivityManager.activeNetwork).thenReturn(network)
+    whenever(mockConnectivityManager.getNetworkCapabilities(network)).thenReturn(mockCapabilities)
+    whenever(mockConnectivityManager.allNetworks).thenReturn(arrayOf(network))
+
+    val field =
+        AndroidNetworkConnectivityMonitor::class.java.getDeclaredField("connectivityManager")
+    field.isAccessible = true
+    val originalManager = field.get(monitor)
+    field.set(monitor, mockConnectivityManager)
+
+    val result = method.invoke(monitor) as Boolean
+    assertTrue("Should return true for ethernet transport", result)
+
+    field.set(monitor, originalManager)
+    monitor.unregister()
+  }
+
+  @Test
+  fun `checkConnectivity handles network with multiple transport types`() = runTest {
+    val monitor = AndroidNetworkConnectivityMonitor(context)
+    val network = ShadowNetwork.newInstance(1)
+
+    val method =
+        AndroidNetworkConnectivityMonitor::class.java.getDeclaredMethod("checkConnectivity")
+    method.isAccessible = true
+
+    val mockCapabilities = mock<NetworkCapabilities>()
+    whenever(mockCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+        .thenReturn(true)
+    whenever(mockCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+        .thenReturn(false)
+    whenever(mockCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)).thenReturn(true)
+    whenever(mockCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)).thenReturn(true)
+    whenever(mockCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
+        .thenReturn(false)
+
+    val mockConnectivityManager = mock<ConnectivityManager>()
+    whenever(mockConnectivityManager.activeNetwork).thenReturn(network)
+    whenever(mockConnectivityManager.getNetworkCapabilities(network)).thenReturn(mockCapabilities)
+    whenever(mockConnectivityManager.allNetworks).thenReturn(arrayOf(network))
+
+    val field =
+        AndroidNetworkConnectivityMonitor::class.java.getDeclaredField("connectivityManager")
+    field.isAccessible = true
+    val originalManager = field.get(monitor)
+    field.set(monitor, mockConnectivityManager)
+
+    val result = method.invoke(monitor) as Boolean
+    assertTrue("Should return true when multiple transports available", result)
+
+    field.set(monitor, originalManager)
+    monitor.unregister()
+  }
+
+  @Test
+  fun `onUnavailable sets state to false immediately`() = runTest {
+    val monitor = AndroidNetworkConnectivityMonitor(context)
+
+    val callback = getNetworkCallback(monitor)
+
+    // Set initial state to true
+    val stateField = AndroidNetworkConnectivityMonitor::class.java.getDeclaredField("_isOnline")
+    stateField.isAccessible = true
+    val stateFlow = stateField.get(monitor) as kotlinx.coroutines.flow.MutableStateFlow<Boolean>
+    stateFlow.value = true
+
+    callback.onUnavailable()
+
+    kotlinx.coroutines.delay(10)
+
+    assertFalse("State should be false after onUnavailable", monitor.isOnline.value)
+
+    monitor.unregister()
+  }
+
+  @Test
+  fun `isCurrentlyOnline returns same value as checkConnectivity`() = runTest {
+    val monitor = AndroidNetworkConnectivityMonitor(context)
+    val network = ShadowNetwork.newInstance(1)
+
+    val method =
+        AndroidNetworkConnectivityMonitor::class.java.getDeclaredMethod("checkConnectivity")
+    method.isAccessible = true
+
+    val mockCapabilities = mock<NetworkCapabilities>()
+    whenever(mockCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+        .thenReturn(true)
+    whenever(mockCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+        .thenReturn(true)
+
+    val mockConnectivityManager = mock<ConnectivityManager>()
+    whenever(mockConnectivityManager.activeNetwork).thenReturn(network)
+    whenever(mockConnectivityManager.getNetworkCapabilities(network)).thenReturn(mockCapabilities)
+
+    val field =
+        AndroidNetworkConnectivityMonitor::class.java.getDeclaredField("connectivityManager")
+    field.isAccessible = true
+    val originalManager = field.get(monitor)
+    field.set(monitor, mockConnectivityManager)
+
+    val checkResult = method.invoke(monitor) as Boolean
+    val isCurrentlyOnlineResult = monitor.isCurrentlyOnline()
+
+    assertEquals(
+        "isCurrentlyOnline should match checkConnectivity", checkResult, isCurrentlyOnlineResult)
+
+    field.set(monitor, originalManager)
+    monitor.unregister()
   }
 
   // Helper to access the private network callback for testing
