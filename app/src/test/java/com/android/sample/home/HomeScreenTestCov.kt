@@ -38,7 +38,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-private fun createHomeViewModel() = HomeViewModel(FakeProfileRepository())
+private fun createHomeViewModel() = HomeViewModel(profileRepository = FakeProfileRepository())
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [31])
@@ -98,14 +98,14 @@ class HomeScreenTestCov {
 
   @Test
   fun viewModel_updateMessageDraft_updates_text() {
-    val viewModel = HomeViewModel(FakeProfileRepository())
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
     viewModel.updateMessageDraft("Test message")
     assertEquals("Test message", viewModel.uiState.value.messageDraft)
   }
 
   @Test
   fun viewModel_sendMessage_with_empty_text_does_nothing() {
-    val viewModel = HomeViewModel(FakeProfileRepository())
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
     val initialMessagesCount = viewModel.uiState.value.messages.size
     viewModel.sendMessage()
     assertEquals(initialMessagesCount, viewModel.uiState.value.messages.size)
@@ -127,7 +127,7 @@ class HomeScreenTestCov {
 
   @Test
   fun viewModel_toggleSystemConnection_changes_system_state() {
-    val viewModel = HomeViewModel(FakeProfileRepository())
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
     val system = viewModel.uiState.value.systems.first()
     val initialConnected = system.isConnected
     viewModel.toggleSystemConnection(system.id)
@@ -137,7 +137,7 @@ class HomeScreenTestCov {
 
   @Test
   fun viewModel_toggleSystemConnection_with_invalid_id_does_nothing() {
-    val viewModel = HomeViewModel(FakeProfileRepository())
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
     val initialSystems = viewModel.uiState.value.systems
     viewModel.toggleSystemConnection("invalid-id")
     assertEquals(initialSystems, viewModel.uiState.value.systems)
@@ -145,7 +145,7 @@ class HomeScreenTestCov {
 
   @Test
   fun viewModel_multiple_system_toggles_work() {
-    val viewModel = HomeViewModel(FakeProfileRepository())
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
     val systems = viewModel.uiState.value.systems
     val first = systems.first()
     val second = systems.getOrNull(1)
@@ -272,14 +272,14 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_displays_root_element() {
-    val viewModel = HomeViewModel(FakeProfileRepository())
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
     composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
   }
 
   @Test
   fun screen_displays_core_buttons() {
-    val viewModel = HomeViewModel(FakeProfileRepository())
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
     composeRule.onNodeWithTag(HomeTags.MenuBtn).assertIsDisplayed()
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).assertIsDisplayed()
@@ -289,7 +289,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_displays_message_field() {
-    val viewModel = HomeViewModel(FakeProfileRepository())
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
     composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
   }
@@ -297,7 +297,7 @@ class HomeScreenTestCov {
   @Test
   fun screen_action_buttons_trigger_callbacks() {
     var action1Clicked = false
-    val viewModel = HomeViewModel(FakeProfileRepository())
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
     composeRule.setContent {
       MaterialTheme {
         HomeScreen(viewModel = viewModel, onAction1Click = { action1Clicked = true })
@@ -348,7 +348,7 @@ class HomeScreenTestCov {
 
   @Test
   fun screen_message_field_updates_viewModel() {
-    val viewModel = HomeViewModel(FakeProfileRepository())
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
     composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput("New message")
     assertEquals("New message", viewModel.uiState.value.messageDraft)
@@ -824,7 +824,7 @@ class HomeScreenTestCov {
 
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
-    composeRule.onNodeWithText("Clear Chat?").assertIsDisplayed()
+    composeRule.onNodeWithText("Delete chat?").assertIsDisplayed()
     composeRule.runOnIdle { viewModel.hideDeleteConfirmation() }
     composeRule.waitUntil(timeoutMillis = 2_000) { !viewModel.uiState.value.showDeleteConfirmation }
 

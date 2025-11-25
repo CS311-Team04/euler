@@ -15,40 +15,54 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import com.android.sample.settings.AppearanceMode
 
 private val DarkColorScheme =
     darkColorScheme(
-        primary = Color(0xFFFF0000), // Red
+        primary = EulerRed,
+        onPrimary = Color.White,
+        primaryContainer = EulerRed,
         secondary = PurpleGrey80,
         tertiary = Pink80,
-        background = Color(0xFF000000), // Black
-        surface = Color(0xFF1E1E1E), // Dark gray for cards/surfaces
-        onPrimary = Color.White,
-        onBackground = Color.White,
-        onSurface = Color.White,
-        onSurfaceVariant = Color(0xFFBDBDBD) // Light gray for secondary text
-        )
+        background = DarkBackground,
+        onBackground = DarkOnBackground,
+        surface = DarkSurface,
+        onSurface = DarkOnBackground,
+        surfaceVariant = DarkSurfaceVariant,
+        onSurfaceVariant = DarkOnSurfaceVariant,
+        outline = DarkOutline,
+        outlineVariant = DarkOutline)
 
 private val LightColorScheme =
     lightColorScheme(
-        primary = Color(0xFFFF0000), // Red
+        primary = EulerRed,
+        onPrimary = Color.White,
+        primaryContainer = EulerRed,
         secondary = PurpleGrey40,
         tertiary = Pink40,
-        background = Color(0xFF000000), // Black
-        surface = Color(0xFF1E1E1E), // Dark gray for cards/surfaces
-        onPrimary = Color.White,
-        onBackground = Color.White,
-        onSurface = Color.White,
-        onSurfaceVariant = Color(0xFFBDBDBD) // Light gray for secondary text
-        )
+        background = LightBackground,
+        onBackground = LightOnBackground,
+        surface = LightSurface,
+        onSurface = LightOnBackground,
+        surfaceVariant = LightSurfaceVariant,
+        onSurfaceVariant = LightOnSurfaceVariant,
+        outline = LightOutline,
+        outlineVariant = LightOutline)
 
 @Composable
 fun SampleAppTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    appearanceMode: AppearanceMode = AppearanceMode.SYSTEM,
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
+  val isSystemDark = isSystemInDarkTheme()
+  val darkTheme =
+      when (appearanceMode) {
+        AppearanceMode.SYSTEM -> isSystemDark
+        AppearanceMode.DARK -> true
+        AppearanceMode.LIGHT -> false
+      }
   val colorScheme =
       when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
@@ -62,9 +76,10 @@ fun SampleAppTheme(
   if (!view.isInEditMode) {
     SideEffect {
       val window = (view.context as Activity).window
-      // Force a black status bar with light icons for consistent appearance
-      window.statusBarColor = androidx.compose.ui.graphics.Color.Black.toArgb()
-      WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
+      window.statusBarColor = colorScheme.background.toArgb()
+      window.navigationBarColor = colorScheme.background.toArgb()
+      WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+      WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !darkTheme
     }
   }
 

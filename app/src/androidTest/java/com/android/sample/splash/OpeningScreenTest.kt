@@ -5,9 +5,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.sample.authentification.AuthProvider
 import com.android.sample.authentification.AuthUiState
+import com.android.sample.settings.Localization
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -97,5 +99,16 @@ class OpeningScreenTest {
     composeRule
         .onNodeWithContentDescription(OpeningScreenTestConstants.OPENING_SCREEN_CONTENT_DESCRIPTION)
         .assertIsDisplayed()
+  }
+
+  @Test
+  fun displays_by_epfl_footer_text() {
+    composeRule.setContent {
+      MaterialTheme {
+        OpeningScreen(authState = AuthUiState.Idle, onNavigateToSignIn = {}, onNavigateToHome = {})
+      }
+    }
+
+    composeRule.onNodeWithText(Localization.t("by_epfl")).assertIsDisplayed()
   }
 }

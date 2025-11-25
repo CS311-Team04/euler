@@ -21,6 +21,16 @@ object Localization {
     }
   }
 
+  fun appearanceLabel(mode: AppearanceMode): String {
+    val key =
+        when (mode) {
+          AppearanceMode.SYSTEM -> "appearance_system"
+          AppearanceMode.LIGHT -> "appearance_light"
+          AppearanceMode.DARK -> "appearance_dark"
+        }
+    return t(key)
+  }
+
   private fun english() =
       mapOf(
           // Settings
@@ -28,6 +38,9 @@ object Localization {
           "profile" to "Profile",
           "connectors" to "Connectors",
           "appearance" to "Appearance",
+          "appearance_system" to "System default",
+          "appearance_light" to "Light",
+          "appearance_dark" to "Dark",
           "speech_language" to "Speech language",
           "log_out" to "Log out",
           "close" to "Close",
@@ -67,7 +80,7 @@ object Localization {
           // Home Screen - Actions
           "share" to "Share",
           "delete" to "Delete",
-          "clear_chat" to "Clear Chat?",
+          "clear_chat" to "Delete chat?",
           "clear_chat_message" to "This will delete all messages. This action cannot be undone.",
           "cancel" to "Cancel",
 
@@ -78,6 +91,10 @@ object Localization {
           "view_all_chats" to "View all chats",
           "powered_by" to "Powered by Apertus",
           "settings" to "Settings",
+          "all_chats" to "ALL CHATS",
+          "no_conversations_yet" to "No conversations yet",
+          "default_user_name" to "Student",
+          "untitled_conversation" to "Untitled",
 
           // Drawer - Recent Items
           "recent_cs220_exam" to "CS220 Final Exam retrieval",
@@ -92,6 +109,9 @@ object Localization {
           "profile" to "Profil",
           "connectors" to "Connecteurs",
           "appearance" to "Apparence",
+          "appearance_system" to "Défaut système",
+          "appearance_light" to "Clair",
+          "appearance_dark" to "Sombre",
           "speech_language" to "Langue de synthèse",
           "log_out" to "Se déconnecter",
           "close" to "Fermer",
@@ -143,6 +163,10 @@ object Localization {
           "view_all_chats" to "Voir tous les chats",
           "powered_by" to "Propulsé par Apertus",
           "settings" to "Paramètres",
+          "all_chats" to "TOUS LES CHATS",
+          "no_conversations_yet" to "Aucune conversation pour l'instant",
+          "default_user_name" to "Étudiant",
+          "untitled_conversation" to "Sans titre",
 
           // Drawer - Recent Items
           "recent_cs220_exam" to "Récupération examen final CS220",
@@ -157,6 +181,9 @@ object Localization {
           "profile" to "Profil",
           "connectors" to "Konnektoren",
           "appearance" to "Erscheinungsbild",
+          "appearance_system" to "Systemstandard",
+          "appearance_light" to "Hell",
+          "appearance_dark" to "Dunkel",
           "speech_language" to "Sprachsprache",
           "log_out" to "Abmelden",
           "close" to "Schließen",
@@ -208,6 +235,10 @@ object Localization {
           "view_all_chats" to "Alle Chats anzeigen",
           "powered_by" to "Bereitgestellt von Apertus",
           "settings" to "Einstellungen",
+          "all_chats" to "ALLE CHATS",
+          "no_conversations_yet" to "Noch keine Konversationen",
+          "default_user_name" to "Student",
+          "untitled_conversation" to "Ohne Titel",
 
           // Drawer - Recent Items
           "recent_cs220_exam" to "CS220 Abschlussprüfung Abruf",
@@ -222,6 +253,9 @@ object Localization {
           "profile" to "Perfil",
           "connectors" to "Conectores",
           "appearance" to "Apariencia",
+          "appearance_system" to "Sistema",
+          "appearance_light" to "Claro",
+          "appearance_dark" to "Oscuro",
           "speech_language" to "Idioma de voz",
           "log_out" to "Cerrar sesión",
           "close" to "Cerrar",
@@ -273,6 +307,10 @@ object Localization {
           "view_all_chats" to "Ver todos los chats",
           "powered_by" to "Impulsado por Apertus",
           "settings" to "Configuración",
+          "all_chats" to "TODOS LOS CHATS",
+          "no_conversations_yet" to "Aún no hay conversaciones",
+          "default_user_name" to "Estudiante",
+          "untitled_conversation" to "Sin título",
 
           // Drawer - Recent Items
           "recent_cs220_exam" to "Recuperación examen final CS220",
@@ -287,6 +325,9 @@ object Localization {
           "profile" to "Profilo",
           "connectors" to "Connettori",
           "appearance" to "Aspetto",
+          "appearance_system" to "Sistema",
+          "appearance_light" to "Chiaro",
+          "appearance_dark" to "Scuro",
           "speech_language" to "Lingua vocale",
           "log_out" to "Disconnetti",
           "close" to "Chiudi",
@@ -338,6 +379,10 @@ object Localization {
           "view_all_chats" to "Visualizza tutte le chat",
           "powered_by" to "Fornito da Apertus",
           "settings" to "Impostazioni",
+          "all_chats" to "TUTTE LE CHAT",
+          "no_conversations_yet" to "Nessuna conversazione al momento",
+          "default_user_name" to "Studente",
+          "untitled_conversation" to "Senza titolo",
 
           // Drawer - Recent Items
           "recent_cs220_exam" to "Recupero esame finale CS220",
@@ -352,6 +397,9 @@ object Localization {
           "profile" to "Perfil",
           "connectors" to "Conectores",
           "appearance" to "Aparência",
+          "appearance_system" to "Sistema",
+          "appearance_light" to "Claro",
+          "appearance_dark" to "Escuro",
           "speech_language" to "Idioma de voz",
           "log_out" to "Sair",
           "close" to "Fechar",
@@ -403,6 +451,10 @@ object Localization {
           "view_all_chats" to "Ver todos os chats",
           "powered_by" to "Desenvolvido por Apertus",
           "settings" to "Configurações",
+          "all_chats" to "TODOS OS CHATS",
+          "no_conversations_yet" to "Ainda não há conversas",
+          "default_user_name" to "Estudante",
+          "untitled_conversation" to "Sem título",
 
           // Drawer - Recent Items
           "recent_cs220_exam" to "Recuperação exame final CS220",
@@ -417,6 +469,9 @@ object Localization {
           "profile" to "个人资料",
           "connectors" to "连接器",
           "appearance" to "外观",
+          "appearance_system" to "系统默认",
+          "appearance_light" to "浅色",
+          "appearance_dark" to "深色",
           "speech_language" to "语音语言",
           "log_out" to "登出",
           "close" to "关闭",
@@ -467,6 +522,10 @@ object Localization {
           "view_all_chats" to "查看所有聊天",
           "powered_by" to "由 Apertus 提供支持",
           "settings" to "设置",
+          "all_chats" to "所有聊天",
+          "no_conversations_yet" to "暂时没有会话",
+          "default_user_name" to "学生",
+          "untitled_conversation" to "未命名",
 
           // Drawer - Recent Items
           "recent_cs220_exam" to "CS220 期末考试检索",

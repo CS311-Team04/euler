@@ -11,6 +11,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -35,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -42,13 +45,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.offset
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.android.sample.Chat.ChatMessage
 import com.android.sample.Chat.ChatType
 import com.android.sample.R
 import com.android.sample.settings.Localization
+import com.android.sample.speech.SpeechPlayback
+import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.ui.components.GuestProfileWarningModal
+import com.android.sample.ui.theme.EulerRed
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -93,12 +100,26 @@ fun HomeScreen(
     onProfileClick: () -> Unit = {},
     onVoiceChatClick: () -> Unit = {},
     openDrawerOnStart: Boolean = false,
-    speechHelper: com.android.sample.speech.SpeechToTextHelper? = null,
+    speechHelper: SpeechToTextHelper? = null,
+    ttsHelper: SpeechPlayback? = null,
     forceNewChatOnFirstOpen: Boolean = false
 ) {
   val ui by viewModel.uiState.collectAsState()
   val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
   val scope = rememberCoroutineScope()
+  val colorScheme = MaterialTheme.colorScheme
+  val backgroundColor = colorScheme.background
+  val surfaceColor = colorScheme.surface
+  val surfaceVariantColor = colorScheme.surfaceVariant
+  val textPrimary = colorScheme.onBackground
+  val textSecondary = colorScheme.onSurfaceVariant
+  val accentColor = colorScheme.primary
+
+  val audioController = remember(ttsHelper) { HomeAudioController(ttsHelper) }
+
+  DisposableEffect(audioController) { onDispose { audioController.stop() } }
+
+  LaunchedEffect(ui.messages) { audioController.handleMessagesChanged(ui.messages) }
 
   val ranNewChatOnce = remember { mutableStateOf(false) }
   LaunchedEffect(forceNewChatOnFirstOpen) {
@@ -174,11 +195,12 @@ fun HomeScreen(
                 drawerState.close()
                 if (ui.isDrawerOpen) viewModel.toggleDrawer()
               }
-            })
+            },
+            onDeleteConversations = { ids -> viewModel.deleteConversations(ids) })
       }) {
         Scaffold(
-            modifier = modifier.fillMaxSize().background(Color.Black).testTag(HomeTags.Root),
-            containerColor = Color.Black,
+            modifier = modifier.fillMaxSize().background(backgroundColor).testTag(HomeTags.Root),
+            containerColor = backgroundColor,
             topBar = {
               CenterAlignedTopAppBar(
                   navigationIcon = {
@@ -193,7 +215,7 @@ fun HomeScreen(
                           Icon(
                               Icons.Default.Menu,
                               contentDescription = Localization.t("menu"),
-                              tint = Color.White,
+                              tint = textPrimary,
                               modifier = Modifier.size(24.dp))
                         }
                   },
@@ -211,33 +233,43 @@ fun HomeScreen(
                           Icon(
                               Icons.Default.MoreVert,
                               contentDescription = Localization.t("more"),
-                              tint = Color.White,
+                              tint = textPrimary,
                               modifier = Modifier.size(24.dp))
                         }
 
-                    // Top-right menu (placeholder)
+                    // Top-right menu with Delete and Share
                     DropdownMenu(
                         expanded = ui.isTopRightOpen,
                         onDismissRequest = { viewModel.setTopRightOpen(false) },
-                        modifier = Modifier.testTag(HomeTags.TopRightMenu)) {
-                          DropdownMenuItem(
-                              text = { Text("Delete current chat") },
+                        modifier = Modifier.testTag(HomeTags.TopRightMenu),
+                        containerColor = MaterialTheme.colorScheme.surface) {
+                          DeleteMenuItem(
                               onClick = {
                                 viewModel.setTopRightOpen(false)
                                 viewModel.showDeleteConfirmation()
+                              })
+                          DropdownMenuItem(
+                              text = {
+                                Text(
+                                    Localization.t("share"),
+                                    color = MaterialTheme.colorScheme.onSurface)
+                              },
+                              onClick = {
+                                viewModel.setTopRightOpen(false)
+                                // TODO: Implement share functionality
                               })
                         }
                   },
                   colors =
                       TopAppBarDefaults.topAppBarColors(
-                          containerColor = Color.Black,
-                          titleContentColor = Color.White,
-                          navigationIconContentColor = Color.White,
-                          actionIconContentColor = Color.White))
+                          containerColor = backgroundColor,
+                          titleContentColor = textPrimary,
+                          navigationIconContentColor = textPrimary,
+                          actionIconContentColor = textPrimary))
             },
             bottomBar = {
               Column(
-                  Modifier.fillMaxWidth().background(Color.Black).padding(bottom = 16.dp),
+                  Modifier.fillMaxWidth().background(backgroundColor).padding(bottom = 16.dp),
                   horizontalAlignment = Alignment.CenterHorizontally) {
                     // Horizontal scrollable row of suggestion chips
                     val suggestions =
@@ -300,90 +332,35 @@ fun HomeScreen(
 
                     Spacer(Modifier.height(16.dp))
 
-                    // Message input bound to ViewModel state.
-                    OutlinedTextField(
+                    // Message input bar - perfectly aligned capsule design
+                    ChatInputBar(
                         value = ui.messageDraft,
                         onValueChange = { viewModel.updateMessageDraft(it) },
-                        placeholder = { Text(Localization.t("message_euler"), color = Color.Gray) },
-                        modifier =
-                            Modifier.fillMaxWidth()
-                                .padding(horizontal = 16.dp)
-                                .height(60.dp)
-                                .testTag(HomeTags.MessageField),
+                        placeholder = Localization.t("message_euler"),
                         enabled = !ui.isSending,
-                        singleLine = true,
-                        trailingIcon = {
-                          Row(horizontalArrangement = Arrangement.spacedBy(0.2.dp)) {
-                            // Voice chat button - opens voice visualizer
-                            IconButton(
-                                onClick = {
-                                  speechHelper?.startListening(
-                                      onResult = { recognized ->
-                                        viewModel.updateMessageDraft(recognized)
-                                      })
-                                },
-                                enabled = speechHelper != null,
-                                modifier = Modifier.testTag(HomeTags.MicBtn)) {
-                                  Icon(
-                                      Icons.Default.Mic,
-                                      contentDescription = Localization.t("dictate"),
-                                      tint = Color.Gray)
-                                }
-
-                            val canSend = ui.messageDraft.isNotBlank() && !ui.isSending
-
-                            Box(
-                                modifier = Modifier.size(36.dp),
-                                contentAlignment = Alignment.Center) {
-                                  Crossfade(targetState = canSend, label = "voice-button") {
-                                      readyToSend ->
-                                    if (!readyToSend) {
-                                      IconButton(
-                                          onClick = onVoiceChatClick,
-                                          modifier =
-                                              Modifier.fillMaxSize().testTag(HomeTags.VoiceBtn)) {
-                                            Icon(
-                                                Icons.Default.GraphicEq,
-                                                contentDescription = "Voice mode",
-                                                tint = Color.Gray,
-                                                modifier = Modifier.size(18.dp))
-                                          }
-                                    } else {
-                                      Spacer(modifier = Modifier.size(18.dp))
-                                    }
-                                  }
-                                }
-
-                            BubbleSendButton(
-                                enabled = canSend,
-                                isSending = ui.isSending,
-                                onClick = {
-                                  if (canSend) {
-                                    onSendMessage(ui.messageDraft)
-                                    viewModel.sendMessage()
-                                  }
-                                })
+                        isSending = ui.isSending,
+                        canSend = ui.messageDraft.isNotBlank() && !ui.isSending,
+                        onSendClick = {
+                          if (ui.messageDraft.isNotBlank() && !ui.isSending) {
+                            onSendMessage(ui.messageDraft)
+                            viewModel.sendMessage()
                           }
                         },
-                        shape = RoundedCornerShape(50),
-                        colors =
-                            OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                disabledTextColor = Color.LightGray,
-                                cursorColor = Color.White,
-                                focusedPlaceholderColor = Color.Gray,
-                                unfocusedPlaceholderColor = Color.Gray,
-                                focusedBorderColor = Color.DarkGray,
-                                unfocusedBorderColor = Color.DarkGray,
-                                focusedContainerColor = Color(0xFF121212),
-                                unfocusedContainerColor = Color(0xFF121212),
-                                disabledContainerColor = Color(0xFF121212)))
+                        onMicClick = {
+                          speechHelper?.startListening(
+                              onResult = { recognized -> viewModel.updateMessageDraft(recognized) })
+                        },
+                        onVoiceModeClick = onVoiceChatClick,
+                        speechHelperAvailable = speechHelper != null,
+                        textPrimary = textPrimary,
+                        textSecondary = textSecondary,
+                        surfaceVariantColor = surfaceVariantColor,
+                        modifier = Modifier.testTag(HomeTags.MessageField))
 
                     Spacer(Modifier.height(16.dp))
                     Text(
                         text = Localization.t("powered_by").uppercase(),
-                        color = Color.Gray,
+                        color = textSecondary,
                         fontSize = 11.sp,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(horizontal = 16.dp))
@@ -391,7 +368,7 @@ fun HomeScreen(
             }) { padding ->
               // Chat content: list of messages + thinking indicator at the end while sending.
               Box(
-                  modifier = Modifier.fillMaxSize().padding(padding).background(Color.Black),
+                  modifier = Modifier.fillMaxSize().padding(padding).background(backgroundColor),
                   contentAlignment = Alignment.Center) {
                     if (ui.messages.isEmpty() && !ui.isSending) {
                       // Show animated intro title when list is empty
@@ -420,6 +397,8 @@ fun HomeScreen(
                             items(items = ui.messages, key = { it.id }) { item ->
                               val showLeadingDot =
                                   item.id == ui.streamingMessageId && item.text.isEmpty()
+                              val audioState =
+                                  audioController.audioStateFor(item, ui.streamingMessageId)
 
                               // If this message carries a source, draw the card first
                               if (item.source != null && !item.isThinking) {
@@ -441,7 +420,9 @@ fun HomeScreen(
                               ChatMessage(
                                   message = item,
                                   modifier = Modifier.fillMaxWidth(),
-                                  isStreaming = showLeadingDot)
+                                  isStreaming = showLeadingDot,
+                                  audioState = audioState,
+                                  aiText = textPrimary)
                             }
 
                             // Global thinking indicator shown AFTER the last user message.
@@ -489,15 +470,16 @@ fun HomeScreen(
 /** Compact, rounded action button used in the bottom actions row. */
 @Composable
 private fun SuggestionChip(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+  val colorScheme = MaterialTheme.colorScheme
   Surface(
       onClick = onClick,
       shape = RoundedCornerShape(50.dp),
-      color = Color(0xFF1E1E1E),
+      color = colorScheme.surfaceVariant,
       modifier = modifier.height(50.dp)) {
         Box(
             modifier = Modifier.fillMaxHeight().padding(horizontal = 20.dp, vertical = 12.dp),
             contentAlignment = Alignment.Center) {
-              Text(text = text, color = Color.White, fontSize = 14.sp)
+              Text(text = text, color = colorScheme.onSurface, fontSize = 14.sp)
             }
       }
 }
@@ -515,12 +497,167 @@ private fun TopRightPanelPlaceholder(onDismiss: () -> Unit, onDeleteClick: () ->
       })
 }
 
+/** Delete menu item that turns red on hover/press. */
+@Composable
+private fun DeleteMenuItem(onClick: () -> Unit) {
+  val interactionSource = remember { MutableInteractionSource() }
+  val isPressed by interactionSource.collectIsPressedAsState()
+  val isHovered by interactionSource.collectIsHoveredAsState()
+  val colorScheme = MaterialTheme.colorScheme
+
+  val textColor by
+      animateColorAsState(
+          targetValue = if (isPressed || isHovered) colorScheme.error else colorScheme.onSurface,
+          label = "delete-text-color")
+
+  DropdownMenuItem(
+      text = { Text(Localization.t("delete"), color = textColor) },
+      onClick = onClick,
+      interactionSource = interactionSource)
+}
+
 /**
- * Modal shown to confirm clearing the chat history. Exposes two testTags: "home_delete_cancel" and
- * "home_delete_confirm" on buttons.
+ * Perfectly aligned chat input bar with capsule shape, matching design specifications. Features:
+ * - Capsule shape with large corner radius
+ * - Vertically centered placeholder text
+ * - Properly aligned microphone and voice/send buttons
+ * - Smooth transition from voice mode to send button
  */
 @Composable
+private fun ChatInputBar(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    enabled: Boolean,
+    isSending: Boolean,
+    canSend: Boolean,
+    onSendClick: () -> Unit,
+    onMicClick: () -> Unit,
+    onVoiceModeClick: () -> Unit,
+    speechHelperAvailable: Boolean,
+    textPrimary: Color,
+    textSecondary: Color,
+    surfaceVariantColor: Color,
+    modifier: Modifier = Modifier
+) {
+  OutlinedTextField(
+      value = value,
+      onValueChange = onValueChange,
+      placeholder = {
+        Text(
+            text = placeholder,
+            color = textSecondary,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Normal)
+      },
+      modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp).height(52.dp),
+      enabled = enabled,
+      singleLine = true,
+      textStyle =
+          MaterialTheme.typography.bodyMedium.copy(
+              fontSize = 15.sp, fontWeight = FontWeight.Normal),
+      trailingIcon = {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(end = 4.dp)) {
+              // Microphone button
+              IconButton(
+                  onClick = onMicClick,
+                  enabled = speechHelperAvailable && enabled,
+                  modifier = Modifier.size(40.dp).testTag(HomeTags.MicBtn)) {
+                    Icon(
+                        Icons.Default.Mic,
+                        contentDescription = Localization.t("dictate"),
+                        tint = textSecondary,
+                        modifier = Modifier.size(22.dp))
+                  }
+
+              // Voice mode / Send button - sized to match chatbox height with tiny margin (52dp -
+              // 9dp margin = 43dp)
+              Box(
+                  modifier = Modifier.size(43.dp).offset(y = (-1).dp),
+                  contentAlignment = Alignment.Center) {
+                    Crossfade(targetState = canSend, label = "voice-to-send-transition") {
+                        readyToSend ->
+                      if (!readyToSend) {
+                        // Voice mode button - circular with waveform icon
+                        Surface(
+                            onClick = onVoiceModeClick,
+                            modifier = Modifier.fillMaxSize().testTag(HomeTags.VoiceBtn),
+                            shape = CircleShape,
+                            color = textSecondary.copy(alpha = 0.2f),
+                            tonalElevation = 0.dp,
+                            shadowElevation = 0.dp) {
+                              Box(
+                                  modifier = Modifier.fillMaxSize(),
+                                  contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.GraphicEq,
+                                        contentDescription = "Voice mode",
+                                        tint = textSecondary,
+                                        modifier = Modifier.size(18.dp))
+                                  }
+                            }
+                      } else {
+                        // Red send button - transitions from voice mode, matches chatbox height
+                        Surface(
+                            onClick = onSendClick,
+                            modifier = Modifier.fillMaxSize().testTag(HomeTags.SendBtn),
+                            shape = CircleShape,
+                            color = EulerRed,
+                            tonalElevation = 0.dp,
+                            shadowElevation = 0.dp) {
+                              Box(
+                                  modifier = Modifier.fillMaxSize(),
+                                  contentAlignment = Alignment.Center) {
+                                    if (isSending) {
+                                      CircularProgressIndicator(
+                                          strokeWidth = 2.dp,
+                                          modifier = Modifier.size(18.dp),
+                                          color = Color.White)
+                                    } else {
+                                      val icon =
+                                          try {
+                                            androidx.compose.material.icons.Icons.Rounded.Send
+                                          } catch (_: Throwable) {
+                                            androidx.compose.material.icons.Icons.Default.Send
+                                          }
+                                      Icon(
+                                          imageVector = icon,
+                                          contentDescription = Localization.t("send"),
+                                          tint = Color.White,
+                                          modifier = Modifier.size(18.dp))
+                                    }
+                                  }
+                            }
+                      }
+                    }
+                  }
+            }
+      },
+      shape = RoundedCornerShape(50.dp),
+      colors =
+          OutlinedTextFieldDefaults.colors(
+              focusedTextColor = textPrimary,
+              unfocusedTextColor = textPrimary,
+              disabledTextColor = textPrimary.copy(alpha = 0.6f),
+              cursorColor = textPrimary,
+              focusedPlaceholderColor = textSecondary,
+              unfocusedPlaceholderColor = textSecondary,
+              focusedBorderColor = textSecondary.copy(alpha = 0.5f),
+              unfocusedBorderColor = textSecondary.copy(alpha = 0.35f),
+              focusedContainerColor = surfaceVariantColor,
+              unfocusedContainerColor = surfaceVariantColor,
+              disabledContainerColor = surfaceVariantColor))
+}
+
+/** Simple delete confirmation modal with "Delete chat?" title and Cancel/Delete buttons. */
+@Composable
 private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit) {
+  val colorScheme = MaterialTheme.colorScheme
+  val textPrimary = colorScheme.onSurface
+  val textSecondary = colorScheme.onSurfaceVariant
   Box(
       modifier =
           Modifier.fillMaxSize()
@@ -529,14 +666,14 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
       contentAlignment = Alignment.Center) {
         Card(
             modifier = Modifier.width(280.dp).padding(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+            colors = CardDefaults.cardColors(containerColor = colorScheme.surface),
             shape = RoundedCornerShape(16.dp)) {
               Column(
                   modifier = Modifier.padding(24.dp),
                   horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = Localization.t("clear_chat"),
-                        color = Color.White,
+                        color = textPrimary,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold)
 
@@ -544,7 +681,7 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
 
                     Text(
                         text = Localization.t("clear_chat_message"),
-                        color = Color.Gray,
+                        color = textSecondary,
                         fontSize = 14.sp,
                         textAlign = TextAlign.Center)
 
@@ -557,19 +694,21 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
                               onClick = onCancel,
                               modifier = Modifier.weight(1f),
                               colors =
-                                  ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A2A)),
+                                  ButtonDefaults.buttonColors(
+                                      containerColor = colorScheme.surfaceVariant),
                               shape = RoundedCornerShape(8.dp)) {
-                                Text(Localization.t("cancel"), color = Color.White)
+                                Text(Localization.t("cancel"), color = textPrimary)
                               }
 
                           Button(
                               onClick = onConfirm,
                               modifier = Modifier.weight(1f),
-                              colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                              colors =
+                                  ButtonDefaults.buttonColors(containerColor = colorScheme.primary),
                               shape = RoundedCornerShape(8.dp)) {
                                 Text(
                                     Localization.t("delete"),
-                                    color = Color.White,
+                                    color = colorScheme.onPrimary,
                                     fontWeight = FontWeight.Bold)
                               }
                         }
@@ -584,6 +723,7 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
  */
 @Composable
 private fun ThinkingIndicator(modifier: Modifier = Modifier) {
+  val colorScheme = MaterialTheme.colorScheme
   var dots by remember { mutableStateOf(0) }
   LaunchedEffect(Unit) {
     while (true) {
@@ -595,15 +735,17 @@ private fun ThinkingIndicator(modifier: Modifier = Modifier) {
   Surface(
       modifier = modifier,
       shape = RoundedCornerShape(12.dp),
-      color = Color(0x14FFFFFF),
+      color = colorScheme.surfaceVariant.copy(alpha = 0.6f),
       tonalElevation = 0.dp) {
         Row(
             Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically) {
               CircularProgressIndicator(
-                  strokeWidth = 2.dp, modifier = Modifier.size(16.dp), color = Color.Gray)
+                  strokeWidth = 2.dp,
+                  modifier = Modifier.size(16.dp),
+                  color = colorScheme.onSurfaceVariant)
               Spacer(Modifier.width(8.dp))
-              Text(text = text, color = Color.LightGray, fontSize = 13.sp)
+              Text(text = text, color = colorScheme.onSurfaceVariant, fontSize = 13.sp)
             }
       }
 }
@@ -614,11 +756,9 @@ private fun ThinkingIndicator(modifier: Modifier = Modifier) {
  * - Disabled when the draft is blank or a send is in progress.
  */
 @Composable
-private fun BubbleSendButton(
-    enabled: Boolean,
-    isSending: Boolean,
-    onClick: () -> Unit,
-) {
+private fun BubbleSendButton(enabled: Boolean, isSending: Boolean, onClick: () -> Unit) {
+  val colorScheme = MaterialTheme.colorScheme
+  val accent = colorScheme.primary
   val size = 40.dp
   val interaction = remember { MutableInteractionSource() }
 
@@ -626,9 +766,9 @@ private fun BubbleSendButton(
       animateColorAsState(
           targetValue =
               when {
-                isSending -> Color(0xFFC62828)
-                enabled -> Color(0xFFE53935)
-                else -> Color(0xFF3C3C3C)
+                isSending -> accent.copy(alpha = 0.85f)
+                enabled -> accent
+                else -> colorScheme.onSurface.copy(alpha = 0.2f)
               },
           label = "bubble-color")
 
@@ -652,7 +792,7 @@ private fun BubbleSendButton(
         contentAlignment = Alignment.Center) {
           if (isSending) {
             CircularProgressIndicator(
-                strokeWidth = 2.dp, modifier = Modifier.size(18.dp), color = Color.White)
+                strokeWidth = 2.dp, modifier = Modifier.size(18.dp), color = colorScheme.onPrimary)
           } else {
             val icon =
                 try {
@@ -663,7 +803,9 @@ private fun BubbleSendButton(
             Crossfade(targetState = enabled, label = "send-button-state") { canSend ->
               Icon(
                   imageVector = icon,
-                  tint = if (canSend) Color.White else Color.White.copy(alpha = 0.35f),
+                  tint =
+                      if (canSend) colorScheme.onPrimary
+                      else colorScheme.onSurface.copy(alpha = 0.4f),
                   contentDescription = Localization.t("send"),
                   modifier = Modifier.size(18.dp))
             }
@@ -678,6 +820,7 @@ private fun BubbleSendButton(
  */
 @Composable
 internal fun AnimatedIntroTitle(modifier: Modifier = Modifier) {
+  val colorScheme = MaterialTheme.colorScheme
   val suggestions = remember {
     listOf(
         Localization.t("intro_suggestion_1"),
@@ -704,7 +847,7 @@ internal fun AnimatedIntroTitle(modifier: Modifier = Modifier) {
         // Title: "Ask Euler Anything" in deep burgundy/plum
         Text(
             text = Localization.t("ask_euler_anything"),
-            color = Color(0xFF8B0000), // Deep burgundy red
+            color = colorScheme.primary,
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
@@ -730,7 +873,7 @@ internal fun AnimatedIntroTitle(modifier: Modifier = Modifier) {
               label = "suggestion-transition") { index ->
                 Text(
                     text = suggestions[index],
-                    color = Color.White,
+                    color = colorScheme.onBackground,
                     fontSize = 16.sp,
                     textAlign = TextAlign.Center)
               }
@@ -746,11 +889,12 @@ private fun SourceCard(
     retrievedAt: Long,
     onVisit: () -> Unit
 ) {
+  val colorScheme = MaterialTheme.colorScheme
   Column(
       modifier =
           Modifier.fillMaxWidth()
               .clip(RoundedCornerShape(10.dp))
-              .background(Color(0xFF1C1C1E))
+              .background(colorScheme.surfaceVariant)
               .padding(horizontal = 12.dp, vertical = 6.dp)) {
         // Top line: “Retrieved from EPFL.ch Website”
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -762,7 +906,7 @@ private fun SourceCard(
           Spacer(Modifier.width(4.dp))
           Text(
               text = "Retrieved from  $siteLabel",
-              color = Color(0xFFBDBDBD),
+              color = colorScheme.onSurfaceVariant,
               style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp))
         }
 
@@ -772,7 +916,7 @@ private fun SourceCard(
           // Title (ellipsized to one line)
           Text(
               text = url,
-              color = Color.White,
+              color = colorScheme.onSurface,
               style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
               maxLines = 1,
               overflow = TextOverflow.Ellipsis,
@@ -784,14 +928,14 @@ private fun SourceCard(
               onClick = onVisit,
               shape = RoundedCornerShape(6.dp),
               contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-              colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))) {
-                Text("Visit")
+              colors = ButtonDefaults.buttonColors(containerColor = colorScheme.primary)) {
+                Text("Visit", color = colorScheme.onPrimary)
                 Spacer(Modifier.width(6.dp))
                 Icon(
                     imageVector = androidx.compose.material.icons.Icons.Outlined.OpenInNew,
                     contentDescription = null,
                     modifier = Modifier.size(10.dp),
-                    tint = Color.White)
+                    tint = colorScheme.onPrimary)
               }
         }
 
@@ -808,7 +952,7 @@ private fun SourceCard(
             }
         Text(
             text = "Retrieved on $dateStr",
-            color = Color.Gray,
+            color = colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp))
       }
 }

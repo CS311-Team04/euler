@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Extension
@@ -35,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -62,15 +64,15 @@ fun SettingsPage(
     onConnectorsClick: () -> Unit = {},
     onInfoClick: () -> Unit = {}
 ) {
-  val background = Color(0xFF121212)
-  val rowBackground = background
-  val textPrimary = Color(0xFFECECEC)
-  val textSecondary = Color(0xFF9E9E9E)
-  val accentRed = Color(0xFFEB5757)
-  val outline = Color.White.copy(alpha = 0.08f)
+  val colorScheme = MaterialTheme.colorScheme
+  val background = colorScheme.background
+  val rowBackground = colorScheme.surface
+  val textPrimary = colorScheme.onBackground
+  val textSecondary = colorScheme.onSurfaceVariant
+  val accentRed = colorScheme.primary
 
-  // Bind to global AppSettings so changes update the whole app
-  val language = remember { mutableStateOf(AppSettings.language) }
+  val language by AppSettings.languageState
+  val appearanceMode by AppSettings.appearanceState
 
   Box(modifier = Modifier.fillMaxSize().background(background)) {
     Column(
@@ -125,6 +127,41 @@ fun SettingsPage(
                     textColor = textPrimary,
                     secondaryTextColor = textSecondary)
 
+                // Appearance with dropdown
+                val appearanceMenuExpanded = remember { mutableStateOf(false) }
+                Box {
+                  SettingsRow(
+                      icon = Icons.Filled.DarkMode,
+                      title = Localization.t("appearance"),
+                      backgroundColor = rowBackground,
+                      textColor = textPrimary,
+                      secondaryTextColor = textSecondary,
+                      trailing = {
+                        TrailingValue(
+                            value = Localization.appearanceLabel(appearanceMode),
+                            textColor = textSecondary,
+                            onClick = { appearanceMenuExpanded.value = true })
+                      },
+                      onClick = { appearanceMenuExpanded.value = true })
+
+                  DropdownMenu(
+                      expanded = appearanceMenuExpanded.value,
+                      onDismissRequest = { appearanceMenuExpanded.value = false },
+                      containerColor = rowBackground,
+                  ) {
+                    AppearanceMode.entries.forEach { option ->
+                      DropdownMenuItem(
+                          text = {
+                            Text(Localization.appearanceLabel(option), color = textPrimary)
+                          },
+                          onClick = {
+                            AppSettings.setAppearanceMode(option)
+                            appearanceMenuExpanded.value = false
+                          })
+                    }
+                  }
+                }
+
                 // Speech language with dropdown
                 val languageMenuExpanded = remember { mutableStateOf(false) }
                 Box {
@@ -136,7 +173,7 @@ fun SettingsPage(
                       secondaryTextColor = textSecondary,
                       trailing = {
                         TrailingValue(
-                            value = language.value.code,
+                            value = language.code,
                             textColor = textSecondary,
                             onClick = { languageMenuExpanded.value = true })
                       },
@@ -151,7 +188,6 @@ fun SettingsPage(
                       DropdownMenuItem(
                           text = { Text(option.code, color = textPrimary) },
                           onClick = {
-                            language.value = option
                             AppSettings.setLanguage(option)
                             languageMenuExpanded.value = false
                           })
@@ -232,7 +268,7 @@ private fun SettingsRow(
                   modifier =
                       Modifier.size(36.dp)
                           .clip(CircleShape)
-                          .background(Color.White.copy(alpha = 0.06f)),
+                          .background(textColor.copy(alpha = 0.08f)),
                   contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = icon,
@@ -271,7 +307,7 @@ private fun TrailingValue(value: String, textColor: Color, onClick: () -> Unit) 
 
 @Composable
 private fun SectionDivider() {
-  Divider(modifier = Modifier.padding(vertical = 4.dp), color = Color.White.copy(alpha = 0.0f))
+  Divider(modifier = Modifier.padding(vertical = 4.dp), color = Color.Transparent)
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF000000)

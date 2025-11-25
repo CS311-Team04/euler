@@ -262,8 +262,10 @@ fun VoiceScreen(
         voiceUiState.isSpeaking -> Color(0xFF097345)
         else -> Color(0xFC0000)
       }
+  val backgroundColor = MaterialTheme.colorScheme.background
+  val foregroundColor = MaterialTheme.colorScheme.onBackground
 
-  Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
+  Box(modifier = modifier.fillMaxSize().background(backgroundColor)) {
 
     // Visualizer in the center - uses real mic if active, otherwise silent mock
     // ManagedLevelSource prevents VoiceVisualizer from auto start/stop
@@ -331,7 +333,7 @@ fun VoiceScreen(
                     size = 100.dp,
                     background =
                         if (isMicActive) Color(0x33000000) else Color(0x0), // Visual indicator
-                    iconTint = if (isMicActive) Color(0xFFFF0000) else Color.White)
+                    iconTint = if (isMicActive) Color(0xFFFF0000) else foregroundColor)
                 RoundIconButton(
                     onClick = {
                       safeShutdown(onClose, voiceChatViewModel, playback, coroutineScope)
@@ -340,7 +342,7 @@ fun VoiceScreen(
                     contentDescription = "Close voice screen",
                     size = 100.dp,
                     background = Color(0x0),
-                    iconTint = Color.White)
+                    iconTint = foregroundColor)
               }
           Spacer(Modifier.height(14.dp))
 
@@ -357,6 +359,7 @@ fun VoiceScreen(
 
 @Composable
 internal fun StatusCard(uiState: VoiceChatViewModel.VoiceChatUiState) {
+  val errorMessage = uiState.lastError?.takeIf { it.isNotBlank() } ?: return
   Column(
       horizontalAlignment = Alignment.CenterHorizontally,
       modifier =
@@ -364,9 +367,7 @@ internal fun StatusCard(uiState: VoiceChatViewModel.VoiceChatUiState) {
               .padding(horizontal = 24.dp)
               .background(Color(0x33000000), shape = CircleShape)
               .padding(vertical = 12.dp)) {
-        uiState.lastError
-            ?.takeIf { it.isNotBlank() }
-            ?.let { error -> Text(text = error, color = Color(0xFFFF6F61), fontSize = 11.sp) }
+        Text(text = errorMessage, color = Color(0xFFFF6F61), fontSize = 11.sp)
       }
 }
 

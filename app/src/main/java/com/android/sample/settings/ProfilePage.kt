@@ -32,6 +32,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -62,11 +63,12 @@ fun ProfilePage(
     onSaveProfile: (UserProfile) -> Unit = {},
     initialProfile: UserProfile? = null
 ) {
-  val background = Color(0xFF121212)
-  val cardColor = Color(0xFF1E1E1E)
-  val textPrimary = Color(0xFFECECEC)
-  val textSecondary = Color(0xFF9E9E9E)
-  val accent = Color(0xFFEB5757)
+  val colorScheme = MaterialTheme.colorScheme
+  val background = colorScheme.background
+  val cardColor = colorScheme.surface
+  val textPrimary = colorScheme.onBackground
+  val textSecondary = colorScheme.onSurfaceVariant
+  val accent = colorScheme.primary
 
   val authEmail = remember {
     if (TestFlags.fakeEmail != null) {
@@ -92,10 +94,10 @@ fun ProfilePage(
     }
   }
 
-  Box(modifier = Modifier.fillMaxSize().background(background)) {
+  Column(modifier = Modifier.fillMaxSize().background(background)) {
     Column(
         modifier =
-            Modifier.fillMaxSize()
+            Modifier.weight(1f)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 16.dp)) {
           Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -183,17 +185,21 @@ fun ProfilePage(
                               ProfileFieldDefinition(
                                   icon = Icons.Filled.HomeWork,
                                   label = "Faculty",
-                                  placeholder = "Add your faculty"),
+                                  placeholder = "Select your faculty"),
                           value = formManager.faculty,
-                          onValueChange = { formManager.updateFaculty(it) }),
+                          onValueChange = { formManager.updateFaculty(it) },
+                          options = formManager.facultyOptions,
+                          placeholderColor = textSecondary.copy(alpha = 0.6f)),
                       ProfileFieldState(
                           definition =
                               ProfileFieldDefinition(
                                   icon = Icons.Filled.LocationCity,
                                   label = "Section",
-                                  placeholder = "Add your section/program"),
+                                  placeholder = "Select your section/program"),
                           value = formManager.section,
-                          onValueChange = { formManager.updateSection(it) })),
+                          onValueChange = { formManager.updateSection(it) },
+                          options = formManager.sectionOptions,
+                          placeholderColor = textSecondary.copy(alpha = 0.6f))),
               backgroundColor = cardColor,
               textPrimary = textPrimary,
               textSecondary = textSecondary)
@@ -228,14 +234,18 @@ fun ProfilePage(
               backgroundColor = cardColor,
               textPrimary = textPrimary,
               textSecondary = textSecondary)
-        }
 
-    Text(
-        text = "BY EPFL",
-        color = textSecondary,
-        fontSize = 12.sp,
-        textAlign = TextAlign.Center,
-        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp))
+          Spacer(modifier = Modifier.height(24.dp))
+
+          Spacer(modifier = Modifier.height(32.dp))
+
+          Text(
+              text = "BY EPFL",
+              color = textSecondary,
+              fontSize = 12.sp,
+              textAlign = TextAlign.Center,
+              modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp))
+        }
   }
 }
 
@@ -265,6 +275,7 @@ private fun EditableInfoSection(
     textPrimary: Color,
     textSecondary: Color
 ) {
+  val dividerColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
   Surface(
       color = backgroundColor,
       shape = RoundedCornerShape(16.dp),
@@ -286,9 +297,7 @@ private fun EditableInfoSection(
                 backgroundColor = backgroundColor)
 
             if (index < fields.lastIndex) {
-              HorizontalDivider(
-                  modifier = Modifier.padding(vertical = 12.dp),
-                  color = Color.White.copy(alpha = 0.08f))
+              HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = dividerColor)
             }
           }
         }
@@ -302,6 +311,8 @@ private fun EditableInfoRow(
     textSecondary: Color,
     backgroundColor: Color
 ) {
+  val iconBackground = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f)
+  val dropdownBackground = MaterialTheme.colorScheme.surfaceVariant
   val contentAlpha = if (field.enabled) 1f else 0.5f
   Column(
       modifier = Modifier.fillMaxWidth().alpha(contentAlpha),
@@ -310,9 +321,7 @@ private fun EditableInfoRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
               Surface(
-                  modifier = Modifier.size(40.dp),
-                  shape = CircleShape,
-                  color = Color.White.copy(alpha = 0.06f)) {
+                  modifier = Modifier.size(40.dp), shape = CircleShape, color = iconBackground) {
                     Box(contentAlignment = Alignment.Center) {
                       Icon(
                           imageVector = field.definition.icon,
@@ -344,7 +353,7 @@ private fun EditableInfoRow(
                       it
                     }
                   },
-              color = Color(0xFF161616),
+              color = dropdownBackground,
               shape = RoundedCornerShape(12.dp)) {
                 Row(
                     modifier =
@@ -407,6 +416,9 @@ private fun ProfileTextField(
     placeholderColor: Color,
     enabled: Boolean = true
 ) {
+  val colorScheme = MaterialTheme.colorScheme
+  val containerColor = colorScheme.surfaceVariant
+  val indicatorColor = colorScheme.outline
   OutlinedTextField(
       value = value,
       onValueChange = onValueChange,
@@ -417,12 +429,12 @@ private fun ProfileTextField(
       placeholder = { Text(text = placeholder, color = placeholderColor) },
       colors =
           TextFieldDefaults.colors(
-              focusedContainerColor = Color(0xFF161616),
-              unfocusedContainerColor = Color(0xFF161616),
-              disabledContainerColor = Color(0xFF161616),
-              focusedIndicatorColor = Color(0xFF333333),
-              unfocusedIndicatorColor = Color(0xFF262626),
-              disabledIndicatorColor = Color(0xFF262626),
+              focusedContainerColor = containerColor,
+              unfocusedContainerColor = containerColor,
+              disabledContainerColor = containerColor,
+              focusedIndicatorColor = indicatorColor,
+              unfocusedIndicatorColor = indicatorColor.copy(alpha = 0.7f),
+              disabledIndicatorColor = indicatorColor.copy(alpha = 0.4f),
               cursorColor = textColor,
               focusedTextColor = textColor,
               unfocusedTextColor = textColor,
