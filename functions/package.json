@@ -14,11 +14,11 @@
     "deploy": "firebase deploy --only functions",
     "clean": "rm -rf lib",
     "lint": "echo skip-lint",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:unit": "jest --testPathIgnorePatterns=integration",
-    "test:integration:summary": "FIRESTORE_EMULATOR_HOST=localhost:8080 jest summary.integration.test.ts"
+    "test": "jest --config jest.config.js",
+    "test:watch": "jest --config jest.config.js --watch",
+    "test:coverage": "jest --config jest.config.js --coverage",
+    "test:unit": "jest --config jest.config.js --testPathIgnorePatterns=integration",
+    "test:integration:summary": "FIRESTORE_EMULATOR_HOST=localhost:8080 jest --config jest.config.js summary.integration.test.ts"
   },
   "dependencies": {
     "dotenv": "^16.6.1",
