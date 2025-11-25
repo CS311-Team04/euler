@@ -946,7 +946,7 @@ private fun SourceCard(
           Icon(
               imageVector = Icons.Default.CheckCircle,
               contentDescription = null,
-              tint = Color(0xFF4CAF50), // green tick
+              tint = com.android.sample.ui.theme.EulerGreen,
               modifier = Modifier.size(14.dp))
           Spacer(Modifier.width(4.dp))
           Text(
