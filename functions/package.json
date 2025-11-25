@@ -16,8 +16,10 @@
     "lint": "echo skip-lint",
     "test": "jest --config jest.config.js",
     "test:watch": "jest --config jest.config.js --watch",
-    "test:coverage": "jest --config jest.config.js --coverage",
+    "test:coverage": "jest --config jest.config.js --coverage --testPathIgnorePatterns=integration",
+    "test:coverage:all": "jest --config jest.config.js --coverage",
     "test:unit": "jest --config jest.config.js --testPathIgnorePatterns=integration",
+    "test:integration": "FIRESTORE_EMULATOR_HOST=localhost:8080 jest --config jest.config.js --testPathPattern=integration",
     "test:integration:summary": "FIRESTORE_EMULATOR_HOST=localhost:8080 jest --config jest.config.js summary.integration.test.ts"
   },
   "dependencies": {

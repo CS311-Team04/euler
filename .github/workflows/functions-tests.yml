@@ -39,13 +39,10 @@ jobs:
         run: npm run lint || echo "No linter configured"
         continue-on-error: true
 
-      - name: Run unit tests
-        working-directory: ./functions
-        run: npm run test:unit
-
-      - name: Generate coverage report
+      - name: Run unit tests with coverage
         working-directory: ./functions
         run: npm run test:coverage
+        # Note: Integration tests are excluded - they run in the integration-test job below
 
       - name: Upload coverage to Codecov (optional)
         uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238
