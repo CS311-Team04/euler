@@ -139,11 +139,34 @@ jobs:
           api-level: 34
           target: google_apis
           arch: x86_64
-          # device/profile retiré : on laisse le défaut (Pixel 2)
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
-          script: ./gradlew connectedDebugAndroidTest --parallel --build-cache
+          script: |
+            set +e
+            attempt=1
+            max_attempts=2
 
+            while [ $attempt -le $max_attempts ]; do
+              echo "Running connectedDebugAndroidTest (attempt $attempt/$max_attempts)..."
+              ./gradlew connectedDebugAndroidTest --parallel --build-cache
+              exit_code=$?
+
+              if [ $exit_code -eq 0 ]; then
+                echo "connectedDebugAndroidTest succeeded on attempt $attempt"
+                exit 0
+              fi
+
+              if [ $attempt -eq $max_attempts ]; then
+                echo "connectedDebugAndroidTest failed after $max_attempts attempts (exit code $exit_code)"
+                exit $exit_code
+              fi
+
+              echo "connectedDebugAndroidTest failed (exit code $exit_code), retrying in 30s..."
+              attempt=$((attempt + 1))
+              sleep 30
+            done
+  
+  
 
   sonar:
     name: SonarCloud analysis
