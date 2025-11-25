@@ -714,14 +714,14 @@ class HomeScreenComposeInteractionsTest {
   }
 
   @Test
-  fun drawerSettings_click_triggers_callback_and_closes_drawer() {
+  fun drawerConnectors_click_triggers_callback_and_closes_drawer() {
     val viewModel = createViewModel()
     // Open the drawer before composition so drawer content is visible
     viewModel.toggleDrawer()
-    var settingsInvoked = false
+    var connectorsInvoked = false
 
     composeRule.setContent {
-      HomeScreen(viewModel = viewModel, onSettingsClick = { settingsInvoked = true })
+      HomeScreen(viewModel = viewModel, onConnectorsClick = { connectorsInvoked = true })
     }
 
     // Allow drawer state transitions to run
@@ -733,9 +733,51 @@ class HomeScreenComposeInteractionsTest {
         .performClick()
 
     composeRule.runOnIdle {
-      assertTrue(settingsInvoked)
+      assertTrue(connectorsInvoked)
       assertFalse(viewModel.uiState.value.isDrawerOpen)
     }
+  }
+
+  @Test
+  fun drawerConnectors_and_settings_callbacks_are_independent() {
+    val viewModel = createViewModel()
+    viewModel.toggleDrawer()
+    var connectorsInvoked = false
+    var settingsInvoked = false
+
+    composeRule.setContent {
+      HomeScreen(
+          viewModel = viewModel,
+          onConnectorsClick = { connectorsInvoked = true },
+          onSettingsClick = { settingsInvoked = true })
+    }
+
+    composeRule.mainClock.advanceTimeByFrame()
+
+    // Click connectors row
+    composeRule.onNodeWithTag(DrawerTags.ConnectorsRow, useUnmergedTree = true).performClick()
+
+    composeRule.runOnIdle {
+      assertTrue(connectorsInvoked)
+      assertFalse(settingsInvoked)
+    }
+  }
+
+  @Test
+  fun homeScreen_passes_onConnectorsClick_to_drawer() {
+    val viewModel = createViewModel()
+    viewModel.toggleDrawer()
+    var callbackInvoked = false
+
+    composeRule.setContent {
+      HomeScreen(viewModel = viewModel, onConnectorsClick = { callbackInvoked = true })
+    }
+
+    composeRule.mainClock.advanceTimeByFrame()
+
+    composeRule.onNodeWithTag(DrawerTags.ConnectorsRow, useUnmergedTree = true).performClick()
+
+    composeRule.runOnIdle { assertTrue(callbackInvoked) }
   }
 
   @Test
