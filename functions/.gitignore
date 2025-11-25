@@ -3,6 +3,9 @@ lib/
 *.js
 *.js.map
 
+# Keep TypeScript tooling configs
+!jest.config.js
+
 # TypeScript cache
 *.tsbuildinfo
 
