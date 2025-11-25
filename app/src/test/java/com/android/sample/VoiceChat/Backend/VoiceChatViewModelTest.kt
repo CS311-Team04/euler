@@ -5,11 +5,16 @@ import androidx.test.core.app.ApplicationProvider
 import com.android.sample.conversations.ConversationRepository
 import com.android.sample.llm.FakeLlmClient
 import com.android.sample.util.MainDispatcherRule
+import com.google.android.gms.tasks.Tasks
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.functions.FirebaseFunctions
+import com.google.firebase.functions.HttpsCallableReference
+import com.google.firebase.functions.HttpsCallableResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -623,10 +628,168 @@ class VoiceChatViewModelTest {
         // Note: Speech request emission is tested indirectly through integration tests
       }
 
+  @Test
+  fun handleUserUtterance_upgrades_title_with_generateTitleFn() =
+      runTest(testDispatcher) {
+        // Test that ensureConversationExists launches background job to upgrade title
+        val auth = mock<FirebaseAuth>()
+        val user = mock<FirebaseUser>()
+        val repo = mock<ConversationRepository>()
+
+        whenever(auth.currentUser).thenReturn(user)
+        whenever(repo.startNewConversation(any())).thenReturn("conv-title-upgrade")
+        whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+        whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+
+        val functions = mock<FirebaseFunctions>()
+        val callable = mock<HttpsCallableReference>()
+        val result = mock<HttpsCallableResult>()
+        whenever(functions.getHttpsCallable("generateTitleFn")).thenReturn(callable)
+        whenever(callable.call(any<Map<String, String>>())).thenReturn(Tasks.forResult(result))
+        whenever(result.getData()).thenReturn(mapOf("title" to "Generated Title from Voice"))
+
+        val viewModel =
+            VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" }, testDispatcher)
+        viewModel.setPrivateField("auth", auth)
+        viewModel.setPrivateField("repo", repo)
+        viewModel.setFunctions(functions)
+
+        val firstMessage = "What is EPFL?"
+        viewModel.handleUserUtterance(firstMessage)
+
+        advanceUntilIdle()
+        // Wait a bit more for the background title upgrade job
+        testDispatcher.scheduler.advanceTimeBy(1000)
+        advanceUntilIdle()
+
+        // Verify conversation was created with quick title
+        verify(repo).startNewConversation(any())
+        // Verify title was upgraded in background
+        verify(repo).updateConversationTitle("conv-title-upgrade", "Generated Title from Voice")
+      }
+
+  @Test
+  fun handleUserUtterance_title_upgrade_failure_keeps_quick_title() =
+      runTest(testDispatcher) {
+        // Test that if generateTitleFn fails, we keep the quick title
+        val auth = mock<FirebaseAuth>()
+        val user = mock<FirebaseUser>()
+        val repo = mock<ConversationRepository>()
+
+        whenever(auth.currentUser).thenReturn(user)
+        whenever(repo.startNewConversation(any())).thenReturn("conv-title-fail")
+        whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+
+        val functions = mock<FirebaseFunctions>()
+        val callable = mock<HttpsCallableReference>()
+        whenever(functions.getHttpsCallable("generateTitleFn")).thenReturn(callable)
+        whenever(callable.call(any<Map<String, String>>()))
+            .thenReturn(Tasks.forException(Exception("Network error")))
+
+        val viewModel =
+            VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" }, testDispatcher)
+        viewModel.setPrivateField("auth", auth)
+        viewModel.setPrivateField("repo", repo)
+        viewModel.setFunctions(functions)
+
+        viewModel.handleUserUtterance("Test message")
+        advanceUntilIdle()
+        // Wait a bit more for the background title upgrade job
+        testDispatcher.scheduler.advanceTimeBy(1000)
+        advanceUntilIdle()
+
+        // Verify conversation was created
+        verify(repo).startNewConversation(any())
+        // Verify title was NOT upgraded (kept quick title)
+        verify(repo, never()).updateConversationTitle(any(), any())
+      }
+
+  @Test
+  fun handleUserUtterance_title_upgrade_skipped_when_generated_title_is_blank() =
+      runTest(testDispatcher) {
+        // Test that if generateTitleFn returns blank title, we keep the quick title
+        val auth = mock<FirebaseAuth>()
+        val user = mock<FirebaseUser>()
+        val repo = mock<ConversationRepository>()
+
+        whenever(auth.currentUser).thenReturn(user)
+        whenever(repo.startNewConversation(any())).thenReturn("conv-title-blank")
+        whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+
+        val functions = mock<FirebaseFunctions>()
+        val callable = mock<HttpsCallableReference>()
+        val result = mock<HttpsCallableResult>()
+        whenever(functions.getHttpsCallable("generateTitleFn")).thenReturn(callable)
+        whenever(callable.call(any<Map<String, String>>())).thenReturn(Tasks.forResult(result))
+        whenever(result.getData()).thenReturn(mapOf("title" to "")) // Blank title
+
+        val viewModel =
+            VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" }, testDispatcher)
+        viewModel.setPrivateField("auth", auth)
+        viewModel.setPrivateField("repo", repo)
+        viewModel.setFunctions(functions)
+
+        viewModel.handleUserUtterance("Test message")
+        advanceUntilIdle()
+        // Wait a bit more for the background title upgrade job
+        testDispatcher.scheduler.advanceTimeBy(1000)
+        advanceUntilIdle()
+
+        // Verify conversation was created
+        verify(repo).startNewConversation(any())
+        // Verify title was NOT upgraded (kept quick title because generated was blank)
+        verify(repo, never()).updateConversationTitle(any(), any())
+      }
+
+  @Test
+  fun handleUserUtterance_title_upgrade_skipped_when_generated_title_equals_quick_title() =
+      runTest(testDispatcher) {
+        // Test that if generateTitleFn returns same title as quick title, we don't update
+        val auth = mock<FirebaseAuth>()
+        val user = mock<FirebaseUser>()
+        val repo = mock<ConversationRepository>()
+
+        whenever(auth.currentUser).thenReturn(user)
+        val quickTitle = "What is EPFL?"
+        whenever(repo.startNewConversation(any())).thenReturn("conv-title-same")
+        whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+
+        val functions = mock<FirebaseFunctions>()
+        val callable = mock<HttpsCallableReference>()
+        val result = mock<HttpsCallableResult>()
+        whenever(functions.getHttpsCallable("generateTitleFn")).thenReturn(callable)
+        whenever(callable.call(any<Map<String, String>>())).thenReturn(Tasks.forResult(result))
+        whenever(result.getData()).thenReturn(mapOf("title" to quickTitle)) // Same as quick title
+
+        val viewModel =
+            VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" }, testDispatcher)
+        viewModel.setPrivateField("auth", auth)
+        viewModel.setPrivateField("repo", repo)
+        viewModel.setFunctions(functions)
+
+        viewModel.handleUserUtterance("What is EPFL?")
+        advanceUntilIdle()
+        // Wait a bit more for the background title upgrade job
+        testDispatcher.scheduler.advanceTimeBy(1000)
+        advanceUntilIdle()
+
+        // Verify conversation was created
+        verify(repo).startNewConversation(any())
+        // Verify title was NOT upgraded (same as quick title)
+        verify(repo, never()).updateConversationTitle(any(), any())
+      }
+
   // Helper function to set private fields using reflection
   private fun VoiceChatViewModel.setPrivateField(name: String, value: Any?) {
     val field = VoiceChatViewModel::class.java.getDeclaredField(name)
     field.isAccessible = true
     field.set(this, value)
+  }
+
+  // Helper function to set FirebaseFunctions using reflection
+  private fun VoiceChatViewModel.setFunctions(fake: FirebaseFunctions) {
+    val delegateField = VoiceChatViewModel::class.java.getDeclaredField("functions\$delegate")
+    delegateField.isAccessible = true
+    delegateField.set(this, lazyOf(fake))
   }
 }

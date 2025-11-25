@@ -3,13 +3,16 @@ package com.android.sample.VoiceChat.Backend
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.android.sample.BuildConfig
 import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.ConversationTitleFormatter
 import com.android.sample.llm.FirebaseFunctionsLlmClient
 import com.android.sample.llm.LlmClient
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.functions.FirebaseFunctions
 import java.util.UUID
+import kotlin.getValue
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 /**
  * Coordinates speech-to-text transcripts with the custom LLM and delegates playback to the UI.
@@ -45,6 +49,18 @@ class VoiceChatViewModel(
 
   private val repo = ConversationRepository(auth, db)
   private var currentConversationId: String? = null
+
+  /**
+   * Firebase Functions handle for title generation. Uses local emulator when configured via
+   * BuildConfig flags.
+   */
+  private val functions: FirebaseFunctions by lazy {
+    FirebaseFunctions.getInstance(BuildConfig.FUNCTIONS_REGION).apply {
+      if (BuildConfig.USE_FUNCTIONS_EMULATOR) {
+        useEmulator(BuildConfig.FUNCTIONS_HOST, BuildConfig.FUNCTIONS_PORT)
+      }
+    }
+  }
 
   private val _uiState = MutableStateFlow(VoiceChatUiState())
   val uiState: StateFlow<VoiceChatUiState> = _uiState.asStateFlow()
@@ -136,6 +152,9 @@ class VoiceChatViewModel(
   /**
    * Ensures a conversation exists for the current session. Returns conversation ID if signed in,
    * null if guest mode.
+   *
+   * Creates a conversation with a quick title, then upgrades it in the background using
+   * generateTitleFn (same pattern as text mode).
    */
   private suspend fun ensureConversationExists(cleaned: String): String? {
     if (isGuest()) {
@@ -148,6 +167,21 @@ class VoiceChatViewModel(
           val newId = repo.startNewConversation(quickTitle)
           currentConversationId = newId
           Log.d(TAG, "Created new voice conversation: $newId with title: $quickTitle")
+
+          // Upgrade title in background (once)
+          viewModelScope.launch {
+            try {
+              val good = fetchTitle(cleaned)
+              if (good.isNotBlank() && good != quickTitle) {
+                repo.updateConversationTitle(newId, good)
+                Log.d(TAG, "Upgraded conversation title: $newId -> $good")
+              }
+            } catch (e: Exception) {
+              // Keep provisional title on error
+              Log.d(TAG, "Failed to upgrade title, keeping provisional: ${e.message}")
+            }
+          }
+
           newId
         }
   }
@@ -200,6 +234,24 @@ class VoiceChatViewModel(
           isSpeaking = false,
           lastError = t.message ?: "Unable to generate response",
       )
+    }
+  }
+
+  /**
+   * Ask `generateTitleFn` for a better title; fallback to
+   * [ConversationTitleFormatter.localTitleFrom] on errors.
+   */
+  private suspend fun fetchTitle(question: String): String {
+    return try {
+      val res =
+          functions.getHttpsCallable("generateTitleFn").call(mapOf("question" to question)).await()
+      val t = (res.getData() as? Map<*, *>)?.get("title") as? String
+      (t?.takeIf { it.isNotBlank() } ?: ConversationTitleFormatter.localTitleFrom(question)).also {
+        Log.d(TAG, "fetchTitle(): generated='$it'")
+      }
+    } catch (_: Exception) {
+      Log.d(TAG, "fetchTitle(): fallback to local extraction")
+      ConversationTitleFormatter.localTitleFrom(question)
     }
   }
 
