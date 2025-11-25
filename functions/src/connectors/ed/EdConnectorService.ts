@@ -59,7 +59,7 @@ export class EdConnectorService {
         lastError: "invalid_credentials",
       };
 
-      // On peut choisir de sauvegarder cet état pour afficher l'erreur dans le UI
+      // We save this error state so the UI can display feedback to the user.
       await this.repo.saveConfig(userId, errorConfig);
       return errorConfig;
     }
