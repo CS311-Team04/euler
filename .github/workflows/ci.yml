@@ -18,23 +18,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # 1) Static checks: formatting + lint
+  # ---------------------------------------------------------------------------
   static-checks:
     name: Static checks (ktfmt + lint)
     runs-on: ubuntu-24.04
 
     steps:
-      # Checkout repository source code
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Install JDK 17 for Gradle/Android
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
           java-version: "17"
 
-      # Cache Gradle dependencies to speed up subsequent runs
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
@@ -44,41 +44,37 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-gradle-
 
-      # Make sure gradlew is executable
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
-      # Run formatting check and Android Lint
       - name: KTFmt Check and Lint
         run: ./gradlew ktfmtCheck lint --parallel --build-cache
 
-      # Upload lint reports so they can be inspected from the CI run
       - name: Upload lint report
         uses: actions/upload-artifact@v4
         with:
           name: lint-report
           path: app/build/reports/lint-*
 
+  # ---------------------------------------------------------------------------
+  # 2) Unit tests + Jacoco coverage
+  # ---------------------------------------------------------------------------
   unit-tests:
     name: Unit tests + coverage
     runs-on: ubuntu-24.04
     env:
-      # Increase max heap size for Gradle / JVM
       _JAVA_OPTIONS: "-Xmx4g"
 
     steps:
-      # Checkout repository source code
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Install JDK 17
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
           java-version: "17"
 
-      # Reuse Gradle cache (same config as in static-checks)
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
@@ -88,26 +84,30 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-gradle-
 
-      # Ensure gradlew is executable
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
-      # Run assembleDebug, unit tests and generate Jacoco coverage report in one Gradle invocation
+      # Build debug APK + run unit tests + generate Jacoco report
       - name: Build debug APK + run unit tests + Jacoco
         run: |
           ./gradlew assembleDebug testDebugUnitTest jacocoTestReport --parallel --build-cache
 
-      # Expose the Jacoco report as an artifact for later use (e.g. by Sonar)
       - name: Upload Jacoco report
         uses: actions/upload-artifact@v4
         with:
           name: jacoco-test-report
           path: app/build/reports/jacoco/jacocoTestReport
 
-  # NEW JOB: instrumented tests on emulator
+  # ---------------------------------------------------------------------------
+  # 3) Instrumented tests on emulator (connectedDebugAndroidTest)
+  #    - Uses beefier runner
+  #    - Caches Android SDK and AVD to avoid re-downloading every time
+  #    - Retries once in case the emulator is flaky
+  # ---------------------------------------------------------------------------
   connected-tests:
     name: Instrumented tests (connectedDebugAndroidTest)
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    needs: [static-checks, unit-tests]
     env:
       _JAVA_OPTIONS: "-Xmx4g"
 
@@ -133,65 +133,121 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
+      # ---------- Android SDK cache ----------
+      - name: Cache Android SDK
+        uses: actions/cache@v4
+        id: android-sdk
+        with:
+          path: ~/android-sdk
+          # Key includes OS + specific system image + build-tools version
+          key: ${{ runner.os }}-android-sdk-a34-googleapis-x86_64-bt35.0.0
+
+      # Install SDK only if cache is missing
+      - name: Install Android SDK (if not cached)
+        if: steps.android-sdk.outputs.cache-hit != 'true'
+        run: |
+          set -e
+
+          mkdir -p "$HOME/android-sdk"
+
+          # Use any preinstalled sdkmanager as bootstrap
+          if command -v sdkmanager >/dev/null 2>&1; then
+            SDKMANAGER="sdkmanager"
+          elif [ -x "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" ]; then
+            SDKMANAGER="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          else
+            echo "sdkmanager not found on this runner"
+            exit 1
+          fi
+
+          yes | "$SDKMANAGER" --sdk_root="$HOME/android-sdk" \
+            "platform-tools" \
+            "platforms;android-34" \
+            "build-tools;35.0.0" \
+            "system-images;android-34;google_apis;x86_64" \
+            "emulator"
+
+      # Export SDK location so emulator-runner uses the cached SDK
+      - name: Export Android SDK env
+        run: |
+          echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$HOME/android-sdk" >> "$GITHUB_ENV"
+          echo "$HOME/android-sdk/platform-tools" >> "$GITHUB_PATH"
+
+      # ---------- AVD cache ----------
+      - name: Cache AVD
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: ${{ runner.os }}-avd-34
+
+      # If no cached AVD, create one snapshot to reuse next runs
+      - name: Create AVD and generate snapshot for caching
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: false
+          script: echo "Generated AVD snapshot for caching."
+
+      # Run connectedDebugAndroidTest with a retry in case the emulator is flaky
       - name: Run connected Android tests on emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
           target: google_apis
           arch: x86_64
+          force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
-          script: |
-            set +e
-            attempt=1
-            max_attempts=2
-
+          script: >
+            attempt=1; max_attempts=2;
             while [ $attempt -le $max_attempts ]; do
-              echo "Running connectedDebugAndroidTest (attempt $attempt/$max_attempts)..."
-              ./gradlew connectedDebugAndroidTest --parallel --build-cache
-              exit_code=$?
-
+              echo "Running connectedDebugAndroidTest (attempt $attempt/$max_attempts)...";
+              ./gradlew connectedDebugAndroidTest --parallel --build-cache;
+              exit_code=$?;
               if [ $exit_code -eq 0 ]; then
-                echo "connectedDebugAndroidTest succeeded on attempt $attempt"
-                exit 0
-              fi
-
+                echo "connectedDebugAndroidTest succeeded on attempt $attempt"; exit 0;
+              fi;
               if [ $attempt -eq $max_attempts ]; then
-                echo "connectedDebugAndroidTest failed after $max_attempts attempts (exit code $exit_code)"
-                exit $exit_code
-              fi
-
-              echo "connectedDebugAndroidTest failed (exit code $exit_code), retrying in 30s..."
-              attempt=$((attempt + 1))
-              sleep 30
+                echo "connectedDebugAndroidTest failed after $max_attempts attempts (exit code $exit_code)"; exit $exit_code;
+              fi;
+              echo "connectedDebugAndroidTest failed (exit code $exit_code), retrying in 30s...";
+              attempt=$((attempt+1));
+              sleep 30;
             done
   
-  
 
+  # ---------------------------------------------------------------------------
+  # 4) SonarCloud analysis
+  # ---------------------------------------------------------------------------
   sonar:
     name: SonarCloud analysis
-    # Wait for static checks, unit tests AND instrumented tests
-    needs: [static-checks, unit-tests, connected-tests]
+    needs: [static-checks, unit-tests]
     runs-on: ubuntu-24.04
     env:
       _JAVA_OPTIONS: "-Xmx4g"
 
     steps:
-      # Checkout full git history and submodules for better Sonar analysis
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          fetch-depth: 0 # required for proper blame/coverage mapping in Sonar
+          fetch-depth: 0
 
-      # Install JDK 17
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
           java-version: "17"
 
-      # Reuse Gradle cache again for the sonar step
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
@@ -201,7 +257,6 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-gradle-
 
-      # Cache SonarQube scanner dependencies
       - name: Cache SonarQube packages
         uses: actions/cache@v4
         with:
@@ -209,27 +264,23 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
-      # Ensure gradlew is executable
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
-      # Download lint reports generated in the static-checks job
       - name: Download lint report
         uses: actions/download-artifact@v4
         with:
           name: lint-report
           path: app/build/reports/
 
-      # Download Jacoco coverage report generated in the unit-tests job
       - name: Download Jacoco report
         uses: actions/download-artifact@v4
         with:
           name: jacoco-test-report
           path: app/build/reports/jacoco/jacocoTestReport
 
-      # Run SonarCloud analysis using the existing reports and project config
       - name: Upload report to SonarCloud
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # required for PR decoration
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}     # SonarCloud authentication
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: ./gradlew sonar --parallel --build-cache --stacktrace --info
