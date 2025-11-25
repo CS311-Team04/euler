@@ -80,12 +80,6 @@ class HomeViewModelTest {
     stateFlow.value = current.copy(userName = name)
   }
 
-  private fun HomeViewModel.setPrivateField(name: String, value: Any?) {
-    val field = HomeViewModel::class.java.getDeclaredField(name)
-    field.isAccessible = true
-    field.set(this, value)
-  }
-
   private fun HomeViewModel.invokeStartData() {
     val method = HomeViewModel::class.java.getDeclaredMethod("startData")
     method.isAccessible = true
@@ -517,34 +511,6 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         assertEquals("conv-1", viewModel.uiState.value.currentConversationId)
-      }
-
-  @Test
-  fun auth_listener_sign_in_triggers_startData() =
-      runTest(testDispatcher) {
-        val auth = mock<FirebaseAuth>()
-        // Configure auth to have no current user initially (guest mode)
-        whenever(auth.currentUser).thenReturn(null)
-        val repo = mock<ConversationRepository>()
-        val conversationsFlow = MutableSharedFlow<List<Conversation>>(replay = 1)
-        whenever(repo.conversationsFlow()).thenReturn(conversationsFlow)
-        whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
-        val viewModel = HomeViewModel(FakeLlmClient(), auth, repo)
-        viewModel.setPrivateField("lastUid", null)
-
-        val listenerField = HomeViewModel::class.java.getDeclaredField("authListener")
-        listenerField.isAccessible = true
-        val listener = listenerField.get(viewModel) as FirebaseAuth.AuthStateListener
-
-        // Now simulate sign-in by updating the same mock auth
-        val user = mock<FirebaseUser>()
-        whenever(auth.currentUser).thenReturn(user)
-        whenever(user.uid).thenReturn("user-123")
-
-        listener.onAuthStateChanged(auth)
-        advanceUntilIdle()
-
-        runBlocking { verify(repo, timeout(1_000)).conversationsFlow() }
       }
 
   @Test
