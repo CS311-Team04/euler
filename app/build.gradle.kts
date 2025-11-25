@@ -382,7 +382,7 @@ sonar {
         }
 
         // Basic exclusions
-        property("sonar.exclusions", "**/build/**,**/R.java,**/R.kt,**/BuildConfig.*,**/*.xml,**/res/**")
+        property("sonar.exclusions", "**/build/**,**/R.java,**/R.kt,**/BuildConfig.*,**/*.xml,**/res/**,**/.github/workflows/ci.yml")
 
         // Coverage - only if report exists
         val coverageReport = file("${project.layout.buildDirectory.get()}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml")
