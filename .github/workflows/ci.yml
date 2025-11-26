@@ -208,28 +208,7 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
-          script: |
-            set -e
-            attempt=1
-            max_attempts=2
-            
-            while [ "$attempt" -le "$max_attempts" ]; do
-              echo "Running connectedDebugAndroidTest (attempt $attempt/$max_attempts)..."
-            
-              if ./gradlew connectedDebugAndroidTest --parallel --build-cache; then
-                echo "connectedDebugAndroidTest succeeded on attempt $attempt"
-                exit 0
-              fi
-            
-              if [ "$attempt" -eq "$max_attempts" ]; then
-                echo "connectedDebugAndroidTest failed after $max_attempts attempts"
-                exit 1
-              fi
-            
-              echo "connectedDebugAndroidTest failed, retrying in 30s..."
-              attempt=$((attempt + 1))
-              sleep 30
-            done
+          script: ./gradlew connectedDebugAndroidTest --parallel --build-cache
   
 
   # ---------------------------------------------------------------------------
