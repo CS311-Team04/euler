@@ -2,7 +2,10 @@
 
 import { EdConnectorService } from "../src/connectors/ed/EdConnectorService";
 import { EdConnectorRepository } from "../src/connectors/ed/EdConnectorRepository";
-import { EdConnectorConfig } from "../src/connectors/ed/EdConnectorModel";
+import {
+  EdConnectorConfig,
+  ED_CONNECTOR_ERROR_CODES,
+} from "../src/connectors/ed/EdConnectorModel";
 import { EdDiscussionClient } from "../src/connectors/ed/EdDiscussionClient";
 
 jest.mock("../src/connectors/ed/EdDiscussionClient");
@@ -71,7 +74,7 @@ describe("EdConnectorService", () => {
 
     const result = await service.getStatus("user-1");
 
-    expect(result).toBe(existing);
+    expect(result).toEqual(existing);
   });
 
   it("connect sets error status when testConnection() fails", async () => {
@@ -89,10 +92,10 @@ describe("EdConnectorService", () => {
 
     const savedConfig = (repo.saveConfig as jest.Mock).mock.calls[0][1] as EdConnectorConfig;
     expect(savedConfig.status).toBe("error");
-    expect(savedConfig.lastError).toBe("invalid_credentials");
+    expect(savedConfig.lastError).toBe(ED_CONNECTOR_ERROR_CODES.INVALID_CREDENTIALS);
 
     expect(result.status).toBe("error");
-    expect(result.lastError).toBe("invalid_credentials");
+    expect(result.lastError).toBe(ED_CONNECTOR_ERROR_CODES.INVALID_CREDENTIALS);
   });
 
   it("connect stores the encrypted token and sets status to connected when testConnection() succeeds", async () => {
@@ -136,7 +139,7 @@ describe("EdConnectorService", () => {
       baseUrl: "https://eu.edstem.org/api",
       apiKeyEncrypted: encrypt("my-token"),
       lastTestAt: "2025-01-01T00:00:00.000Z",
-      lastError: "test_failed",
+      lastError: ED_CONNECTOR_ERROR_CODES.TEST_FAILED,
     };
     repo.getConfig.mockResolvedValueOnce(existing);
     testConnectionMock.mockResolvedValueOnce(true);
@@ -177,7 +180,7 @@ describe("EdConnectorService", () => {
 
     const savedConfig = (repo.saveConfig as jest.Mock).mock.calls[0][1] as EdConnectorConfig;
     expect(savedConfig.status).toBe("error");
-    expect(savedConfig.lastError).toBe("test_failed");
+    expect(savedConfig.lastError).toBe(ED_CONNECTOR_ERROR_CODES.TEST_FAILED);
 
     expect(result.status).toBe("error");
   });

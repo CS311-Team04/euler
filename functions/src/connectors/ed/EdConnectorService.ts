@@ -1,4 +1,7 @@
-import { EdConnectorConfig } from "./EdConnectorModel";
+import {
+  EdConnectorConfig,
+  ED_CONNECTOR_ERROR_CODES,
+} from "./EdConnectorModel";
 import { EdConnectorRepository } from "./EdConnectorRepository";
 import { EdDiscussionClient } from "./EdDiscussionClient";
 
@@ -56,7 +59,7 @@ export class EdConnectorService {
         status: "error",
         baseUrl,
         lastTestAt: now,
-        lastError: "invalid_credentials",
+        lastError: ED_CONNECTOR_ERROR_CODES.INVALID_CREDENTIALS,
       };
 
       // We save this error state so the UI can display feedback to the user.
@@ -106,7 +109,7 @@ export class EdConnectorService {
       ...existing,
       status: ok ? "connected" : "error",
       lastTestAt: now,
-      lastError: ok ? null : "test_failed",
+      lastError: ok ? null : ED_CONNECTOR_ERROR_CODES.TEST_FAILED,
     };
 
     await this.repo.saveConfig(userId, updated);

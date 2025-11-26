@@ -33,7 +33,7 @@ export class EdConnectorRepository {
    * Saves (or updates) the connector config for the given user.
    * Uses merge to allow partial updates if needed.
    */
-  async saveConfig(userId: string, config: EdConnectorConfig): Promise<void> {
+  async saveConfig(userId: string, config: Partial<EdConnectorConfig>): Promise<void> {
     await this.docRef(userId).set(config, { merge: true });
   }
 
