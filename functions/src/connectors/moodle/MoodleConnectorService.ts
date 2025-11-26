@@ -4,14 +4,18 @@ import {
 import { MoodleConnectorRepository } from "./MoodleConnectorRepository";
 import { MoodleClient } from "./MoodleClient";
 
+/**
+    * Service for managing Moodle connector configurations and interactions.
+ */
 export class MoodleConnectorService {
   constructor(
     private readonly repo: MoodleConnectorRepository,
-    // simple pluggable crypto so you can replace with real encryption
+    // simple pluggable crypto to replace later with real encryption
     private readonly encrypt: (plain: string) => string,
     private readonly decrypt: (cipher: string) => string
   ) {}
 
+  // Retrieves the current status of the Moodle connector for a user
   async getStatus(userId: string): Promise<MoodleConnectorConfig> {
     const config = await this.repo.getConfig(userId);
     if (!config) {
@@ -20,6 +24,7 @@ export class MoodleConnectorService {
     return config;
   }
 
+  // Connects to Moodle with given parameters and saves the configuration
   async connect(
     userId: string,
     params: { baseUrl: string; token: string }
@@ -57,6 +62,7 @@ export class MoodleConnectorService {
     await this.repo.deleteConfig(userId);
   }
 
+  // Tests the existing Moodle connection and updates the status
   async test(userId: string): Promise<MoodleConnectorConfig> {
     const existing = await this.repo.getConfig(userId);
     if (

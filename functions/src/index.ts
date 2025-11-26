@@ -734,13 +734,13 @@ export const generateTitleFn = europeFunctions.https.onCall(async (data: Generat
 import { MoodleConnectorRepository } from "./connectors/moodle/MoodleConnectorRepository";
 import { MoodleConnectorService } from "./connectors/moodle/MoodleConnectorService";
 
-// Very simple placeholder encryption for dev.
+// simple placeholder encryption for dev.
 const encrypt = (plain: string): string => plain; // todo
 const decrypt = (cipher: string): string => cipher; // to do
 
 const moodleRepo = new MoodleConnectorRepository(db);
 const moodleService = new MoodleConnectorService(moodleRepo, encrypt, decrypt);
-
+// callable functions
 export const connectorsMoodleStatusFn = europeFunctions.https.onCall(
   async (data, context) => {
     if (!context.auth?.uid) {
@@ -758,7 +758,7 @@ export const connectorsMoodleStatusFn = europeFunctions.https.onCall(
     };
   }
 );
-
+// attempts to connect to Moodle with provided baseUrl and token
 export const connectorsMoodleConnectFn = europeFunctions.https.onCall(
   async (data, context) => {
     if (!context.auth?.uid) {
@@ -785,7 +785,7 @@ export const connectorsMoodleConnectFn = europeFunctions.https.onCall(
     };
   }
 );
-
+// disconnects Moodle for the user
 export const connectorsMoodleDisconnectFn = europeFunctions.https.onCall(
   async (data, context) => {
     if (!context.auth?.uid) {
@@ -799,7 +799,7 @@ export const connectorsMoodleDisconnectFn = europeFunctions.https.onCall(
     return { status: "not_connected" };
   }
 );
-
+// tests the Moodle connection for the user
 export const connectorsMoodleTestFn = europeFunctions.https.onCall(
   async (data, context) => {
     if (!context.auth?.uid) {

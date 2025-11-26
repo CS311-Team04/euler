@@ -4,6 +4,9 @@ export class MoodleClient {
     private readonly token: string
   ) {}
 
+  /**
+    * Builds the full URL for a given Moodle web service function.
+   */
   private buildUrl(wsFunction: string): string {
     const trimmedBase = this.baseUrl.replace(/\/+$/, "");
     const url = new URL(trimmedBase + "/webservice/rest/server.php");
