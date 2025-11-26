@@ -9,12 +9,6 @@ describe('onMessageCreate Trigger', () => {
     expect(typeof onMessageCreate).toBe('function');
   });
 
-  it('should have buildRollingSummary logic available', async () => {
-    // This is a smoke test to ensure the module loads
-    const index = await import('../index');
-    expect(index.onMessageCreate).toBeDefined();
-  });
-
   // Note: Full testing of Firestore triggers requires:
   // 1. Firebase emulator running
   // 2. Proper firebase-functions-test setup

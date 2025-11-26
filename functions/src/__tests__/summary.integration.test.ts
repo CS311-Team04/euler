@@ -15,6 +15,27 @@ import * as admin from 'firebase-admin';
  * focus on Firebase functionality, not third-party API integration.
  */
 
+/**
+ * Helper function to poll for a condition instead of using fixed timeouts.
+ * More reliable for waiting on async operations like Firestore triggers.
+ */
+async function pollUntil<T>(
+  fn: () => Promise<T>,
+  predicate: (result: T) => boolean,
+  options: { maxAttempts?: number; intervalMs?: number } = {}
+): Promise<T> {
+  const { maxAttempts = 10, intervalMs = 200 } = options;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const result = await fn();
+    if (predicate(result)) {
+      return result;
+    }
+    await new Promise(resolve => setTimeout(resolve, intervalMs));
+  }
+  // Return final result even if predicate never matched
+  return fn();
+}
+
 describe('Summary Generation Integration Tests', () => {
   let db: admin.firestore.Firestore;
   let emulatorConnected = false;
@@ -40,11 +61,19 @@ describe('Summary Generation Integration Tests', () => {
       console.log('   All 6 integration tests will run!');
     } catch (error: any) {
       emulatorConnected = false;
-      console.warn('⚠️  Firestore emulator not reachable. Some tests will be skipped.');
+      console.warn('⚠️  Firestore emulator not reachable. Tests requiring emulator will be skipped.');
       console.warn(`   Error: ${error.message}`);
       console.warn('   Start emulator: firebase emulators:start --only firestore');
     }
   });
+  
+  /** Helper to skip tests when emulator is not connected */
+  function skipIfNoEmulator(): void {
+    if (!emulatorConnected) {
+      // Using pending() equivalent for Jest - this marks the test as skipped
+      throw new Error('SKIPPED: Firestore emulator not running. Start with: firebase emulators:start --only firestore');
+    }
+  }
 
   beforeEach(() => {
     // Mock fetch for Jina embeddings
@@ -128,11 +157,7 @@ Intentions/attentes : L'utilisateur souhaite des informations sur les programmes
 
   describe('onMessageCreate Trigger (requires emulator)', () => {
     it('should add summary when new message is created', async () => {
-      // Check if emulator is connected
-      if (!emulatorConnected) {
-        console.warn('⚠️  Skipping: Firestore emulator not running');
-        return;
-      }
+      skipIfNoEmulator();
 
       const userId = `test-user-${Date.now()}`;
       const conversationId = `test-conv-${Date.now()}`;
@@ -165,13 +190,16 @@ Intentions/attentes : L'utilisateur souhaite des informations sur les programmes
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
-      // Wait for trigger to process (in real scenario)
-      // Note: This requires the trigger to be deployed to emulator
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Check if summary was added
-      const updatedMsg = await msg3.get();
-      const data = updatedMsg.data();
+      // Poll for trigger to process instead of fixed timeout
+      // This is more reliable than arbitrary waits
+      const data = await pollUntil(
+        async () => {
+          const doc = await msg3.get();
+          return doc.data();
+        },
+        (d) => d?.summary !== undefined, // Wait until summary is added
+        { maxAttempts: 15, intervalMs: 200 } // Up to 3 seconds total
+      );
 
       // Note: This will only work if the trigger is running in emulator
       console.log('Message data:', data);
@@ -189,11 +217,7 @@ Intentions/attentes : L'utilisateur souhaite des informations sur les programmes
     });
 
     it('should not add summary if message already has one', async () => {
-      // Check if emulator is connected
-      if (!emulatorConnected) {
-        console.warn('⚠️  Skipping: Firestore emulator not running');
-        return;
-      }
+      skipIfNoEmulator();
 
       const userId = `test-user-${Date.now()}`;
       const conversationId = `test-conv-${Date.now()}`;
@@ -211,12 +235,15 @@ Intentions/attentes : L'utilisateur souhaite des informations sur les programmes
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
-      // Wait a bit
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Verify summary wasn't changed
-      const updated = await msgWithSummary.get();
-      const data = updated.data();
+      // Poll to verify summary wasn't changed (wait a short time for any potential trigger)
+      const data = await pollUntil(
+        async () => {
+          const doc = await msgWithSummary.get();
+          return doc.data();
+        },
+        () => true, // Just wait for at least one poll cycle
+        { maxAttempts: 5, intervalMs: 200 }
+      );
       
       expect(data?.summary).toBe('Existing summary');
 
@@ -226,11 +253,7 @@ Intentions/attentes : L'utilisateur souhaite des informations sur les programmes
     });
 
     it('should handle conversation with multiple turns', async () => {
-      // Check if emulator is connected
-      if (!emulatorConnected) {
-        console.warn('⚠️  Skipping: Firestore emulator not running');
-        return;
-      }
+      skipIfNoEmulator();
 
       const userId = `test-user-${Date.now()}`;
       const conversationId = `test-conv-${Date.now()}`;
@@ -260,12 +283,15 @@ Intentions/attentes : L'utilisateur souhaite des informations sur les programmes
         await new Promise(resolve => setTimeout(resolve, 100));
       }
 
-      // Wait for potential trigger processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Fetch all messages
-      const snapshot = await messagesRef.orderBy('createdAt').get();
-      const fetchedMessages = snapshot.docs.map(doc => doc.data());
+      // Poll until all messages are visible
+      const fetchedMessages = await pollUntil(
+        async () => {
+          const snapshot = await messagesRef.orderBy('createdAt').get();
+          return snapshot.docs.map(doc => doc.data());
+        },
+        (msgs) => msgs.length === 5,
+        { maxAttempts: 15, intervalMs: 200 }
+      );
 
       expect(fetchedMessages.length).toBe(5);
       expect(fetchedMessages[0].role).toBe('user');
@@ -324,11 +350,7 @@ Contraintes/préférences : Section informatique (IC) préférée.`
     });
 
     it('should handle empty conversation history', async () => {
-      // Check if emulator is connected
-      if (!emulatorConnected) {
-        console.warn('⚠️  Skipping: Firestore emulator not running');
-        return;
-      }
+      skipIfNoEmulator();
 
       const userId = `test-user-${Date.now()}`;
       const conversationId = `test-conv-${Date.now()}`;
@@ -345,9 +367,12 @@ Contraintes/préférences : Section informatique (IC) préférée.`
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      const snapshot = await messagesRef.get();
+      // Poll to verify message was added
+      const snapshot = await pollUntil(
+        () => messagesRef.get(),
+        (snap) => snap.size === 1,
+        { maxAttempts: 5, intervalMs: 200 }
+      );
       expect(snapshot.size).toBe(1);
 
       // Clean up

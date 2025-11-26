@@ -69,25 +69,5 @@ describe('Integration Tests (requires emulators)', () => {
     // Clean up
     await messageRef.delete();
   });
-
-  it('should handle callable function invocation', async () => {
-    // This test would call your callable functions through the emulator
-    // You'd need to set up the Firebase Functions SDK on the client side
-    
-    // Example structure (requires additional setup):
-    /*
-    const functions = admin.functions();
-    const generateTitle = functions.httpsCallable('generateTitleFn');
-    
-    const result = await generateTitle({
-      question: 'What is EPFL?'
-    });
-    
-    expect(result.data.title).toBeDefined();
-    expect(result.data.title).not.toBe('New conversation');
-    */
-    
-    expect(true).toBe(true); // Placeholder
-  });
 });
 
