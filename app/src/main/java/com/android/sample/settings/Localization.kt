@@ -108,7 +108,28 @@ object Localization {
           "recent_cs220_exam" to "CS220 Final Exam retrieval",
           "recent_linear_algebra" to "Linear Algebra help",
           "recent_deadline" to "Project deadline query",
-          "recent_registration" to "Course registration info")
+          "recent_registration" to "Course registration info",
+
+          // EPFL Campus Connector
+          "epfl_campus_title" to "EPFL Campus",
+          "epfl_campus_subtitle" to "Connect your schedule",
+          "epfl_instructions_title" to "How to connect",
+          "epfl_step_1" to "Open EPFL Campus app → Schedule",
+          "epfl_step_2" to "Tap ⚙️ → Export calendar",
+          "epfl_step_3" to "Copy the ICS URL (starts with campus.epfl.ch)",
+          "epfl_step_4" to "Come back here and paste it below",
+          "epfl_open_campus" to "Open EPFL Campus",
+          "epfl_paste_url" to "Paste your ICS URL",
+          "epfl_connect" to "Connect Schedule",
+          "epfl_syncing" to "Syncing...",
+          "epfl_connected" to "Connected",
+          "epfl_events_synced" to "events synced",
+          "epfl_last_sync" to "Last sync",
+          "epfl_disconnect" to "Disconnect",
+          "epfl_connected_info" to "EULER can now answer questions about your schedule, like \"What classes do I have tomorrow?\" or \"Where is my next lecture?\"",
+          "epfl_clipboard_detected" to "ICS URL detected!",
+          "not_now" to "Not now",
+          "use_this_url" to "Use this URL")
 
   private fun french() =
       mapOf(
@@ -188,7 +209,28 @@ object Localization {
           "recent_cs220_exam" to "Récupération examen final CS220",
           "recent_linear_algebra" to "Aide en algèbre linéaire",
           "recent_deadline" to "Requête date limite projet",
-          "recent_registration" to "Info inscription aux cours")
+          "recent_registration" to "Info inscription aux cours",
+
+          // EPFL Campus Connector
+          "epfl_campus_title" to "EPFL Campus",
+          "epfl_campus_subtitle" to "Connectez votre emploi du temps",
+          "epfl_instructions_title" to "Comment se connecter",
+          "epfl_step_1" to "Ouvrez EPFL Campus → Horaire",
+          "epfl_step_2" to "Tapez ⚙️ → Exporter le calendrier",
+          "epfl_step_3" to "Copiez l'URL ICS (commence par campus.epfl.ch)",
+          "epfl_step_4" to "Revenez ici et collez-la ci-dessous",
+          "epfl_open_campus" to "Ouvrir EPFL Campus",
+          "epfl_paste_url" to "Collez votre URL ICS",
+          "epfl_connect" to "Connecter l'emploi du temps",
+          "epfl_syncing" to "Synchronisation...",
+          "epfl_connected" to "Connecté",
+          "epfl_events_synced" to "événements synchronisés",
+          "epfl_last_sync" to "Dernière sync",
+          "epfl_disconnect" to "Déconnecter",
+          "epfl_connected_info" to "EULER peut maintenant répondre aux questions sur votre emploi du temps, comme « Quels cours ai-je demain ? » ou « Où est mon prochain cours ? »",
+          "epfl_clipboard_detected" to "URL ICS détectée !",
+          "not_now" to "Pas maintenant",
+          "use_this_url" to "Utiliser cette URL")
 
   private fun german() =
       mapOf(

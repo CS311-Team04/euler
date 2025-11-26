@@ -54,6 +54,7 @@ object Routes {
   const val Profile = "profile"
   const val Connectors = "connectors"
   const val VoiceChat = "voice_chat"
+  const val EpflCampus = "epfl_campus"
 }
 
 @VisibleForTesting internal var appNavControllerObserver: ((NavHostController) -> Unit)? = null
@@ -497,7 +498,7 @@ fun AppNav(
                 isProfileEnabled = !homeUiState.isGuest,
                 showProfileWarning = homeUiState.showGuestProfileWarning,
                 onDismissProfileWarning = { homeViewModel.hideGuestProfileWarning() },
-                onConnectorsClick = { nav.navigate(Routes.Settings) })
+                onConnectorsClick = { nav.navigate(Routes.EpflCampus) })
           }
 
           composable(Routes.Profile) {
@@ -543,6 +544,13 @@ fun AppNav(
                 onClose = { nav.popBackStack() },
                 modifier = Modifier.fillMaxSize(),
                 speechHelper = speechHelper)
+          }
+          
+          // EPFL Campus Connector Screen
+          composable(Routes.EpflCampus) {
+            com.android.sample.epfl.EpflCampusConnectorScreen(
+                onBackClick = { nav.popBackStack() }
+            )
           }
         }
       }

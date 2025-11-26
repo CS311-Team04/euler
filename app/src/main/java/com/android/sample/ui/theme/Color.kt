@@ -12,6 +12,7 @@ val Pink40 = Color(0xFF7D5260)
 
 // Euler brand colors
 val EulerRed = Color(0xFFEB5757)
+val EulerGreen = Color(0xFF39D98A)
 val DarkBackground = Color(0xFF0F0F0F)
 val DarkSurface = Color(0xFF1A1A1A)
 val DarkSurfaceVariant = Color(0xFF242424)

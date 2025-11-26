@@ -379,12 +379,35 @@ type AnswerWithRagInput = {
   model?: string;
   summary?: string;
   recentTranscript?: string;
+  uid?: string; // Optional: for schedule context
 };
 
+// Schedule-related question patterns
+const SCHEDULE_PATTERNS = /\b(horaire|schedule|timetable|cours|class|lecture|planning|agenda|calendrier|calendar|demain|tomorrow|aujourd'hui|today|cette semaine|this week|prochaine|next|quand|when|heure|time|salle|room|où|where|leçon|lesson)\b/i;
+
 export async function answerWithRagCore({
-  question, topK, model, summary, recentTranscript, client,
+  question, topK, model, summary, recentTranscript, uid, client,
 }: AnswerWithRagInput & { client?: OpenAI }) {
   const q = question.trim();
+  
+  // Check if this is a schedule-related question and fetch schedule context
+  let scheduleContext = "";
+  const isScheduleQuestion = SCHEDULE_PATTERNS.test(q);
+  
+  if (isScheduleQuestion && uid) {
+    try {
+      scheduleContext = await getScheduleContextCore(uid);
+      if (scheduleContext) {
+        logger.info("answerWithRagCore.scheduleContext", { 
+          uid, 
+          hasSchedule: true, 
+          contextLen: scheduleContext.length 
+        });
+      }
+    } catch (e) {
+      logger.warn("answerWithRagCore.scheduleContextFailed", { error: String(e) });
+    }
+  }
 
   // Gate 1: skip retrieval on small talk
   const isSmallTalk = SMALL_TALK.test(q) && q.length <= 30;
@@ -453,13 +476,14 @@ export async function answerWithRagCore({
     "- Sinon, réponds en 2–4 phrases courtes, chacune sur sa propre ligne.",
     "- Utilise des retours à la ligne pour aérer; pas de titres ni de clôture.",
     "- Rédige toujours au vouvoiement (« vous »). Pour tout fait sur l'utilisateur, écris « Vous … ».",
-    "- Si la question concerne l'utilisateur (section, identité, langue/préférences), réponds UNIQUEMENT à partir du résumé/ fenêtre récente et ignore le contexte RAG.",
+    "- Si la question concerne l'utilisateur (section, identité, langue/préférences, horaire personnel), réponds UNIQUEMENT à partir du résumé/ fenêtre récente/ emploi du temps et ignore le contexte RAG.",
     "- Si le résumé contient des faits pertinents (ex.: section IC, langue, préférences), utilise‑les et ne redemande pas ces informations.",
     trimmedSummary ? `\nRésumé conversationnel (à utiliser, ne pas afficher tel quel):\n${trimmedSummary}\n` : "",
     trimmedTranscript ? `Fenêtre récente (ne pas afficher):\n${trimmedTranscript}\n` : "",
-    context ? `Contexte RAG (ignorer pour infos personnelles):\n${context}\n` : "",
+    scheduleContext ? `\nEmploi du temps EPFL de l'utilisateur (à utiliser pour répondre aux questions d'horaire):\n${scheduleContext}\n` : "",
+    context ? `Contexte RAG (ignorer pour infos personnelles et horaires):\n${context}\n` : "",
     `Question: ${question}`,
-    "Si l'information n'est pas dans le résumé ni le contexte, dis que tu ne sais pas.",
+    "Si l'information n'est pas dans le résumé, l'emploi du temps, ni le contexte, dis que tu ne sais pas.",
   ].join("\n");
 
   logger.info("answerWithRagCore.context", {
@@ -495,6 +519,9 @@ export async function answerWithRagCore({
       : "",
     trimmedTranscript
       ? "Fenêtre récente (ne pas afficher; utile pour les références immédiates):\n" + trimmedTranscript
+      : "",
+    scheduleContext
+      ? "Emploi du temps EPFL de l'utilisateur (utiliser pour questions d'horaire, cours, salles):\n" + scheduleContext
       : "",
   ]
     .filter(Boolean)
@@ -679,7 +706,7 @@ export const indexChunksFn = europeFunctions.https.onCall(async (data: IndexChun
   }
 });
 
-export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerWithRagInput) => {
+export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerWithRagInput, context) => {
   try {
     const question = String(data?.question || "").trim();
     const topK = Number(data?.topK ?? 2);
@@ -687,6 +714,9 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
     const summary = typeof data?.summary === "string" ? data.summary : undefined;
     const recentTranscript =
       typeof (data as any)?.recentTranscript === "string" ? (data as any).recentTranscript : undefined;
+    // Get uid from auth context for schedule integration
+    const uid = context.auth?.uid;
+    
     if (!question) throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
 
     // === ED Intent Detection (fast, regex-based) ===
@@ -720,10 +750,11 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
       summaryLen: summary ? summary.length : 0,
       hasTranscript: Boolean(recentTranscript),
       transcriptLen: recentTranscript ? recentTranscript.length : 0,
+      hasUid: Boolean(uid),
       topK,
       model: model ?? process.env.APERTUS_MODEL_ID!,
     });
-    const ragResult = await answerWithRagCore({ question, topK, model, summary, recentTranscript });
+    const ragResult = await answerWithRagCore({ question, topK, model, summary, recentTranscript, uid });
     return {
       ...ragResult,
       ed_intent_detected: false,
@@ -903,3 +934,258 @@ export const connectorsMoodleTestFn = europeFunctions.https.onCall(
     };
   }
 );
+
+/* =========================================================
+ *        EPFL CAMPUS SCHEDULE (ICS Integration)
+ * ======================================================= */
+
+/** Parsed calendar event from ICS */
+interface ScheduleEvent {
+  uid: string;
+  summary: string;
+  location?: string;
+  description?: string;
+  dtstart: string; // ISO string
+  dtend: string;   // ISO string
+  rrule?: string;  // recurrence rule if any
+}
+
+/** Parse ICS text into structured events */
+function parseICS(icsText: string): ScheduleEvent[] {
+  const events: ScheduleEvent[] = [];
+  const lines = icsText.replace(/\r\n /g, '').replace(/\r\n\t/g, '').split(/\r?\n/);
+  
+  let currentEvent: Partial<ScheduleEvent> | null = null;
+  
+  for (const line of lines) {
+    if (line === 'BEGIN:VEVENT') {
+      currentEvent = {};
+    } else if (line === 'END:VEVENT' && currentEvent) {
+      if (currentEvent.uid && currentEvent.summary && currentEvent.dtstart && currentEvent.dtend) {
+        events.push(currentEvent as ScheduleEvent);
+      }
+      currentEvent = null;
+    } else if (currentEvent) {
+      const colonIdx = line.indexOf(':');
+      if (colonIdx === -1) continue;
+      
+      let key = line.slice(0, colonIdx);
+      const value = line.slice(colonIdx + 1);
+      
+      // Handle properties with parameters like DTSTART;TZID=Europe/Zurich:20251127T081500
+      const semicolonIdx = key.indexOf(';');
+      if (semicolonIdx !== -1) {
+        key = key.slice(0, semicolonIdx);
+      }
+      
+      switch (key) {
+        case 'UID':
+          currentEvent.uid = value;
+          break;
+        case 'SUMMARY':
+          currentEvent.summary = value.replace(/\\,/g, ',').replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
+          break;
+        case 'LOCATION':
+          currentEvent.location = value.replace(/\\,/g, ',').replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
+          break;
+        case 'DESCRIPTION':
+          currentEvent.description = value.replace(/\\,/g, ',').replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
+          break;
+        case 'DTSTART':
+          currentEvent.dtstart = parseICSDate(value);
+          break;
+        case 'DTEND':
+          currentEvent.dtend = parseICSDate(value);
+          break;
+        case 'RRULE':
+          currentEvent.rrule = value;
+          break;
+      }
+    }
+  }
+  
+  return events;
+}
+
+/** Convert ICS date format to ISO string */
+function parseICSDate(icsDate: string): string {
+  // Handle formats: 20251127T081500Z or 20251127T081500 or 20251127
+  const clean = icsDate.replace('Z', '');
+  if (clean.length === 8) {
+    // Date only: YYYYMMDD
+    return `${clean.slice(0, 4)}-${clean.slice(4, 6)}-${clean.slice(6, 8)}T00:00:00`;
+  }
+  // DateTime: YYYYMMDDTHHMMSS
+  const datePart = clean.slice(0, 8);
+  const timePart = clean.slice(9, 15);
+  return `${datePart.slice(0, 4)}-${datePart.slice(4, 6)}-${datePart.slice(6, 8)}T${timePart.slice(0, 2)}:${timePart.slice(2, 4)}:${timePart.slice(4, 6)}`;
+}
+
+/** Format schedule events for LLM context */
+function formatScheduleForContext(events: ScheduleEvent[], daysAhead = 7): string {
+  const now = new Date();
+  const cutoff = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+  
+  // Filter events within the window
+  const upcoming = events
+    .filter(e => {
+      const start = new Date(e.dtstart);
+      return start >= now && start <= cutoff;
+    })
+    .sort((a, b) => new Date(a.dtstart).getTime() - new Date(b.dtstart).getTime());
+  
+  if (upcoming.length === 0) {
+    return "Aucun événement prévu dans les 7 prochains jours.";
+  }
+  
+  const lines: string[] = [];
+  let currentDay = '';
+  
+  for (const event of upcoming) {
+    const start = new Date(event.dtstart);
+    const end = new Date(event.dtend);
+    const dayStr = start.toLocaleDateString('fr-CH', { weekday: 'long', day: 'numeric', month: 'long' });
+    
+    if (dayStr !== currentDay) {
+      currentDay = dayStr;
+      lines.push(`\n📅 ${dayStr.charAt(0).toUpperCase() + dayStr.slice(1)}`);
+    }
+    
+    const timeStart = start.toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' });
+    const timeEnd = end.toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' });
+    const loc = event.location ? ` @ ${event.location}` : '';
+    lines.push(`  • ${timeStart}–${timeEnd}: ${event.summary}${loc}`);
+  }
+  
+  return lines.join('\n');
+}
+
+/** Sync user's EPFL schedule from ICS URL */
+type SyncScheduleInput = { icsUrl: string };
+
+export async function syncEpflScheduleCore(uid: string, { icsUrl }: SyncScheduleInput) {
+  // Validate URL
+  if (!icsUrl || typeof icsUrl !== 'string') {
+    throw new Error("Missing or invalid 'icsUrl'");
+  }
+  
+  // Basic URL validation - should look like an EPFL/IS-Academia ICS URL
+  const url = icsUrl.trim();
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    throw new Error("Invalid URL format");
+  }
+  
+  // Fetch the ICS file
+  logger.info("syncEpflSchedule.fetching", { uid, urlPreview: url.slice(0, 60) });
+  
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'EULER-App/1.0',
+      'Accept': 'text/calendar, */*',
+    },
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ICS: ${response.status} ${response.statusText}`);
+  }
+  
+  const icsText = await response.text();
+  
+  if (!icsText.includes('BEGIN:VCALENDAR')) {
+    throw new Error("Invalid ICS format: not a valid calendar file");
+  }
+  
+  // Parse events
+  const events = parseICS(icsText);
+  logger.info("syncEpflSchedule.parsed", { uid, eventCount: events.length });
+  
+  // Store in Firestore under user document
+  const userRef = db.collection('users').doc(uid);
+  await userRef.set({
+    epflSchedule: {
+      icsUrl: url,
+      events: events.slice(0, 500), // Limit to 500 events
+      lastSync: admin.firestore.FieldValue.serverTimestamp(),
+      eventCount: events.length,
+    }
+  }, { merge: true });
+  
+  logger.info("syncEpflSchedule.stored", { uid, eventCount: events.length });
+  
+  return {
+    success: true,
+    eventCount: events.length,
+    message: `Successfully synced ${events.length} events from your EPFL schedule.`,
+  };
+}
+
+/** Get user's schedule context for LLM */
+export async function getScheduleContextCore(uid: string): Promise<string> {
+  const userDoc = await db.collection('users').doc(uid).get();
+  const data = userDoc.data();
+  
+  if (!data?.epflSchedule?.events || data.epflSchedule.events.length === 0) {
+    return "";
+  }
+  
+  return formatScheduleForContext(data.epflSchedule.events, 14);
+}
+
+/** Callable: sync EPFL schedule */
+export const syncEpflScheduleFn = europeFunctions.https.onCall(async (data: SyncScheduleInput, context) => {
+  if (!context.auth?.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "User must be signed in");
+  }
+  
+  try {
+    return await syncEpflScheduleCore(context.auth.uid, data);
+  } catch (e: any) {
+    logger.error("syncEpflScheduleFn.failed", { error: String(e), uid: context.auth.uid });
+    throw new functions.https.HttpsError("internal", e.message || "Failed to sync schedule");
+  }
+});
+
+/** Callable: disconnect EPFL schedule */
+export const disconnectEpflScheduleFn = europeFunctions.https.onCall(async (_data, context) => {
+  if (!context.auth?.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "User must be signed in");
+  }
+  
+  try {
+    const userRef = db.collection('users').doc(context.auth.uid);
+    await userRef.update({
+      epflSchedule: admin.firestore.FieldValue.delete(),
+    });
+    
+    logger.info("disconnectEpflSchedule.success", { uid: context.auth.uid });
+    return { success: true, message: "EPFL schedule disconnected" };
+  } catch (e: any) {
+    logger.error("disconnectEpflScheduleFn.failed", { error: String(e), uid: context.auth.uid });
+    throw new functions.https.HttpsError("internal", e.message || "Failed to disconnect");
+  }
+});
+
+/** Callable: get schedule status */
+export const getEpflScheduleStatusFn = europeFunctions.https.onCall(async (_data, context) => {
+  if (!context.auth?.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "User must be signed in");
+  }
+  
+  try {
+    const userDoc = await db.collection('users').doc(context.auth.uid).get();
+    const data = userDoc.data();
+    
+    if (!data?.epflSchedule) {
+      return { connected: false };
+    }
+    
+    return {
+      connected: true,
+      eventCount: data.epflSchedule.eventCount ?? data.epflSchedule.events?.length ?? 0,
+      lastSync: data.epflSchedule.lastSync?.toDate?.()?.toISOString() ?? null,
+    };
+  } catch (e: any) {
+    logger.error("getEpflScheduleStatusFn.failed", { error: String(e), uid: context.auth.uid });
+    throw new functions.https.HttpsError("internal", e.message || "Failed to get status");
+  }
+});
