@@ -9,7 +9,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModelProvider
@@ -28,23 +28,27 @@ import com.android.sample.authentification.AuthUiState
 import com.android.sample.home.HomeScreen
 import com.android.sample.home.HomeViewModel
 import com.android.sample.network.AndroidNetworkConnectivityMonitor
-import com.android.sample.settings.ProfilePage
+import com.android.sample.onboarding.OnboardingPersonalInfoScreen
+import com.android.sample.profile.UserProfileRepository
+import com.android.sample.settings.ProfileScreen
 import com.android.sample.settings.SettingsPage
 import com.android.sample.settings.connectors.ConnectorsScreen
 import com.android.sample.sign_in.AuthViewModel
 import com.android.sample.speech.SpeechPlayback
 import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.splash.OpeningScreen
+import kotlinx.coroutines.launch
 
 object Routes {
   const val Opening = "opening"
   const val SignIn = "signin"
+  const val OnboardingPersonalInfo = "onboarding_personal_info"
   const val Home = "home"
   const val HomeWithDrawer = "home_with_drawer"
   const val Settings = "settings"
   const val Profile = "profile"
-  const val VoiceChat = "voice_chat"
   const val Connectors = "connectors"
+  const val VoiceChat = "voice_chat"
 }
 
 @VisibleForTesting internal var appNavControllerObserver: ((NavHostController) -> Unit)? = null
@@ -114,6 +118,14 @@ internal fun navigateHomeFromSignIn(navigate: NavigateAction) {
 }
 
 @VisibleForTesting
+internal fun navigateToOnboarding(navigate: NavigateAction) {
+  navigate(Routes.OnboardingPersonalInfo) {
+    popUpTo(Routes.SignIn) { inclusive = true }
+    launchSingleTop = true
+  }
+}
+
+@VisibleForTesting
 internal fun navigateHomeToSignIn(navigate: NavigateAction) {
   navigate(Routes.SignIn) {
     popUpTo(Routes.Home) { inclusive = true }
@@ -169,6 +181,29 @@ internal fun handleProfileClick(
   }
 }
 
+/**
+ * Checks if the user has completed onboarding (has a profile) and navigates accordingly. If no
+ * profile exists, navigates to onboarding. Otherwise, navigates to home.
+ */
+private suspend fun checkAndNavigateAfterSignIn(nav: NavHostController) {
+  val profileRepository = UserProfileRepository()
+  val profile = profileRepository.loadProfile()
+  if (profile == null || profile.fullName.isBlank()) {
+    // User needs onboarding - navigate to onboarding screen
+    nav.navigate(Routes.OnboardingPersonalInfo) {
+      popUpTo(Routes.SignIn) { inclusive = true }
+      launchSingleTop = true
+    }
+  } else {
+    // User has profile - navigate to home
+    nav.navigate(Routes.Home) {
+      popUpTo(Routes.SignIn) { inclusive = true }
+      launchSingleTop = true
+      restoreState = true
+    }
+  }
+}
+
 @SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
 fun AppNav(
@@ -190,6 +225,15 @@ fun AppNav(
   // Get current back stack entry
   val navBackStackEntry by nav.currentBackStackEntryAsState()
   val currentDestination = navBackStackEntry?.destination?.route
+  val profileRepository = remember { UserProfileRepository() }
+  val coroutineScope = rememberCoroutineScope()
+
+  // Check for onboarding after sign-in
+  LaunchedEffect(authState, currentDestination) {
+    if (authState is AuthUiState.SignedIn && currentDestination == Routes.SignIn) {
+      coroutineScope.launch { checkAndNavigateAfterSignIn(nav) }
+    }
+  }
 
   // Handle Microsoft authentication when loading
   LaunchedEffect(authState) {
@@ -209,7 +253,9 @@ fun AppNav(
               })
         },
         navigateHome = {
-          navigateHomeFromSignIn { route, builder -> nav.navigate(route) { builder(this) } }
+          // Navigation will be handled by the onboarding check LaunchedEffect above
+          // This is kept for backward compatibility but the actual navigation
+          // happens in the checkAndNavigateAfterSignIn function
         })
   }
 
@@ -236,6 +282,18 @@ fun AppNav(
               onMicrosoftLogin = { authViewModel.onMicrosoftLoginClick() },
               onSwitchEduLogin = { authViewModel.onSwitchEduLoginClick() },
               isOffline = isOffline)
+        }
+
+        // Onboarding Personal Info Screen
+        composable(Routes.OnboardingPersonalInfo) {
+          OnboardingPersonalInfoScreen(
+              onContinue = {
+                // Navigate to home after onboarding is complete
+                nav.navigate(Routes.Home) {
+                  popUpTo(Routes.OnboardingPersonalInfo) { inclusive = true }
+                  launchSingleTop = true
+                }
+              })
         }
         navigation(startDestination = Routes.Home, route = "home_root") {
           // Home Screen
@@ -401,9 +459,7 @@ fun AppNav(
                 isProfileEnabled = !homeUiState.isGuest,
                 showProfileWarning = homeUiState.showGuestProfileWarning,
                 onDismissProfileWarning = { homeViewModel.hideGuestProfileWarning() },
-                onConnectorsClick = {
-                  navigateToConnectors { route, builder -> nav.navigate(route) { builder(this) } }
-                })
+                onConnectorsClick = { nav.navigate(Routes.Settings) })
           }
 
           composable(Routes.Profile) {
@@ -428,11 +484,8 @@ fun AppNav(
                 nav.popBackStack()
               }
             } else {
-              LaunchedEffect(Unit) { homeViewModel.refreshProfile() }
-              ProfilePage(
-                  onBackClick = { nav.popBackStack() },
-                  onSaveProfile = { profile -> homeViewModel.saveProfile(profile) },
-                  initialProfile = homeUiState.profile)
+              // Use ProfileScreen which manages its own ViewModel and loads profile from Firestore
+              ProfileScreen(onBackClick = { nav.popBackStack() })
             }
           }
           // Connectors Screen
