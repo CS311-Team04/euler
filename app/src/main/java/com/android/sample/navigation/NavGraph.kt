@@ -11,6 +11,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavOptionsBuilder
@@ -25,6 +27,7 @@ import com.android.sample.authentification.AuthUIScreen
 import com.android.sample.authentification.AuthUiState
 import com.android.sample.home.HomeScreen
 import com.android.sample.home.HomeViewModel
+import com.android.sample.network.AndroidNetworkConnectivityMonitor
 import com.android.sample.settings.ProfilePage
 import com.android.sample.settings.SettingsPage
 import com.android.sample.settings.connectors.ConnectorsScreen
@@ -174,9 +177,14 @@ fun AppNav(
     speechHelper: SpeechToTextHelper,
     ttsHelper: SpeechPlayback
 ) {
+  val context = LocalContext.current
+  val networkMonitor = remember { AndroidNetworkConnectivityMonitor(context) }
   val nav =
       rememberNavController().also { controller -> appNavControllerObserver?.invoke(controller) }
-  val authViewModel = remember { authViewModelFactory?.invoke() ?: AuthViewModel() }
+  val authViewModel =
+      remember(networkMonitor) {
+        authViewModelFactory?.invoke() ?: AuthViewModel(networkMonitor = networkMonitor)
+      }
   val authState by authViewModel.state.collectAsState()
 
   // Get current back stack entry
@@ -222,16 +230,29 @@ fun AppNav(
 
         // SignIn Screen
         composable(Routes.SignIn) {
+          val isOffline by authViewModel.isOffline.collectAsState()
           AuthUIScreen(
               state = authState,
               onMicrosoftLogin = { authViewModel.onMicrosoftLoginClick() },
-              onSwitchEduLogin = { authViewModel.onSwitchEduLoginClick() })
+              onSwitchEduLogin = { authViewModel.onSwitchEduLoginClick() },
+              isOffline = isOffline)
         }
         navigation(startDestination = Routes.Home, route = "home_root") {
           // Home Screen
           composable(Routes.Home) {
             val parentEntry = nav.getBackStackEntry("home_root")
-            val homeViewModel: HomeViewModel = viewModel(parentEntry)
+            val homeViewModel: HomeViewModel =
+                viewModel(
+                    parentEntry,
+                    factory =
+                        object : ViewModelProvider.Factory {
+                          @Suppress("UNCHECKED_CAST")
+                          override fun <T : androidx.lifecycle.ViewModel> create(
+                              modelClass: Class<T>
+                          ): T {
+                            return HomeViewModel(networkMonitor = networkMonitor) as T
+                          }
+                        })
             val homeUiState by homeViewModel.uiState.collectAsState()
 
             // LaunchedEffect for guest mode synchronization
@@ -282,7 +303,18 @@ fun AppNav(
           // Home With Drawer
           composable(Routes.HomeWithDrawer) {
             val parentEntry = nav.getBackStackEntry("home_root")
-            val homeViewModel: HomeViewModel = viewModel(parentEntry)
+            val homeViewModel: HomeViewModel =
+                viewModel(
+                    parentEntry,
+                    factory =
+                        object : ViewModelProvider.Factory {
+                          @Suppress("UNCHECKED_CAST")
+                          override fun <T : androidx.lifecycle.ViewModel> create(
+                              modelClass: Class<T>
+                          ): T {
+                            return HomeViewModel(networkMonitor = networkMonitor) as T
+                          }
+                        })
             val homeUiState by homeViewModel.uiState.collectAsState()
 
             HomeScreen(
@@ -327,7 +359,18 @@ fun AppNav(
           // Settings
           composable(Routes.Settings) {
             val parentEntry = nav.getBackStackEntry("home_root")
-            val homeViewModel: HomeViewModel = viewModel(parentEntry)
+            val homeViewModel: HomeViewModel =
+                viewModel(
+                    parentEntry,
+                    factory =
+                        object : ViewModelProvider.Factory {
+                          @Suppress("UNCHECKED_CAST")
+                          override fun <T : androidx.lifecycle.ViewModel> create(
+                              modelClass: Class<T>
+                          ): T {
+                            return HomeViewModel(networkMonitor = networkMonitor) as T
+                          }
+                        })
             val homeUiState by homeViewModel.uiState.collectAsState()
 
             SettingsPage(
@@ -365,7 +408,18 @@ fun AppNav(
 
           composable(Routes.Profile) {
             val parentEntry = nav.getBackStackEntry("home_root")
-            val homeViewModel: HomeViewModel = viewModel(parentEntry)
+            val homeViewModel: HomeViewModel =
+                viewModel(
+                    parentEntry,
+                    factory =
+                        object : ViewModelProvider.Factory {
+                          @Suppress("UNCHECKED_CAST")
+                          override fun <T : androidx.lifecycle.ViewModel> create(
+                              modelClass: Class<T>
+                          ): T {
+                            return HomeViewModel(networkMonitor = networkMonitor) as T
+                          }
+                        })
             val homeUiState by homeViewModel.uiState.collectAsState()
 
             if (homeUiState.isGuest) {

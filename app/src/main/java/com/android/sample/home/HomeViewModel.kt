@@ -13,6 +13,7 @@ import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.MessageDTO
 import com.android.sample.llm.FirebaseFunctionsLlmClient
 import com.android.sample.llm.LlmClient
+import com.android.sample.network.NetworkConnectivityMonitor
 import com.android.sample.profile.UserProfile
 import com.android.sample.profile.UserProfileRepository
 import com.google.firebase.auth.FirebaseAuth
@@ -31,6 +32,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -67,7 +69,8 @@ class HomeViewModel(
     private val repo: ConversationRepository =
         ConversationRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance()),
     private val profileRepository: com.android.sample.profile.ProfileDataSource =
-        UserProfileRepository()
+        UserProfileRepository(),
+    private val networkMonitor: NetworkConnectivityMonitor? = null
 ) : ViewModel() {
   companion object {
     private const val TAG = "HomeViewModel"
@@ -129,6 +132,7 @@ class HomeViewModel(
 
   private var dataStarted = false
   private var authListener: FirebaseAuth.AuthStateListener? = null
+  private var networkMonitorJob: Job? = null
 
   init {
     val current = auth.currentUser?.uid
@@ -151,6 +155,28 @@ class HomeViewModel(
           }
         }
     auth.addAuthStateListener(requireNotNull(authListener))
+
+    // Monitor network connectivity
+    networkMonitor?.let { monitor ->
+      networkMonitorJob =
+          viewModelScope.launch {
+            monitor.isOnline.collectLatest { isOnline ->
+              _uiState.update { state ->
+                val wasOffline = state.isOffline
+                val newState = state.copy(isOffline = !isOnline)
+                // Show offline message when going offline, but only if user is signed in
+                if (!isOnline && !wasOffline && auth.currentUser != null) {
+                  newState.copy(showOfflineMessage = true)
+                } else if (isOnline && wasOffline) {
+                  // Hide offline message when back online
+                  newState.copy(showOfflineMessage = false)
+                } else {
+                  newState
+                }
+              }
+            }
+          }
+    }
 
     if (current != null) {
       // already signed in
@@ -405,6 +431,11 @@ class HomeViewModel(
     _uiState.update { it.copy(messageDraft = text) }
   }
 
+  /** Dismiss the offline message. */
+  fun dismissOfflineMessage() {
+    _uiState.update { it.copy(showOfflineMessage = false) }
+  }
+
   /** Select a conversation by id and exit the local placeholder state. */
   fun selectConversation(id: String) {
     Log.d(TAG, "selectConversation(): $id")
@@ -463,6 +494,23 @@ class HomeViewModel(
   fun sendMessage() {
     val current = _uiState.value
     if (current.isSending || current.streamingMessageId != null) return
+    // Don't allow sending messages when offline - check both state and actual connectivity
+    if (current.isOffline) {
+      // Update state to show offline message if not already shown
+      if (!current.showOfflineMessage && auth.currentUser != null) {
+        _uiState.update { it.copy(showOfflineMessage = true) }
+      }
+      return
+    }
+    // Double-check actual connectivity as a safety measure
+    if (networkMonitor?.isCurrentlyOnline() == false) {
+      _uiState.update {
+        it.copy(
+            isOffline = true,
+            showOfflineMessage = if (auth.currentUser != null) true else it.showOfflineMessage)
+      }
+      return
+    }
     val msg = current.messageDraft.trim()
     if (msg.isEmpty()) return
 
@@ -940,6 +988,9 @@ class HomeViewModel(
     messagesJob = null
     activeStreamJob?.cancel()
     activeStreamJob = null
+    networkMonitorJob?.cancel()
+    networkMonitorJob = null
+    (networkMonitor as? com.android.sample.network.AndroidNetworkConnectivityMonitor)?.unregister()
   }
 
   /**

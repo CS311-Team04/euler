@@ -570,11 +570,13 @@ class NavGraphComposeTest {
   fun appNav_settings_from_drawer_navigates_to_settings_screen() {
     val speechHelper = mock<SpeechToTextHelper>()
     val stateFlow = MutableStateFlow<AuthUiState>(AuthUiState.SignedIn)
+    val isOfflineFlow = MutableStateFlow<Boolean>(false)
     val ttsHelper = mock<SpeechPlayback>()
 
     val construction =
         mockConstruction(AuthViewModel::class.java) { mock, _ ->
           whenever(mock.state).thenReturn(stateFlow)
+          whenever(mock.isOffline).thenReturn(isOfflineFlow)
           doAnswer {}.whenever(mock).onMicrosoftLoginClick()
           doAnswer {}.whenever(mock).onSwitchEduLoginClick()
           doAnswer { stateFlow.value = AuthUiState.SignedIn }
@@ -614,11 +616,13 @@ class NavGraphComposeTest {
   fun appNav_voice_button_navigates_to_voice_screen_and_back() {
     val speechHelper = mock<SpeechToTextHelper>()
     val stateFlow = MutableStateFlow<AuthUiState>(AuthUiState.SignedIn)
+    val isOfflineFlow = MutableStateFlow<Boolean>(false)
     val ttsHelper = mock<SpeechPlayback>()
 
     val construction =
         mockConstruction(AuthViewModel::class.java) { mock, _ ->
           whenever(mock.state).thenReturn(stateFlow)
+          whenever(mock.isOffline).thenReturn(isOfflineFlow)
           doAnswer {}.whenever(mock).onMicrosoftLoginClick()
           doAnswer {}.whenever(mock).onSwitchEduLoginClick()
           doAnswer { stateFlow.value = AuthUiState.SignedIn }
@@ -666,11 +670,13 @@ class NavGraphComposeTest {
   fun appNav_settings_log_out_returns_to_sign_in() {
     val speechHelper = mock<SpeechToTextHelper>()
     val stateFlow = MutableStateFlow<AuthUiState>(AuthUiState.SignedIn)
+    val isOfflineFlow = MutableStateFlow<Boolean>(false)
     val ttsHelper = mock<SpeechPlayback>()
 
     val construction =
         mockConstruction(AuthViewModel::class.java) { mock, _ ->
           whenever(mock.state).thenReturn(stateFlow)
+          whenever(mock.isOffline).thenReturn(isOfflineFlow)
           doAnswer {}.whenever(mock).onMicrosoftLoginClick()
           doAnswer {}.whenever(mock).onSwitchEduLoginClick()
           doAnswer { stateFlow.value = AuthUiState.SignedIn }
@@ -726,11 +732,13 @@ class NavGraphComposeTest {
   fun appNav_opening_idle_navigates_to_sign_in() {
     val speechHelper = mock<SpeechToTextHelper>()
     val stateFlow = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
+    val isOfflineFlow = MutableStateFlow<Boolean>(false)
     val ttsHelper = mock<SpeechPlayback>()
 
     val construction =
         mockConstruction(AuthViewModel::class.java) { mock, _ ->
           whenever(mock.state).thenReturn(stateFlow)
+          whenever(mock.isOffline).thenReturn(isOfflineFlow)
           doAnswer {}.whenever(mock).onMicrosoftLoginClick()
           doAnswer {}.whenever(mock).onSwitchEduLoginClick()
           doAnswer {}.whenever(mock).onAuthenticationSuccess()
