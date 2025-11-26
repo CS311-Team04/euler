@@ -517,7 +517,7 @@ class HomeViewModel(
                   // Upgrade du titre en arrière-plan (UNE fois)
                   launch {
                     try {
-                      val good = fetchTitle(msg)
+                      val good = ConversationTitleFormatter.fetchTitle(functions, msg, TAG)
                       if (good.isNotBlank() && good != quickTitle) {
                         repo.updateConversationTitle(newId, good)
                       }
@@ -910,25 +910,6 @@ class HomeViewModel(
           type = if (this.role == "user") ChatType.USER else ChatType.AI)
 
   /** Make a short provisional title from the first prompt. */
-
-  /**
-   * Ask `generateTitleFn` for a better title; fallback to
-   * [ConversationTitleFormatter.localTitleFrom] on errors.
-   */
-  private suspend fun fetchTitle(question: String): String {
-    return try {
-      val res =
-          functions.getHttpsCallable("generateTitleFn").call(mapOf("question" to question)).await()
-      val t = (res.getData() as? Map<*, *>)?.get("title") as? String
-      (t?.takeIf { it.isNotBlank() } ?: ConversationTitleFormatter.localTitleFrom(question)).also {
-        Log.d(TAG, "fetchTitle(): generated='$it'")
-      }
-    } catch (_: Exception) {
-      Log.d(TAG, "fetchTitle(): fallback to local extraction")
-      ConversationTitleFormatter.localTitleFrom(question)
-    }
-  }
-
   override fun onCleared() {
     super.onCleared()
     authListener?.let { auth.removeAuthStateListener(it) }

@@ -26,7 +26,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
 /**
  * Coordinates speech-to-text transcripts with the custom LLM and delegates playback to the UI.
@@ -170,7 +169,7 @@ class VoiceChatViewModel(
           // Upgrade title in background (once)
           viewModelScope.launch {
             try {
-              val good = fetchTitle(cleaned)
+              val good = ConversationTitleFormatter.fetchTitle(functions, cleaned, TAG)
               if (good.isNotBlank() && good != quickTitle) {
                 repo.updateConversationTitle(newId, good)
                 Log.d(TAG, "Upgraded conversation title: $newId -> $good")
@@ -233,24 +232,6 @@ class VoiceChatViewModel(
           isSpeaking = false,
           lastError = t.message ?: "Unable to generate response",
       )
-    }
-  }
-
-  /**
-   * Ask `generateTitleFn` for a better title; fallback to
-   * [ConversationTitleFormatter.localTitleFrom] on errors.
-   */
-  private suspend fun fetchTitle(question: String): String {
-    return try {
-      val res =
-          functions.getHttpsCallable("generateTitleFn").call(mapOf("question" to question)).await()
-      val t = (res.getData() as? Map<*, *>)?.get("title") as? String
-      (t?.takeIf { it.isNotBlank() } ?: ConversationTitleFormatter.localTitleFrom(question)).also {
-        Log.d(TAG, "fetchTitle(): generated='$it'")
-      }
-    } catch (_: Exception) {
-      Log.d(TAG, "fetchTitle(): fallback to local extraction")
-      ConversationTitleFormatter.localTitleFrom(question)
     }
   }
 
