@@ -1,3 +1,6 @@
+/**
+    * A simple Moodle web service client for testing connectivity.
+ */
 export class MoodleClient {
   constructor(
     private readonly baseUrl: string,
