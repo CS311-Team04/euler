@@ -5,6 +5,7 @@ import android.app.Activity
 import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -29,6 +30,7 @@ import com.android.sample.home.HomeScreen
 import com.android.sample.home.HomeViewModel
 import com.android.sample.network.AndroidNetworkConnectivityMonitor
 import com.android.sample.onboarding.OnboardingPersonalInfoScreen
+import com.android.sample.onboarding.OnboardingRoleScreen
 import com.android.sample.profile.UserProfileRepository
 import com.android.sample.settings.ProfileScreen
 import com.android.sample.settings.SettingsPage
@@ -43,6 +45,7 @@ object Routes {
   const val Opening = "opening"
   const val SignIn = "signin"
   const val OnboardingPersonalInfo = "onboarding_personal_info"
+  const val OnboardingRole = "onboarding_role"
   const val Home = "home"
   const val HomeWithDrawer = "home_with_drawer"
   const val Settings = "settings"
@@ -214,6 +217,10 @@ fun AppNav(
 ) {
   val context = LocalContext.current
   val networkMonitor = remember { AndroidNetworkConnectivityMonitor(context) }
+
+  // Cleanup network monitor when composable is disposed
+  DisposableEffect(networkMonitor) { onDispose { networkMonitor.unregister() } }
+
   val nav =
       rememberNavController().also { controller -> appNavControllerObserver?.invoke(controller) }
   val authViewModel =
@@ -284,13 +291,25 @@ fun AppNav(
               isOffline = isOffline)
         }
 
-        // Onboarding Personal Info Screen
+        // Onboarding Personal Info Screen (Step 1)
         composable(Routes.OnboardingPersonalInfo) {
           OnboardingPersonalInfoScreen(
               onContinue = {
+                // Navigate to step 2 (OnboardingRole)
+                nav.navigate(Routes.OnboardingRole) {
+                  popUpTo(Routes.OnboardingPersonalInfo) { inclusive = false }
+                  launchSingleTop = true
+                }
+              })
+        }
+
+        // Onboarding Role Screen (Step 2)
+        composable(Routes.OnboardingRole) {
+          OnboardingRoleScreen(
+              onContinue = {
                 // Navigate to home after onboarding is complete
                 nav.navigate(Routes.Home) {
-                  popUpTo(Routes.OnboardingPersonalInfo) { inclusive = true }
+                  popUpTo(Routes.OnboardingRole) { inclusive = true }
                   launchSingleTop = true
                 }
               })
