@@ -1,0 +1,120 @@
+name: Test Cloud Functions
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'functions/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'functions/**'
+
+jobs:
+  test:
+    name: Test Functions
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: functions/package.json
+
+      - name: Install dependencies
+        working-directory: ./functions
+        run: npm install
+
+      - name: Run linter (if you have one)
+        working-directory: ./functions
+        run: npm run lint || echo "No linter configured"
+        continue-on-error: true
+
+      - name: Run unit tests with coverage
+        working-directory: ./functions
+        run: npm run test:coverage
+        # Note: Integration tests are excluded - they run in the integration-test job below
+
+      - name: Upload coverage to Codecov (optional)
+        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238
+        with:
+          files: ./functions/coverage/lcov.info
+          flags: functions
+          name: functions-coverage
+          fail_ci_if_error: false
+
+      - name: Check coverage threshold
+        working-directory: ./functions
+        run: |
+          # Parse coverage percentage (example - adjust based on your needs)
+          COVERAGE=$(cat coverage/coverage-summary.json | jq '.total.lines.pct')
+          echo "Coverage: $COVERAGE%"
+          if (( $(echo "$COVERAGE < 60" | bc -l) )); then
+            echo "❌ Coverage below 60%"
+            exit 1
+          fi
+          echo "✅ Coverage acceptable"
+
+      - name: Build TypeScript
+        working-directory: ./functions
+        run: npm run build
+
+      - name: Archive test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: functions/coverage/
+
+  # Optional: Integration tests with Firebase Emulator
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: functions/package.json
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Install dependencies
+        working-directory: ./functions
+        run: npm install
+
+      - name: Start Firebase Emulators
+        run: |
+          firebase emulators:start --only functions,firestore &
+          # Wait for emulators to start
+          sleep 10
+
+      - name: Run integration tests
+        working-directory: ./functions
+        run: npm run test:integration
+        env:
+          FIRESTORE_EMULATOR_HOST: localhost:8080
+          FUNCTIONS_EMULATOR_HOST: localhost:5001
+
+      - name: Stop emulators
+        if: always()
+        run: |
+          # Kill emulator processes
+          pkill -f firebase || true
+
