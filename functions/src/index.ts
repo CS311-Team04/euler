@@ -10,7 +10,9 @@ import { randomUUID } from "node:crypto";
 import * as functions from "firebase-functions/v1";
 import admin from "firebase-admin";
 
+
 const europeFunctions = functions.region("europe-west6");
+
 
 /* ---------- helpers ---------- */
 function withV1(url?: string): string {
@@ -745,3 +747,93 @@ export const generateTitleFn = europeFunctions.https.onCall(async (data: Generat
   if (!q) throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
   return await generateTitleCore({ question: q, model });
 });
+
+/* =========================================================
+ *                MOODLE CONNECTOR
+ * ======================================================= */
+import { MoodleConnectorRepository } from "./connectors/moodle/MoodleConnectorRepository";
+import { MoodleConnectorService } from "./connectors/moodle/MoodleConnectorService";
+
+// simple placeholder encryption for dev.
+const encrypt = (plain: string): string => plain; // todo
+const decrypt = (cipher: string): string => cipher; // to do
+
+const moodleRepo = new MoodleConnectorRepository(db);
+const moodleService = new MoodleConnectorService(moodleRepo, encrypt, decrypt);
+// callable functions
+export const connectorsMoodleStatusFn = europeFunctions.https.onCall(
+  async (data, context) => {
+    if (!context.auth?.uid) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "User must be authenticated"
+      );
+    }
+
+    const config = await moodleService.getStatus(context.auth.uid);
+    return {
+      status: config.status,
+      lastTestAt: config.lastTestAt ?? null,
+      lastError: config.lastError ?? null,
+    };
+  }
+);
+// attempts to connect to Moodle with provided baseUrl and token
+export const connectorsMoodleConnectFn = europeFunctions.https.onCall(
+  async (data, context) => {
+    if (!context.auth?.uid) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "User must be authenticated"
+      );
+    }
+
+    const baseUrl = String(data?.baseUrl || "").trim();
+    const token = String(data?.token || "").trim();
+    if (!baseUrl || !token) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "baseUrl and token are required"
+      );
+    }
+
+    const config = await moodleService.connect(context.auth.uid, { baseUrl, token });
+    return {
+      status: config.status,
+      lastTestAt: config.lastTestAt ?? null,
+      lastError: config.lastError ?? null,
+    };
+  }
+);
+// disconnects Moodle for the user
+export const connectorsMoodleDisconnectFn = europeFunctions.https.onCall(
+  async (data, context) => {
+    if (!context.auth?.uid) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "User must be authenticated"
+      );
+    }
+
+    await moodleService.disconnect(context.auth.uid);
+    return { status: "not_connected" };
+  }
+);
+// tests the Moodle connection for the user
+export const connectorsMoodleTestFn = europeFunctions.https.onCall(
+  async (data, context) => {
+    if (!context.auth?.uid) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "User must be authenticated"
+      );
+    }
+
+    const config = await moodleService.test(context.auth.uid);
+    return {
+      status: config.status,
+      lastTestAt: config.lastTestAt ?? null,
+      lastError: config.lastError ?? null,
+    };
+  }
+);
