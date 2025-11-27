@@ -30,6 +30,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
+private const val ROLE_STUDENT = "Student"
+private const val ROLE_PHD_CANDIDATE = "PhD Candidate"
+private const val ROLE_PROFESSOR = "Professor"
+private const val ROLE_ADMINISTRATION = "Administration"
+
 @Composable
 fun OnboardingRoleScreen(onContinue: () -> Unit, viewModel: OnboardingRoleViewModel = viewModel()) {
   val uiState by viewModel.uiState.collectAsState()
@@ -58,24 +63,24 @@ fun OnboardingRoleScreen(onContinue: () -> Unit, viewModel: OnboardingRoleViewMo
             modifier = Modifier.fillMaxWidth().weight(1f),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
               RoleOptionCard(
-                  role = "Student",
-                  isSelected = uiState.selectedRole == "Student",
-                  onClick = { viewModel.selectRole("Student") })
+                  role = ROLE_STUDENT,
+                  isSelected = uiState.selectedRole == ROLE_STUDENT,
+                  onClick = { viewModel.selectRole(ROLE_STUDENT) })
 
               RoleOptionCard(
-                  role = "PhD Candidate",
-                  isSelected = uiState.selectedRole == "PhD Candidate",
-                  onClick = { viewModel.selectRole("PhD Candidate") })
+                  role = ROLE_PHD_CANDIDATE,
+                  isSelected = uiState.selectedRole == ROLE_PHD_CANDIDATE,
+                  onClick = { viewModel.selectRole(ROLE_PHD_CANDIDATE) })
 
               RoleOptionCard(
-                  role = "Professor",
-                  isSelected = uiState.selectedRole == "Professor",
-                  onClick = { viewModel.selectRole("Professor") })
+                  role = ROLE_PROFESSOR,
+                  isSelected = uiState.selectedRole == ROLE_PROFESSOR,
+                  onClick = { viewModel.selectRole(ROLE_PROFESSOR) })
 
               RoleOptionCard(
-                  role = "Administration",
-                  isSelected = uiState.selectedRole == "Administration",
-                  onClick = { viewModel.selectRole("Administration") })
+                  role = ROLE_ADMINISTRATION,
+                  isSelected = uiState.selectedRole == ROLE_ADMINISTRATION,
+                  onClick = { viewModel.selectRole(ROLE_ADMINISTRATION) })
             }
 
         // Error message
