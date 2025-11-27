@@ -26,6 +26,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowForward
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -78,6 +80,7 @@ fun AuthUIScreen(
     state: AuthUiState,
     onMicrosoftLogin: () -> Unit,
     onSwitchEduLogin: () -> Unit,
+    isOffline: Boolean = false,
     modifier: Modifier = Modifier
 ) {
   Box(
@@ -135,6 +138,12 @@ fun AuthUIScreen(
 
                           Spacer(modifier = Modifier.height(40.dp))
 
+                          // Offline message (shown when offline and not signed in)
+                          if (isOffline && state !is AuthUiState.SignedIn) {
+                            OfflineMessageCard(modifier = Modifier.fillMaxWidth())
+                            Spacer(modifier = Modifier.height(16.dp))
+                          }
+
                           // Buttons section
                           val isMicrosoftLoading =
                               state is AuthUiState.Loading &&
@@ -145,7 +154,7 @@ fun AuthUIScreen(
 
                           // Microsoft Entra ID button
                           MicrosoftEntraButton(
-                              enabled = !isMicrosoftLoading,
+                              enabled = !isMicrosoftLoading && !isOffline,
                               isLoading = isMicrosoftLoading,
                               onClick = onMicrosoftLogin,
                               modifier = Modifier.testTag(AuthTags.BtnMicrosoft))
@@ -159,7 +168,7 @@ fun AuthUIScreen(
 
                           // Guest button
                           GuestButton(
-                              enabled = !isGuestLoading,
+                              enabled = !isGuestLoading && !isOffline,
                               isLoading = isGuestLoading,
                               onClick = onSwitchEduLogin,
                               modifier = Modifier.testTag(AuthTags.BtnSwitchEdu))
@@ -354,6 +363,22 @@ private fun GuestButton(
                     }
                   }
             }
+      }
+}
+
+/** Offline message card shown on the sign-in screen when offline. */
+@Composable
+private fun OfflineMessageCard(modifier: Modifier = Modifier) {
+  Card(
+      modifier = modifier,
+      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+      shape = RoundedCornerShape(12.dp)) {
+        Text(
+            text = "You're not connected to the internet. Please try again.",
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(16.dp))
       }
 }
 

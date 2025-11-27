@@ -115,6 +115,7 @@ fun DrawerContent(
     onToggleSystem: (String) -> Unit = {},
     onSignOut: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onConnectorsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onProfileDisabledClick: () -> Unit = {},
     onClose: () -> Unit = {},
@@ -167,7 +168,7 @@ fun DrawerContent(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        DrawerConnectorsRow(onSettingsClick = onSettingsClick)
+        DrawerConnectorsRow(onConnectorsClick = onConnectorsClick)
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -277,7 +278,7 @@ private fun DrawerNewChatRow(onNewChat: () -> Unit) {
  * this entry from the bottom Settings icon.
  */
 @Composable
-private fun DrawerConnectorsRow(onSettingsClick: () -> Unit) {
+private fun DrawerConnectorsRow(onConnectorsClick: () -> Unit) {
   val colorScheme = MaterialTheme.colorScheme
   val primaryTextColor = colorScheme.onSurface
   val mutedIconColor = colorScheme.onSurfaceVariant
@@ -287,7 +288,7 @@ private fun DrawerConnectorsRow(onSettingsClick: () -> Unit) {
       modifier =
           Modifier.fillMaxWidth()
               .clip(RoundedCornerShape(12.dp))
-              .clickable { onSettingsClick() }
+              .clickable { onConnectorsClick() }
               .padding(vertical = 12.dp)
               .testTag(DrawerTags.ConnectorsRow)) {
         Row(verticalAlignment = Alignment.CenterVertically) {

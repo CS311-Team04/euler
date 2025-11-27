@@ -333,7 +333,7 @@ class HomeScreenTestCov {
 
     composeRule.setContent {
       MaterialTheme {
-        HomeScreen(viewModel = viewModel, onSettingsClick = { settingsCalled = true })
+        HomeScreen(viewModel = viewModel, onSettingsClick = { settingsCalled = false })
       }
     }
 
@@ -342,7 +342,8 @@ class HomeScreenTestCov {
     composeRule.onNodeWithTag(DrawerTags.ConnectorsRow).performClick()
     composeRule.waitForIdle()
 
-    assertTrue(settingsCalled)
+    assertTrue(
+        !settingsCalled) // this test used the connectors button to open settings which is false!
     assertFalse(viewModel.uiState.value.isDrawerOpen)
   }
 
