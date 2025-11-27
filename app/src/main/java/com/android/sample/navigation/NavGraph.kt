@@ -29,6 +29,7 @@ import com.android.sample.authentification.AuthUiState
 import com.android.sample.home.HomeScreen
 import com.android.sample.home.HomeViewModel
 import com.android.sample.network.AndroidNetworkConnectivityMonitor
+import com.android.sample.onboarding.OnboardingAcademicScreen
 import com.android.sample.onboarding.OnboardingPersonalInfoScreen
 import com.android.sample.onboarding.OnboardingRoleScreen
 import com.android.sample.profile.UserProfileRepository
@@ -46,6 +47,7 @@ object Routes {
   const val SignIn = "signin"
   const val OnboardingPersonalInfo = "onboarding_personal_info"
   const val OnboardingRole = "onboarding_role"
+  const val OnboardingAcademic = "onboarding_academic"
   const val Home = "home"
   const val HomeWithDrawer = "home_with_drawer"
   const val Settings = "settings"
@@ -228,8 +230,18 @@ fun AppNav(
 
   // Check for onboarding after sign-in
   LaunchedEffect(authState, currentDestination) {
-    if (authState is AuthUiState.SignedIn && currentDestination == Routes.SignIn) {
-      coroutineScope.launch { checkAndNavigateAfterSignIn(nav) }
+    when {
+      authState is AuthUiState.SignedIn && currentDestination == Routes.SignIn -> {
+        coroutineScope.launch { checkAndNavigateAfterSignIn(nav) }
+      }
+      authState is AuthUiState.Guest && currentDestination == Routes.SignIn -> {
+        // Navigate directly to Home for guest users (skip onboarding)
+        nav.navigate(Routes.Home) {
+          popUpTo(Routes.SignIn) { inclusive = true }
+          launchSingleTop = true
+          restoreState = true
+        }
+      }
     }
   }
 
@@ -298,9 +310,21 @@ fun AppNav(
         composable(Routes.OnboardingRole) {
           OnboardingRoleScreen(
               onContinue = {
+                // Navigate to step 3 (OnboardingAcademic)
+                nav.navigate(Routes.OnboardingAcademic) {
+                  popUpTo(Routes.OnboardingRole) { inclusive = false }
+                  launchSingleTop = true
+                }
+              })
+        }
+
+        // Onboarding Academic Screen (Step 3)
+        composable(Routes.OnboardingAcademic) {
+          OnboardingAcademicScreen(
+              onContinue = {
                 // Navigate to home after onboarding is complete
                 nav.navigate(Routes.Home) {
-                  popUpTo(Routes.OnboardingRole) { inclusive = true }
+                  popUpTo(Routes.OnboardingAcademic) { inclusive = true }
                   launchSingleTop = true
                 }
               })
