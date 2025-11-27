@@ -23,6 +23,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -93,7 +94,10 @@ fun OnboardingRoleScreen(onContinue: () -> Unit, viewModel: OnboardingRoleViewMo
               Button(
                   onClick = { viewModel.continueToNext(onContinue) },
                   enabled = uiState.canContinue,
-                  modifier = Modifier.fillMaxWidth().height(56.dp),
+                  modifier =
+                      Modifier.fillMaxWidth()
+                          .height(56.dp)
+                          .testTag("continue_button"),
                   shape = RoundedCornerShape(12.dp),
                   colors =
                       ButtonDefaults.buttonColors(
@@ -109,7 +113,10 @@ fun OnboardingRoleScreen(onContinue: () -> Unit, viewModel: OnboardingRoleViewMo
               OutlinedButton(
                   onClick = { viewModel.skip(onContinue) },
                   enabled = !uiState.isSaving,
-                  modifier = Modifier.fillMaxWidth().height(56.dp),
+                  modifier =
+                      Modifier.fillMaxWidth()
+                          .height(56.dp)
+                          .testTag("skip_button"),
                   shape = RoundedCornerShape(12.dp),
                   colors =
                       ButtonDefaults.outlinedButtonColors(

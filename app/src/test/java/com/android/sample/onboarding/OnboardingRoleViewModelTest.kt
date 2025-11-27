@@ -59,11 +59,11 @@ class OnboardingRoleViewModelTest {
   fun selectRole_clearsPreviousError() = runTest {
     // First, cause an error by making save fail
     whenever(mockRepository.loadProfile()).thenReturn(null)
-    whenever(mockRepository.saveProfile(org.mockito.kotlin.any())).thenThrow(
-        RuntimeException("Test error"))
+    whenever(mockRepository.saveProfile(org.mockito.kotlin.any()))
+        .thenThrow(RuntimeException("Test error"))
 
     viewModel.selectRole("Professor")
-    viewModel.continueToNext { /* navigation callback */ }
+    viewModel.continueToNext { /* navigation callback */}
     advanceUntilIdle()
 
     var state = viewModel.uiState.first()
@@ -119,7 +119,7 @@ class OnboardingRoleViewModelTest {
     whenever(mockRepository.loadProfile()).thenReturn(existingProfile)
 
     viewModel.selectRole("Professor")
-    viewModel.continueToNext { /* navigation callback */ }
+    viewModel.continueToNext { /* navigation callback */}
     advanceUntilIdle()
 
     // Verify saveProfile was called with preserved fields + new role
@@ -139,7 +139,7 @@ class OnboardingRoleViewModelTest {
   @Test
   fun continueToNext_doesNothing_whenNoRoleSelected() = runTest {
     // Don't select a role
-    viewModel.continueToNext { /* navigation callback */ }
+    viewModel.continueToNext { /* navigation callback */}
     advanceUntilIdle()
 
     // Verify saveProfile was never called
@@ -155,7 +155,7 @@ class OnboardingRoleViewModelTest {
     whenever(mockRepository.loadProfile()).thenReturn(null)
 
     viewModel.selectRole("Student")
-    viewModel.continueToNext { /* navigation callback */ }
+    viewModel.continueToNext { /* navigation callback */}
 
     // Check state immediately (before coroutine completes)
     val stateBefore = viewModel.uiState.first()
@@ -171,8 +171,8 @@ class OnboardingRoleViewModelTest {
   fun continueToNext_handlesException() = runTest {
     val errorMessage = "Network error"
     whenever(mockRepository.loadProfile()).thenReturn(null)
-    whenever(mockRepository.saveProfile(org.mockito.kotlin.any())).thenThrow(
-        RuntimeException(errorMessage))
+    whenever(mockRepository.saveProfile(org.mockito.kotlin.any()))
+        .thenThrow(RuntimeException(errorMessage))
 
     viewModel.selectRole("Administration")
     var navigationCalled = false
@@ -190,18 +190,17 @@ class OnboardingRoleViewModelTest {
   @Test
   fun continueToNext_handlesExceptionWithNullMessage() = runTest {
     whenever(mockRepository.loadProfile()).thenReturn(null)
-    whenever(mockRepository.saveProfile(org.mockito.kotlin.any())).thenThrow(
-        RuntimeException())
+    whenever(mockRepository.saveProfile(org.mockito.kotlin.any())).thenThrow(RuntimeException())
 
     viewModel.selectRole("Student")
-    viewModel.continueToNext { /* navigation callback */ }
+    viewModel.continueToNext { /* navigation callback */}
     advanceUntilIdle()
 
     val state = viewModel.uiState.first()
-    assertNotNull("Should have default error message when exception has no message", state.saveError)
+    assertNotNull(
+        "Should have default error message when exception has no message", state.saveError)
     assertTrue(
-        "Error should contain default message",
-        state.saveError!!.contains("Failed to save role"))
+        "Error should contain default message", state.saveError!!.contains("Failed to save role"))
   }
 
   @Test
@@ -243,7 +242,7 @@ class OnboardingRoleViewModelTest {
 
     whenever(mockRepository.loadProfile()).thenReturn(existingProfile)
 
-    viewModel.skip { /* navigation callback */ }
+    viewModel.skip { /* navigation callback */}
     advanceUntilIdle()
 
     // Verify saveProfile was called with preserved fields but empty roleDescription
@@ -264,8 +263,8 @@ class OnboardingRoleViewModelTest {
   fun skip_handlesException() = runTest {
     val errorMessage = "Save failed"
     whenever(mockRepository.loadProfile()).thenReturn(null)
-    whenever(mockRepository.saveProfile(org.mockito.kotlin.any())).thenThrow(
-        RuntimeException(errorMessage))
+    whenever(mockRepository.saveProfile(org.mockito.kotlin.any()))
+        .thenThrow(RuntimeException(errorMessage))
 
     var navigationCalled = false
     viewModel.skip { navigationCalled = true }
@@ -284,7 +283,7 @@ class OnboardingRoleViewModelTest {
     whenever(mockRepository.loadProfile()).thenReturn(null)
     whenever(mockRepository.saveProfile(org.mockito.kotlin.any())).thenThrow(RuntimeException())
 
-    viewModel.skip { /* navigation callback */ }
+    viewModel.skip { /* navigation callback */}
     advanceUntilIdle()
 
     val state = viewModel.uiState.first()
@@ -300,10 +299,11 @@ class OnboardingRoleViewModelTest {
 
     viewModel.selectRole("Student")
     val initialState = viewModel.uiState.first()
-    assertTrue("Continue should be enabled when role selected and not saving", initialState.canContinue)
+    assertTrue(
+        "Continue should be enabled when role selected and not saving", initialState.canContinue)
 
     // Start saving
-    viewModel.continueToNext { /* navigation callback */ }
+    viewModel.continueToNext { /* navigation callback */}
     // Note: With test dispatcher, this completes quickly, but the logic is correct
     advanceUntilIdle()
 
@@ -321,7 +321,7 @@ class OnboardingRoleViewModelTest {
     for (role in roles) {
       val testViewModel = OnboardingRoleViewModel(profileRepository = mockRepository)
       testViewModel.selectRole(role)
-      testViewModel.continueToNext { /* navigation callback */ }
+      testViewModel.continueToNext { /* navigation callback */}
       advanceUntilIdle()
 
       val captor = argumentCaptor<UserProfile>()
@@ -334,4 +334,3 @@ class OnboardingRoleViewModelTest {
     }
   }
 }
-
