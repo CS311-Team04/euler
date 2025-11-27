@@ -121,14 +121,6 @@ internal fun navigateHomeFromSignIn(navigate: NavigateAction) {
 }
 
 @VisibleForTesting
-internal fun navigateToOnboarding(navigate: NavigateAction) {
-  navigate(Routes.OnboardingPersonalInfo) {
-    popUpTo(Routes.SignIn) { inclusive = true }
-    launchSingleTop = true
-  }
-}
-
-@VisibleForTesting
 internal fun navigateHomeToSignIn(navigate: NavigateAction) {
   navigate(Routes.SignIn) {
     popUpTo(Routes.Home) { inclusive = true }
@@ -232,7 +224,6 @@ fun AppNav(
   // Get current back stack entry
   val navBackStackEntry by nav.currentBackStackEntryAsState()
   val currentDestination = navBackStackEntry?.destination?.route
-  val profileRepository = remember { UserProfileRepository() }
   val coroutineScope = rememberCoroutineScope()
 
   // Check for onboarding after sign-in

@@ -336,7 +336,6 @@ class OnboardingRoleScreenTest {
     advanceUntilIdle()
 
     composeRule.waitForIdle()
-
   }
 
   @Test

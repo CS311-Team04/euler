@@ -94,10 +94,7 @@ fun OnboardingRoleScreen(onContinue: () -> Unit, viewModel: OnboardingRoleViewMo
               Button(
                   onClick = { viewModel.continueToNext(onContinue) },
                   enabled = uiState.canContinue,
-                  modifier =
-                      Modifier.fillMaxWidth()
-                          .height(56.dp)
-                          .testTag("continue_button"),
+                  modifier = Modifier.fillMaxWidth().height(56.dp).testTag("continue_button"),
                   shape = RoundedCornerShape(12.dp),
                   colors =
                       ButtonDefaults.buttonColors(
@@ -113,10 +110,7 @@ fun OnboardingRoleScreen(onContinue: () -> Unit, viewModel: OnboardingRoleViewMo
               OutlinedButton(
                   onClick = { viewModel.skip(onContinue) },
                   enabled = !uiState.isSaving,
-                  modifier =
-                      Modifier.fillMaxWidth()
-                          .height(56.dp)
-                          .testTag("skip_button"),
+                  modifier = Modifier.fillMaxWidth().height(56.dp).testTag("skip_button"),
                   shape = RoundedCornerShape(12.dp),
                   colors =
                       ButtonDefaults.outlinedButtonColors(
