@@ -12,10 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,7 +20,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -93,39 +89,11 @@ fun OnboardingRoleScreen(onContinue: () -> Unit, viewModel: OnboardingRoleViewMo
         }
 
         // Buttons
-        Column(
-            modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-              // Continue button
-              Button(
-                  onClick = { viewModel.continueToNext(onContinue) },
-                  enabled = uiState.canContinue,
-                  modifier = Modifier.fillMaxWidth().height(56.dp).testTag("continue_button"),
-                  shape = RoundedCornerShape(12.dp),
-                  colors =
-                      ButtonDefaults.buttonColors(
-                          containerColor = colorScheme.primary,
-                          disabledContainerColor = colorScheme.surfaceVariant)) {
-                    Text(
-                        text = if (uiState.isSaving) "Saving..." else "Continue",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium)
-                  }
-
-              // Skip button
-              OutlinedButton(
-                  onClick = { viewModel.skip(onContinue) },
-                  enabled = !uiState.isSaving,
-                  modifier = Modifier.fillMaxWidth().height(56.dp).testTag("skip_button"),
-                  shape = RoundedCornerShape(12.dp),
-                  colors =
-                      ButtonDefaults.outlinedButtonColors(
-                          contentColor = colorScheme.onSurfaceVariant)) {
-                    Text(
-                        text = if (uiState.isSaving) "Saving..." else "Skip",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium)
-                  }
-            }
+        OnboardingNavigationFooter(
+            onContinue = { viewModel.continueToNext(onContinue) },
+            onSkip = { viewModel.skip(onContinue) },
+            canContinue = uiState.canContinue,
+            isSaving = uiState.isSaving)
       }
 }
 
