@@ -1,4 +1,4 @@
-/// <reference types="jest" />
+import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
 
 import { EdConnectorService } from "../src/connectors/ed/EdConnectorService";
 import { EdConnectorRepository } from "../src/connectors/ed/EdConnectorRepository";
@@ -21,7 +21,7 @@ const decrypt = (cipher: string) => cipher.replace(/^enc:/, "");
 describe("EdConnectorService", () => {
   let repo: jest.Mocked<EdConnectorRepository>;
   let service: EdConnectorService;
-  let testConnectionMock: jest.Mock;
+  let testConnectionMock: any;
 
   beforeEach(() => {
     // Mock repository

@@ -54,6 +54,7 @@ object Localization {
           "disconnect_confirm_title" to "Disconnect?",
           "disconnect_confirm_message" to "Are you sure you want to disconnect %s?",
           "cancel" to "Cancel",
+          "ed_connect_generic_error" to "Failed to connect to ED. Please try again.",
 
           // Home Screen - Navigation
           "menu" to "Menu",
@@ -133,6 +134,7 @@ object Localization {
           "disconnect_confirm_title" to "Déconnecter?",
           "disconnect_confirm_message" to "Êtes-vous sûr de vouloir déconnecter %s?",
           "cancel" to "Annuler",
+          "ed_connect_generic_error" to "La connexion à ED a échoué. Veuillez réessayer.",
 
           // Home Screen - Navigation
           "menu" to "Menu",

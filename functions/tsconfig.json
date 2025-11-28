@@ -7,10 +7,10 @@
     "strict": true,
     "skipLibCheck": true,
     "outDir": "lib",
+    "rootDir": "src",
     "sourceMap": true,
     "noImplicitReturns": true,
-    "noUnusedLocals": true,
-    "types": ["node", "jest"]
+    "noUnusedLocals": true
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": ["src"]
 }
