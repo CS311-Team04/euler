@@ -542,7 +542,6 @@ fun AppNav(
           composable(Routes.VoiceChat) {
             val parentEntry = nav.getBackStackEntry("home_root")
             val homeViewModel: HomeViewModel = viewModel(parentEntry)
-            val homeUiState by homeViewModel.uiState.collectAsState()
 
             // Create VoiceChatViewModel with conversation repository and current conversation ID
             // The lambda reads the current state each time it's called
