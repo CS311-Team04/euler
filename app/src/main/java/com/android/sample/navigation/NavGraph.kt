@@ -10,7 +10,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModelProvider
@@ -22,10 +21,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navigation
+import com.android.sample.VoiceChat.Backend.VoiceChatViewModel
 import com.android.sample.VoiceChat.UI.VoiceScreen
 import com.android.sample.auth.MicrosoftAuth
 import com.android.sample.authentification.AuthUIScreen
 import com.android.sample.authentification.AuthUiState
+import com.android.sample.conversations.ConversationRepository
 import com.android.sample.home.HomeScreen
 import com.android.sample.home.HomeViewModel
 import com.android.sample.network.AndroidNetworkConnectivityMonitor
@@ -40,7 +41,8 @@ import com.android.sample.sign_in.AuthViewModel
 import com.android.sample.speech.SpeechPlayback
 import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.splash.OpeningScreen
-import kotlinx.coroutines.launch
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 object Routes {
   const val Opening = "opening"
@@ -229,13 +231,12 @@ fun AppNav(
   // Get current back stack entry
   val navBackStackEntry by nav.currentBackStackEntryAsState()
   val currentDestination = navBackStackEntry?.destination?.route
-  val coroutineScope = rememberCoroutineScope()
 
   // Check for onboarding after sign-in
   LaunchedEffect(authState, currentDestination) {
     when {
       authState is AuthUiState.SignedIn && currentDestination == Routes.SignIn -> {
-        coroutineScope.launch { navigateToOnboardingOrHome(nav) }
+        navigateToOnboardingOrHome(nav)
       }
       authState is AuthUiState.Guest && currentDestination == Routes.SignIn -> {
         // Navigate directly to Home for guest users (skip onboarding)
@@ -539,10 +540,37 @@ fun AppNav(
 
           // Voice Chat Screen
           composable(Routes.VoiceChat) {
+            val parentEntry = nav.getBackStackEntry("home_root")
+            val homeViewModel: HomeViewModel = viewModel(parentEntry)
+            val homeUiState by homeViewModel.uiState.collectAsState()
+
+            // Create VoiceChatViewModel with conversation repository and current conversation ID
+            // The lambda reads the current state each time it's called
+            val voiceChatViewModel =
+                remember(homeViewModel) {
+                  val conversationRepo =
+                      try {
+                        ConversationRepository(
+                            FirebaseAuth.getInstance(), FirebaseFirestore.getInstance())
+                      } catch (e: Exception) {
+                        null // Guest mode - no repository
+                      }
+                  VoiceChatViewModel(
+                      conversationRepository = conversationRepo,
+                      getCurrentConversationId = {
+                        homeViewModel.uiState.value.currentConversationId
+                      },
+                      onConversationCreated = { conversationId ->
+                        // Select the newly created conversation in HomeViewModel
+                        homeViewModel.selectConversation(conversationId)
+                      })
+                }
+
             VoiceScreen(
                 onClose = { nav.popBackStack() },
                 modifier = Modifier.fillMaxSize(),
-                speechHelper = speechHelper)
+                speechHelper = speechHelper,
+                voiceChatViewModel = voiceChatViewModel)
           }
         }
       }
