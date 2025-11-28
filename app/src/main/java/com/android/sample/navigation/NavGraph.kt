@@ -181,34 +181,6 @@ internal fun handleProfileClick(
 }
 
 /**
- * Creates a ConversationRepository with try-catch handling for guest mode (lines 551-557). Returns
- * null if an exception occurs during creation.
- */
-@VisibleForTesting
-internal fun createConversationRepositoryOrNull(): ConversationRepository? {
-  return try {
-    ConversationRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance())
-  } catch (e: Exception) {
-    null // Guest mode - no repository
-  }
-}
-
-/** Creates the getCurrentConversationId lambda function as used in NavGraph (lines 560-561). */
-@VisibleForTesting
-internal fun createGetCurrentConversationIdLambda(homeViewModel: HomeViewModel): () -> String? {
-  return { homeViewModel.uiState.value.currentConversationId }
-}
-
-/** Creates the onConversationCreated callback as used in NavGraph (lines 562-565). */
-@VisibleForTesting
-internal fun createOnConversationCreatedCallback(homeViewModel: HomeViewModel): (String) -> Unit {
-  return { conversationId ->
-    // Select the newly created conversation in HomeViewModel
-    homeViewModel.selectConversation(conversationId)
-  }
-}
-
-/**
  * Routes the signed-in user to either onboarding or home based on their profile status. Assumes the
  * user is authenticated (caller guarantees this).
  * - If profile is null or incomplete (no fullName), navigates to onboarding.
@@ -575,12 +547,22 @@ fun AppNav(
             // The lambda reads the current state each time it's called
             val voiceChatViewModel =
                 remember(homeViewModel) {
-                  val conversationRepo = createConversationRepositoryOrNull()
+                  val conversationRepo =
+                      try {
+                        ConversationRepository(
+                            FirebaseAuth.getInstance(), FirebaseFirestore.getInstance())
+                      } catch (e: Exception) {
+                        null // Guest mode - no repository
+                      }
                   VoiceChatViewModel(
                       conversationRepository = conversationRepo,
-                      getCurrentConversationId =
-                          createGetCurrentConversationIdLambda(homeViewModel),
-                      onConversationCreated = createOnConversationCreatedCallback(homeViewModel))
+                      getCurrentConversationId = {
+                        homeViewModel.uiState.value.currentConversationId
+                      },
+                      onConversationCreated = { conversationId ->
+                        // Select the newly created conversation in HomeViewModel
+                        homeViewModel.selectConversation(conversationId)
+                      })
                 }
 
             VoiceScreen(
