@@ -179,12 +179,15 @@ internal fun handleProfileClick(
 }
 
 /**
- * Checks if the user has completed onboarding (has a profile) and navigates accordingly. If no
- * profile exists, navigates to onboarding. Otherwise, navigates to home.
+ * Routes the signed-in user to either onboarding or home based on their profile status. Assumes the
+ * user is authenticated (caller guarantees this).
+ * - If profile is null or incomplete (no fullName), navigates to onboarding.
+ * - Otherwise, navigates to home.
  */
-private suspend fun checkAndNavigateAfterSignIn(nav: NavHostController) {
+private suspend fun navigateToOnboardingOrHome(nav: NavHostController) {
   val profileRepository = UserProfileRepository()
   val profile = profileRepository.loadProfile()
+
   if (profile == null || profile.fullName.isBlank()) {
     // User needs onboarding - navigate to onboarding screen
     nav.navigate(Routes.OnboardingPersonalInfo) {
@@ -232,7 +235,7 @@ fun AppNav(
   LaunchedEffect(authState, currentDestination) {
     when {
       authState is AuthUiState.SignedIn && currentDestination == Routes.SignIn -> {
-        coroutineScope.launch { checkAndNavigateAfterSignIn(nav) }
+        coroutineScope.launch { navigateToOnboardingOrHome(nav) }
       }
       authState is AuthUiState.Guest && currentDestination == Routes.SignIn -> {
         // Navigate directly to Home for guest users (skip onboarding)
@@ -265,7 +268,7 @@ fun AppNav(
         navigateHome = {
           // Navigation will be handled by the onboarding check LaunchedEffect above
           // This is kept for backward compatibility but the actual navigation
-          // happens in the checkAndNavigateAfterSignIn function
+          // happens in the navigateToOnboardingOrHome function
         })
   }
 
@@ -323,8 +326,9 @@ fun AppNav(
           OnboardingAcademicScreen(
               onContinue = {
                 // Navigate to home after onboarding is complete
+                // Clear entire back stack so Home becomes the new root
                 nav.navigate(Routes.Home) {
-                  popUpTo(Routes.OnboardingAcademic) { inclusive = true }
+                  popUpTo(Routes.SignIn) { inclusive = true }
                   launchSingleTop = true
                 }
               })
