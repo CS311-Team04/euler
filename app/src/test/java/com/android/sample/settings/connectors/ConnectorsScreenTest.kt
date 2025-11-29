@@ -13,7 +13,12 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.platform.app.InstrumentationRegistry
 import com.android.sample.settings.connectors.Connector
+import com.android.sample.settings.connectors.ConnectorsColors
 import com.android.sample.settings.connectors.ConnectorsScreen
+import com.android.sample.settings.connectors.DisconnectConfirmationDialog
+import com.android.sample.settings.connectors.getDialogSurfaceColor
+import com.android.sample.ui.theme.ConnectorsLightSurface
+import com.android.sample.ui.theme.DarkSurface
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import kotlinx.coroutines.Dispatchers
@@ -761,5 +766,62 @@ class ConnectorsScreenTest {
         return@repeat
       }
     }
+  }
+
+  // Tests directs pour augmenter la couverture - testent toutes les branches
+  @Test
+  fun `getDialogSurfaceColor dark mode`() {
+    assertEquals(DarkSurface, getDialogSurfaceColor(true))
+  }
+
+  @Test
+  fun `getDialogSurfaceColor light mode`() {
+    assertEquals(ConnectorsLightSurface, getDialogSurfaceColor(false))
+  }
+
+  @Test
+  fun `DisconnectConfirmationDialog light mode`() {
+    val colors =
+        ConnectorsColors(
+            background = androidx.compose.ui.graphics.Color.White,
+            textPrimary = androidx.compose.ui.graphics.Color.Black,
+            textSecondary = androidx.compose.ui.graphics.Color.Gray,
+            textSecondary50 = androidx.compose.ui.graphics.Color.LightGray,
+            glassBackground = androidx.compose.ui.graphics.Color.White,
+            glassBorder = androidx.compose.ui.graphics.Color.Gray,
+            shadowSpot = androidx.compose.ui.graphics.Color.Black,
+            shadowAmbient = androidx.compose.ui.graphics.Color.Black,
+            onPrimaryColor = androidx.compose.ui.graphics.Color.White,
+            connectedGreen = androidx.compose.ui.graphics.Color.Green,
+            connectedGreenBackground = androidx.compose.ui.graphics.Color.Green,
+            accentRed = androidx.compose.ui.graphics.Color.Red)
+    composeRule.setContent {
+      MaterialTheme { DisconnectConfirmationDialog("Test", colors, false, {}, {}) }
+    }
+    composeRule.waitForIdle()
+    composeRule.onNodeWithText("Disconnect?", substring = true).assertIsDisplayed()
+  }
+
+  @Test
+  fun `DisconnectConfirmationDialog dark mode`() {
+    val colors =
+        ConnectorsColors(
+            background = androidx.compose.ui.graphics.Color.Black,
+            textPrimary = androidx.compose.ui.graphics.Color.White,
+            textSecondary = androidx.compose.ui.graphics.Color.LightGray,
+            textSecondary50 = androidx.compose.ui.graphics.Color.Gray,
+            glassBackground = androidx.compose.ui.graphics.Color.DarkGray,
+            glassBorder = androidx.compose.ui.graphics.Color.Gray,
+            shadowSpot = androidx.compose.ui.graphics.Color.Black,
+            shadowAmbient = androidx.compose.ui.graphics.Color.Black,
+            onPrimaryColor = androidx.compose.ui.graphics.Color.White,
+            connectedGreen = androidx.compose.ui.graphics.Color.Green,
+            connectedGreenBackground = androidx.compose.ui.graphics.Color.Green,
+            accentRed = androidx.compose.ui.graphics.Color.Red)
+    composeRule.setContent {
+      MaterialTheme { DisconnectConfirmationDialog("Test", colors, true, {}, {}) }
+    }
+    composeRule.waitForIdle()
+    composeRule.onNodeWithText("Disconnect?", substring = true).assertIsDisplayed()
   }
 }

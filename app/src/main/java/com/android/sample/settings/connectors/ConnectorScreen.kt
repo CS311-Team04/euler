@@ -229,12 +229,12 @@ fun ConnectorsScreen(
 }
 
 /** Computes dialog surface color based on theme. */
-private fun getDialogSurfaceColor(isDark: Boolean) =
+internal fun getDialogSurfaceColor(isDark: Boolean) =
     if (isDark) DarkSurface else ConnectorsLightSurface
 
 /** Clean and minimal disconnect confirmation dialog */
 @Composable
-private fun DisconnectConfirmationDialog(
+internal fun DisconnectConfirmationDialog(
     connectorName: String,
     colors: ConnectorsColors,
     isDark: Boolean,
@@ -287,7 +287,7 @@ private fun DisconnectConfirmationDialog(
 }
 
 @Composable
-private fun EdConnectDialog(
+internal fun EdConnectDialog(
     colors: ConnectorsColors,
     isDark: Boolean,
     isLoading: Boolean,
