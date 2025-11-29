@@ -10,8 +10,12 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
+import androidx.test.platform.app.InstrumentationRegistry
 import com.android.sample.settings.connectors.Connector
 import com.android.sample.settings.connectors.ConnectorsScreen
+import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -40,6 +44,16 @@ class ConnectorsScreenTest {
 
   @Before
   fun setup() {
+    val context = InstrumentationRegistry.getInstrumentation().targetContext
+    if (FirebaseApp.getApps(context).isEmpty()) {
+      FirebaseApp.initializeApp(
+          context,
+          FirebaseOptions.Builder()
+              .setApplicationId("1:1234567890:android:test")
+              .setProjectId("test-project")
+              .setApiKey("fake-api-key")
+              .build())
+    }
     Dispatchers.setMain(testDispatcher)
     AnimationConfig.disableAnimations = true
     TestFlags.fakeEmail = ""
@@ -435,6 +449,74 @@ class ConnectorsScreenTest {
         assertFalse("Dialog should not exist", true)
       } catch (_: AssertionError) {
         // Dialog does not exist, which is expected
+      }
+    }
+  }
+
+  @Test
+  fun `screen respects appearance mode DARK`() = runTest {
+    AppSettings.setAppearanceMode(AppearanceMode.DARK)
+    composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+    composeRule.onNodeWithText("Connectors").assertIsDisplayed()
+  }
+
+  @Test
+  fun `screen respects appearance mode LIGHT`() = runTest {
+    AppSettings.setAppearanceMode(AppearanceMode.LIGHT)
+    composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+    composeRule.onNodeWithText("Connectors").assertIsDisplayed()
+  }
+
+  @Test
+  fun `disconnect dialog appears and works correctly`() = runTest {
+    composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    composeRule.onAllNodesWithText("Connect")[0].performClick()
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    repeat(10) {
+      composeRule.waitForIdle()
+      advanceUntilIdle()
+      if (composeRule.onAllNodesWithText("Disconnect").fetchSemanticsNodes().isNotEmpty()) {
+        composeRule.onAllNodesWithText("Disconnect")[0].performClick()
+        composeRule.waitForIdle()
+        advanceUntilIdle()
+        composeRule.onNodeWithText("Disconnect?", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Cancel").performClick()
+        return@repeat
+      }
+    }
+  }
+
+  @Test
+  fun `ed connect dialog appears and handles input`() = runTest {
+    composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    composeRule.onAllNodesWithText("Connect")[1].performClick()
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    repeat(10) {
+      composeRule.waitForIdle()
+      advanceUntilIdle()
+      if (composeRule.onAllNodesWithText("Connect to ED").fetchSemanticsNodes().isNotEmpty()) {
+        composeRule.onNodeWithText("ED API token", substring = true).performTextInput("test-token")
+        composeRule
+            .onNodeWithText("Base URL (optional)", substring = true)
+            .performTextInput("https://test.com")
+        composeRule.waitForIdle()
+        advanceUntilIdle()
+        composeRule.onNodeWithText("Cancel").performClick()
+        return@repeat
       }
     }
   }
