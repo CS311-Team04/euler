@@ -13,7 +13,9 @@ import { EdConnectorRepository } from "./connectors/ed/EdConnectorRepository";
 import { EdConnectorService } from "./connectors/ed/EdConnectorService";
 import { encryptSecret, decryptSecret } from "./security/secretCrypto";
 
+
 const europeFunctions = functions.region("europe-west6");
+
 
 /* ---------- helpers ---------- */
 function withV1(url?: string): string {
@@ -37,11 +39,22 @@ function normalizePointId(id: string | number): string | number {
 
 /* ---------- clients ---------- */
 // Chat = PublicAI (Apertus)
-const chatClient = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-  baseURL: withV1(process.env.OPENAI_BASE_URL),
-  defaultHeaders: { "User-Agent": "euler-mvp/1.0 (genkit-functions)" },
-});
+let chatClient: OpenAI | null = null;
+function getChatClient(): OpenAI {
+  if (!chatClient) {
+    chatClient = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY!,
+      baseURL: withV1(process.env.OPENAI_BASE_URL),
+      defaultHeaders: { "User-Agent": "euler-mvp/1.0 (genkit-functions)" },
+    });
+  }
+  return chatClient;
+}
+
+// For testing: allow overriding the client
+export function setChatClient(client: OpenAI | null) {
+  chatClient = client;
+}
 
 // Firebase Admin (Firestore)
 if (!admin.apps.length) {
@@ -86,16 +99,19 @@ const EPFL_SYSTEM_PROMPT =
  *                         CHAT (optional)
  * ======================================================= */
 export async function apertusChatFnCore({
-  messages, model, temperature,
+  messages, model, temperature, client,
 }: {
   messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
-  model?: string; temperature?: number;
+  model?: string; 
+  temperature?: number;
+  client?: OpenAI;
 }) {
   const finalMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [
     { role: "system", content: EPFL_SYSTEM_PROMPT },
     ...messages,
   ];
-  const resp = await chatClient.chat.completions.create({
+  const activeClient = client ?? getChatClient();
+  const resp = await activeClient.chat.completions.create({
     model: model ?? process.env.APERTUS_MODEL_ID!,
     messages: finalMessages,
     temperature: temperature ?? 0.2,
@@ -110,7 +126,7 @@ export async function apertusChatFnCore({
  * ======================================================= */
 type GenerateTitleInput = { question: string; model?: string };
 
-export async function generateTitleCore({ question, model }: GenerateTitleInput) {
+export async function generateTitleCore({ question, model, client }: GenerateTitleInput & { client?: OpenAI }) {
   const prompt = [
     "Generate a concise conversation title (4-5 words max, no trailing punctuation).",
     `User's first question: "${question.trim()}"`,
@@ -122,11 +138,13 @@ export async function generateTitleCore({ question, model }: GenerateTitleInput)
     messages: [{ role: "user", content: prompt }],
     model,
     temperature: 0.2,
+    client,
   });
 
   const title = (reply || "")
     .replace(/\s+/g, " ")
-    .replace(/^["'“”]+|["'“”]+$/g, "")
+    .replace(/^["'""«»]+|["'""«»]+$/g, "") // Strip quotes from start/end
+    .replace(/^["'""«»\s]+|["'""«»\s]+$/g, "") // Second pass for nested quotes
     .trim()
     .slice(0, 60);
 
@@ -375,8 +393,8 @@ type AnswerWithRagInput = {
 };
 
 export async function answerWithRagCore({
-  question, topK, model, summary, recentTranscript,
-}: AnswerWithRagInput) {
+  question, topK, model, summary, recentTranscript, client,
+}: AnswerWithRagInput & { client?: OpenAI }) {
   const q = question.trim();
 
   // Gate 1: skip retrieval on small talk
@@ -493,7 +511,8 @@ export async function answerWithRagCore({
     .filter(Boolean)
     .join("\n\n");
 
-  const chat = await chatClient.chat.completions.create({
+  const activeClient = client ?? getChatClient();
+  const chat = await activeClient.chat.completions.create({
     model: model ?? process.env.APERTUS_MODEL_ID!,
     messages: [
       { role: "system", content: systemContent },
@@ -534,9 +553,11 @@ function clampText(s: string | undefined | null, max = 1200): string {
 async function buildRollingSummary({
   priorSummary,
   recentTurns,
+  client,
 }: {
   priorSummary?: string;
   recentTurns: ChatTurn[];
+  client?: OpenAI;
 }): Promise<string> {
   // Keep inputs short and deterministic
   const sys =
@@ -578,7 +599,8 @@ async function buildRollingSummary({
   });
 
   const modelId = process.env.APERTUS_SUMMARY_MODEL_ID || process.env.APERTUS_MODEL_ID!;
-  const resp = await chatClient.chat.completions.create({
+  const activeClient = client ?? getChatClient();
+  const resp = await activeClient.chat.completions.create({
     model: modelId,
     messages: parts,
     temperature: 0.1,
@@ -671,7 +693,7 @@ export const indexChunksFn = europeFunctions.https.onCall(async (data: IndexChun
 export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerWithRagInput) => {
   try {
     const question = String(data?.question || "").trim();
-    const topK = Number(data?.topK ?? 5);
+    const topK = Number(data?.topK ?? 2);
     const model = data?.model;
     const summary = typeof data?.summary === "string" ? data.summary : undefined;
     const recentTranscript =
@@ -853,3 +875,92 @@ export const edConnectorTestFn = europeFunctions.https.onCall(
   }
 );
 
+/* =========================================================
+ *                MOODLE CONNECTOR
+ * ======================================================= */
+import { MoodleConnectorRepository } from "./connectors/moodle/MoodleConnectorRepository";
+import { MoodleConnectorService } from "./connectors/moodle/MoodleConnectorService";
+
+// simple placeholder encryption for dev.
+const encrypt = (plain: string): string => plain; // todo
+const decrypt = (cipher: string): string => cipher; // to do
+
+const moodleRepo = new MoodleConnectorRepository(db);
+const moodleService = new MoodleConnectorService(moodleRepo, encrypt, decrypt);
+// callable functions
+export const connectorsMoodleStatusFn = europeFunctions.https.onCall(
+  async (data, context) => {
+    if (!context.auth?.uid) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "User must be authenticated"
+      );
+    }
+
+    const config = await moodleService.getStatus(context.auth.uid);
+    return {
+      status: config.status,
+      lastTestAt: config.lastTestAt ?? null,
+      lastError: config.lastError ?? null,
+    };
+  }
+);
+// attempts to connect to Moodle with provided baseUrl and token
+export const connectorsMoodleConnectFn = europeFunctions.https.onCall(
+  async (data, context) => {
+    if (!context.auth?.uid) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "User must be authenticated"
+      );
+    }
+
+    const baseUrl = String(data?.baseUrl || "").trim();
+    const token = String(data?.token || "").trim();
+    if (!baseUrl || !token) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "baseUrl and token are required"
+      );
+    }
+
+    const config = await moodleService.connect(context.auth.uid, { baseUrl, token });
+    return {
+      status: config.status,
+      lastTestAt: config.lastTestAt ?? null,
+      lastError: config.lastError ?? null,
+    };
+  }
+);
+// disconnects Moodle for the user
+export const connectorsMoodleDisconnectFn = europeFunctions.https.onCall(
+  async (data, context) => {
+    if (!context.auth?.uid) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "User must be authenticated"
+      );
+    }
+
+    await moodleService.disconnect(context.auth.uid);
+    return { status: "not_connected" };
+  }
+);
+// tests the Moodle connection for the user
+export const connectorsMoodleTestFn = europeFunctions.https.onCall(
+  async (data, context) => {
+    if (!context.auth?.uid) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "User must be authenticated"
+      );
+    }
+
+    const config = await moodleService.test(context.auth.uid);
+    return {
+      status: config.status,
+      lastTestAt: config.lastTestAt ?? null,
+      lastError: config.lastError ?? null,
+    };
+  }
+);

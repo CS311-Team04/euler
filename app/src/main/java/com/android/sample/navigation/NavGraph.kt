@@ -5,6 +5,7 @@ import android.app.Activity
 import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -28,7 +29,9 @@ import com.android.sample.authentification.AuthUiState
 import com.android.sample.home.HomeScreen
 import com.android.sample.home.HomeViewModel
 import com.android.sample.network.AndroidNetworkConnectivityMonitor
+import com.android.sample.onboarding.OnboardingAcademicScreen
 import com.android.sample.onboarding.OnboardingPersonalInfoScreen
+import com.android.sample.onboarding.OnboardingRoleScreen
 import com.android.sample.profile.UserProfileRepository
 import com.android.sample.settings.ProfileScreen
 import com.android.sample.settings.SettingsPage
@@ -43,6 +46,8 @@ object Routes {
   const val Opening = "opening"
   const val SignIn = "signin"
   const val OnboardingPersonalInfo = "onboarding_personal_info"
+  const val OnboardingRole = "onboarding_role"
+  const val OnboardingAcademic = "onboarding_academic"
   const val Home = "home"
   const val HomeWithDrawer = "home_with_drawer"
   const val Settings = "settings"
@@ -118,14 +123,6 @@ internal fun navigateHomeFromSignIn(navigate: NavigateAction) {
 }
 
 @VisibleForTesting
-internal fun navigateToOnboarding(navigate: NavigateAction) {
-  navigate(Routes.OnboardingPersonalInfo) {
-    popUpTo(Routes.SignIn) { inclusive = true }
-    launchSingleTop = true
-  }
-}
-
-@VisibleForTesting
 internal fun navigateHomeToSignIn(navigate: NavigateAction) {
   navigate(Routes.SignIn) {
     popUpTo(Routes.Home) { inclusive = true }
@@ -182,12 +179,15 @@ internal fun handleProfileClick(
 }
 
 /**
- * Checks if the user has completed onboarding (has a profile) and navigates accordingly. If no
- * profile exists, navigates to onboarding. Otherwise, navigates to home.
+ * Routes the signed-in user to either onboarding or home based on their profile status. Assumes the
+ * user is authenticated (caller guarantees this).
+ * - If profile is null or incomplete (no fullName), navigates to onboarding.
+ * - Otherwise, navigates to home.
  */
-private suspend fun checkAndNavigateAfterSignIn(nav: NavHostController) {
+private suspend fun navigateToOnboardingOrHome(nav: NavHostController) {
   val profileRepository = UserProfileRepository()
   val profile = profileRepository.loadProfile()
+
   if (profile == null || profile.fullName.isBlank()) {
     // User needs onboarding - navigate to onboarding screen
     nav.navigate(Routes.OnboardingPersonalInfo) {
@@ -214,6 +214,10 @@ fun AppNav(
 ) {
   val context = LocalContext.current
   val networkMonitor = remember { AndroidNetworkConnectivityMonitor(context) }
+
+  // Cleanup network monitor when composable is disposed
+  DisposableEffect(networkMonitor) { onDispose { networkMonitor.unregister() } }
+
   val nav =
       rememberNavController().also { controller -> appNavControllerObserver?.invoke(controller) }
   val authViewModel =
@@ -225,13 +229,22 @@ fun AppNav(
   // Get current back stack entry
   val navBackStackEntry by nav.currentBackStackEntryAsState()
   val currentDestination = navBackStackEntry?.destination?.route
-  val profileRepository = remember { UserProfileRepository() }
   val coroutineScope = rememberCoroutineScope()
 
   // Check for onboarding after sign-in
   LaunchedEffect(authState, currentDestination) {
-    if (authState is AuthUiState.SignedIn && currentDestination == Routes.SignIn) {
-      coroutineScope.launch { checkAndNavigateAfterSignIn(nav) }
+    when {
+      authState is AuthUiState.SignedIn && currentDestination == Routes.SignIn -> {
+        coroutineScope.launch { navigateToOnboardingOrHome(nav) }
+      }
+      authState is AuthUiState.Guest && currentDestination == Routes.SignIn -> {
+        // Navigate directly to Home for guest users (skip onboarding)
+        nav.navigate(Routes.Home) {
+          popUpTo(Routes.SignIn) { inclusive = true }
+          launchSingleTop = true
+          restoreState = true
+        }
+      }
     }
   }
 
@@ -255,7 +268,7 @@ fun AppNav(
         navigateHome = {
           // Navigation will be handled by the onboarding check LaunchedEffect above
           // This is kept for backward compatibility but the actual navigation
-          // happens in the checkAndNavigateAfterSignIn function
+          // happens in the navigateToOnboardingOrHome function
         })
   }
 
@@ -284,13 +297,38 @@ fun AppNav(
               isOffline = isOffline)
         }
 
-        // Onboarding Personal Info Screen
+        // Onboarding Personal Info Screen (Step 1)
         composable(Routes.OnboardingPersonalInfo) {
           OnboardingPersonalInfoScreen(
               onContinue = {
+                // Navigate to step 2 (OnboardingRole)
+                nav.navigate(Routes.OnboardingRole) {
+                  popUpTo(Routes.OnboardingPersonalInfo) { inclusive = false }
+                  launchSingleTop = true
+                }
+              })
+        }
+
+        // Onboarding Role Screen (Step 2)
+        composable(Routes.OnboardingRole) {
+          OnboardingRoleScreen(
+              onContinue = {
+                // Navigate to step 3 (OnboardingAcademic)
+                nav.navigate(Routes.OnboardingAcademic) {
+                  popUpTo(Routes.OnboardingRole) { inclusive = false }
+                  launchSingleTop = true
+                }
+              })
+        }
+
+        // Onboarding Academic Screen (Step 3)
+        composable(Routes.OnboardingAcademic) {
+          OnboardingAcademicScreen(
+              onContinue = {
                 // Navigate to home after onboarding is complete
+                // Clear entire back stack so Home becomes the new root
                 nav.navigate(Routes.Home) {
-                  popUpTo(Routes.OnboardingPersonalInfo) { inclusive = true }
+                  popUpTo(Routes.SignIn) { inclusive = true }
                   launchSingleTop = true
                 }
               })
