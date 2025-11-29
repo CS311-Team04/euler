@@ -14,7 +14,9 @@ const ALGORITHM = "aes-256-gcm";
 const KEY_ENV_VAR = "CONNECTORS_SECRET_KEY";
 
 // Derive a 32-byte key from the env var using SHA-256
-const rawKey = process.env[KEY_ENV_VAR];
+const rawKey =
+  process.env[KEY_ENV_VAR] ||
+  (process.env.NODE_ENV === "test" ? "test-secret-key" : undefined);
 
 if (!rawKey) {
   // You can also choose to log a warning instead of throwing,
