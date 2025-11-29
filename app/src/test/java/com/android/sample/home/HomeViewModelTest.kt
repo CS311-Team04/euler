@@ -413,7 +413,8 @@ class HomeViewModelTest {
         "llmClient",
         object : LlmClient {
           override suspend fun generateReply(prompt: String): BotReply =
-              BotReply("Voici un lien utile.", "https://www.epfl.ch/education/projects")
+              BotReply(
+                  "Voici un lien utile.", "https://www.epfl.ch/education/projects", false, null)
         })
 
     viewModel.updateMessageDraft("Où trouver des projets ?")
