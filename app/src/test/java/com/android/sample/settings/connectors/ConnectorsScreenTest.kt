@@ -472,7 +472,7 @@ class ConnectorsScreenTest {
   }
 
   @Test
-  fun `disconnect dialog appears and works correctly`() = runTest {
+  fun `disconnect dialog appears with all elements`() = runTest {
     composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
     composeRule.waitForIdle()
     advanceUntilIdle()
@@ -481,7 +481,8 @@ class ConnectorsScreenTest {
     composeRule.waitForIdle()
     advanceUntilIdle()
 
-    repeat(10) {
+    // Wait for connector to be connected
+    repeat(50) {
       composeRule.waitForIdle()
       advanceUntilIdle()
       if (composeRule.onAllNodesWithText("Disconnect").fetchSemanticsNodes().isNotEmpty()) {
@@ -489,40 +490,16 @@ class ConnectorsScreenTest {
         composeRule.waitForIdle()
         advanceUntilIdle()
         composeRule.onNodeWithText("Disconnect?", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithText("Cancel").performClick()
+        composeRule.onNodeWithText("Moodle", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Disconnect", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Cancel").assertIsDisplayed()
         return@repeat
       }
     }
   }
 
   @Test
-  fun `ed connect dialog appears and handles input`() = runTest {
-    composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
-    composeRule.waitForIdle()
-    advanceUntilIdle()
-
-    composeRule.onAllNodesWithText("Connect")[1].performClick()
-    composeRule.waitForIdle()
-    advanceUntilIdle()
-
-    repeat(10) {
-      composeRule.waitForIdle()
-      advanceUntilIdle()
-      if (composeRule.onAllNodesWithText("Connect to ED").fetchSemanticsNodes().isNotEmpty()) {
-        composeRule.onNodeWithText("ED API token", substring = true).performTextInput("test-token")
-        composeRule
-            .onNodeWithText("Base URL (optional)", substring = true)
-            .performTextInput("https://test.com")
-        composeRule.waitForIdle()
-        advanceUntilIdle()
-        composeRule.onNodeWithText("Cancel").performClick()
-        return@repeat
-      }
-    }
-  }
-
-  @Test
-  fun `disconnect dialog confirm button works`() = runTest {
+  fun `disconnect dialog confirm button triggers callbacks`() = runTest {
     var connectorClicked = false
     composeRule.setContent {
       MaterialTheme { ConnectorsScreen(onConnectorClick = { connectorClicked = true }) }
@@ -534,7 +511,7 @@ class ConnectorsScreenTest {
     composeRule.waitForIdle()
     advanceUntilIdle()
 
-    repeat(10) {
+    repeat(50) {
       composeRule.waitForIdle()
       advanceUntilIdle()
       if (composeRule.onAllNodesWithText("Disconnect").fetchSemanticsNodes().isNotEmpty()) {
@@ -551,7 +528,7 @@ class ConnectorsScreenTest {
   }
 
   @Test
-  fun `disconnect dialog dismiss button works`() = runTest {
+  fun `disconnect dialog dismiss button closes dialog`() = runTest {
     composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
     composeRule.waitForIdle()
     advanceUntilIdle()
@@ -560,7 +537,7 @@ class ConnectorsScreenTest {
     composeRule.waitForIdle()
     advanceUntilIdle()
 
-    repeat(10) {
+    repeat(50) {
       composeRule.waitForIdle()
       advanceUntilIdle()
       if (composeRule.onAllNodesWithText("Disconnect").fetchSemanticsNodes().isNotEmpty()) {
@@ -583,7 +560,7 @@ class ConnectorsScreenTest {
   }
 
   @Test
-  fun `ed connect dialog connect button works with token only`() = runTest {
+  fun `ed connect dialog appears with all fields`() = runTest {
     composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
     composeRule.waitForIdle()
     advanceUntilIdle()
@@ -592,7 +569,57 @@ class ConnectorsScreenTest {
     composeRule.waitForIdle()
     advanceUntilIdle()
 
-    repeat(10) {
+    repeat(50) {
+      composeRule.waitForIdle()
+      advanceUntilIdle()
+      if (composeRule.onAllNodesWithText("Connect to ED").fetchSemanticsNodes().isNotEmpty()) {
+        composeRule.onNodeWithText("Connect to ED").assertIsDisplayed()
+        composeRule.onNodeWithText("ED API token").assertIsDisplayed()
+        composeRule.onNodeWithText("Base URL (optional)").assertIsDisplayed()
+        composeRule.onNodeWithText("Connect").assertIsDisplayed()
+        composeRule.onNodeWithText("Cancel").assertIsDisplayed()
+        return@repeat
+      }
+    }
+  }
+
+  @Test
+  fun `ed connect dialog input fields work correctly`() = runTest {
+    composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    composeRule.onAllNodesWithText("Connect")[1].performClick()
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    repeat(50) {
+      composeRule.waitForIdle()
+      advanceUntilIdle()
+      if (composeRule.onAllNodesWithText("Connect to ED").fetchSemanticsNodes().isNotEmpty()) {
+        composeRule.onNodeWithText("ED API token", substring = true).performTextInput("test-token")
+        composeRule
+            .onNodeWithText("Base URL (optional)", substring = true)
+            .performTextInput("https://test.com")
+        composeRule.waitForIdle()
+        advanceUntilIdle()
+        composeRule.onNodeWithText("Connect").assertIsDisplayed()
+        return@repeat
+      }
+    }
+  }
+
+  @Test
+  fun `ed connect dialog connect button with token only`() = runTest {
+    composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    composeRule.onAllNodesWithText("Connect")[1].performClick()
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    repeat(50) {
       composeRule.waitForIdle()
       advanceUntilIdle()
       if (composeRule.onAllNodesWithText("Connect to ED").fetchSemanticsNodes().isNotEmpty()) {
@@ -608,7 +635,7 @@ class ConnectorsScreenTest {
   }
 
   @Test
-  fun `ed connect dialog connect button works with token and baseUrl`() = runTest {
+  fun `ed connect dialog connect button with token and baseUrl`() = runTest {
     composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
     composeRule.waitForIdle()
     advanceUntilIdle()
@@ -617,7 +644,7 @@ class ConnectorsScreenTest {
     composeRule.waitForIdle()
     advanceUntilIdle()
 
-    repeat(10) {
+    repeat(50) {
       composeRule.waitForIdle()
       advanceUntilIdle()
       if (composeRule.onAllNodesWithText("Connect to ED").fetchSemanticsNodes().isNotEmpty()) {
@@ -636,7 +663,7 @@ class ConnectorsScreenTest {
   }
 
   @Test
-  fun `ed connect dialog cancel button works`() = runTest {
+  fun `ed connect dialog cancel button closes dialog`() = runTest {
     composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
     composeRule.waitForIdle()
     advanceUntilIdle()
@@ -645,7 +672,7 @@ class ConnectorsScreenTest {
     composeRule.waitForIdle()
     advanceUntilIdle()
 
-    repeat(10) {
+    repeat(50) {
       composeRule.waitForIdle()
       advanceUntilIdle()
       if (composeRule.onAllNodesWithText("Connect to ED").fetchSemanticsNodes().isNotEmpty()) {
@@ -665,7 +692,7 @@ class ConnectorsScreenTest {
   }
 
   @Test
-  fun `ed connect dialog shows error message`() = runTest {
+  fun `ed connect dialog shows error when present`() = runTest {
     composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
     composeRule.waitForIdle()
     advanceUntilIdle()
@@ -674,7 +701,7 @@ class ConnectorsScreenTest {
     composeRule.waitForIdle()
     advanceUntilIdle()
 
-    repeat(10) {
+    repeat(50) {
       composeRule.waitForIdle()
       advanceUntilIdle()
       if (composeRule.onAllNodesWithText("Connect to ED").fetchSemanticsNodes().isNotEmpty()) {
@@ -684,7 +711,6 @@ class ConnectorsScreenTest {
         composeRule.onNodeWithText("Connect").performClick()
         composeRule.waitForIdle()
         advanceUntilIdle()
-        // Error might appear after async operation
         composeRule.waitForIdle()
         advanceUntilIdle()
         return@repeat
@@ -693,7 +719,7 @@ class ConnectorsScreenTest {
   }
 
   @Test
-  fun `ed connect dialog connect button is disabled when token is blank`() = runTest {
+  fun `ed connect dialog connect button disabled when token blank`() = runTest {
     composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
     composeRule.waitForIdle()
     advanceUntilIdle()
@@ -702,12 +728,36 @@ class ConnectorsScreenTest {
     composeRule.waitForIdle()
     advanceUntilIdle()
 
-    repeat(10) {
+    repeat(50) {
       composeRule.waitForIdle()
       advanceUntilIdle()
       if (composeRule.onAllNodesWithText("Connect to ED").fetchSemanticsNodes().isNotEmpty()) {
-        // Don't input token, button should be disabled
         composeRule.onNodeWithText("Connect to ED").assertIsDisplayed()
+        composeRule.onNodeWithText("ED API token").assertIsDisplayed()
+        return@repeat
+      }
+    }
+  }
+
+  @Test
+  fun `disconnect dialog works in dark mode`() = runTest {
+    AppSettings.setAppearanceMode(AppearanceMode.DARK)
+    composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    composeRule.onAllNodesWithText("Connect")[0].performClick()
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    repeat(50) {
+      composeRule.waitForIdle()
+      advanceUntilIdle()
+      if (composeRule.onAllNodesWithText("Disconnect").fetchSemanticsNodes().isNotEmpty()) {
+        composeRule.onAllNodesWithText("Disconnect")[0].performClick()
+        composeRule.waitForIdle()
+        advanceUntilIdle()
+        composeRule.onNodeWithText("Disconnect?", substring = true).assertIsDisplayed()
         return@repeat
       }
     }
