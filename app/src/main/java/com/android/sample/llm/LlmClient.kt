@@ -9,7 +9,20 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
-data class BotReply(val reply: String, val url: String?)
+/**
+ * Response from the LLM backend.
+ *
+ * @param reply The text response from the LLM
+ * @param url Optional URL source reference
+ * @param edIntentDetected Whether an ED Discussion posting intent was detected
+ * @param edIntent The type of ED intent detected (e.g., "post_question")
+ */
+data class BotReply(
+    val reply: String,
+    val url: String?,
+    val edIntentDetected: Boolean = false,
+    val edIntent: String? = null
+)
 
 /**
  * Abstraction over the Large Language Model backend.
@@ -137,7 +150,29 @@ class FirebaseFunctionsLlmClient(
               Log.w("FirebaseFunctionsLlmClient", "Failed to cast primary_url to String", e)
               null
             }
-        BotReply(replyText, url)
+
+        // Parse ED intent detection fields
+        val edIntentDetected =
+            try {
+              map["ed_intent_detected"] as? Boolean ?: false
+            } catch (e: ClassCastException) {
+              Log.w("FirebaseFunctionsLlmClient", "Failed to cast ed_intent_detected to Boolean", e)
+              false
+            }
+
+        val edIntent =
+            try {
+              map["ed_intent"] as? String
+            } catch (e: ClassCastException) {
+              Log.w("FirebaseFunctionsLlmClient", "Failed to cast ed_intent to String", e)
+              null
+            }
+
+        if (edIntentDetected) {
+          Log.d("FirebaseFunctionsLlmClient", "ED intent detected: $edIntent")
+        }
+
+        BotReply(replyText, url, edIntentDetected, edIntent)
       }
 
   companion object {

@@ -136,7 +136,9 @@ internal fun parseBotReply(body: String, gson: Gson): BotReply {
   val replyText =
       json.getTrimmedString(JSON_KEY_REPLY) ?: throw IllegalStateException("Empty LLM reply")
   val url = json.getTrimmedString(JSON_KEY_PRIMARY_URL)
-  return BotReply(replyText, url)
+  val edIntentDetected = json.getBoolean(JSON_KEY_ED_INTENT_DETECTED)
+  val edIntent = json.getTrimmedString(JSON_KEY_ED_INTENT)
+  return BotReply(replyText, url, edIntentDetected, edIntent)
 }
 
 private fun JsonObject.getTrimmedString(key: String): String? {
@@ -148,6 +150,13 @@ private fun JsonObject.getTrimmedString(key: String): String? {
   return value.takeIf { it.isNotEmpty() }
 }
 
+private fun JsonObject.getBoolean(key: String): Boolean {
+  val element: JsonElement = get(key) ?: return false
+  if (element.isJsonNull || !element.isJsonPrimitive) return false
+  val primitive = element.asJsonPrimitive
+  return if (primitive.isBoolean) primitive.asBoolean else false
+}
+
 private const val HEADER_CONTENT_TYPE = "Content-Type"
 private const val HEADER_AUTHORIZATION = "Authorization"
 private const val AUTH_SCHEME_BEARER = "Bearer"
@@ -155,5 +164,7 @@ private const val CONTENT_TYPE_JSON = "application/json; charset=utf-8"
 private const val JSON_KEY_QUESTION = "question"
 private const val JSON_KEY_REPLY = "reply"
 private const val JSON_KEY_PRIMARY_URL = "primary_url"
+private const val JSON_KEY_ED_INTENT_DETECTED = "ed_intent_detected"
+private const val JSON_KEY_ED_INTENT = "ed_intent"
 // Standard localhost identifier - safe loopback address (RFC 5735)
 private const val LOCALHOST = "localhost"
