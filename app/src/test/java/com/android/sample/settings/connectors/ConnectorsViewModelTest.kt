@@ -1,21 +1,19 @@
 package com.android.sample.settings.connectors
 
-import com.google.firebase.FirebaseApp
 import com.google.firebase.functions.FirebaseFunctions
+import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
-import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 
 // Mock EdConnectorRemoteDataSource for testing
-private class MockEdConnectorRemoteDataSource(functions: FirebaseFunctions) :
-    EdConnectorRemoteDataSource(functions) {
+// We pass null for functions since we override all methods that use it
+private class MockEdConnectorRemoteDataSource : EdConnectorRemoteDataSource(null) {
   var statusToReturn: EdConnectorStatusRemote = EdConnectorStatusRemote.NOT_CONNECTED
   var connectShouldSucceed: Boolean = true
 
@@ -47,63 +45,12 @@ private class MockEdConnectorRemoteDataSource(functions: FirebaseFunctions) :
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConnectorsViewModelTest {
 
-  companion object {
-    // Cache FirebaseFunctions instance to avoid repeated initialization issues
-    @Volatile private var cachedFunctions: FirebaseFunctions? = null
-
-    private fun getFirebaseFunctions(): FirebaseFunctions {
-      if (cachedFunctions != null) {
-        return cachedFunctions!!
-      }
-      synchronized(this) {
-        if (cachedFunctions != null) {
-          return cachedFunctions!!
-        }
-        // Initialize Firebase if needed
-        try {
-          FirebaseApp.initializeApp(RuntimeEnvironment.getApplication())
-        } catch (e: Exception) {
-          // Already initialized, ignore
-        }
-        // Try to get FirebaseFunctions with region, fallback to default if it fails
-        val functions =
-            try {
-              FirebaseFunctions.getInstance("europe-west6")
-            } catch (e: IllegalStateException) {
-              // In CI or when Firebase is not properly initialized, use default instance
-              try {
-                FirebaseFunctions.getInstance()
-              } catch (e2: Exception) {
-                // If that also fails, try to initialize Firebase first
-                try {
-                  FirebaseApp.initializeApp(RuntimeEnvironment.getApplication())
-                  FirebaseFunctions.getInstance()
-                } catch (e3: Exception) {
-                  // Last resort: use the region-specific one anyway
-                  FirebaseFunctions.getInstance("europe-west6")
-                }
-              }
-            }
-        cachedFunctions = functions
-        return functions
-      }
-    }
-  }
-
-  @Before
-  fun setup() {
-    // Initialize Firebase for Robolectric tests
-    try {
-      FirebaseApp.initializeApp(RuntimeEnvironment.getApplication())
-    } catch (e: Exception) {
-      // Already initialized, ignore
-    }
-  }
-
   private fun createViewModel(): ConnectorsViewModel {
-    val functions = getFirebaseFunctions()
-    val mockDataSource = MockEdConnectorRemoteDataSource(functions)
-    return ConnectorsViewModel(edRemoteDataSource = mockDataSource)
+    // We don't need a real FirebaseFunctions instance since we override all methods
+    // Mock FirebaseFunctions to avoid initialization issues in CI
+    val mockFunctions = mockk<FirebaseFunctions>(relaxed = true)
+    val mockDataSource = MockEdConnectorRemoteDataSource()
+    return ConnectorsViewModel(functions = mockFunctions, edRemoteDataSource = mockDataSource)
   }
 
   @Test

@@ -13,11 +13,11 @@ private const val FN_TEST = "edConnectorTestFn"
  * renvoyée par le backend.
  */
 open class EdConnectorRemoteDataSource(
-    private val functions: FirebaseFunctions,
+    private val functions: FirebaseFunctions? = null,
 ) {
 
   open suspend fun getStatus(): EdConnectorConfigRemote {
-    val result = functions.getHttpsCallable(FN_STATUS).call().await()
+    val result = functions!!.getHttpsCallable(FN_STATUS).call().await()
     return mapEdConnectorConfig(result.getData())
   }
 
@@ -30,17 +30,17 @@ open class EdConnectorRemoteDataSource(
       payload["baseUrl"] = baseUrl
     }
 
-    val result = functions.getHttpsCallable(FN_CONNECT).call(payload).await()
+    val result = functions!!.getHttpsCallable(FN_CONNECT).call(payload).await()
     return mapEdConnectorConfig(result.getData())
   }
 
   open suspend fun disconnect(): EdConnectorConfigRemote {
-    val result = functions.getHttpsCallable(FN_DISCONNECT).call().await()
+    val result = functions!!.getHttpsCallable(FN_DISCONNECT).call().await()
     return mapEdConnectorConfig(result.getData())
   }
 
   suspend fun test(): EdConnectorConfigRemote {
-    val result = functions.getHttpsCallable(FN_TEST).call().await()
+    val result = functions!!.getHttpsCallable(FN_TEST).call().await()
     return mapEdConnectorConfig(result.getData())
   }
 }
