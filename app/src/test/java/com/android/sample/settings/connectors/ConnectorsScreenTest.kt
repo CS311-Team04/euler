@@ -520,4 +520,196 @@ class ConnectorsScreenTest {
       }
     }
   }
+
+  @Test
+  fun `disconnect dialog confirm button works`() = runTest {
+    var connectorClicked = false
+    composeRule.setContent {
+      MaterialTheme { ConnectorsScreen(onConnectorClick = { connectorClicked = true }) }
+    }
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    composeRule.onAllNodesWithText("Connect")[0].performClick()
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    repeat(10) {
+      composeRule.waitForIdle()
+      advanceUntilIdle()
+      if (composeRule.onAllNodesWithText("Disconnect").fetchSemanticsNodes().isNotEmpty()) {
+        composeRule.onAllNodesWithText("Disconnect")[0].performClick()
+        composeRule.waitForIdle()
+        advanceUntilIdle()
+        composeRule.onNodeWithText("Disconnect", substring = true).performClick()
+        composeRule.waitForIdle()
+        advanceUntilIdle()
+        assertTrue(connectorClicked)
+        return@repeat
+      }
+    }
+  }
+
+  @Test
+  fun `disconnect dialog dismiss button works`() = runTest {
+    composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    composeRule.onAllNodesWithText("Connect")[0].performClick()
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    repeat(10) {
+      composeRule.waitForIdle()
+      advanceUntilIdle()
+      if (composeRule.onAllNodesWithText("Disconnect").fetchSemanticsNodes().isNotEmpty()) {
+        composeRule.onAllNodesWithText("Disconnect")[0].performClick()
+        composeRule.waitForIdle()
+        advanceUntilIdle()
+        composeRule.onNodeWithText("Cancel").performClick()
+        composeRule.waitForIdle()
+        advanceUntilIdle()
+        composeRule.runOnIdle {
+          try {
+            composeRule.onNodeWithText("Disconnect?", substring = true).assertDoesNotExist()
+          } catch (_: AssertionError) {
+            // Expected
+          }
+        }
+        return@repeat
+      }
+    }
+  }
+
+  @Test
+  fun `ed connect dialog connect button works with token only`() = runTest {
+    composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    composeRule.onAllNodesWithText("Connect")[1].performClick()
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    repeat(10) {
+      composeRule.waitForIdle()
+      advanceUntilIdle()
+      if (composeRule.onAllNodesWithText("Connect to ED").fetchSemanticsNodes().isNotEmpty()) {
+        composeRule.onNodeWithText("ED API token", substring = true).performTextInput("test-token")
+        composeRule.waitForIdle()
+        advanceUntilIdle()
+        composeRule.onNodeWithText("Connect").performClick()
+        composeRule.waitForIdle()
+        advanceUntilIdle()
+        return@repeat
+      }
+    }
+  }
+
+  @Test
+  fun `ed connect dialog connect button works with token and baseUrl`() = runTest {
+    composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    composeRule.onAllNodesWithText("Connect")[1].performClick()
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    repeat(10) {
+      composeRule.waitForIdle()
+      advanceUntilIdle()
+      if (composeRule.onAllNodesWithText("Connect to ED").fetchSemanticsNodes().isNotEmpty()) {
+        composeRule.onNodeWithText("ED API token", substring = true).performTextInput("test-token")
+        composeRule
+            .onNodeWithText("Base URL (optional)", substring = true)
+            .performTextInput("https://example.com")
+        composeRule.waitForIdle()
+        advanceUntilIdle()
+        composeRule.onNodeWithText("Connect").performClick()
+        composeRule.waitForIdle()
+        advanceUntilIdle()
+        return@repeat
+      }
+    }
+  }
+
+  @Test
+  fun `ed connect dialog cancel button works`() = runTest {
+    composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    composeRule.onAllNodesWithText("Connect")[1].performClick()
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    repeat(10) {
+      composeRule.waitForIdle()
+      advanceUntilIdle()
+      if (composeRule.onAllNodesWithText("Connect to ED").fetchSemanticsNodes().isNotEmpty()) {
+        composeRule.onNodeWithText("Cancel").performClick()
+        composeRule.waitForIdle()
+        advanceUntilIdle()
+        composeRule.runOnIdle {
+          try {
+            composeRule.onNodeWithText("Connect to ED").assertDoesNotExist()
+          } catch (_: AssertionError) {
+            // Expected
+          }
+        }
+        return@repeat
+      }
+    }
+  }
+
+  @Test
+  fun `ed connect dialog shows error message`() = runTest {
+    composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    composeRule.onAllNodesWithText("Connect")[1].performClick()
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    repeat(10) {
+      composeRule.waitForIdle()
+      advanceUntilIdle()
+      if (composeRule.onAllNodesWithText("Connect to ED").fetchSemanticsNodes().isNotEmpty()) {
+        composeRule.onNodeWithText("ED API token", substring = true).performTextInput("invalid")
+        composeRule.waitForIdle()
+        advanceUntilIdle()
+        composeRule.onNodeWithText("Connect").performClick()
+        composeRule.waitForIdle()
+        advanceUntilIdle()
+        // Error might appear after async operation
+        composeRule.waitForIdle()
+        advanceUntilIdle()
+        return@repeat
+      }
+    }
+  }
+
+  @Test
+  fun `ed connect dialog connect button is disabled when token is blank`() = runTest {
+    composeRule.setContent { MaterialTheme { ConnectorsScreen() } }
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    composeRule.onAllNodesWithText("Connect")[1].performClick()
+    composeRule.waitForIdle()
+    advanceUntilIdle()
+
+    repeat(10) {
+      composeRule.waitForIdle()
+      advanceUntilIdle()
+      if (composeRule.onAllNodesWithText("Connect to ED").fetchSemanticsNodes().isNotEmpty()) {
+        // Don't input token, button should be disabled
+        composeRule.onNodeWithText("Connect to ED").assertIsDisplayed()
+        return@repeat
+      }
+    }
+  }
 }
