@@ -12,16 +12,16 @@ private const val FN_TEST = "edConnectorTestFn"
  * Petit data source pour appeler les Cloud Functions ED. Chaque méthode renvoie la config actuelle
  * renvoyée par le backend.
  */
-class EdConnectorRemoteDataSource(
+open class EdConnectorRemoteDataSource(
     private val functions: FirebaseFunctions,
 ) {
 
-  suspend fun getStatus(): EdConnectorConfigRemote {
+  open suspend fun getStatus(): EdConnectorConfigRemote {
     val result = functions.getHttpsCallable(FN_STATUS).call().await()
     return mapEdConnectorConfig(result.getData())
   }
 
-  suspend fun connect(apiToken: String, baseUrl: String?): EdConnectorConfigRemote {
+  open suspend fun connect(apiToken: String, baseUrl: String?): EdConnectorConfigRemote {
     val payload =
         hashMapOf<String, Any>(
             "apiToken" to apiToken,
@@ -34,7 +34,7 @@ class EdConnectorRemoteDataSource(
     return mapEdConnectorConfig(result.getData())
   }
 
-  suspend fun disconnect(): EdConnectorConfigRemote {
+  open suspend fun disconnect(): EdConnectorConfigRemote {
     val result = functions.getHttpsCallable(FN_DISCONNECT).call().await()
     return mapEdConnectorConfig(result.getData())
   }

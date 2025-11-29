@@ -1,15 +1,73 @@
 package com.android.sample.settings.connectors
 
+import com.google.firebase.FirebaseApp
+import com.google.firebase.functions.FirebaseFunctions
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 
+// Mock EdConnectorRemoteDataSource for testing
+private class MockEdConnectorRemoteDataSource(functions: FirebaseFunctions) :
+    EdConnectorRemoteDataSource(functions) {
+  var statusToReturn: EdConnectorStatusRemote = EdConnectorStatusRemote.NOT_CONNECTED
+  var connectShouldSucceed: Boolean = true
+
+  override suspend fun getStatus(): EdConnectorConfigRemote {
+    return EdConnectorConfigRemote(
+        status = statusToReturn, baseUrl = null, lastTestAt = null, lastError = null)
+  }
+
+  override suspend fun connect(apiToken: String, baseUrl: String?): EdConnectorConfigRemote {
+    return EdConnectorConfigRemote(
+        status =
+            if (connectShouldSucceed) EdConnectorStatusRemote.CONNECTED
+            else EdConnectorStatusRemote.ERROR,
+        baseUrl = baseUrl,
+        lastTestAt = null,
+        lastError = if (connectShouldSucceed) null else "invalid_credentials")
+  }
+
+  override suspend fun disconnect(): EdConnectorConfigRemote {
+    return EdConnectorConfigRemote(
+        status = EdConnectorStatusRemote.NOT_CONNECTED,
+        baseUrl = null,
+        lastTestAt = null,
+        lastError = null)
+  }
+}
+
+@RunWith(RobolectricTestRunner::class)
+@OptIn(ExperimentalCoroutinesApi::class)
 class ConnectorsViewModelTest {
+
+  @Before
+  fun setup() {
+    // Initialize Firebase for Robolectric tests
+    try {
+      FirebaseApp.initializeApp(RuntimeEnvironment.getApplication())
+    } catch (e: Exception) {
+      // Already initialized, ignore
+    }
+  }
+
+  private fun createViewModel(): ConnectorsViewModel {
+    val functions = FirebaseFunctions.getInstance("europe-west6")
+    val mockDataSource = MockEdConnectorRemoteDataSource(functions)
+    return ConnectorsViewModel(edRemoteDataSource = mockDataSource)
+  }
 
   @Test
   fun `initial state has 4 connectors all not connected`() = runTest {
-    val viewModel = ConnectorsViewModel()
+    val viewModel = createViewModel()
+    // Wait for the init coroutine to complete
+    advanceUntilIdle()
     val uiState = viewModel.uiState.first()
 
     assertEquals(4, uiState.connectors.size)
@@ -19,7 +77,8 @@ class ConnectorsViewModelTest {
 
   @Test
   fun `connectConnector sets connector to connected`() = runTest {
-    val viewModel = ConnectorsViewModel()
+    val viewModel = createViewModel()
+    advanceUntilIdle()
 
     viewModel.connectConnector("moodle")
     val uiState = viewModel.uiState.first()
@@ -35,7 +94,8 @@ class ConnectorsViewModelTest {
 
   @Test
   fun `connectConnector with non-existent id does nothing`() = runTest {
-    val viewModel = ConnectorsViewModel()
+    val viewModel = createViewModel()
+    advanceUntilIdle()
     val initialState = viewModel.uiState.first()
 
     viewModel.connectConnector("non_existent")
@@ -46,7 +106,8 @@ class ConnectorsViewModelTest {
 
   @Test
   fun `showDisconnectConfirmation sets pending connector`() = runTest {
-    val viewModel = ConnectorsViewModel()
+    val viewModel = createViewModel()
+    advanceUntilIdle()
     val connector = Connector(id = "test", name = "Test", description = "Desc", isConnected = true)
 
     viewModel.showDisconnectConfirmation(connector)
@@ -58,7 +119,8 @@ class ConnectorsViewModelTest {
 
   @Test
   fun `disconnectConnector sets connector to not connected and clears pending`() = runTest {
-    val viewModel = ConnectorsViewModel()
+    val viewModel = createViewModel()
+    advanceUntilIdle()
 
     // First connect a connector
     viewModel.connectConnector("moodle")
@@ -70,6 +132,7 @@ class ConnectorsViewModelTest {
 
     // Disconnect
     viewModel.disconnectConnector("moodle")
+    advanceUntilIdle() // Wait for async disconnect
     val disconnectedState = viewModel.uiState.first()
 
     val disconnectedMoodle = disconnectedState.connectors.find { it.id == "moodle" }
@@ -80,11 +143,13 @@ class ConnectorsViewModelTest {
 
   @Test
   fun `disconnectConnector with non-existent id only clears pending`() = runTest {
-    val viewModel = ConnectorsViewModel()
+    val viewModel = createViewModel()
+    advanceUntilIdle()
     val connector = Connector(id = "test", name = "Test", description = "Desc", isConnected = true)
 
     viewModel.showDisconnectConfirmation(connector)
     viewModel.disconnectConnector("non_existent")
+    advanceUntilIdle()
     val uiState = viewModel.uiState.first()
 
     assertNull(uiState.pendingConnectorForDisconnect)
@@ -92,7 +157,8 @@ class ConnectorsViewModelTest {
 
   @Test
   fun `dismissDisconnectConfirmation clears pending connector`() = runTest {
-    val viewModel = ConnectorsViewModel()
+    val viewModel = createViewModel()
+    advanceUntilIdle()
     val connector = Connector(id = "test", name = "Test", description = "Desc", isConnected = true)
 
     viewModel.showDisconnectConfirmation(connector)
@@ -106,17 +172,18 @@ class ConnectorsViewModelTest {
 
   @Test
   fun `multiple connect operations work correctly`() = runTest {
-    val viewModel = ConnectorsViewModel()
+    val viewModel = createViewModel()
+    advanceUntilIdle()
 
     viewModel.connectConnector("moodle")
     viewModel.connectConnector("ed")
+    // For ED, it opens a dialog, so we need to check the state differently
     val uiState = viewModel.uiState.first()
 
     val moodle = uiState.connectors.find { it.id == "moodle" }
-    val ed = uiState.connectors.find { it.id == "ed" }
-
+    // ED should open dialog, not connect directly
     assertTrue(moodle!!.isConnected)
-    assertTrue(ed!!.isConnected)
+    assertTrue(uiState.isEdConnectDialogOpen)
 
     // Other connectors should remain not connected
     val otherConnectors = uiState.connectors.filter { it.id !in listOf("moodle", "ed") }
@@ -125,7 +192,8 @@ class ConnectorsViewModelTest {
 
   @Test
   fun `connect then disconnect then connect again works`() = runTest {
-    val viewModel = ConnectorsViewModel()
+    val viewModel = createViewModel()
+    advanceUntilIdle()
 
     viewModel.connectConnector("moodle")
     var uiState = viewModel.uiState.first()
@@ -134,6 +202,7 @@ class ConnectorsViewModelTest {
     val moodle = uiState.connectors.find { it.id == "moodle" }!!
     viewModel.showDisconnectConfirmation(moodle)
     viewModel.disconnectConnector("moodle")
+    advanceUntilIdle()
     uiState = viewModel.uiState.first()
     assertFalse(uiState.connectors.find { it.id == "moodle" }!!.isConnected)
 
