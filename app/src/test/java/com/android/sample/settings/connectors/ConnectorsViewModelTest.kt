@@ -47,6 +47,49 @@ private class MockEdConnectorRemoteDataSource(functions: FirebaseFunctions) :
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConnectorsViewModelTest {
 
+  companion object {
+    // Cache FirebaseFunctions instance to avoid repeated initialization issues
+    @Volatile private var cachedFunctions: FirebaseFunctions? = null
+
+    private fun getFirebaseFunctions(): FirebaseFunctions {
+      if (cachedFunctions != null) {
+        return cachedFunctions!!
+      }
+      synchronized(this) {
+        if (cachedFunctions != null) {
+          return cachedFunctions!!
+        }
+        // Initialize Firebase if needed
+        try {
+          FirebaseApp.initializeApp(RuntimeEnvironment.getApplication())
+        } catch (e: Exception) {
+          // Already initialized, ignore
+        }
+        // Try to get FirebaseFunctions with region, fallback to default if it fails
+        val functions =
+            try {
+              FirebaseFunctions.getInstance("europe-west6")
+            } catch (e: IllegalStateException) {
+              // In CI or when Firebase is not properly initialized, use default instance
+              try {
+                FirebaseFunctions.getInstance()
+              } catch (e2: Exception) {
+                // If that also fails, try to initialize Firebase first
+                try {
+                  FirebaseApp.initializeApp(RuntimeEnvironment.getApplication())
+                  FirebaseFunctions.getInstance()
+                } catch (e3: Exception) {
+                  // Last resort: use the region-specific one anyway
+                  FirebaseFunctions.getInstance("europe-west6")
+                }
+              }
+            }
+        cachedFunctions = functions
+        return functions
+      }
+    }
+  }
+
   @Before
   fun setup() {
     // Initialize Firebase for Robolectric tests
@@ -58,7 +101,7 @@ class ConnectorsViewModelTest {
   }
 
   private fun createViewModel(): ConnectorsViewModel {
-    val functions = FirebaseFunctions.getInstance("europe-west6")
+    val functions = getFirebaseFunctions()
     val mockDataSource = MockEdConnectorRemoteDataSource(functions)
     return ConnectorsViewModel(edRemoteDataSource = mockDataSource)
   }
