@@ -206,6 +206,66 @@ private suspend fun navigateToOnboardingOrHome(nav: NavHostController) {
   }
 }
 
+/**
+ * Creates a ConversationRepository or returns null if in guest mode. This function handles
+ * exceptions gracefully to allow guest mode operation.
+ */
+@VisibleForTesting
+internal fun createConversationRepositoryOrNull(): ConversationRepository? {
+  return try {
+    ConversationRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance())
+  } catch (e: Exception) {
+    null // Guest mode - no repository
+  }
+}
+
+/**
+ * Creates a lambda that reads the current conversation ID from HomeViewModel's UI state. The lambda
+ * reads the state each time it's called, ensuring it always returns the current value.
+ */
+@VisibleForTesting
+internal fun createGetCurrentConversationIdLambda(homeViewModel: HomeViewModel): () -> String? {
+  return { homeViewModel.uiState.value.currentConversationId }
+}
+
+/**
+ * Creates a callback that selects a newly created conversation in HomeViewModel. This callback is
+ * invoked when a new conversation is created during voice chat.
+ */
+@VisibleForTesting
+internal fun createOnConversationCreatedCallback(homeViewModel: HomeViewModel): (String) -> Unit {
+  return { conversationId ->
+    // Select the newly created conversation in HomeViewModel
+    homeViewModel.selectConversation(conversationId)
+  }
+}
+
+/**
+ * Factory function to create a VoiceChatViewModel with conversation management. This function is
+ * testable and can be used in both the composable and unit tests.
+ *
+ * @param homeViewModel The HomeViewModel instance to read current conversation state
+ * @param createConversationRepositoryOrNull Lambda to create or retrieve ConversationRepository
+ * @param createGetCurrentConversationIdLambda Lambda factory to create getCurrentConversationId
+ *   lambda
+ * @param createOnConversationCreatedCallback Lambda factory to create onConversationCreated
+ *   callback
+ * @return A configured VoiceChatViewModel instance
+ */
+@VisibleForTesting
+internal fun createVoiceChatViewModel(
+    homeViewModel: HomeViewModel,
+    createConversationRepositoryOrNull: () -> ConversationRepository?,
+    createGetCurrentConversationIdLambda: (HomeViewModel) -> () -> String?,
+    createOnConversationCreatedCallback: (HomeViewModel) -> (String) -> Unit
+): VoiceChatViewModel {
+  val conversationRepo = createConversationRepositoryOrNull()
+  return VoiceChatViewModel(
+      conversationRepository = conversationRepo,
+      getCurrentConversationId = createGetCurrentConversationIdLambda(homeViewModel),
+      onConversationCreated = createOnConversationCreatedCallback(homeViewModel))
+}
+
 @SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
 fun AppNav(
@@ -547,21 +607,14 @@ fun AppNav(
             // The lambda reads the current state each time it's called
             val voiceChatViewModel =
                 remember(homeViewModel) {
-                  val conversationRepo =
-                      try {
-                        ConversationRepository(
-                            FirebaseAuth.getInstance(), FirebaseFirestore.getInstance())
-                      } catch (e: Exception) {
-                        null // Guest mode - no repository
-                      }
-                  VoiceChatViewModel(
-                      conversationRepository = conversationRepo,
-                      getCurrentConversationId = {
-                        homeViewModel.uiState.value.currentConversationId
+                  createVoiceChatViewModel(
+                      homeViewModel = homeViewModel,
+                      createConversationRepositoryOrNull = { createConversationRepositoryOrNull() },
+                      createGetCurrentConversationIdLambda = {
+                        createGetCurrentConversationIdLambda(it)
                       },
-                      onConversationCreated = { conversationId ->
-                        // Select the newly created conversation in HomeViewModel
-                        homeViewModel.selectConversation(conversationId)
+                      createOnConversationCreatedCallback = {
+                        createOnConversationCreatedCallback(it)
                       })
                 }
 
