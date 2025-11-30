@@ -283,6 +283,31 @@ internal fun createVoiceChatViewModelForComposable(
       createOnConversationCreatedCallback = { createOnConversationCreatedCallback(it) })
 }
 
+/**
+ * Composable content for the VoiceChat screen. This function is extracted to be testable and
+ * ensures code coverage of the VoiceChat composable content.
+ *
+ * @param homeViewModel The HomeViewModel instance
+ * @param speechHelper The SpeechToTextHelper for voice input
+ * @param onClose Callback when the voice screen should be closed
+ */
+@VisibleForTesting
+@Composable
+internal fun VoiceChatContent(
+    homeViewModel: HomeViewModel,
+    speechHelper: SpeechToTextHelper,
+    onClose: () -> Unit
+) {
+  val voiceChatViewModel =
+      remember(homeViewModel) { createVoiceChatViewModelForComposable(homeViewModel) }
+
+  VoiceScreen(
+      onClose = onClose,
+      modifier = Modifier.fillMaxSize(),
+      speechHelper = speechHelper,
+      voiceChatViewModel = voiceChatViewModel)
+}
+
 @SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
 fun AppNav(
@@ -620,16 +645,12 @@ fun AppNav(
             val parentEntry = nav.getBackStackEntry("home_root")
             val homeViewModel: HomeViewModel = viewModel(parentEntry)
 
-            // Create VoiceChatViewModel using the helper function
-            // The helper function is tested in NavGraphTest.createVoiceChatViewModelForComposable_*
-            val voiceChatViewModel =
-                remember(homeViewModel) { createVoiceChatViewModelForComposable(homeViewModel) }
-
-            VoiceScreen(
-                onClose = { nav.popBackStack() },
-                modifier = Modifier.fillMaxSize(),
+            // Use the extracted VoiceChatContent composable
+            // This composable is tested in NavGraphTest.voiceChatContent_*
+            VoiceChatContent(
+                homeViewModel = homeViewModel,
                 speechHelper = speechHelper,
-                voiceChatViewModel = voiceChatViewModel)
+                onClose = { nav.popBackStack() })
           }
         }
       }
