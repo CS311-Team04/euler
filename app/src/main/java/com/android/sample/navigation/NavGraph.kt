@@ -532,9 +532,10 @@ fun AppNav(
             ConnectorsScreen(
                 onBackClick = { nav.popBackStack() },
                 onConnectorClick = { connectorId ->
-                  // For now, just a placeholder. In the future, this will trigger the connection
-                  // flow
-                  android.util.Log.d("NavGraph", "Connector clicked: $connectorId")
+                  when (connectorId) {
+                    "epfl_campus" -> nav.navigate(Routes.EpflCampus)
+                    else -> android.util.Log.d("NavGraph", "Connector clicked: $connectorId")
+                  }
                 })
           }
 
