@@ -6,7 +6,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavOptions
@@ -483,30 +485,55 @@ class NavGraphVoiceChatViewModelConfigTest {
 
   @Test
   fun voiceChatComposable_mounts_and_executes_exact_lines() {
-    // This test mounts the actual VoiceChat composable to ensure lines 619-649 are covered
-    // by executing the exact code in the composable
-    val speechHelper = mockk<SpeechToTextHelper>(relaxed = true)
+    renderVoiceChatComposable(composeRule)
+    composeRule.onRoot().assertIsDisplayed()
+  }
 
-    composeRule.setContent {
+  @Test
+  fun voiceChatComposable_shows_close_button() {
+    renderVoiceChatComposable(composeRule)
+    composeRule.onNodeWithContentDescription("Close voice screen").assertIsDisplayed()
+  }
+
+  private fun HomeViewModel.updateUiState(
+      transform: (com.android.sample.home.HomeUiState) -> com.android.sample.home.HomeUiState
+  ) {
+    val field = HomeViewModel::class.java.getDeclaredField("_uiState")
+    field.isAccessible = true
+    @Suppress("UNCHECKED_CAST")
+    val stateFlow =
+        field.get(this)
+            as kotlinx.coroutines.flow.MutableStateFlow<com.android.sample.home.HomeUiState>
+    stateFlow.value = transform(stateFlow.value)
+  }
+
+  private fun HomeViewModel.setPrivateField(name: String, value: Any?) {
+    val field = HomeViewModel::class.java.getDeclaredField(name)
+    field.isAccessible = true
+    field.set(this, value)
+  }
+
+  private fun HomeViewModel.getBooleanField(name: String): Boolean {
+    val field = HomeViewModel::class.java.getDeclaredField(name)
+    field.isAccessible = true
+    return field.getBoolean(this)
+  }
+
+  private fun renderVoiceChatComposable(
+      rule: ComposeContentTestRule,
+      speechHelper: SpeechToTextHelper = mockk(relaxed = true)
+  ) {
+    rule.setContent {
       MaterialTheme {
         val nav = rememberNavController()
 
-        // Create a minimal NavHost that includes the VoiceChat route
-        // This will execute the exact code from lines 619-649 in NavGraph.kt
-        // VoiceChat is set as startDestination in the navigation block to ensure it's executed
         NavHost(navController = nav, startDestination = "home_root") {
-          // Home root route needed for getBackStackEntry("home_root")
           navigation(startDestination = Routes.VoiceChat, route = "home_root") {
             composable(Routes.VoiceChat) {
-              // This is the EXACT code from NavGraph.kt lines 619-649
               @Suppress("UnrememberedGetBackStackEntry")
               val parentEntry = nav.getBackStackEntry("home_root")
               val homeViewModel: HomeViewModel = viewModel(parentEntry)
 
-              // Create VoiceChatViewModel with conversation repository and current conversation ID
-              // The lambda reads the current state each time it's called
-              // This exact code pattern (lines 610-618) is tested in
-              // NavGraphTest.voiceChatComposable_exact_pattern
               @Suppress("RememberReturnType")
               val voiceChatViewModel =
                   remember(homeViewModel) {
@@ -533,36 +560,7 @@ class NavGraphVoiceChatViewModelConfigTest {
         }
       }
     }
-
-    // Wait for composition to complete
-    composeRule.waitForIdle()
-
-    // Verify that the VoiceScreen is displayed (this confirms the composable executed)
-    composeRule.onRoot().assertIsDisplayed()
-  }
-
-  private fun HomeViewModel.updateUiState(
-      transform: (com.android.sample.home.HomeUiState) -> com.android.sample.home.HomeUiState
-  ) {
-    val field = HomeViewModel::class.java.getDeclaredField("_uiState")
-    field.isAccessible = true
-    @Suppress("UNCHECKED_CAST")
-    val stateFlow =
-        field.get(this)
-            as kotlinx.coroutines.flow.MutableStateFlow<com.android.sample.home.HomeUiState>
-    stateFlow.value = transform(stateFlow.value)
-  }
-
-  private fun HomeViewModel.setPrivateField(name: String, value: Any?) {
-    val field = HomeViewModel::class.java.getDeclaredField(name)
-    field.isAccessible = true
-    field.set(this, value)
-  }
-
-  private fun HomeViewModel.getBooleanField(name: String): Boolean {
-    val field = HomeViewModel::class.java.getDeclaredField(name)
-    field.isAccessible = true
-    return field.getBoolean(this)
+    rule.waitForIdle()
   }
 }
 
