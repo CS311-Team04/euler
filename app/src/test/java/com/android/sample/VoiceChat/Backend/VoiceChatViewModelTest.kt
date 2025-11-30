@@ -65,7 +65,7 @@ class VoiceChatViewModelTest {
   @Test
   fun stopAll_resets_state() {
     // Test stopAll resets state (called by onCleared line 142)
-    val viewModel = VoiceChatViewModel(FakeLlmClient(), testDispatcher)
+    val viewModel = VoiceChatViewModel(FakeLlmClient())
 
     // Set some state first
     viewModel.onSpeechStarted()
@@ -82,7 +82,7 @@ class VoiceChatViewModelTest {
   @Test
   fun startLevelAnimation_cancels_previous_job() {
     // Test startLevelAnimation cancels previous job (line 149)
-    val viewModel = VoiceChatViewModel(FakeLlmClient(), testDispatcher)
+    val viewModel = VoiceChatViewModel(FakeLlmClient())
 
     // Start animation twice - second should cancel first
     viewModel.onSpeechStarted() // Calls startLevelAnimation
@@ -95,7 +95,7 @@ class VoiceChatViewModelTest {
   @Test
   fun startLevelAnimation_resets_lastEmittedLevel() {
     // Test startLevelAnimation resets lastEmittedLevel (line 150)
-    val viewModel = VoiceChatViewModel(FakeLlmClient(), testDispatcher)
+    val viewModel = VoiceChatViewModel(FakeLlmClient())
 
     // Start animation - should reset to 0f
     viewModel.onSpeechStarted()
@@ -107,7 +107,7 @@ class VoiceChatViewModelTest {
   @Test
   fun startLevelAnimation_loops_through_pattern() {
     // Test startLevelAnimation loops through LEVEL_PATTERN (lines 153-158)
-    val viewModel = VoiceChatViewModel(FakeLlmClient(), testDispatcher)
+    val viewModel = VoiceChatViewModel(FakeLlmClient())
 
     viewModel.onSpeechStarted()
 
@@ -118,7 +118,7 @@ class VoiceChatViewModelTest {
   @Test
   fun startLevelAnimation_emits_levels_continuously() {
     // Test startLevelAnimation emits levels continuously (line 156)
-    val viewModel = VoiceChatViewModel(FakeLlmClient(), testDispatcher)
+    val viewModel = VoiceChatViewModel(FakeLlmClient())
 
     viewModel.onSpeechStarted()
 
@@ -129,7 +129,7 @@ class VoiceChatViewModelTest {
   @Test
   fun startLevelAnimation_delays_between_frames() {
     // Test startLevelAnimation delays between frames (line 158)
-    val viewModel = VoiceChatViewModel(FakeLlmClient(), testDispatcher)
+    val viewModel = VoiceChatViewModel(FakeLlmClient())
 
     viewModel.onSpeechStarted()
 
@@ -140,7 +140,7 @@ class VoiceChatViewModelTest {
   @Test
   fun onSpeechStarted_sets_isSpeaking_to_true() {
     // Test onSpeechStarted sets isSpeaking to true (line 111)
-    val viewModel = VoiceChatViewModel(FakeLlmClient(), testDispatcher)
+    val viewModel = VoiceChatViewModel(FakeLlmClient())
 
     viewModel.onSpeechStarted()
 
@@ -151,7 +151,7 @@ class VoiceChatViewModelTest {
   @Test
   fun onSpeechStarted_clears_lastError() {
     // Test onSpeechStarted clears lastError (line 111)
-    val viewModel = VoiceChatViewModel(FakeLlmClient(), testDispatcher)
+    val viewModel = VoiceChatViewModel(FakeLlmClient())
 
     // Set an error first
     viewModel.reportError("Test error")
@@ -165,7 +165,7 @@ class VoiceChatViewModelTest {
   @Test
   fun onSpeechStarted_calls_startLevelAnimation() {
     // Test onSpeechStarted calls startLevelAnimation (line 112)
-    val viewModel = VoiceChatViewModel(FakeLlmClient(), testDispatcher)
+    val viewModel = VoiceChatViewModel(FakeLlmClient())
 
     viewModel.onSpeechStarted()
 
@@ -176,7 +176,7 @@ class VoiceChatViewModelTest {
   @Test
   fun onSpeechFinished_calls_stopLevelAnimation() {
     // Test onSpeechFinished calls stopLevelAnimation (line 117)
-    val viewModel = VoiceChatViewModel(FakeLlmClient(), testDispatcher)
+    val viewModel = VoiceChatViewModel(FakeLlmClient())
 
     viewModel.onSpeechStarted()
     viewModel.onSpeechFinished()
@@ -188,7 +188,7 @@ class VoiceChatViewModelTest {
   @Test
   fun onSpeechFinished_sets_isSpeaking_to_false() {
     // Test onSpeechFinished sets isSpeaking to false (line 118)
-    val viewModel = VoiceChatViewModel(FakeLlmClient(), testDispatcher)
+    val viewModel = VoiceChatViewModel(FakeLlmClient())
 
     viewModel.onSpeechStarted()
     assertTrue("isSpeaking should be true", viewModel.uiState.value.isSpeaking)
@@ -201,8 +201,7 @@ class VoiceChatViewModelTest {
   fun handleUserUtterance_trims_transcript() =
       runTest(testDispatcher) {
         // Test handleUserUtterance trims transcript (line 63)
-        val viewModel =
-            VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" }, testDispatcher)
+        val viewModel = VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" })
 
         viewModel.handleUserUtterance("  Hello  ")
 
@@ -215,7 +214,7 @@ class VoiceChatViewModelTest {
   fun handleUserUtterance_returns_early_for_empty_transcript() =
       runTest(testDispatcher) {
         // Test handleUserUtterance returns early for empty (line 64)
-        val viewModel = VoiceChatViewModel(FakeLlmClient(), testDispatcher)
+        val viewModel = VoiceChatViewModel(FakeLlmClient())
 
         val initialState = viewModel.uiState.value
 
@@ -233,8 +232,7 @@ class VoiceChatViewModelTest {
   fun handleUserUtterance_cancels_previous_job() =
       runTest(testDispatcher) {
         // Test handleUserUtterance cancels previous job (line 66)
-        val viewModel =
-            VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" }, testDispatcher)
+        val viewModel = VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" })
 
         // Start first generation
         viewModel.handleUserUtterance("First")
@@ -253,8 +251,7 @@ class VoiceChatViewModelTest {
   fun handleUserUtterance_sets_isSpeaking_to_false() =
       runTest(testDispatcher) {
         // Test handleUserUtterance sets isSpeaking to false (line 73)
-        val viewModel =
-            VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" }, testDispatcher)
+        val viewModel = VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" })
 
         viewModel.handleUserUtterance("Test")
 
@@ -268,8 +265,7 @@ class VoiceChatViewModelTest {
   fun handleUserUtterance_clears_lastError() =
       runTest(testDispatcher) {
         // Test handleUserUtterance clears lastError (line 74)
-        val viewModel =
-            VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" }, testDispatcher)
+        val viewModel = VoiceChatViewModel(FakeLlmClient().apply { nextReply = "Reply" })
 
         // Set error first
         viewModel.reportError("Previous error")
@@ -299,7 +295,6 @@ class VoiceChatViewModelTest {
         val viewModel =
             VoiceChatViewModel(
                 FakeLlmClient().apply { nextReply = "AI Reply" },
-                testDispatcher,
                 conversationRepository = repo,
                 getCurrentConversationId = { null })
 
@@ -331,7 +326,6 @@ class VoiceChatViewModelTest {
         val viewModel =
             VoiceChatViewModel(
                 FakeLlmClient().apply { nextReply = "Response" },
-                testDispatcher,
                 conversationRepository = repo,
                 getCurrentConversationId = { null })
 
@@ -358,7 +352,6 @@ class VoiceChatViewModelTest {
         val viewModel =
             VoiceChatViewModel(
                 FakeLlmClient().apply { nextReply = aiReply },
-                testDispatcher,
                 conversationRepository = repo,
                 getCurrentConversationId = { null })
 
@@ -380,7 +373,6 @@ class VoiceChatViewModelTest {
         val viewModel =
             VoiceChatViewModel(
                 FakeLlmClient().apply { nextReply = "Reply" },
-                testDispatcher,
                 conversationRepository = null, // Guest mode
                 getCurrentConversationId = { null })
 
@@ -408,7 +400,6 @@ class VoiceChatViewModelTest {
         val viewModel =
             VoiceChatViewModel(
                 FakeLlmClient().apply { nextReply = "Reply" },
-                testDispatcher,
                 conversationRepository = repo,
                 getCurrentConversationId = { null })
 
@@ -444,7 +435,6 @@ class VoiceChatViewModelTest {
         val viewModel =
             VoiceChatViewModel(
                 FakeLlmClient().apply { nextReply = "Reply" },
-                testDispatcher,
                 conversationRepository = repo,
                 getCurrentConversationId = { existingConvId })
 
@@ -476,7 +466,6 @@ class VoiceChatViewModelTest {
         val viewModel =
             VoiceChatViewModel(
                 FakeLlmClient().apply { nextReply = "Reply" },
-                testDispatcher,
                 conversationRepository = repo,
                 getCurrentConversationId = { null })
 
@@ -496,8 +485,7 @@ class VoiceChatViewModelTest {
         // Test handleGenerationError updates state correctly on LLM failure
         val errorMessage = "Network error"
         val viewModel =
-            VoiceChatViewModel(
-                FakeLlmClient().apply { failure = RuntimeException(errorMessage) }, testDispatcher)
+            VoiceChatViewModel(FakeLlmClient().apply { failure = RuntimeException(errorMessage) })
 
         viewModel.handleUserUtterance("Test")
 
@@ -514,9 +502,7 @@ class VoiceChatViewModelTest {
   fun handleUserUtterance_handles_llm_generation_error_with_null_message() =
       runTest(testDispatcher) {
         // Test handleGenerationError handles null error message
-        val viewModel =
-            VoiceChatViewModel(
-                FakeLlmClient().apply { failure = RuntimeException() }, testDispatcher)
+        val viewModel = VoiceChatViewModel(FakeLlmClient().apply { failure = RuntimeException() })
 
         viewModel.handleUserUtterance("Test")
 
@@ -535,8 +521,7 @@ class VoiceChatViewModelTest {
       runTest(testDispatcher) {
         // Test updateStateWithReply updates state correctly
         val aiReply = "This is the AI response"
-        val viewModel =
-            VoiceChatViewModel(FakeLlmClient().apply { nextReply = aiReply }, testDispatcher)
+        val viewModel = VoiceChatViewModel(FakeLlmClient().apply { nextReply = aiReply })
 
         viewModel.handleUserUtterance("Question")
 
@@ -564,7 +549,6 @@ class VoiceChatViewModelTest {
         val viewModel =
             VoiceChatViewModel(
                 FakeLlmClient().apply { nextReply = "Reply" },
-                testDispatcher,
                 conversationRepository = repo,
                 getCurrentConversationId = { null })
 
@@ -595,7 +579,6 @@ class VoiceChatViewModelTest {
         val viewModel =
             VoiceChatViewModel(
                 FakeLlmClient().apply { nextReply = "Reply" },
-                testDispatcher,
                 conversationRepository = repo,
                 getCurrentConversationId = { null })
 
@@ -631,7 +614,6 @@ class VoiceChatViewModelTest {
         val viewModel =
             VoiceChatViewModel(
                 FakeLlmClient().apply { nextReply = "Reply" },
-                testDispatcher,
                 conversationRepository = repo,
                 getCurrentConversationId = { null })
         viewModel.setFunctions(functions)
@@ -672,7 +654,6 @@ class VoiceChatViewModelTest {
         val viewModel =
             VoiceChatViewModel(
                 FakeLlmClient().apply { nextReply = "Reply" },
-                testDispatcher,
                 conversationRepository = repo,
                 getCurrentConversationId = { null })
         viewModel.setFunctions(functions)
