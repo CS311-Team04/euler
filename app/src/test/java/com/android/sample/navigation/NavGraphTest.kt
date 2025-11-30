@@ -578,6 +578,7 @@ class NavGraphVoiceChatViewModelConfigTest {
               val homeViewModel: HomeViewModel = viewModel(parentEntry)
 
               // Line 625-626: Create VoiceChatViewModel using the helper function
+              @Suppress("RememberReturnType")
               val voiceChatViewModel =
                   remember(homeViewModel) { createVoiceChatViewModelForComposable(homeViewModel) }
 
