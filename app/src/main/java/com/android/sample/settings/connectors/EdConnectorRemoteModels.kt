@@ -1,9 +1,9 @@
 package com.android.sample.settings.connectors
 
 /**
- * Mirror des statuts du connecteur ED renvoyés par Firebase Functions.
+ * Mirror of ED connector statuses returned by Firebase Functions.
  *
- * Backend (TypeScript) renvoie:
+ * Backend (TypeScript) returns:
  * - "not_connected"
  * - "connected"
  * - "error"
@@ -24,8 +24,8 @@ enum class EdConnectorStatusRemote {
 }
 
 /**
- * Modèle "remote" pour la config ED telle que renvoyée par les callables. C’est ce type qu’on
- * utilise dans le ViewModel / UI.
+ * "Remote" model for ED config as returned by callables. This is the type used in the ViewModel /
+ * UI.
  */
 data class EdConnectorConfigRemote(
     val status: EdConnectorStatusRemote,
@@ -34,7 +34,7 @@ data class EdConnectorConfigRemote(
     val lastError: String?
 )
 
-/** Mapping brut Any? -> EdConnectorConfigRemote à partir de result.data des fonctions Firebase. */
+/** Raw mapping Any? -> EdConnectorConfigRemote from Firebase Functions result.data. */
 @Suppress("UNCHECKED_CAST")
 fun mapEdConnectorConfig(raw: Any?): EdConnectorConfigRemote {
   val map = raw as? Map<String, Any?> ?: emptyMap()

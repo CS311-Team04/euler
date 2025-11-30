@@ -50,7 +50,7 @@ class ConnectorsViewModel(
   /** Connects a connector (no confirmation needed). */
   fun connectConnector(connectorId: String) {
     if (connectorId == "ed") {
-      // Pour ED on ouvre le dialog de connexion (token)
+      // For ED, open the connection dialog (token)
       _uiState.update { it.copy(isEdConnectDialogOpen = true, edConnectError = null) }
       return
     }
@@ -76,34 +76,8 @@ class ConnectorsViewModel(
   /** Disconnects a connector after confirmation. */
   fun disconnectConnector(connectorId: String) {
     if (connectorId == "ed") {
-      // Cas spécial ED : on appelle le backend pour vraiment supprimer la config
-      viewModelScope.launch {
-        // On ferme le dialog tout de suite
-        _uiState.update { it.copy(pendingConnectorForDisconnect = null) }
-
-        try {
-          // Appel de la Cloud Function: edConnectorDisconnectFn
-          edRemoteDataSource.disconnect()
-
-          // Si ça marche, on met ED en "déconnecté" côté UI
-          _uiState.update { current ->
-            current.copy(
-                connectors =
-                    current.connectors.map { connector ->
-                      if (connector.id == "ed") {
-                        connector.copy(isConnected = false)
-                      } else {
-                        connector
-                      }
-                    })
-          }
-        } catch (_: Exception) {
-          // Pour l'instant on ne gère pas encore d'erreur user-facing ici.
-          // Tu pourras plus tard ajouter un champ errorMessage dans l’UI state si tu veux.
-        }
-      }
+      disconnectEdConnector()
     } else {
-      // Comportement local pour les autres connecteurs (Moodle, etc.)
       _uiState.update { currentState ->
         currentState.copy(
             connectors =
@@ -119,15 +93,38 @@ class ConnectorsViewModel(
     }
   }
 
+  private fun disconnectEdConnector() {
+    viewModelScope.launch {
+      _uiState.update { it.copy(pendingConnectorForDisconnect = null) }
+      try {
+        edRemoteDataSource.disconnect()
+        _uiState.update { current ->
+          current.copy(
+              connectors =
+                  current.connectors.map { connector ->
+                    if (connector.id == "ed") {
+                      connector.copy(isConnected = false)
+                    } else {
+                      connector
+                    }
+                  })
+        }
+      } catch (_: Exception) {
+        // For now, we don't handle user-facing errors here yet.
+      }
+    }
+  }
+
   /** Dismisses the disconnect confirmation dialog. */
   fun dismissDisconnectConfirmation() {
     _uiState.update { it.copy(pendingConnectorForDisconnect = null) }
   }
 
+  /** Refreshes the ED connector status from the backend. */
   private fun refreshEdStatus() {
     viewModelScope.launch {
       try {
-        // on indique qu'on charge, on reset l'erreur ED
+        // Indicate loading, reset ED error
         _uiState.update { it.copy(isLoadingEd = true, edError = null) }
 
         val config: EdConnectorConfigRemote = edRemoteDataSource.getStatus()
@@ -153,15 +150,15 @@ class ConnectorsViewModel(
     }
   }
 
-  /** Ferme le dialog de connexion ED. */
+  /** Closes the ED connection dialog. */
   fun dismissEdConnectDialog() {
     _uiState.update { it.copy(isEdConnectDialogOpen = false, edConnectError = null) }
   }
 
-  /** Confirme la connexion ED avec le token (et baseUrl optionnelle). */
+  /** Confirms ED connection with token (and optional baseUrl). */
   fun confirmEdConnect(apiToken: String, baseUrl: String?) {
     viewModelScope.launch {
-      // on indique qu'on est en train de connecter
+      // Indicate we are connecting
       _uiState.update { it.copy(isEdConnecting = true, edConnectError = null) }
 
       try {
@@ -171,7 +168,7 @@ class ConnectorsViewModel(
             "config after connect: status=${config.status}, lastError=${config.lastError}")
 
         if (config.status == EdConnectorStatusRemote.CONNECTED) {
-          // succès : on met ED en "connected" et on ferme le dialog
+          // Success: set ED to "connected" and close the dialog
           _uiState.update { state ->
             val updatedConnectors =
                 state.connectors.map { connector ->
@@ -190,7 +187,7 @@ class ConnectorsViewModel(
             )
           }
         } else {
-          // backend a répondu ERROR (ex: invalid_credentials)
+          // Backend returned ERROR (e.g.: invalid_credentials)
           _uiState.update { state ->
             val friendlyMessageKey =
                 when (config.lastError) {
@@ -207,7 +204,7 @@ class ConnectorsViewModel(
           }
         }
       } catch (e: Exception) {
-        // Erreur réseau / autre
+        // Network error / other
         _uiState.update { state ->
           state.copy(
               isEdConnecting = false,

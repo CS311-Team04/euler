@@ -165,7 +165,7 @@ fun ConnectorsScreen(
     Column(modifier = Modifier.fillMaxSize()) {
       ConnectorsTopBar(onBackClick = onBackClick, colors = connectorState.colors)
 
-      // Petit indicateur pendant qu'on teste / charge le statut ED
+      // Small indicator while testing/loading ED status
       if (uiState.isLoadingEd) {
         LinearProgressIndicator(
             modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.ScreenHorizontalPadding))
@@ -174,7 +174,7 @@ fun ConnectorsScreen(
         Spacer(modifier = Modifier.height(Dimens.ScreenContentSpacing))
       }
 
-      // Message d'erreur ED (par ex: "Failed to load ED connector status")
+      // ED error message (e.g.: "Failed to load ED connector status")
       uiState.edError?.let { errorText ->
         Text(
             text = errorText,
@@ -202,7 +202,7 @@ fun ConnectorsScreen(
     ConnectorsFooter(
         colors = connectorState.colors, modifier = Modifier.align(Alignment.BottomCenter))
 
-    // Disconnect confirmation dialog (inchangé)
+    // Disconnect confirmation dialog (unchanged)
     uiState.pendingConnectorForDisconnect?.let { connector ->
       DisconnectConfirmationDialog(
           connectorName = connector.name,
@@ -286,6 +286,7 @@ internal fun DisconnectConfirmationDialog(
       shape = RoundedCornerShape(Dimens.DialogCornerRadius))
 }
 
+/** Dialog for connecting to ED with API token and optional base URL. */
 @Composable
 internal fun EdConnectDialog(
     colors: ConnectorsColors,
