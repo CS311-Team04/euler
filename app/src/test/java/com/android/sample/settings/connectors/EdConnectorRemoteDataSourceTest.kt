@@ -38,80 +38,45 @@ class EdConnectorRemoteDataSourceTest {
             "baseUrl" to "https://example.com",
             "lastTestAt" to "2024-01-01",
             "lastError" to null)
-    val functions = setupMockFunctions("edConnectorStatusFn", createMockResult(responseData))
-    val dataSource = EdConnectorRemoteDataSource(functions)
-
+    val dataSource =
+        EdConnectorRemoteDataSource(
+            setupMockFunctions("edConnectorStatusFn", createMockResult(responseData)))
     val result = dataSource.getStatus()
-
     assertEquals(EdConnectorStatusRemote.CONNECTED, result.status)
     assertEquals("https://example.com", result.baseUrl)
   }
 
   @Test
-  fun `connect with baseUrl includes it in payload`() = runTest {
+  fun `connect handles baseUrl variations`() = runTest {
     val responseData = mapOf<String, Any?>("status" to "connected")
     val functions = setupMockFunctions("edConnectorConnectFn", createMockResult(responseData))
     val dataSource = EdConnectorRemoteDataSource(functions)
 
-    val result = dataSource.connect("token", "https://example.com")
-
-    assertEquals(EdConnectorStatusRemote.CONNECTED, result.status)
+    assertEquals(
+        EdConnectorStatusRemote.CONNECTED,
+        dataSource.connect("token", "https://example.com").status)
+    assertEquals(EdConnectorStatusRemote.CONNECTED, dataSource.connect("token", null).status)
+    assertEquals(EdConnectorStatusRemote.CONNECTED, dataSource.connect("token", "   ").status)
   }
 
   @Test
-  fun `connect without baseUrl does not include it`() = runTest {
-    val responseData = mapOf<String, Any?>("status" to "connected")
-    val functions = setupMockFunctions("edConnectorConnectFn", createMockResult(responseData))
-    val dataSource = EdConnectorRemoteDataSource(functions)
-
-    val result = dataSource.connect("token", null)
-
-    assertEquals(EdConnectorStatusRemote.CONNECTED, result.status)
+  fun `disconnect and test return correct config`() = runTest {
+    val disconnectData = mapOf<String, Any?>("status" to "not_connected")
+    val testData = mapOf<String, Any?>("status" to "connected")
+    val disconnectSource =
+        EdConnectorRemoteDataSource(
+            setupMockFunctions("edConnectorDisconnectFn", createMockResult(disconnectData)))
+    val testSource =
+        EdConnectorRemoteDataSource(
+            setupMockFunctions("edConnectorTestFn", createMockResult(testData)))
+    assertEquals(EdConnectorStatusRemote.NOT_CONNECTED, disconnectSource.disconnect().status)
+    assertEquals(EdConnectorStatusRemote.CONNECTED, testSource.test().status)
   }
 
   @Test
-  fun `connect with blank baseUrl does not include it`() = runTest {
-    val responseData = mapOf<String, Any?>("status" to "connected")
-    val functions = setupMockFunctions("edConnectorConnectFn", createMockResult(responseData))
-    val dataSource = EdConnectorRemoteDataSource(functions)
-
-    val result = dataSource.connect("token", "   ")
-
-    assertEquals(EdConnectorStatusRemote.CONNECTED, result.status)
-  }
-
-  @Test
-  fun `disconnect returns correct config`() = runTest {
-    val responseData = mapOf<String, Any?>("status" to "not_connected")
-    val functions = setupMockFunctions("edConnectorDisconnectFn", createMockResult(responseData))
-    val dataSource = EdConnectorRemoteDataSource(functions)
-
-    val result = dataSource.disconnect()
-
-    assertEquals(EdConnectorStatusRemote.NOT_CONNECTED, result.status)
-  }
-
-  @Test
-  fun `test returns correct config`() = runTest {
-    val responseData = mapOf<String, Any?>("status" to "connected")
-    val functions = setupMockFunctions("edConnectorTestFn", createMockResult(responseData))
-    val dataSource = EdConnectorRemoteDataSource(functions)
-
-    val result = dataSource.test()
-
-    assertEquals(EdConnectorStatusRemote.CONNECTED, result.status)
-  }
-
-  @Test
-  fun `mapEdConnectorConfig handles null input`() = runTest {
-    val result = mapEdConnectorConfig(null)
-    assertEquals(EdConnectorStatusRemote.NOT_CONNECTED, result.status)
-  }
-
-  @Test
-  fun `mapEdConnectorConfig handles non-map input`() = runTest {
-    val result = mapEdConnectorConfig("not a map")
-    assertEquals(EdConnectorStatusRemote.NOT_CONNECTED, result.status)
+  fun `mapEdConnectorConfig handles invalid input`() = runTest {
+    assertEquals(EdConnectorStatusRemote.NOT_CONNECTED, mapEdConnectorConfig(null).status)
+    assertEquals(EdConnectorStatusRemote.NOT_CONNECTED, mapEdConnectorConfig("not a map").status)
   }
 
   @Test
@@ -122,9 +87,7 @@ class EdConnectorRemoteDataSourceTest {
             "baseUrl" to "https://test.com",
             "lastTestAt" to "2024-01-01",
             "lastError" to "test error")
-
     val result = mapEdConnectorConfig(input)
-
     assertEquals(EdConnectorStatusRemote.ERROR, result.status)
     assertEquals("https://test.com", result.baseUrl)
     assertEquals("2024-01-01", result.lastTestAt)

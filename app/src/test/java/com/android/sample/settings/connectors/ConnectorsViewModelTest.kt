@@ -116,24 +116,14 @@ class ConnectorsViewModelTest {
   fun `disconnectConnector sets connector to not connected and clears pending`() = runTest {
     val viewModel = createViewModel()
     advanceUntilIdle()
-
-    // First connect a connector
     viewModel.connectConnector("moodle")
-    val connectedState = viewModel.uiState.first()
-    val moodle = connectedState.connectors.find { it.id == "moodle" }!!
-
-    // Show disconnect confirmation
+    val moodle = viewModel.uiState.first().connectors.find { it.id == "moodle" }!!
     viewModel.showDisconnectConfirmation(moodle)
-
-    // Disconnect
     viewModel.disconnectConnector("moodle")
-    advanceUntilIdle() // Wait for async disconnect
-    val disconnectedState = viewModel.uiState.first()
-
-    val disconnectedMoodle = disconnectedState.connectors.find { it.id == "moodle" }
-    assertNotNull(disconnectedMoodle)
-    assertFalse(disconnectedMoodle!!.isConnected)
-    assertNull(disconnectedState.pendingConnectorForDisconnect)
+    advanceUntilIdle()
+    val uiState = viewModel.uiState.first()
+    assertFalse(uiState.connectors.find { it.id == "moodle" }!!.isConnected)
+    assertNull(uiState.pendingConnectorForDisconnect)
   }
 
   @Test
@@ -189,21 +179,16 @@ class ConnectorsViewModelTest {
   fun `connect then disconnect then connect again works`() = runTest {
     val viewModel = createViewModel()
     advanceUntilIdle()
-
     viewModel.connectConnector("moodle")
     var uiState = viewModel.uiState.first()
     assertTrue(uiState.connectors.find { it.id == "moodle" }!!.isConnected)
-
-    val moodle = uiState.connectors.find { it.id == "moodle" }!!
-    viewModel.showDisconnectConfirmation(moodle)
+    viewModel.showDisconnectConfirmation(uiState.connectors.find { it.id == "moodle" }!!)
     viewModel.disconnectConnector("moodle")
     advanceUntilIdle()
     uiState = viewModel.uiState.first()
     assertFalse(uiState.connectors.find { it.id == "moodle" }!!.isConnected)
-
     viewModel.connectConnector("moodle")
-    uiState = viewModel.uiState.first()
-    assertTrue(uiState.connectors.find { it.id == "moodle" }!!.isConnected)
+    assertTrue(viewModel.uiState.first().connectors.find { it.id == "moodle" }!!.isConnected)
   }
 
   @Test
@@ -213,20 +198,15 @@ class ConnectorsViewModelTest {
     val viewModel =
         ConnectorsViewModel(functions = mockFunctions, edRemoteDataSource = mockDataSource)
     advanceUntilIdle()
-
-    // Connect ED first
     viewModel.connectConnector("ed")
     viewModel.confirmEdConnect("test-token", null)
     advanceUntilIdle()
-    var uiState = viewModel.uiState.first()
-    assertTrue(uiState.connectors.find { it.id == "ed" }!!.isConnected)
-
-    // Disconnect ED
-    val edConnector = uiState.connectors.find { it.id == "ed" }!!
+    val edConnector = viewModel.uiState.first().connectors.find { it.id == "ed" }!!
+    assertTrue(edConnector.isConnected)
     viewModel.showDisconnectConfirmation(edConnector)
     viewModel.disconnectConnector("ed")
     advanceUntilIdle()
-    uiState = viewModel.uiState.first()
+    val uiState = viewModel.uiState.first()
     assertFalse(uiState.connectors.find { it.id == "ed" }!!.isConnected)
     assertNull(uiState.pendingConnectorForDisconnect)
   }
@@ -238,12 +218,10 @@ class ConnectorsViewModelTest {
     val viewModel =
         ConnectorsViewModel(functions = mockFunctions, edRemoteDataSource = mockDataSource)
     advanceUntilIdle()
-
     viewModel.connectConnector("ed")
     viewModel.confirmEdConnect("test-token", "https://test.com")
     advanceUntilIdle()
     val uiState = viewModel.uiState.first()
-
     assertTrue(uiState.connectors.find { it.id == "ed" }!!.isConnected)
     assertFalse(uiState.isEdConnectDialogOpen)
     assertFalse(uiState.isEdConnecting)
@@ -251,69 +229,26 @@ class ConnectorsViewModelTest {
   }
 
   @Test
-  fun `confirmEdConnect with invalid_credentials error shows error message`() = runTest {
-    val mockFunctions = mockk<FirebaseFunctions>(relaxed = true)
-    val mockDataSource =
-        MockEdConnectorRemoteDataSource().apply {
-          connectShouldSucceed = false
-          connectError = "invalid_credentials"
-        }
-    val viewModel =
-        ConnectorsViewModel(functions = mockFunctions, edRemoteDataSource = mockDataSource)
-    advanceUntilIdle()
-
-    viewModel.connectConnector("ed")
-    viewModel.confirmEdConnect("invalid-token", null)
-    advanceUntilIdle()
-    val uiState = viewModel.uiState.first()
-
-    assertFalse(uiState.connectors.find { it.id == "ed" }!!.isConnected)
-    assertFalse(uiState.isEdConnecting)
-    assertNotNull(uiState.edConnectError)
-  }
-
-  @Test
-  fun `confirmEdConnect with api_unreachable error shows error message`() = runTest {
-    val mockFunctions = mockk<FirebaseFunctions>(relaxed = true)
-    val mockDataSource =
-        MockEdConnectorRemoteDataSource().apply {
-          connectShouldSucceed = false
-          connectError = "api_unreachable"
-        }
-    val viewModel =
-        ConnectorsViewModel(functions = mockFunctions, edRemoteDataSource = mockDataSource)
-    advanceUntilIdle()
-
-    viewModel.connectConnector("ed")
-    viewModel.confirmEdConnect("test-token", null)
-    advanceUntilIdle()
-    val uiState = viewModel.uiState.first()
-
-    assertFalse(uiState.connectors.find { it.id == "ed" }!!.isConnected)
-    assertFalse(uiState.isEdConnecting)
-    assertNotNull(uiState.edConnectError)
-  }
-
-  @Test
-  fun `confirmEdConnect with generic error shows error message`() = runTest {
-    val mockFunctions = mockk<FirebaseFunctions>(relaxed = true)
-    val mockDataSource =
-        MockEdConnectorRemoteDataSource().apply {
-          connectShouldSucceed = false
-          connectError = "unknown_error"
-        }
-    val viewModel =
-        ConnectorsViewModel(functions = mockFunctions, edRemoteDataSource = mockDataSource)
-    advanceUntilIdle()
-
-    viewModel.connectConnector("ed")
-    viewModel.confirmEdConnect("test-token", null)
-    advanceUntilIdle()
-    val uiState = viewModel.uiState.first()
-
-    assertFalse(uiState.connectors.find { it.id == "ed" }!!.isConnected)
-    assertFalse(uiState.isEdConnecting)
-    assertNotNull(uiState.edConnectError)
+  fun `confirmEdConnect with errors shows error message`() = runTest {
+    val errors = listOf("invalid_credentials", "api_unreachable", "unknown_error")
+    errors.forEach { error ->
+      val mockFunctions = mockk<FirebaseFunctions>(relaxed = true)
+      val mockDataSource =
+          MockEdConnectorRemoteDataSource().apply {
+            connectShouldSucceed = false
+            connectError = error
+          }
+      val viewModel =
+          ConnectorsViewModel(functions = mockFunctions, edRemoteDataSource = mockDataSource)
+      advanceUntilIdle()
+      viewModel.connectConnector("ed")
+      viewModel.confirmEdConnect("test-token", null)
+      advanceUntilIdle()
+      val uiState = viewModel.uiState.first()
+      assertFalse(uiState.connectors.find { it.id == "ed" }!!.isConnected)
+      assertFalse(uiState.isEdConnecting)
+      assertNotNull(uiState.edConnectError)
+    }
   }
 
   @Test
@@ -323,12 +258,10 @@ class ConnectorsViewModelTest {
     val viewModel =
         ConnectorsViewModel(functions = mockFunctions, edRemoteDataSource = mockDataSource)
     advanceUntilIdle()
-
     viewModel.connectConnector("ed")
     viewModel.confirmEdConnect("test-token", null)
     advanceUntilIdle()
     val uiState = viewModel.uiState.first()
-
     assertFalse(uiState.connectors.find { it.id == "ed" }!!.isConnected)
     assertFalse(uiState.isEdConnecting)
     assertNotNull(uiState.edConnectError)
