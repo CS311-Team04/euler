@@ -512,7 +512,9 @@ class NavGraphVoiceChatViewModelConfigTest {
                   remember(homeViewModel) {
                     createVoiceChatViewModel(
                         homeViewModel = homeViewModel,
-                        createConversationRepositoryOrNull = { createConversationRepositoryOrNull() },
+                        createConversationRepositoryOrNull = {
+                          createConversationRepositoryOrNull()
+                        },
                         createGetCurrentConversationIdLambda = {
                           createGetCurrentConversationIdLambda(it)
                         },
