@@ -50,12 +50,13 @@ class EpflScheduleRepository(
             val response = result.getData() as? Map<String, Any>
             
             val success = response?.get("success") as? Boolean ?: false
-            val eventCount = (response?.get("eventCount") as? Number)?.toInt() ?: 0
+            val weeklySlots = (response?.get("weeklySlots") as? Number)?.toInt() ?: 0
+            val finalExams = (response?.get("finalExams") as? Number)?.toInt() ?: 0
             val message = response?.get("message") as? String ?: "Schedule synced"
             
             if (success) {
-                Log.d(TAG, "Schedule synced successfully: $eventCount events")
-                SyncResult.Success(eventCount, message)
+                Log.d(TAG, "Schedule synced: $weeklySlots weekly slots, $finalExams exams")
+                SyncResult.Success(weeklySlots, finalExams, message)
             } else {
                 SyncResult.Error(message)
             }
@@ -85,9 +86,11 @@ class EpflScheduleRepository(
             val connected = response?.get("connected") as? Boolean ?: false
             
             if (connected) {
-                val eventCount = (response?.get("eventCount") as? Number)?.toInt() ?: 0
+                val weeklySlots = (response?.get("weeklySlots") as? Number)?.toInt() ?: 0
+                val finalExams = (response?.get("finalExams") as? Number)?.toInt() ?: 0
                 val lastSync = response?.get("lastSync") as? String
-                ScheduleStatus.Connected(eventCount, lastSync)
+                val optimized = response?.get("optimized") as? Boolean ?: true
+                ScheduleStatus.Connected(weeklySlots, finalExams, lastSync, optimized)
             } else {
                 ScheduleStatus.NotConnected
             }
@@ -149,7 +152,11 @@ class EpflScheduleRepository(
  * Result of schedule sync operation
  */
 sealed class SyncResult {
-    data class Success(val eventCount: Int, val message: String) : SyncResult()
+    data class Success(
+        val weeklySlots: Int, 
+        val finalExams: Int, 
+        val message: String
+    ) : SyncResult()
     data class Error(val message: String) : SyncResult()
 }
 
@@ -158,7 +165,12 @@ sealed class SyncResult {
  */
 sealed class ScheduleStatus {
     object NotConnected : ScheduleStatus()
-    data class Connected(val eventCount: Int, val lastSync: String?) : ScheduleStatus()
+    data class Connected(
+        val weeklySlots: Int,
+        val finalExams: Int,
+        val lastSync: String?,
+        val optimized: Boolean = true
+    ) : ScheduleStatus()
     data class Error(val message: String) : ScheduleStatus()
 }
 

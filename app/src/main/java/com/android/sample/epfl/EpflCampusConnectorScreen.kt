@@ -162,7 +162,8 @@ fun EpflCampusConnectorScreen(
                 } else if (uiState.isConnected) {
                     // Connected state
                     ConnectedCard(
-                        eventCount = uiState.eventCount,
+                        weeklySlots = uiState.weeklySlots,
+                        finalExams = uiState.finalExams,
                         lastSync = uiState.lastSync,
                         surface = surface,
                         textPrimary = textPrimary,
@@ -325,7 +326,8 @@ private fun EpflHeaderCard(
 
 @Composable
 private fun ConnectedCard(
-    eventCount: Int,
+    weeklySlots: Int,
+    finalExams: Int,
     lastSync: String?,
     surface: androidx.compose.ui.graphics.Color,
     textPrimary: androidx.compose.ui.graphics.Color,
@@ -364,7 +366,7 @@ private fun ConnectedCard(
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = "$eventCount ${Localization.t("epfl_events_synced")}",
+                        text = "$weeklySlots ${Localization.t("epfl_weekly_classes")} • $finalExams ${Localization.t("epfl_exams")}",
                         color = textSecondary,
                         fontSize = 14.sp
                     )

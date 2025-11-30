@@ -431,11 +431,14 @@ fun HomeScreen(
                                     title = item.source.title,
                                     url = item.source.url,
                                     retrievedAt = item.source.retrievedAt,
-                                    onVisit = {
-                                      val intent =
-                                          Intent(Intent.ACTION_VIEW, Uri.parse(item.source.url))
-                                      context.startActivity(intent)
-                                    })
+                                    isScheduleSource = item.source.isScheduleSource,
+                                    onVisit = if (item.source.url != null && !item.source.isScheduleSource) {
+                                      {
+                                        val intent =
+                                            Intent(Intent.ACTION_VIEW, Uri.parse(item.source.url))
+                                        context.startActivity(intent)
+                                      }
+                                    } else null)
                                 Spacer(Modifier.height(8.dp))
                               }
 
@@ -936,76 +939,103 @@ private fun OfflineMessageBanner(onDismiss: () -> Unit, modifier: Modifier = Mod
 private fun SourceCard(
     siteLabel: String,
     title: String,
-    url: String,
+    url: String?,
     retrievedAt: Long,
-    onVisit: () -> Unit
+    isScheduleSource: Boolean = false,
+    onVisit: (() -> Unit)? = null
 ) {
   val colorScheme = MaterialTheme.colorScheme
-  Column(
-      modifier =
-          Modifier.fillMaxWidth()
-              .clip(RoundedCornerShape(10.dp))
-              .background(colorScheme.surfaceVariant)
-              .padding(horizontal = 12.dp, vertical = 6.dp)) {
-        // Top line: “Retrieved from EPFL.ch Website”
-        Row(verticalAlignment = Alignment.CenterVertically) {
-          Icon(
-              imageVector = Icons.Default.CheckCircle,
-              contentDescription = null,
-              tint = com.android.sample.ui.theme.EulerGreen,
-              modifier = Modifier.size(14.dp))
-          Spacer(Modifier.width(4.dp))
-          Text(
-              text = "Retrieved from  $siteLabel",
-              color = colorScheme.onSurfaceVariant,
-              style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp))
-        }
+  
+  if (isScheduleSource) {
+    // Compact schedule indicator - just a small inline badge
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+      Icon(
+          imageVector = Icons.Default.CheckCircle,
+          contentDescription = null,
+          tint = com.android.sample.ui.theme.EulerGreen,
+          modifier = Modifier.size(12.dp))
+      Spacer(Modifier.width(6.dp))
+      Text(
+          text = "📅 $siteLabel",
+          color = colorScheme.onSurfaceVariant,
+          style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp))
+    }
+  } else {
+    // Full RAG source card with Visit button
+    Column(
+        modifier =
+            Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(colorScheme.surfaceVariant)
+                .padding(horizontal = 12.dp, vertical = 6.dp)) {
+          // Top line: "Retrieved from EPFL.ch Website"
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = null,
+                tint = com.android.sample.ui.theme.EulerGreen,
+                modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = "Retrieved from  $siteLabel",
+                color = colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp))
+          }
 
-        Spacer(Modifier.height(4.dp))
+          Spacer(Modifier.height(4.dp))
 
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-          // Title (ellipsized to one line)
-          Text(
-              text = url,
-              color = colorScheme.onSurface,
-              style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
-              maxLines = 1,
-              overflow = TextOverflow.Ellipsis,
-              modifier = Modifier.weight(1f))
+          Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            // URL (ellipsized to one line)
+            Text(
+                text = url ?: "",
+                color = colorScheme.onSurface,
+                style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f))
 
-          Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(6.dp))
 
-          Button(
-              onClick = onVisit,
-              shape = RoundedCornerShape(6.dp),
-              contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-              colors = ButtonDefaults.buttonColors(containerColor = colorScheme.primary)) {
-                Text("Visit", color = colorScheme.onPrimary)
-                Spacer(Modifier.width(6.dp))
-                Icon(
-                    imageVector = androidx.compose.material.icons.Icons.Outlined.OpenInNew,
-                    contentDescription = null,
-                    modifier = Modifier.size(10.dp),
-                    tint = colorScheme.onPrimary)
-              }
-        }
-
-        Spacer(Modifier.height(2.dp))
-
-        // Retrieved date
-        val dateStr =
-            remember(retrievedAt) {
-              val d =
-                  java.time.Instant.ofEpochMilli(retrievedAt)
-                      .atZone(java.time.ZoneId.systemDefault())
-                      .toLocalDate()
-              "%02d/%02d/%02d".format(d.dayOfMonth, d.monthValue, d.year % 100)
+            if (onVisit != null && url != null) {
+              Button(
+                  onClick = onVisit,
+                  shape = RoundedCornerShape(6.dp),
+                  contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                  colors = ButtonDefaults.buttonColors(containerColor = colorScheme.primary)) {
+                    Text("Visit", color = colorScheme.onPrimary)
+                    Spacer(Modifier.width(6.dp))
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Outlined.OpenInNew,
+                        contentDescription = null,
+                        modifier = Modifier.size(10.dp),
+                        tint = colorScheme.onPrimary)
+                  }
             }
-        Text(
-            text = "Retrieved on $dateStr",
-            color = colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp))
-      }
+          }
+
+          Spacer(Modifier.height(2.dp))
+
+          // Retrieved date
+          val dateStr =
+              remember(retrievedAt) {
+                val d =
+                    java.time.Instant.ofEpochMilli(retrievedAt)
+                        .atZone(java.time.ZoneId.systemDefault())
+                        .toLocalDate()
+                "%02d/%02d/%02d".format(d.dayOfMonth, d.monthValue, d.year % 100)
+              }
+          Text(
+              text = "Retrieved on $dateStr",
+              color = colorScheme.onSurfaceVariant,
+              style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp))
+        }
+  }
 }
 
 @Preview(showBackground = true, backgroundColor = 0x000000)

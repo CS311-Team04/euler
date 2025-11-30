@@ -43,7 +43,8 @@ class EpflCampusViewModel(
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         isConnected = true,
-                        eventCount = status.eventCount,
+                        weeklySlots = status.weeklySlots,
+                        finalExams = status.finalExams,
                         lastSync = status.lastSync,
                         error = null
                     )
@@ -52,7 +53,8 @@ class EpflCampusViewModel(
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         isConnected = false,
-                        eventCount = 0,
+                        weeklySlots = 0,
+                        finalExams = 0,
                         lastSync = null,
                         error = null
                     )
@@ -139,7 +141,8 @@ class EpflCampusViewModel(
                     _uiState.value = _uiState.value.copy(
                         isSyncing = false,
                         isConnected = true,
-                        eventCount = result.eventCount,
+                        weeklySlots = result.weeklySlots,
+                        finalExams = result.finalExams,
                         successMessage = result.message,
                         icsUrlInput = ""
                     )
@@ -226,7 +229,8 @@ data class EpflCampusUiState(
     val isLoading: Boolean = false,
     val isSyncing: Boolean = false,
     val isConnected: Boolean = false,
-    val eventCount: Int = 0,
+    val weeklySlots: Int = 0,
+    val finalExams: Int = 0,
     val lastSync: String? = null,
     val icsUrlInput: String = "",
     val isValidUrl: Boolean = false,
