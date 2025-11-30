@@ -12,8 +12,6 @@ import com.android.sample.llm.LlmClient
 import com.google.firebase.functions.FirebaseFunctions
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -25,7 +23,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * Coordinates speech-to-text transcripts with the custom LLM and delegates playback to the UI.
@@ -40,7 +37,6 @@ import kotlinx.coroutines.withContext
  */
 class VoiceChatViewModel(
     private val llmClient: LlmClient = FirebaseFunctionsLlmClient(),
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val conversationRepository: ConversationRepository? = null,
     private val getCurrentConversationId: () -> String? = { null },
     private val onConversationCreated: ((String) -> Unit)? = null,
@@ -139,8 +135,7 @@ class VoiceChatViewModel(
       if (conversationId == null) {
         // Create new conversation on first message
         val quickTitle = ConversationTitleFormatter.localTitleFrom(cleaned)
-        conversationId =
-            withContext(ioDispatcher) { conversationRepository.startNewConversation(quickTitle) }
+        conversationId = conversationRepository.startNewConversation(quickTitle)
         Log.d(TAG, "Created new voice conversation: $conversationId with title: $quickTitle")
 
         // Notify that a new conversation was created so it can be selected
@@ -151,9 +146,7 @@ class VoiceChatViewModel(
           try {
             val good = ConversationTitleFormatter.fetchTitle(functions, cleaned, TAG)
             if (good.isNotBlank() && good != quickTitle) {
-              withContext(ioDispatcher) {
-                conversationRepository.updateConversationTitle(conversationId, good)
-              }
+              conversationRepository.updateConversationTitle(conversationId, good)
               Log.d(TAG, "Upgraded conversation title: $conversationId -> $good")
             }
           } catch (e: Exception) {
@@ -179,7 +172,7 @@ class VoiceChatViewModel(
   private suspend fun persistUserMessage(cid: String?, message: String) {
     if (cid == null || conversationRepository == null) return
     try {
-      withContext(ioDispatcher) { conversationRepository.appendMessage(cid, "user", message) }
+      conversationRepository.appendMessage(cid, "user", message)
       Log.d(TAG, "Persisted user message to conversation: $cid")
     } catch (e: Exception) {
       Log.w(TAG, "Failed to persist user message: ${e.message}")
@@ -187,8 +180,7 @@ class VoiceChatViewModel(
   }
 
   /** Generates AI reply using the LLM client. */
-  private suspend fun generateAiReply(cleaned: String) =
-      withContext(ioDispatcher) { llmClient.generateReply(cleaned) }
+  private suspend fun generateAiReply(cleaned: String) = llmClient.generateReply(cleaned)
 
   /** Updates UI state with the AI reply. */
   private fun updateStateWithReply(reply: String) {
@@ -199,7 +191,7 @@ class VoiceChatViewModel(
   private suspend fun persistAiMessage(cid: String?, reply: String) {
     if (cid == null || conversationRepository == null) return
     try {
-      withContext(ioDispatcher) { conversationRepository.appendMessage(cid, "assistant", reply) }
+      conversationRepository.appendMessage(cid, "assistant", reply)
       Log.d(TAG, "Persisted assistant message to conversation: $cid")
     } catch (e: Exception) {
       Log.w(TAG, "Failed to persist assistant message: ${e.message}")
