@@ -437,7 +437,6 @@ private fun InstructionsCard(
             InstructionStep(1, Localization.t("epfl_step_1"), textPrimary, textSecondary)
             InstructionStep(2, Localization.t("epfl_step_2"), textPrimary, textSecondary)
             InstructionStep(3, Localization.t("epfl_step_3"), textPrimary, textSecondary)
-            InstructionStep(4, Localization.t("epfl_step_4"), textPrimary, textSecondary)
         }
     }
 }

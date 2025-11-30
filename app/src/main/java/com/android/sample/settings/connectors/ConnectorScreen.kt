@@ -159,6 +159,11 @@ fun ConnectorsScreen(
 ) {
   val uiState by viewModel.uiState.collectAsState()
   val connectorState = rememberConnectorState()
+  
+  // Refresh connection statuses when screen appears
+  LaunchedEffect(Unit) {
+    viewModel.refreshConnectionStatuses()
+  }
 
   Box(modifier = Modifier.fillMaxSize().background(connectorState.colors.background)) {
     Column(modifier = Modifier.fillMaxSize()) {

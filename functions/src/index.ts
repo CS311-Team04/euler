@@ -470,13 +470,8 @@ export async function answerWithRagCore({
     (recentTranscript ?? "").toString().trim().slice(0, 1500);
 
   // Build schedule-specific instructions if schedule context is present
-  const scheduleInstructions = scheduleContext ? [
-    "RÈGLE IMPORTANTE POUR LES QUESTIONS D'HORAIRE:",
-    "- Réponds UNIQUEMENT avec les informations de l'emploi du temps.",
-    "- NE MENTIONNE PAS le contexte RAG, les sources web, les cours de sport, ou autres informations externes.",
-    "- NE RAJOUTE PAS de phrases comme « Pour plus d'informations... » ou « consultez les sources... ».",
-    "- Termine ta réponse après avoir donné les cours/horaires demandés. Pas de conclusion.",
-  ].join("\n") : "";
+  const scheduleInstructions = scheduleContext ? 
+    "HORAIRE: Liste uniquement les cours demandés (tirets). Pas de commentaires après." : "";
 
   const prompt = [
     "Consigne: réponds brièvement et directement, sans introduction, sans méta‑commentaires et sans phrases de conclusion.",
