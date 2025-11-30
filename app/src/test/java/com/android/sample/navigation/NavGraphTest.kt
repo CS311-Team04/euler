@@ -16,6 +16,7 @@ import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navOptions
 import androidx.test.core.app.ApplicationProvider
+import com.android.sample.VoiceChat.UI.VoiceScreen
 import com.android.sample.authentification.AuthProvider
 import com.android.sample.authentification.AuthUiState
 import com.android.sample.home.HomeViewModel
@@ -488,30 +489,30 @@ class NavGraphVoiceChatViewModelConfigTest {
 
     composeRule.setContent {
       MaterialTheme {
-        val navController = rememberNavController()
+        val nav = rememberNavController()
 
         // Create a minimal NavHost that includes the VoiceChat route
         // This will execute the exact code from lines 619-649 in NavGraph.kt
-        NavHost(navController = navController, startDestination = "home_root") {
+        // VoiceChat is set as startDestination in the navigation block to ensure it's executed
+        NavHost(navController = nav, startDestination = "home_root") {
           // Home root route needed for getBackStackEntry("home_root")
           navigation(startDestination = Routes.VoiceChat, route = "home_root") {
             composable(Routes.VoiceChat) {
               // This is the EXACT code from NavGraph.kt lines 619-649
               @Suppress("UnrememberedGetBackStackEntry")
-              val parentEntry = navController.getBackStackEntry("home_root")
+              val parentEntry = nav.getBackStackEntry("home_root")
               val homeViewModel: HomeViewModel = viewModel(parentEntry)
 
               // Create VoiceChatViewModel with conversation repository and current conversation ID
               // The lambda reads the current state each time it's called
               // This exact code pattern (lines 610-618) is tested in
               // NavGraphTest.voiceChatComposable_exact_pattern
+              @Suppress("RememberReturnType")
               val voiceChatViewModel =
                   remember(homeViewModel) {
-                    return@remember createVoiceChatViewModel(
+                    createVoiceChatViewModel(
                         homeViewModel = homeViewModel,
-                        createConversationRepositoryOrNull = {
-                          createConversationRepositoryOrNull()
-                        },
+                        createConversationRepositoryOrNull = { createConversationRepositoryOrNull() },
                         createGetCurrentConversationIdLambda = {
                           createGetCurrentConversationIdLambda(it)
                         },
@@ -520,9 +521,8 @@ class NavGraphVoiceChatViewModelConfigTest {
                         })
                   }
 
-              // Import VoiceScreen to use it
-              com.android.sample.VoiceChat.UI.VoiceScreen(
-                  onClose = { navController.popBackStack() },
+              VoiceScreen(
+                  onClose = { nav.popBackStack() },
                   modifier = Modifier.fillMaxSize(),
                   speechHelper = speechHelper,
                   voiceChatViewModel = voiceChatViewModel)
@@ -531,6 +531,9 @@ class NavGraphVoiceChatViewModelConfigTest {
         }
       }
     }
+
+    // Wait for composition to complete
+    composeRule.waitForIdle()
 
     // Verify that the VoiceScreen is displayed (this confirms the composable executed)
     composeRule.onRoot().assertIsDisplayed()
