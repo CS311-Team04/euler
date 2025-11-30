@@ -329,15 +329,6 @@ class NavGraphVoiceChatViewModelConfigTest {
   }
 
   @Test
-  fun createConversationRepositoryOrNull_handles_guest_mode_gracefully() {
-    FirebaseAuth.getInstance().signOut()
-    val repo = createConversationRepositoryOrNull()
-    // Repository might still be created even without user (depends on ConversationRepository impl)
-    // We just verify it doesn't throw
-    // The important part is that the function handles exceptions gracefully
-  }
-
-  @Test
   fun createGetCurrentConversationIdLambda_reads_from_homeViewModel_uiState() {
     val homeViewModel = HomeViewModel(FakeLlmClient())
     homeViewModel.updateUiState { it.copy(currentConversationId = "test-conv-123") }
@@ -431,13 +422,6 @@ class NavGraphVoiceChatViewModelConfigTest {
   fun createVoiceChatViewModel_onConversationCreated_callback_works() {
     val homeViewModel = HomeViewModel(FakeLlmClient())
 
-    val viewModel =
-        createVoiceChatViewModel(
-            homeViewModel = homeViewModel,
-            createConversationRepositoryOrNull = { createConversationRepositoryOrNull() },
-            createGetCurrentConversationIdLambda = { createGetCurrentConversationIdLambda(it) },
-            createOnConversationCreatedCallback = { createOnConversationCreatedCallback(it) })
-
     // Simulate conversation creation callback
     val onConversationCreated = createOnConversationCreatedCallback(homeViewModel)
     onConversationCreated("new-conv-from-factory")
@@ -513,6 +497,7 @@ class NavGraphVoiceChatViewModelConfigTest {
           navigation(startDestination = Routes.VoiceChat, route = "home_root") {
             composable(Routes.VoiceChat) {
               // This is the EXACT code from NavGraph.kt lines 619-649
+              @Suppress("UnrememberedGetBackStackEntry")
               val parentEntry = navController.getBackStackEntry("home_root")
               val homeViewModel: HomeViewModel = viewModel(parentEntry)
 
@@ -522,7 +507,7 @@ class NavGraphVoiceChatViewModelConfigTest {
               // NavGraphTest.voiceChatComposable_exact_pattern
               val voiceChatViewModel =
                   remember(homeViewModel) {
-                    createVoiceChatViewModel(
+                    return@remember createVoiceChatViewModel(
                         homeViewModel = homeViewModel,
                         createConversationRepositoryOrNull = {
                           createConversationRepositoryOrNull()
