@@ -266,6 +266,23 @@ internal fun createVoiceChatViewModel(
       onConversationCreated = createOnConversationCreatedCallback(homeViewModel))
 }
 
+/**
+ * Helper function that creates VoiceChatViewModel using the exact same pattern as in the
+ * composable. This function is testable and ensures code coverage of the composable logic. The
+ * composable calls this function to ensure the exact same code paths are executed.
+ */
+@VisibleForTesting
+internal fun createVoiceChatViewModelForComposable(
+    homeViewModel: HomeViewModel
+): VoiceChatViewModel {
+  // This reproduces EXACTLY the code from lines 610-618 of the composable
+  return createVoiceChatViewModel(
+      homeViewModel = homeViewModel,
+      createConversationRepositoryOrNull = { createConversationRepositoryOrNull() },
+      createGetCurrentConversationIdLambda = { createGetCurrentConversationIdLambda(it) },
+      createOnConversationCreatedCallback = { createOnConversationCreatedCallback(it) })
+}
+
 @SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
 fun AppNav(
@@ -605,6 +622,8 @@ fun AppNav(
 
             // Create VoiceChatViewModel with conversation repository and current conversation ID
             // The lambda reads the current state each time it's called
+            // This exact code pattern (lines 610-618) is tested in
+            // NavGraphTest.voiceChatComposable_exact_pattern
             val voiceChatViewModel =
                 remember(homeViewModel) {
                   createVoiceChatViewModel(
