@@ -12,6 +12,7 @@ import admin from "firebase-admin";
 import { EdConnectorRepository } from "./connectors/ed/EdConnectorRepository";
 import { EdConnectorService } from "./connectors/ed/EdConnectorService";
 import { encryptSecret, decryptSecret } from "./security/secretCrypto";
+import { detectPostToEdIntentCore, buildEdIntentPromptForApertus } from "./edIntent";
 
 
 const europeFunctions = functions.region("europe-west6");
@@ -699,6 +700,32 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
     const recentTranscript =
       typeof (data as any)?.recentTranscript === "string" ? (data as any).recentTranscript : undefined;
     if (!question) throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
+
+    // === ED Intent Detection (fast, regex-based) ===
+    const edIntentResult = detectPostToEdIntentCore(question);
+    if (edIntentResult.ed_intent_detected && edIntentResult.ed_intent) {
+      logger.info("answerWithRagFn.edIntentDetected", {
+        intent: edIntentResult.ed_intent,
+        questionLen: question.length,
+      });
+      
+      // Hybrid approach: REGEX detects, Apertus responds naturally
+      const { reply } = await apertusChatFnCore({
+        messages: [{ role: "user", content: buildEdIntentPromptForApertus(question) }],
+        temperature: 0.3,
+      });
+
+      return {
+        reply,
+        primary_url: null,
+        best_score: 0,
+        sources: [],
+        ed_intent_detected: true,
+        ed_intent: edIntentResult.ed_intent,
+      };
+    }
+    // === End ED Intent Detection ===
+
     logger.info("answerWithRagFn.input", {
       questionLen: question.length,
       hasSummary: Boolean(summary),
@@ -708,7 +735,12 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
       topK,
       model: model ?? process.env.APERTUS_MODEL_ID!,
     });
-    return await answerWithRagCore({ question, topK, model, summary, recentTranscript });
+    const ragResult = await answerWithRagCore({ question, topK, model, summary, recentTranscript });
+    return {
+      ...ragResult,
+      ed_intent_detected: false,
+      ed_intent: null,
+    };
   } catch (e: any) {
     logger.error("answerWithRagFn.failed", { error: String(e) });
     throw new functions.https.HttpsError(
@@ -757,8 +789,42 @@ export const answerWithRagHttp = europeFunctions.https.onRequest(async (req: fun
   try {
     if (req.method !== "POST") { res.status(405).end(); return; }
     checkKey(req);
-    const out = await answerWithRagCore(req.body as AnswerWithRagInput);
-    res.status(200).json(out);
+
+    const body = req.body as AnswerWithRagInput;
+    const question = String(body?.question || "").trim();
+
+    // === ED Intent Detection (fast, regex-based) ===
+    const edIntentResult = detectPostToEdIntentCore(question);
+    if (edIntentResult.ed_intent_detected && edIntentResult.ed_intent) {
+      logger.info("answerWithRagHttp.edIntentDetected", {
+        intent: edIntentResult.ed_intent,
+        questionLen: question.length,
+      });
+      
+      // Hybrid approach: REGEX detects, Apertus responds naturally
+      const { reply } = await apertusChatFnCore({
+        messages: [{ role: "user", content: buildEdIntentPromptForApertus(question) }],
+        temperature: 0.3,
+      });
+
+      res.status(200).json({
+        reply,
+        primary_url: null,
+        best_score: 0,
+        sources: [],
+        ed_intent_detected: true,
+        ed_intent: edIntentResult.ed_intent,
+      });
+      return;
+    }
+    // === End ED Intent Detection ===
+
+    const ragResult = await answerWithRagCore(body);
+    res.status(200).json({
+      ...ragResult,
+      ed_intent_detected: false,
+      ed_intent: null,
+    });
   } catch (e: any) {
     res.status(e.code === 401 ? 401 : 400).json({ error: String(e) });
   }

@@ -680,7 +680,16 @@ class HomeViewModel(
                       t)
                   throw t
                 }
-            Log.d(TAG, "startStreaming: received reply, length=${reply.reply.length}")
+            Log.d(
+                TAG,
+                "startStreaming: received reply, length=${reply.reply.length}, edIntentDetected=${reply.edIntentDetected}, edIntent=${reply.edIntent}")
+
+            // Handle ED intent detection - log for now, can be extended for UI actions
+            if (reply.edIntentDetected) {
+              Log.d(TAG, "ED intent detected: ${reply.edIntent} - will show ED-specific response")
+              // TODO: Could trigger ED connector flow here if needed
+              // For now, the reply already contains the appropriate message
+            }
 
             // simulate stream into the placeholder AI message
             simulateStreamingFromText(messageId, reply.reply)

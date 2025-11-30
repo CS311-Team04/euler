@@ -413,7 +413,8 @@ class HomeViewModelTest {
         "llmClient",
         object : LlmClient {
           override suspend fun generateReply(prompt: String): BotReply =
-              BotReply("Voici un lien utile.", "https://www.epfl.ch/education/projects")
+              BotReply(
+                  "Voici un lien utile.", "https://www.epfl.ch/education/projects", false, null)
         })
 
     viewModel.updateMessageDraft("Où trouver des projets ?")
@@ -1533,4 +1534,70 @@ class HomeViewModelTest {
         assertEquals(sourceMeta1.url, finalMessages[source1Index].source?.url)
         assertEquals(sourceMeta2.url, finalMessages[source2Index].source?.url)
       }
+
+  // ==================== ED INTENT TESTS ====================
+
+  @Test
+  fun sendMessage_with_ed_intent_logs_detection() = runBlocking {
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.setEdIntentResponse(
+        reply = "Je comprends que vous souhaitez poster sur ED", intent = "post_question")
+
+    val viewModel = HomeViewModel()
+    viewModel.setPrivateField("llmClient", fakeLlm)
+
+    viewModel.updateMessageDraft("poste sur ed")
+    viewModel.sendMessage()
+    dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+
+    // Verify the message was sent and ED intent detected
+    assertTrue("LLM should have been called", fakeLlm.prompts.isNotEmpty())
+    assertEquals("poste sur ed", fakeLlm.prompts.first())
+  }
+
+  @Test
+  fun sendMessage_without_ed_intent_works_normally() = runBlocking {
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.nextReply = "Normal response about EPFL"
+    fakeLlm.nextEdIntentDetected = false
+    fakeLlm.nextEdIntent = null
+
+    val viewModel = HomeViewModel()
+    viewModel.setPrivateField("llmClient", fakeLlm)
+
+    viewModel.updateMessageDraft("what is EPFL?")
+    viewModel.sendMessage()
+    dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+
+    // Verify the message was sent normally
+    assertTrue("LLM should have been called", fakeLlm.prompts.isNotEmpty())
+    assertEquals("what is EPFL?", fakeLlm.prompts.first())
+  }
+
+  @Test
+  fun botReply_with_ed_intent_contains_correct_fields() {
+    val reply =
+        BotReply(
+            reply = "ED intent response",
+            url = null,
+            edIntentDetected = true,
+            edIntent = "post_question")
+
+    assertTrue(reply.edIntentDetected)
+    assertEquals("post_question", reply.edIntent)
+    assertEquals("ED intent response", reply.reply)
+    assertNull(reply.url)
+  }
+
+  @Test
+  fun botReply_without_ed_intent_has_default_values() {
+    val reply = BotReply(reply = "Normal response", url = "https://epfl.ch")
+
+    assertFalse(reply.edIntentDetected)
+    assertNull(reply.edIntent)
+    assertEquals("Normal response", reply.reply)
+    assertEquals("https://epfl.ch", reply.url)
+  }
 }

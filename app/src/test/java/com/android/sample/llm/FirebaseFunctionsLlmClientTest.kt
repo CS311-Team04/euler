@@ -8,7 +8,10 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -81,6 +84,60 @@ class FirebaseFunctionsLlmClientTest {
     assertEquals(url, result.url)
   }
 
+  @Test
+  fun generateReply_parses_ed_intent_detected_true() = runTest {
+    val reply = "I detected you want to post on ED"
+    val client =
+        clientWithResult(
+            mapOf("reply" to reply, "ed_intent_detected" to true, "ed_intent" to "post_question"))
+
+    val result = client.generateReply("poste sur ed")
+
+    assertEquals(reply, result.reply)
+    assertTrue(result.edIntentDetected)
+    assertEquals("post_question", result.edIntent)
+  }
+
+  @Test
+  fun generateReply_parses_ed_intent_detected_false() = runTest {
+    val reply = "Normal response"
+    val client =
+        clientWithResult(
+            mapOf("reply" to reply, "ed_intent_detected" to false, "ed_intent" to null))
+
+    val result = client.generateReply("what is EPFL?")
+
+    assertEquals(reply, result.reply)
+    assertFalse(result.edIntentDetected)
+    assertNull(result.edIntent)
+  }
+
+  @Test
+  fun generateReply_defaults_ed_intent_when_missing() = runTest {
+    val reply = "Response without ED fields"
+    val client = clientWithResult(mapOf("reply" to reply))
+
+    val result = client.generateReply("Hello")
+
+    assertEquals(reply, result.reply)
+    assertFalse(result.edIntentDetected)
+    assertNull(result.edIntent)
+  }
+
+  @Test
+  fun generateReply_handles_invalid_ed_intent_types() = runTest {
+    val reply = "Response"
+    val client =
+        clientWithResult(
+            mapOf("reply" to reply, "ed_intent_detected" to "not-a-boolean", "ed_intent" to 123))
+
+    val result = client.generateReply("test")
+
+    assertEquals(reply, result.reply)
+    assertFalse(result.edIntentDetected) // Should default to false
+    assertNull(result.edIntent) // Should default to null
+  }
+
   private fun clientWithResult(
       resultMap: Any?,
       fallback: LlmClient? = RecordingFallback("unused")
@@ -110,7 +167,7 @@ class FirebaseFunctionsLlmClientTest {
 
     override suspend fun generateReply(prompt: String): BotReply {
       prompts += prompt
-      return BotReply(reply, null)
+      return BotReply(reply, null, false, null)
     }
   }
 }
