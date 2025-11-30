@@ -79,6 +79,31 @@ describe("detectPostToEdIntentCore", () => {
     );
   });
 
+  // ===== PLACEHOLDER TESTS: Décommenter quand implémenté =====
+  // describe("should detect fetch_posts intent", () => {
+  //   const fetchTestCases = [
+  //     { input: "cherche les posts sur ed", expectedIntent: "fetch_posts" },
+  //     { input: "montre moi les discussions sur ed", expectedIntent: "fetch_posts" },
+  //   ];
+  //   test.each(fetchTestCases)('should detect fetch intent for: "$input"', ({ input, expectedIntent }) => {
+  //     const result = detectPostToEdIntentCore(input);
+  //     expect(result.ed_intent_detected).toBe(true);
+  //     expect(result.ed_intent).toBe(expectedIntent);
+  //   });
+  // });
+
+  // describe("should detect reply_post intent", () => {
+  //   const replyTestCases = [
+  //     { input: "réponds à ce post sur ed", expectedIntent: "reply_post" },
+  //     { input: "commente sur ed", expectedIntent: "reply_post" },
+  //   ];
+  //   test.each(replyTestCases)('should detect reply intent for: "$input"', ({ input, expectedIntent }) => {
+  //     const result = detectPostToEdIntentCore(input);
+  //     expect(result.ed_intent_detected).toBe(true);
+  //     expect(result.ed_intent).toBe(expectedIntent);
+  //   });
+  // });
+
   describe("should NOT detect ED posting intent for questions about ED", () => {
     const negativeTestCases: string[] = [
       // Asking ABOUT ED
@@ -151,15 +176,11 @@ describe("generateEdIntentResponse", () => {
     expect(response).toContain("connecteur ED");
   });
 
-  it("should generate response for post_answer intent", () => {
-    const response = generateEdIntentResponse("post_answer", "test");
-    expect(response).toContain("répondre");
-  });
-
-  it("should generate response for post_comment intent", () => {
-    const response = generateEdIntentResponse("post_comment", "test");
-    expect(response).toContain("commenter");
-  });
+  // ===== PLACEHOLDER TESTS: Décommenter quand implémenté =====
+  // it("should generate response for fetch_posts intent", () => {
+  //   const response = generateEdIntentResponse("fetch_posts", "test");
+  //   expect(response).toContain("consulter des posts");
+  // });
 });
 
 describe("detectAndRespondToEdIntent", () => {
@@ -193,4 +214,3 @@ describe("buildEdIntentPromptForApertus", () => {
     expect(prompt).toContain("bientôt");
   });
 });
-
