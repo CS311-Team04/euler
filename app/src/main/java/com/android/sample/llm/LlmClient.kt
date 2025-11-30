@@ -9,7 +9,20 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
-data class BotReply(val reply: String, val url: String?)
+/**
+ * Response from the LLM backend.
+ *
+ * @param reply The text response from the LLM
+ * @param url Optional URL source reference
+ * @param edIntentDetected Whether an ED Discussion posting intent was detected
+ * @param edIntent The type of ED intent detected (e.g., "post_question")
+ */
+data class BotReply(
+    val reply: String,
+    val url: String?,
+    val edIntentDetected: Boolean = false,
+    val edIntent: String? = null
+)
 
 /**
  * Abstraction over the Large Language Model backend.
@@ -68,81 +81,133 @@ class FirebaseFunctionsLlmClient(
       transcript: String?
   ): BotReply =
       withContext(Dispatchers.IO) {
-        val data =
-            hashMapOf<String, Any>("question" to prompt).apply {
-              summary?.let { put("summary", it) }
-              transcript?.let { put("recentTranscript", it) }
-            }
-
-        val result =
-            try {
-              Log.d(
-                  "FirebaseFunctionsLlmClient",
-                  "Calling $FUNCTION_NAME with data: question=${data["question"]?.toString()?.take(50)}..., hasSummary=${data.containsKey("summary")}, hasTranscript=${data.containsKey("recentTranscript")}")
-              withTimeoutOrNull(timeoutMillis) {
-                functions.getHttpsCallable(FUNCTION_NAME).call(data).await()
-              }
-            } catch (e: FirebaseFunctionsException) {
-              // Firebase Functions specific exception
-              Log.e(
-                  "FirebaseFunctionsLlmClient",
-                  "Firebase Functions error: code=${e.code}, message=${e.message}, details=${e.details}",
-                  e)
-              throw e // Re-throw to be caught by caller
-            } catch (e: Exception) {
-              // Other exceptions (network, timeout, etc.)
-              Log.e(
-                  "FirebaseFunctionsLlmClient",
-                  "Error calling Firebase Function: ${e.javaClass.simpleName}",
-                  e)
-              throw e // Re-throw to be caught by caller
-            }
+        val data = buildRequestPayload(prompt, summary, transcript)
+        val result = callFirebaseFunction(data)
 
         if (result == null) {
-          Log.w("FirebaseFunctionsLlmClient", "Function call returned null (timeout or cancelled)")
+          Log.w(TAG, "Function call returned null (timeout or cancelled)")
           return@withContext fallback?.generateReply(prompt)
               ?: throw IllegalStateException("LLM service unavailable: timeout or cancelled")
         }
 
         Log.d(
-            "FirebaseFunctionsLlmClient",
+            TAG,
             "Received response from $FUNCTION_NAME, data type: ${result.getData()?.javaClass?.simpleName}")
 
-        @Suppress("UNCHECKED_CAST")
         val map =
-            try {
-              result.getData() as? Map<String, Any?>
-            } catch (e: ClassCastException) {
-              Log.e("FirebaseFunctionsLlmClient", "Failed to cast response data to Map", e)
-              return@withContext fallback?.generateReply(prompt)
-                  ?: throw IllegalStateException("Invalid LLM response payload: ${e.message}")
-            }
+            parseResponseMap(result)
                 ?: return@withContext fallback?.generateReply(prompt)
                     ?: throw IllegalStateException("Invalid LLM response payload: null data")
 
         val replyText =
-            try {
-              (map["reply"] as? String)?.takeIf { it.isNotBlank() }
-            } catch (e: ClassCastException) {
-              Log.e("FirebaseFunctionsLlmClient", "Failed to cast reply to String", e)
-              null
-            }
+            parseReplyText(map)
                 ?: return@withContext fallback?.generateReply(prompt)
                     ?: throw IllegalStateException("Empty LLM reply")
 
-        val url =
-            try {
-              map["primary_url"] as? String
-            } catch (e: ClassCastException) {
-              Log.w("FirebaseFunctionsLlmClient", "Failed to cast primary_url to String", e)
-              null
-            }
-        BotReply(replyText, url)
+        buildBotReply(map, replyText)
       }
 
+  private fun buildRequestPayload(
+      prompt: String,
+      summary: String?,
+      transcript: String?
+  ): HashMap<String, Any> =
+      hashMapOf<String, Any>(KEY_QUESTION to prompt).apply {
+        summary?.let { put(KEY_SUMMARY, it) }
+        transcript?.let { put(KEY_TRANSCRIPT, it) }
+      }
+
+  private suspend fun callFirebaseFunction(
+      data: HashMap<String, Any>
+  ): com.google.firebase.functions.HttpsCallableResult? =
+      try {
+        Log.d(
+            TAG,
+            "Calling $FUNCTION_NAME with data: question=${data[KEY_QUESTION]?.toString()?.take(50)}..., hasSummary=${data.containsKey(KEY_SUMMARY)}, hasTranscript=${data.containsKey(KEY_TRANSCRIPT)}")
+        withTimeoutOrNull(timeoutMillis) {
+          functions.getHttpsCallable(FUNCTION_NAME).call(data).await()
+        }
+      } catch (e: FirebaseFunctionsException) {
+        Log.e(
+            TAG,
+            "Firebase Functions error: code=${e.code}, message=${e.message}, details=${e.details}",
+            e)
+        throw e
+      } catch (e: Exception) {
+        Log.e(TAG, "Error calling Firebase Function: ${e.javaClass.simpleName}", e)
+        throw e
+      }
+
+  @Suppress("UNCHECKED_CAST")
+  private fun parseResponseMap(
+      result: com.google.firebase.functions.HttpsCallableResult
+  ): Map<String, Any?>? =
+      try {
+        result.getData() as? Map<String, Any?>
+      } catch (e: ClassCastException) {
+        Log.e(TAG, "Failed to cast response data to Map", e)
+        null
+      }
+
+  private fun parseReplyText(map: Map<String, Any?>): String? =
+      try {
+        (map[KEY_REPLY] as? String)?.takeIf { it.isNotBlank() }
+      } catch (e: ClassCastException) {
+        Log.e(TAG, "Failed to cast reply to String", e)
+        null
+      }
+
+  private fun parsePrimaryUrl(map: Map<String, Any?>): String? =
+      try {
+        map[KEY_PRIMARY_URL] as? String
+      } catch (e: ClassCastException) {
+        Log.w(TAG, "Failed to cast primary_url to String", e)
+        null
+      }
+
+  private fun parseEdIntentDetected(map: Map<String, Any?>): Boolean =
+      try {
+        map[KEY_ED_INTENT_DETECTED] as? Boolean ?: false
+      } catch (e: ClassCastException) {
+        Log.w(TAG, "Failed to cast ed_intent_detected to Boolean", e)
+        false
+      }
+
+  private fun parseEdIntentType(map: Map<String, Any?>): String? =
+      try {
+        map[KEY_ED_INTENT] as? String
+      } catch (e: ClassCastException) {
+        Log.w(TAG, "Failed to cast ed_intent to String", e)
+        null
+      }
+
+  private fun buildBotReply(map: Map<String, Any?>, replyText: String): BotReply {
+    val url = parsePrimaryUrl(map)
+    val edIntentDetected = parseEdIntentDetected(map)
+    val edIntent = parseEdIntentType(map)
+
+    if (edIntentDetected) {
+      Log.d(TAG, "ED intent detected: $edIntent")
+    }
+
+    return BotReply(replyText, url, edIntentDetected, edIntent)
+  }
+
   companion object {
+    private const val TAG = "FirebaseFunctionsLlmClient"
     private const val FUNCTION_NAME = "answerWithRagFn"
     private const val DEFAULT_TIMEOUT_MS = 33_000L
+
+    // Request payload keys
+    private const val KEY_QUESTION = "question"
+    private const val KEY_SUMMARY = "summary"
+    private const val KEY_TRANSCRIPT = "recentTranscript"
+
+    // Response payload keys
+    private const val KEY_REPLY = "reply"
+    private const val KEY_PRIMARY_URL = "primary_url"
+    private const val KEY_ED_INTENT_DETECTED = "ed_intent_detected"
+    private const val KEY_ED_INTENT = "ed_intent"
 
     /**
      * Creates a region-scoped [FirebaseFunctions] instance and wires the local emulator when
