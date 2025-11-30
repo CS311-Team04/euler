@@ -560,8 +560,7 @@ class NavGraphVoiceChatViewModelConfigTest {
 
   @Test
   fun voiceChat_composable_content_creates_viewModel_and_screen() {
-    // This test covers the exact lines 619-633 in NavGraph.kt by reproducing
-    // the composable content in a test NavHost that starts directly on VoiceChat
+    // This test calls VoiceChatComposableContent from NavGraph.kt to cover lines 318-330
     val speechHelper = mockk<SpeechToTextHelper>(relaxed = true)
 
     composeRule.setContent {
@@ -571,23 +570,10 @@ class NavGraphVoiceChatViewModelConfigTest {
         // Create a NavHost that starts directly on VoiceChat within home_root
         NavHost(navController = nav, startDestination = "home_root") {
           navigation(startDestination = Routes.VoiceChat, route = "home_root") {
-            // This reproduces EXACTLY the code from NavGraph.kt lines 619-633
             composable(Routes.VoiceChat) {
-              @Suppress("UnrememberedGetBackStackEntry")
-              val parentEntry = nav.getBackStackEntry("home_root")
-              val homeViewModel: HomeViewModel = viewModel(parentEntry)
-
-              // Line 625-626: Create VoiceChatViewModel using the helper function
-              @Suppress("RememberReturnType")
-              val voiceChatViewModel =
-                  remember(homeViewModel) { createVoiceChatViewModelForComposable(homeViewModel) }
-
-              // Lines 628-632: VoiceScreen call
-              VoiceScreen(
-                  onClose = { nav.popBackStack() },
-                  modifier = Modifier.fillMaxSize(),
-                  speechHelper = speechHelper,
-                  voiceChatViewModel = voiceChatViewModel)
+              // Call VoiceChatComposableContent from NavGraph.kt
+              // This covers lines 318-330 in NavGraph.kt
+              VoiceChatComposableContent(nav, speechHelper)
             }
           }
         }
@@ -595,7 +581,7 @@ class NavGraphVoiceChatViewModelConfigTest {
     }
     composeRule.waitForIdle()
 
-    // Verify VoiceScreen is displayed - this confirms lines 619-633 executed
+    // Verify VoiceScreen is displayed - confirms VoiceChatComposableContent executed
     composeRule.onNodeWithContentDescription("Close voice screen").assertIsDisplayed()
   }
 

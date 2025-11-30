@@ -308,6 +308,23 @@ internal fun VoiceChatContent(
       voiceChatViewModel = voiceChatViewModel)
 }
 
+/**
+ * Complete VoiceChat composable content that includes getting the HomeViewModel from the parent
+ * entry. This function encapsulates the entire VoiceChat composable logic for testability.
+ *
+ * @param nav The NavHostController
+ * @param speechHelper The SpeechToTextHelper for voice input
+ */
+@VisibleForTesting
+@Composable
+internal fun VoiceChatComposableContent(nav: NavHostController, speechHelper: SpeechToTextHelper) {
+  @Suppress("UnrememberedGetBackStackEntry") val parentEntry = nav.getBackStackEntry("home_root")
+  val homeViewModel: HomeViewModel = viewModel(parentEntry)
+
+  VoiceChatContent(
+      homeViewModel = homeViewModel, speechHelper = speechHelper, onClose = { nav.popBackStack() })
+}
+
 @SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
 fun AppNav(
@@ -641,17 +658,8 @@ fun AppNav(
           }
 
           // Voice Chat Screen
-          composable(Routes.VoiceChat) {
-            val parentEntry = nav.getBackStackEntry("home_root")
-            val homeViewModel: HomeViewModel = viewModel(parentEntry)
-
-            // Use the extracted VoiceChatContent composable
-            // This composable is tested in NavGraphTest.voiceChatContent_*
-            VoiceChatContent(
-                homeViewModel = homeViewModel,
-                speechHelper = speechHelper,
-                onClose = { nav.popBackStack() })
-          }
+          // Uses VoiceChatComposableContent which is tested in NavGraphTest
+          composable(Routes.VoiceChat) { VoiceChatComposableContent(nav, speechHelper) }
         }
       }
 }
