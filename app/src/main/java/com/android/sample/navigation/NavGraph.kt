@@ -620,22 +620,10 @@ fun AppNav(
             val parentEntry = nav.getBackStackEntry("home_root")
             val homeViewModel: HomeViewModel = viewModel(parentEntry)
 
-            // Create VoiceChatViewModel with conversation repository and current conversation ID
-            // The lambda reads the current state each time it's called
-            // This exact code pattern (lines 610-618) is tested in
-            // NavGraphTest.voiceChatComposable_exact_pattern
+            // Create VoiceChatViewModel using the helper function
+            // The helper function is tested in NavGraphTest.createVoiceChatViewModelForComposable_*
             val voiceChatViewModel =
-                remember(homeViewModel) {
-                  createVoiceChatViewModel(
-                      homeViewModel = homeViewModel,
-                      createConversationRepositoryOrNull = { createConversationRepositoryOrNull() },
-                      createGetCurrentConversationIdLambda = {
-                        createGetCurrentConversationIdLambda(it)
-                      },
-                      createOnConversationCreatedCallback = {
-                        createOnConversationCreatedCallback(it)
-                      })
-                }
+                remember(homeViewModel) { createVoiceChatViewModelForComposable(homeViewModel) }
 
             VoiceScreen(
                 onClose = { nav.popBackStack() },

@@ -375,17 +375,9 @@ sonar {
         // Basic source configuration - relative to project root
         property("sonar.sources", "src/main/java")
 
-        val unitTestDir = file("src/test/java")
-        val androidTestDir = file("src/androidTest/java")
-        val testDirs = mutableListOf<String>()
-        if (unitTestDir.exists() && unitTestDir.listFiles()?.isNotEmpty() == true) {
-            testDirs += "src/test/java"
-        }
-        if (androidTestDir.exists() && androidTestDir.listFiles()?.isNotEmpty() == true) {
-            testDirs += "src/androidTest/java"
-        }
-        if (testDirs.isNotEmpty()) {
-            property("sonar.tests", testDirs.joinToString(","))
+        val testDir = file("src/test/java")
+        if (testDir.exists() && testDir.listFiles()?.isNotEmpty() == true) {
+            property("sonar.tests", "src/test/java")
         }
 
         // Basic exclusions
