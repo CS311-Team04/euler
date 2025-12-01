@@ -31,6 +31,98 @@ object Localization {
     return t(key)
   }
 
+  private fun edTranslationsEn() =
+      mapOf(
+          "ed_connect_generic_error" to "Failed to connect to ED. Please try again.",
+          "ed_connect_invalid_credentials" to "Invalid credentials. Please check your API token.",
+          "ed_connect_api_unreachable" to "ED API is unreachable. Please check your connection.",
+          "settings_connectors_ed_title" to "Connect to ED",
+          "settings_connectors_ed_api_token_label" to "ED API token",
+          "settings_connectors_ed_base_url_label" to "Base URL (optional)",
+          "settings_connectors_ed_load_error" to "Failed to load ED connector status",
+          "settings_connectors_ed_status_error" to
+              "Unable to load ED connector status. Please try again later.")
+
+  private fun edTranslationsFr() =
+      mapOf(
+          "ed_connect_generic_error" to "La connexion à ED a échoué. Veuillez réessayer.",
+          "ed_connect_invalid_credentials" to
+              "Identifiants invalides. Veuillez vérifier votre jeton API.",
+          "ed_connect_api_unreachable" to
+              "L'API ED est inaccessible. Veuillez vérifier votre connexion.",
+          "settings_connectors_ed_title" to "Se connecter à ED",
+          "settings_connectors_ed_api_token_label" to "Jeton API ED",
+          "settings_connectors_ed_base_url_label" to "URL de base (optionnel)",
+          "settings_connectors_ed_load_error" to "Échec du chargement du statut du connecteur ED",
+          "settings_connectors_ed_status_error" to
+              "Impossible de charger le statut du connecteur ED. Veuillez réessayer plus tard.")
+
+  private fun edTranslationsDe() =
+      mapOf(
+          "ed_connect_generic_error" to
+              "Verbindung zu ED fehlgeschlagen. Bitte versuchen Sie es erneut.",
+          "ed_connect_invalid_credentials" to
+              "Ungültige Anmeldedaten. Bitte überprüfen Sie Ihr API-Token.",
+          "ed_connect_api_unreachable" to
+              "ED-API ist nicht erreichbar. Bitte überprüfen Sie Ihre Verbindung.",
+          "settings_connectors_ed_title" to "Mit ED verbinden",
+          "settings_connectors_ed_api_token_label" to "ED API-Token",
+          "settings_connectors_ed_base_url_label" to "Basis-URL (optional)",
+          "settings_connectors_ed_load_error" to "Fehler beim Laden des ED-Connector-Status",
+          "settings_connectors_ed_status_error" to
+              "ED-Connector-Status konnte nicht geladen werden. Bitte versuchen Sie es später erneut.")
+
+  private fun edTranslationsEs() =
+      mapOf(
+          "ed_connect_generic_error" to "Error al conectar con ED. Por favor, inténtelo de nuevo.",
+          "ed_connect_invalid_credentials" to
+              "Credenciales inválidas. Por favor, verifique su token API.",
+          "ed_connect_api_unreachable" to
+              "La API de ED no es accesible. Por favor, verifique su conexión.",
+          "settings_connectors_ed_title" to "Conectar a ED",
+          "settings_connectors_ed_api_token_label" to "Token API de ED",
+          "settings_connectors_ed_base_url_label" to "URL base (opcional)",
+          "settings_connectors_ed_load_error" to "Error al cargar el estado del conector ED",
+          "settings_connectors_ed_status_error" to
+              "No se pudo cargar el estado del conector ED. Por favor, inténtelo más tarde.")
+
+  private fun edTranslationsIt() =
+      mapOf(
+          "ed_connect_generic_error" to "Connessione a ED fallita. Riprova.",
+          "ed_connect_invalid_credentials" to "Credenziali non valide. Controlla il tuo token API.",
+          "ed_connect_api_unreachable" to
+              "L'API ED non è raggiungibile. Controlla la tua connessione.",
+          "settings_connectors_ed_title" to "Connetti a ED",
+          "settings_connectors_ed_api_token_label" to "Token API ED",
+          "settings_connectors_ed_base_url_label" to "URL base (opzionale)",
+          "settings_connectors_ed_load_error" to
+              "Errore nel caricamento dello stato del connettore ED",
+          "settings_connectors_ed_status_error" to
+              "Impossibile caricare lo stato del connettore ED. Riprova più tardi.")
+
+  private fun edTranslationsPt() =
+      mapOf(
+          "ed_connect_generic_error" to "Falha ao conectar ao ED. Tente novamente.",
+          "ed_connect_invalid_credentials" to "Credenciais inválidas. Verifique seu token API.",
+          "ed_connect_api_unreachable" to "A API ED não está acessível. Verifique sua conexão.",
+          "settings_connectors_ed_title" to "Conectar ao ED",
+          "settings_connectors_ed_api_token_label" to "Token API do ED",
+          "settings_connectors_ed_base_url_label" to "URL base (opcional)",
+          "settings_connectors_ed_load_error" to "Falha ao carregar o status do conector ED",
+          "settings_connectors_ed_status_error" to
+              "Não foi possível carregar o status do conector ED. Tente novamente mais tarde.")
+
+  private fun edTranslationsZh() =
+      mapOf(
+          "ed_connect_generic_error" to "连接到 ED 失败。请重试。",
+          "ed_connect_invalid_credentials" to "凭据无效。请检查您的 API 令牌。",
+          "ed_connect_api_unreachable" to "ED API 无法访问。请检查您的连接。",
+          "settings_connectors_ed_title" to "连接到 ED",
+          "settings_connectors_ed_api_token_label" to "ED API 令牌",
+          "settings_connectors_ed_base_url_label" to "基础 URL（可选）",
+          "settings_connectors_ed_load_error" to "加载 ED 连接器状态失败",
+          "settings_connectors_ed_status_error" to "无法加载 ED 连接器状态。请稍后再试。")
+
   private fun english() =
       mapOf(
           // Settings
@@ -108,7 +200,7 @@ object Localization {
           "recent_cs220_exam" to "CS220 Final Exam retrieval",
           "recent_linear_algebra" to "Linear Algebra help",
           "recent_deadline" to "Project deadline query",
-          "recent_registration" to "Course registration info")
+          "recent_registration" to "Course registration info") + edTranslationsEn()
 
   private fun french() =
       mapOf(
@@ -188,7 +280,7 @@ object Localization {
           "recent_cs220_exam" to "Récupération examen final CS220",
           "recent_linear_algebra" to "Aide en algèbre linéaire",
           "recent_deadline" to "Requête date limite projet",
-          "recent_registration" to "Info inscription aux cours")
+          "recent_registration" to "Info inscription aux cours") + edTranslationsFr()
 
   private fun german() =
       mapOf(
@@ -213,6 +305,18 @@ object Localization {
           "disconnect_confirm_title" to "Trennen?",
           "disconnect_confirm_message" to "Möchten Sie %s wirklich trennen?",
           "cancel" to "Abbrechen",
+          "ed_connect_generic_error" to
+              "Verbindung zu ED fehlgeschlagen. Bitte versuchen Sie es erneut.",
+          "ed_connect_invalid_credentials" to
+              "Ungültige Anmeldedaten. Bitte überprüfen Sie Ihr API-Token.",
+          "ed_connect_api_unreachable" to
+              "ED-API ist nicht erreichbar. Bitte überprüfen Sie Ihre Verbindung.",
+          "settings_connectors_ed_title" to "Mit ED verbinden",
+          "settings_connectors_ed_api_token_label" to "ED API-Token",
+          "settings_connectors_ed_base_url_label" to "Basis-URL (optional)",
+          "settings_connectors_ed_load_error" to "Fehler beim Laden des ED-Connector-Status",
+          "settings_connectors_ed_status_error" to
+              "ED-Connector-Status konnte nicht geladen werden. Bitte versuchen Sie es später erneut.",
 
           // Home Screen - Navigation
           "menu" to "Menü",
@@ -268,7 +372,7 @@ object Localization {
           "recent_cs220_exam" to "CS220 Abschlussprüfung Abruf",
           "recent_linear_algebra" to "Lineare Algebra Hilfe",
           "recent_deadline" to "Projekt-Frist Anfrage",
-          "recent_registration" to "Kursanmeldung Info")
+          "recent_registration" to "Kursanmeldung Info") + edTranslationsDe()
 
   private fun spanish() =
       mapOf(
@@ -348,7 +452,7 @@ object Localization {
           "recent_cs220_exam" to "Recuperación examen final CS220",
           "recent_linear_algebra" to "Ayuda con álgebra lineal",
           "recent_deadline" to "Consulta fecha límite proyecto",
-          "recent_registration" to "Info inscripción cursos")
+          "recent_registration" to "Info inscripción cursos") + edTranslationsEs()
 
   private fun italian() =
       mapOf(
@@ -428,7 +532,7 @@ object Localization {
           "recent_cs220_exam" to "Recupero esame finale CS220",
           "recent_linear_algebra" to "Aiuto con algebra lineare",
           "recent_deadline" to "Richiesta scadenza progetto",
-          "recent_registration" to "Info iscrizione corsi")
+          "recent_registration" to "Info iscrizione corsi") + edTranslationsIt()
 
   private fun portuguese() =
       mapOf(
@@ -508,7 +612,7 @@ object Localization {
           "recent_cs220_exam" to "Recuperação exame final CS220",
           "recent_linear_algebra" to "Ajuda com álgebra linear",
           "recent_deadline" to "Consulta prazo projeto",
-          "recent_registration" to "Info inscrição cursos")
+          "recent_registration" to "Info inscrição cursos") + edTranslationsPt()
 
   private fun chinese() =
       mapOf(
@@ -587,5 +691,5 @@ object Localization {
           "recent_cs220_exam" to "CS220 期末考试检索",
           "recent_linear_algebra" to "线性代数帮助",
           "recent_deadline" to "项目截止日期查询",
-          "recent_registration" to "课程注册信息")
+          "recent_registration" to "课程注册信息") + edTranslationsZh()
 }

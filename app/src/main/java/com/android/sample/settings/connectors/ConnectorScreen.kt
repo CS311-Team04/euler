@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.android.sample.settings.AppSettings
 import com.android.sample.settings.AppearanceMode
@@ -164,7 +165,28 @@ fun ConnectorsScreen(
     Column(modifier = Modifier.fillMaxSize()) {
       ConnectorsTopBar(onBackClick = onBackClick, colors = connectorState.colors)
 
-      Spacer(modifier = Modifier.height(Dimens.ScreenContentSpacing))
+      // Small indicator while testing/loading ED status
+      if (uiState.isLoadingEd) {
+        LinearProgressIndicator(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.ScreenHorizontalPadding))
+        Spacer(modifier = Modifier.height(Dimens.ScreenContentSpacing))
+      } else {
+        Spacer(modifier = Modifier.height(Dimens.ScreenContentSpacing))
+      }
+
+      // ED error message (e.g.: "Failed to load ED connector status")
+      uiState.edError?.let { errorText ->
+        Text(
+            text = errorText,
+            color = connectorState.colors.accentRed,
+            fontSize = Dimens.CardStatusFontSize,
+            textAlign = TextAlign.Center,
+            modifier =
+                Modifier.fillMaxWidth()
+                    .padding(
+                        horizontal = Dimens.ScreenHorizontalPadding,
+                        vertical = Dimens.CardStatusButtonSpacer))
+      }
 
       ConnectorsGrid(
           connectors = uiState.connectors,
@@ -180,7 +202,7 @@ fun ConnectorsScreen(
     ConnectorsFooter(
         colors = connectorState.colors, modifier = Modifier.align(Alignment.BottomCenter))
 
-    // Disconnect confirmation dialog
+    // Disconnect confirmation dialog (unchanged)
     uiState.pendingConnectorForDisconnect?.let { connector ->
       DisconnectConfirmationDialog(
           connectorName = connector.name,
@@ -192,16 +214,27 @@ fun ConnectorsScreen(
           },
           onDismiss = { viewModel.dismissDisconnectConfirmation() })
     }
+
+    if (uiState.isEdConnectDialogOpen) {
+      EdConnectDialog(
+          colors = connectorState.colors,
+          isDark = connectorState.isDark,
+          isLoading = uiState.isEdConnecting,
+          error = uiState.edConnectError,
+          onConfirm = { token, baseUrl -> viewModel.confirmEdConnect(token, baseUrl) },
+          onDismiss = { viewModel.dismissEdConnectDialog() },
+      )
+    }
   }
 }
 
 /** Computes dialog surface color based on theme. */
-private fun getDialogSurfaceColor(isDark: Boolean) =
+internal fun getDialogSurfaceColor(isDark: Boolean) =
     if (isDark) DarkSurface else ConnectorsLightSurface
 
 /** Clean and minimal disconnect confirmation dialog */
 @Composable
-private fun DisconnectConfirmationDialog(
+internal fun DisconnectConfirmationDialog(
     connectorName: String,
     colors: ConnectorsColors,
     isDark: Boolean,
@@ -242,6 +275,96 @@ private fun DisconnectConfirmationDialog(
       dismissButton = {
         TextButton(
             onClick = onDismiss, shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
+              Text(
+                  Localization.t("cancel"),
+                  color = colors.textPrimary,
+                  fontSize = Dimens.DialogTextFontSize,
+                  fontWeight = FontWeight.Medium)
+            }
+      },
+      containerColor = getDialogSurfaceColor(isDark),
+      shape = RoundedCornerShape(Dimens.DialogCornerRadius))
+}
+
+/** Dialog for connecting to ED with API token and optional base URL. */
+@Composable
+internal fun EdConnectDialog(
+    colors: ConnectorsColors,
+    isDark: Boolean,
+    isLoading: Boolean,
+    error: String?,
+    onConfirm: (apiToken: String, baseUrl: String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+  var token by remember { mutableStateOf("") }
+  var baseUrl by remember { mutableStateOf("") }
+
+  AlertDialog(
+      onDismissRequest = { if (!isLoading) onDismiss() },
+      title = {
+        Text(
+            text = Localization.t("settings_connectors_ed_title"),
+            color = colors.textPrimary,
+            fontSize = Dimens.DialogTitleFontSize,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth())
+      },
+      text = {
+        Column {
+          OutlinedTextField(
+              value = token,
+              onValueChange = { token = it },
+              label = { Text(Localization.t("settings_connectors_ed_api_token_label")) },
+              singleLine = true,
+              enabled = !isLoading,
+          )
+          Spacer(modifier = Modifier.height(12.dp))
+
+          OutlinedTextField(
+              value = baseUrl,
+              onValueChange = { baseUrl = it },
+              label = { Text(Localization.t("settings_connectors_ed_base_url_label")) },
+              singleLine = true,
+              enabled = !isLoading,
+          )
+
+          if (!error.isNullOrBlank()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = error,
+                color = colors.accentRed,
+                fontSize = Dimens.DialogTextFontSize,
+                textAlign = TextAlign.Start,
+            )
+          }
+        }
+      },
+      confirmButton = {
+        Button(
+            onClick = {
+              val trimmedToken = token.trim()
+              val trimmedBaseUrl = baseUrl.trim().ifBlank { null }
+              onConfirm(trimmedToken, trimmedBaseUrl)
+            },
+            enabled = token.isNotBlank() && !isLoading,
+            shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
+              if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp), strokeWidth = Dimens.CardBorderWidth)
+              } else {
+                Text(
+                    Localization.t("connect"),
+                    color = colors.onPrimaryColor,
+                    fontSize = Dimens.DialogTextFontSize,
+                    fontWeight = FontWeight.SemiBold)
+              }
+            }
+      },
+      dismissButton = {
+        TextButton(
+            onClick = { if (!isLoading) onDismiss() },
+            shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
               Text(
                   Localization.t("cancel"),
                   color = colors.textPrimary,
