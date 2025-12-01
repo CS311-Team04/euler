@@ -219,7 +219,9 @@ object Localization {
           "epfl_last_sync" to "Last sync",
           "epfl_disconnect" to "Disconnect",
           "epfl_connected_info" to "Your schedule is now connected to the AI assistant.",
-          "epfl_clipboard_detected" to "ICS URL detected!") + edTranslationsEn()
+          "epfl_clipboard_detected" to "ICS URL detected!",
+          "not_now" to "Not now",
+          "use_this_url" to "Use this URL") + edTranslationsEn()
 
   private fun french() =
       mapOf(
@@ -319,7 +321,9 @@ object Localization {
           "epfl_disconnect" to "Déconnecter",
           "epfl_connected_info" to
               "Votre emploi du temps est maintenant connecté à l'assistant IA.",
-          "epfl_clipboard_detected" to "URL ICS détectée !") + edTranslationsFr()
+          "epfl_clipboard_detected" to "URL ICS détectée !",
+          "not_now" to "Plus tard",
+          "use_this_url" to "Utiliser cette URL") + edTranslationsFr()
 
   private fun german() =
       mapOf(
