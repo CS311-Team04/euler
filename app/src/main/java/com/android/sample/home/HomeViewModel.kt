@@ -696,30 +696,29 @@ class HomeViewModel(
             simulateStreamingFromText(messageId, reply.reply)
 
             // add optional source card based on source type
-            val meta: SourceMeta? = when (reply.sourceType) {
-              com.android.sample.llm.SourceType.SCHEDULE -> {
-                // Schedule source - show a small indicator
-                SourceMeta(
-                    siteLabel = "Your EPFL Schedule",
-                    title = "Retrieved from your connected calendar",
-                    url = null,
-                    isScheduleSource = true
-                )
-              }
-              com.android.sample.llm.SourceType.RAG -> {
-                // RAG source - show the web source card if URL exists
-                reply.url?.let { url ->
-                  SourceMeta(
-                      siteLabel = buildSiteLabel(url),
-                      title = buildFallbackTitle(url),
-                      url = url,
-                      isScheduleSource = false
-                  )
+            val meta: SourceMeta? =
+                when (reply.sourceType) {
+                  com.android.sample.llm.SourceType.SCHEDULE -> {
+                    // Schedule source - show a small indicator
+                    SourceMeta(
+                        siteLabel = "Your EPFL Schedule",
+                        title = "Retrieved from your connected calendar",
+                        url = null,
+                        isScheduleSource = true)
+                  }
+                  com.android.sample.llm.SourceType.RAG -> {
+                    // RAG source - show the web source card if URL exists
+                    reply.url?.let { url ->
+                      SourceMeta(
+                          siteLabel = buildSiteLabel(url),
+                          title = buildFallbackTitle(url),
+                          url = url,
+                          isScheduleSource = false)
+                    }
+                  }
+                  com.android.sample.llm.SourceType.NONE -> null
                 }
-              }
-              com.android.sample.llm.SourceType.NONE -> null
-            }
-            
+
             meta?.let { sourceMeta ->
               _uiState.update { s ->
                 s.copy(

@@ -546,12 +546,10 @@ fun AppNav(
                 modifier = Modifier.fillMaxSize(),
                 speechHelper = speechHelper)
           }
-          
+
           // EPFL Campus Connector Screen
           composable(Routes.EpflCampus) {
-            com.android.sample.epfl.EpflCampusConnectorScreen(
-                onBackClick = { nav.popBackStack() }
-            )
+            com.android.sample.epfl.EpflCampusConnectorScreen(onBackClick = { nav.popBackStack() })
           }
         }
       }

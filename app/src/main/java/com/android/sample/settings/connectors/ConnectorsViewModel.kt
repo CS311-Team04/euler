@@ -38,12 +38,12 @@ class ConnectorsViewModel(
 ) : ViewModel() {
   private val _uiState = MutableStateFlow(ConnectorsUiState(connectors = initialConnectors()))
   val uiState: StateFlow<ConnectorsUiState> = _uiState.asStateFlow()
-  
+
   init {
     // Fetch real connection statuses on initialization
     refreshConnectionStatuses()
   }
-  
+
   /** Refresh connection statuses from repositories */
   fun refreshConnectionStatuses() {
     viewModelScope.launch {
@@ -56,13 +56,14 @@ class ConnectorsViewModel(
       }
     }
   }
-  
+
   private fun updateConnectorStatus(connectorId: String, isConnected: Boolean) {
     _uiState.update { currentState ->
       currentState.copy(
-          connectors = currentState.connectors.map {
-            if (it.id == connectorId) it.copy(isConnected = isConnected) else it
-          })
+          connectors =
+              currentState.connectors.map {
+                if (it.id == connectorId) it.copy(isConnected = isConnected) else it
+              })
     }
   }
 

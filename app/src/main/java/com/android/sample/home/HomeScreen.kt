@@ -432,13 +432,16 @@ fun HomeScreen(
                                     url = item.source.url,
                                     retrievedAt = item.source.retrievedAt,
                                     isScheduleSource = item.source.isScheduleSource,
-                                    onVisit = if (item.source.url != null && !item.source.isScheduleSource) {
-                                      {
-                                        val intent =
-                                            Intent(Intent.ACTION_VIEW, Uri.parse(item.source.url))
-                                        context.startActivity(intent)
-                                      }
-                                    } else null)
+                                    onVisit =
+                                        if (item.source.url != null &&
+                                            !item.source.isScheduleSource) {
+                                          {
+                                            val intent =
+                                                Intent(
+                                                    Intent.ACTION_VIEW, Uri.parse(item.source.url))
+                                            context.startActivity(intent)
+                                          }
+                                        } else null)
                                 Spacer(Modifier.height(8.dp))
                               }
 
@@ -945,27 +948,26 @@ private fun SourceCard(
     onVisit: (() -> Unit)? = null
 ) {
   val colorScheme = MaterialTheme.colorScheme
-  
+
   if (isScheduleSource) {
     // Compact schedule indicator - just a small inline badge
     Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(colorScheme.surfaceVariant.copy(alpha = 0.5f))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-      Icon(
-          imageVector = Icons.Default.CheckCircle,
-          contentDescription = null,
-          tint = com.android.sample.ui.theme.EulerGreen,
-          modifier = Modifier.size(12.dp))
-      Spacer(Modifier.width(6.dp))
-      Text(
-          text = "📅 $siteLabel",
-          color = colorScheme.onSurfaceVariant,
-          style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp))
-    }
+        modifier =
+            Modifier.clip(RoundedCornerShape(8.dp))
+                .background(colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+          Icon(
+              imageVector = Icons.Default.CheckCircle,
+              contentDescription = null,
+              tint = com.android.sample.ui.theme.EulerGreen,
+              modifier = Modifier.size(12.dp))
+          Spacer(Modifier.width(6.dp))
+          Text(
+              text = "📅 $siteLabel",
+              color = colorScheme.onSurfaceVariant,
+              style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp))
+        }
   } else {
     // Full RAG source card with Visit button
     Column(

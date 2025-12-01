@@ -16,17 +16,18 @@ import kotlinx.coroutines.withTimeoutOrNull
  * - "none": no external source used
  */
 enum class SourceType {
-    SCHEDULE,
-    RAG,
-    NONE;
-    
-    companion object {
-        fun fromString(s: String?): SourceType = when (s?.lowercase()) {
-            "schedule" -> SCHEDULE
-            "rag" -> RAG
-            else -> NONE
+  SCHEDULE,
+  RAG,
+  NONE;
+
+  companion object {
+    fun fromString(s: String?): SourceType =
+        when (s?.lowercase()) {
+          "schedule" -> SCHEDULE
+          "rag" -> RAG
+          else -> NONE
         }
-    }
+  }
 }
 
 /**
@@ -126,7 +127,7 @@ class FirebaseFunctionsLlmClient(
                 ?: return@withContext fallback?.generateReply(prompt)
                     ?: throw IllegalStateException("Empty LLM reply")
 
-buildBotReply(map, replyText)
+        buildBotReply(map, replyText)
       }
 
   private fun buildRequestPayload(

@@ -126,7 +126,8 @@ object Localization {
           "epfl_exams" to "exams",
           "epfl_last_sync" to "Last sync",
           "epfl_disconnect" to "Disconnect",
-          "epfl_connected_info" to "EULER can now answer questions about your schedule, like \"What classes do I have tomorrow?\" or \"Where is my next lecture?\"",
+          "epfl_connected_info" to
+              "EULER can now answer questions about your schedule, like \"What classes do I have tomorrow?\" or \"Where is my next lecture?\"",
           "epfl_clipboard_detected" to "ICS URL detected!",
           "not_now" to "Not now",
           "use_this_url" to "Use this URL")
@@ -227,7 +228,8 @@ object Localization {
           "epfl_exams" to "examens",
           "epfl_last_sync" to "Dernière sync",
           "epfl_disconnect" to "Déconnecter",
-          "epfl_connected_info" to "EULER peut maintenant répondre aux questions sur votre emploi du temps, comme « Quels cours ai-je demain ? » ou « Où est mon prochain cours ? »",
+          "epfl_connected_info" to
+              "EULER peut maintenant répondre aux questions sur votre emploi du temps, comme « Quels cours ai-je demain ? » ou « Où est mon prochain cours ? »",
           "epfl_clipboard_detected" to "URL ICS détectée !",
           "not_now" to "Pas maintenant",
           "use_this_url" to "Utiliser cette URL")
