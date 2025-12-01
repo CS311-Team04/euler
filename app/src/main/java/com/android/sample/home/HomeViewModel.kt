@@ -44,12 +44,20 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
+/** Type of compact source indicator */
+enum class CompactSourceType {
+  NONE, // Full RAG card with Visit button
+  SCHEDULE, // 📅 schedule indicator
+  FOOD // 🍴 food/restaurant indicator
+}
+
 data class SourceMeta(
     val siteLabel: String, // e.g. "EPFL.ch Website" or "Your Schedule"
     val title: String, // e.g. "Projet de Semestre – Bachelor"
     val url: String?, // null for schedule sources
     val retrievedAt: Long = System.currentTimeMillis(),
-    val isScheduleSource: Boolean = false // true if from user's EPFL schedule
+    val isScheduleSource: Boolean = false, // DEPRECATED: use compactType instead
+    val compactType: CompactSourceType = CompactSourceType.NONE // Type of compact indicator
 )
 /**
  * HomeViewModel
@@ -702,7 +710,17 @@ class HomeViewModel(
                         siteLabel = "Your EPFL Schedule",
                         title = "Retrieved from your connected calendar",
                         url = null,
-                        isScheduleSource = true)
+                        isScheduleSource = true,
+                        compactType = CompactSourceType.SCHEDULE)
+                  }
+                  com.android.sample.llm.SourceType.FOOD -> {
+                    // Food source - show a small indicator
+                    SourceMeta(
+                        siteLabel = "EPFL Restaurants",
+                        title = "Retrieved from Pocket Campus",
+                        url = reply.url,
+                        isScheduleSource = true,
+                        compactType = CompactSourceType.FOOD)
                   }
                   com.android.sample.llm.SourceType.RAG -> {
                     // RAG source - show the web source card if URL exists
@@ -711,7 +729,8 @@ class HomeViewModel(
                           siteLabel = buildSiteLabel(url),
                           title = buildFallbackTitle(url),
                           url = url,
-                          isScheduleSource = false)
+                          isScheduleSource = false,
+                          compactType = CompactSourceType.NONE)
                     }
                   }
                   com.android.sample.llm.SourceType.NONE -> null
