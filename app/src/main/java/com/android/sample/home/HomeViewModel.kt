@@ -535,26 +535,27 @@ class HomeViewModel(
     }
     val msg = current.messageDraft.trim()
     val attachment = current.pendingAttachment
-    
+
     // Allow sending with just attachment or just text
     if (msg.isEmpty() && attachment == null) return
 
     val now = System.currentTimeMillis()
-    
+
     // Build display text for the user message
-    val displayText = if (attachment != null && msg.isNotEmpty()) {
-      "📎 ${attachment.fileName}\n$msg"
-    } else if (attachment != null) {
-      "📎 ${attachment.fileName}"
-    } else {
-      msg
-    }
-    
+    val displayText =
+        if (attachment != null && msg.isNotEmpty()) {
+          "📎 ${attachment.fileName}\n$msg"
+        } else if (attachment != null) {
+          "📎 ${attachment.fileName}"
+        } else {
+          msg
+        }
+
     val userMsg =
         ChatUIModel(
-            id = UUID.randomUUID().toString(), 
-            text = displayText, 
-            timestamp = now, 
+            id = UUID.randomUUID().toString(),
+            text = displayText,
+            timestamp = now,
             type = ChatType.USER,
             attachment = attachment)
     val aiMessageId = UUID.randomUUID().toString()
@@ -566,7 +567,8 @@ class HomeViewModel(
             type = ChatType.AI,
             isThinking = true)
 
-    // UI optimiste : on ajoute user + placeholder, on vide l'input et attachment, on marque l'état de streaming
+    // UI optimiste : on ajoute user + placeholder, on vide l'input et attachment, on marque l'état
+    // de streaming
     _uiState.update { st ->
       st.copy(
           messages = st.messages + userMsg + placeholder,
@@ -581,15 +583,15 @@ class HomeViewModel(
       try {
         Log.d(TAG, "sendMessage: starting, message='${msg.take(50)}...'")
         // Convert ChatAttachment to AttachmentData for the LLM client
-        val attachmentData = attachment?.let {
-          AttachmentData(
-            fileName = it.fileName,
-            mimeType = it.mimeType,
-            base64Data = it.base64Data,
-            printAccessToken = it.printAccessToken
-          )
-        }
-        
+        val attachmentData =
+            attachment?.let {
+              AttachmentData(
+                  fileName = it.fileName,
+                  mimeType = it.mimeType,
+                  base64Data = it.base64Data,
+                  printAccessToken = it.printAccessToken)
+            }
+
         // GUEST: no Firestore, just streaming UI
         if (isGuest()) {
           Log.d(TAG, "sendMessage: guest mode, starting streaming")
@@ -692,7 +694,7 @@ class HomeViewModel(
       }
     }
   }
-  
+
   /** Streaming helper using [LlmClient] and optional summary/transcript/attachment. */
   private fun startStreaming(
       question: String,
@@ -715,8 +717,8 @@ class HomeViewModel(
                 try {
                   withContext(Dispatchers.IO) {
                     llmClient.generateReply(
-                        prompt = question, 
-                        summary = summary, 
+                        prompt = question,
+                        summary = summary,
                         transcript = transcript,
                         attachment = attachment)
                   }

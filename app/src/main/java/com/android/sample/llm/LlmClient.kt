@@ -33,9 +33,7 @@ enum class SourceType {
   }
 }
 
-/**
- * Attachment data to send with a message (e.g., PDF for printing)
- */
+/** Attachment data to send with a message (e.g., PDF for printing) */
 data class AttachmentData(
     val fileName: String,
     val mimeType: String,
@@ -84,8 +82,8 @@ interface LlmClient {
    * Implementations that support RAG can override this.
    */
   suspend fun generateReply(
-      prompt: String, 
-      summary: String?, 
+      prompt: String,
+      summary: String?,
       transcript: String?,
       attachment: AttachmentData? = null
   ): BotReply = generateReply(prompt)
@@ -162,13 +160,14 @@ class FirebaseFunctionsLlmClient(
       hashMapOf<String, Any>(KEY_QUESTION to prompt).apply {
         summary?.let { put(KEY_SUMMARY, it) }
         transcript?.let { put(KEY_TRANSCRIPT, it) }
-        attachment?.let { 
-          put(KEY_ATTACHMENT, hashMapOf(
-            "fileName" to it.fileName,
-            "mimeType" to it.mimeType,
-            "base64Data" to it.base64Data,
-            "printAccessToken" to (it.printAccessToken ?: "")
-          ))
+        attachment?.let {
+          put(
+              KEY_ATTACHMENT,
+              hashMapOf(
+                  "fileName" to it.fileName,
+                  "mimeType" to it.mimeType,
+                  "base64Data" to it.base64Data,
+                  "printAccessToken" to (it.printAccessToken ?: "")))
         }
       }
 
@@ -275,7 +274,8 @@ class FirebaseFunctionsLlmClient(
       Log.d(TAG, "Print intent detected, jobId: $printJobId")
     }
 
-    return BotReply(replyText, url, sourceType, edIntentDetected, edIntent, printIntentDetected, printJobId)
+    return BotReply(
+        replyText, url, sourceType, edIntentDetected, edIntent, printIntentDetected, printJobId)
   }
 
   companion object {

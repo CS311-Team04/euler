@@ -2,6 +2,9 @@ package com.android.sample.home
 
 import android.content.Intent
 import android.net.Uri
+import android.util.Base64
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -22,9 +25,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Menu
@@ -51,9 +54,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import android.util.Base64
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import com.android.sample.Chat.ChatAttachment
 import com.android.sample.Chat.ChatMessage
 import com.android.sample.Chat.ChatType
@@ -132,39 +132,36 @@ fun HomeScreen(
   // File picker for attachments (PDF for printing)
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
-  
+
   // Get EPFL Print access token if connected
   val printRepository = remember { com.android.sample.epfl.print.EpflPrintRepository(context) }
-  
-  val filePickerLauncher = rememberLauncherForActivityResult(
-      contract = ActivityResultContracts.GetContent()
-  ) { uri ->
-      uri?.let {
+
+  val filePickerLauncher =
+      rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) { uri ->
+        uri?.let {
           val contentResolver = context.contentResolver
           val mimeType = contentResolver.getType(uri) ?: "application/pdf"
           // Only accept PDF, JPEG, PNG for printing
           if (mimeType in listOf("application/pdf", "image/jpeg", "image/png")) {
-              val fileName = uri.lastPathSegment?.substringAfterLast("/") ?: "document"
-              contentResolver.openInputStream(uri)?.use { inputStream ->
-                  val bytes = inputStream.readBytes()
-                  val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                  // Get print token if available (with auto-refresh)
-                  scope.launch {
-                      val printToken = printRepository.getAccessTokenRefreshing()
-                      viewModel.setAttachment(
-                          ChatAttachment(
-                              fileName = fileName,
-                              mimeType = mimeType,
-                              base64Data = base64,
-                              sizeBytes = bytes.size.toLong(),
-                              printAccessToken = printToken
-                          )
-                      )
-                  }
+            val fileName = uri.lastPathSegment?.substringAfterLast("/") ?: "document"
+            contentResolver.openInputStream(uri)?.use { inputStream ->
+              val bytes = inputStream.readBytes()
+              val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+              // Get print token if available (with auto-refresh)
+              scope.launch {
+                val printToken = printRepository.getAccessTokenRefreshing()
+                viewModel.setAttachment(
+                    ChatAttachment(
+                        fileName = fileName,
+                        mimeType = mimeType,
+                        base64Data = base64,
+                        sizeBytes = bytes.size.toLong(),
+                        printAccessToken = printToken))
               }
+            }
           }
+        }
       }
-  }
 
   val ranNewChatOnce = remember { mutableStateOf(false) }
   LaunchedEffect(forceNewChatOnFirstOpen) {
@@ -397,9 +394,14 @@ fun HomeScreen(
                         placeholder = Localization.t("message_euler"),
                         enabled = !ui.isSending && !ui.isOffline,
                         isSending = ui.isSending,
-                        canSend = (ui.messageDraft.isNotBlank() || ui.pendingAttachment != null) && !ui.isSending && !ui.isOffline,
+                        canSend =
+                            (ui.messageDraft.isNotBlank() || ui.pendingAttachment != null) &&
+                                !ui.isSending &&
+                                !ui.isOffline,
                         onSendClick = {
-                          if ((ui.messageDraft.isNotBlank() || ui.pendingAttachment != null) && !ui.isSending && !ui.isOffline) {
+                          if ((ui.messageDraft.isNotBlank() || ui.pendingAttachment != null) &&
+                              !ui.isSending &&
+                              !ui.isOffline) {
                             onSendMessage(ui.messageDraft)
                             viewModel.sendMessage()
                           }
@@ -626,43 +628,33 @@ private fun ChatInputBar(
     // Show attachment preview if present
     attachmentName?.let { fileName ->
       Row(
-          modifier = Modifier
-              .fillMaxWidth()
-              .padding(bottom = 8.dp)
-              .background(
-                  surfaceVariantColor.copy(alpha = 0.7f),
-                  RoundedCornerShape(12.dp)
-              )
-              .padding(horizontal = 12.dp, vertical = 8.dp),
-          verticalAlignment = Alignment.CenterVertically
-      ) {
-        Icon(
-            Icons.Default.Description,
-            contentDescription = null,
-            tint = EulerRed,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = fileName,
-            color = textPrimary,
-            fontSize = 13.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
-        IconButton(
-            onClick = onClearAttachment,
-            modifier = Modifier.size(24.dp)
-        ) {
-          Icon(
-              Icons.Default.Close,
-              contentDescription = "Remove attachment",
-              tint = textSecondary,
-              modifier = Modifier.size(16.dp)
-          )
-        }
-      }
+          modifier =
+              Modifier.fillMaxWidth()
+                  .padding(bottom = 8.dp)
+                  .background(surfaceVariantColor.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
+                  .padding(horizontal = 12.dp, vertical = 8.dp),
+          verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Default.Description,
+                contentDescription = null,
+                tint = EulerRed,
+                modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = fileName,
+                color = textPrimary,
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f))
+            IconButton(onClick = onClearAttachment, modifier = Modifier.size(24.dp)) {
+              Icon(
+                  Icons.Default.Close,
+                  contentDescription = "Remove attachment",
+                  tint = textSecondary,
+                  modifier = Modifier.size(16.dp))
+            }
+          }
     }
 
     OutlinedTextField(
@@ -683,17 +675,12 @@ private fun ChatInputBar(
                 fontSize = 15.sp, fontWeight = FontWeight.Normal),
         leadingIcon = {
           // Attachment button
-          IconButton(
-              onClick = onAttachClick,
-              enabled = enabled,
-              modifier = Modifier.size(40.dp)
-          ) {
+          IconButton(onClick = onAttachClick, enabled = enabled, modifier = Modifier.size(40.dp)) {
             Icon(
                 Icons.Default.AttachFile,
                 contentDescription = "Attach file",
                 tint = if (attachmentName != null) EulerRed else textSecondary,
-                modifier = Modifier.size(22.dp)
-            )
+                modifier = Modifier.size(22.dp))
           }
         },
         trailingIcon = {

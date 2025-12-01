@@ -12,9 +12,7 @@ enum class ChatType {
   AI
 }
 
-/**
- * Attachment for a chat message (e.g., PDF for printing).
- */
+/** Attachment for a chat message (e.g., PDF for printing). */
 data class ChatAttachment(
     val fileName: String,
     val mimeType: String,
