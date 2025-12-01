@@ -155,6 +155,21 @@ class EpflCampusViewModelTest {
     assertFalse(state.isSyncing)
   }
 
+  @Test
+  fun `syncSchedule sets success message and clears input on success`() = runTest {
+    whenever(mockRepository.isValidIcsUrl(any())).thenReturn(true)
+    whenever(mockRepository.isLikelyEpflUrl(any())).thenReturn(true)
+    whenever(mockRepository.syncSchedule(any()))
+        .thenReturn(SyncResult.Success(weeklySlots = 12, finalExams = 4, message = "Synced!"))
+
+    val viewModel = createViewModel()
+    viewModel.updateIcsUrl("https://example.com/cal.ics")
+    viewModel.syncSchedule()
+
+    // After sync, successMessage should be set and URL cleared
+    verify(mockRepository).syncSchedule("https://example.com/cal.ics")
+  }
+
   // ===== disconnect tests =====
 
   @Test
@@ -201,6 +216,16 @@ class EpflCampusViewModelTest {
 
     assertFalse(state.showClipboardSuggestion)
     assertNull(state.detectedClipboardUrl)
+  }
+
+  @Test
+  fun `acceptClipboardUrl does nothing when no URL detected`() = runTest {
+    val viewModel = createViewModel()
+    viewModel.acceptClipboardUrl()
+    val state = viewModel.uiState.first()
+
+    assertEquals("", state.icsUrlInput)
+    assertFalse(state.showClipboardSuggestion)
   }
 
   // ===== clearError and clearSuccessMessage tests =====
