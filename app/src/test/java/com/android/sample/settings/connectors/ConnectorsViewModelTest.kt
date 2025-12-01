@@ -12,8 +12,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 // Mock EdConnectorRemoteDataSource for testing
-// We pass null for functions since we override all methods that use it
-private class MockEdConnectorRemoteDataSource : EdConnectorRemoteDataSource(null) {
+// We pass a mock FirebaseFunctions since requireNotNull now validates it
+private class MockEdConnectorRemoteDataSource :
+    EdConnectorRemoteDataSource(mockk<FirebaseFunctions>(relaxed = true)) {
   var statusToReturn: EdConnectorStatusRemote = EdConnectorStatusRemote.NOT_CONNECTED
   var connectShouldSucceed: Boolean = true
   var connectError: String? = null
