@@ -6,5 +6,10 @@ package com.android.sample.settings.connectors
  */
 data class ConnectorsUiState(
     val connectors: List<Connector> = emptyList(),
-    val pendingConnectorForDisconnect: Connector? = null
+    val pendingConnectorForDisconnect: Connector? = null,
+    val isLoadingEd: Boolean = false,
+    val edError: String? = null,
+    val isEdConnectDialogOpen: Boolean = false,
+    val isEdConnecting: Boolean = false,
+    val edConnectError: String? = null,
 )

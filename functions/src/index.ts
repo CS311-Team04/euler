@@ -9,6 +9,9 @@ import OpenAI from "openai";
 import { randomUUID } from "node:crypto";
 import * as functions from "firebase-functions/v1";
 import admin from "firebase-admin";
+import { EdConnectorRepository } from "./connectors/ed/EdConnectorRepository";
+import { EdConnectorService } from "./connectors/ed/EdConnectorService";
+import { encryptSecret, decryptSecret } from "./security/secretCrypto";
 import { detectPostToEdIntentCore, buildEdIntentPromptForApertus } from "./edIntent";
 
 
@@ -59,6 +62,15 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 const db = admin.firestore();
+
+// ED Discussion connector (stored in Firestore under connectors_ed/{userId})
+const edConnectorRepository = new EdConnectorRepository(db);
+const edConnectorService = new EdConnectorService(
+  edConnectorRepository,
+  encryptSecret,
+  decryptSecret,
+  "https://eu.edstem.org/api"
+);
 
 // Embeddings = Jina
 const EMBED_URL = withV1(process.env.EMBED_BASE_URL) + "/embeddings";
@@ -798,6 +810,17 @@ function checkKey(req: functions.https.Request) {
   }
 }
 
+function requireAuth(context: functions.https.CallableContext): string {
+  const uid = context.auth?.uid;
+  if (!uid) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "Authentication is required"
+    );
+  }
+  return uid;
+}
+
 export const indexChunksHttp = europeFunctions.https.onRequest(async (req: functions.https.Request, res: functions.Response<any>) => {
   try {
     if (req.method !== "POST") { res.status(405).end(); return; }
@@ -860,6 +883,110 @@ export const generateTitleFn = europeFunctions.https.onCall(async (data: Generat
   if (!q) throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
   return await generateTitleCore({ question: q, model });
 });
+
+type EdConnectorConnectCallableInput = {
+  apiToken?: string;
+  baseUrl?: string;
+};
+
+export const edConnectorStatusFn = europeFunctions.https.onCall(
+  async (_data, context) => {
+    const uid = requireAuth(context);
+
+    try {
+      const config = await edConnectorService.getStatus(uid);
+      return config;
+    } catch (e: any) {
+      logger.error("edConnectorStatusFn.failed", {
+        uid,
+        error: String(e),
+      });
+      throw new functions.https.HttpsError(
+        "internal",
+        "Failed to get ED connector status",
+        String(e?.message || e)
+      );
+    }
+  }
+);
+
+export const edConnectorConnectFn = europeFunctions.https.onCall(
+  async (data: EdConnectorConnectCallableInput, context) => {
+    const uid = requireAuth(context);
+
+    const apiToken = String(data?.apiToken || "").trim();
+    const baseUrl =
+      typeof data?.baseUrl === "string" ? data.baseUrl : undefined;
+
+    if (!apiToken) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Missing 'apiToken'"
+      );
+    }
+
+    try {
+      const config = await edConnectorService.connect(uid, {
+        apiToken,
+        baseUrl,
+      });
+      return config;
+    } catch (e: any) {
+      logger.error("edConnectorConnectFn.failed", {
+        uid,
+        error: String(e),
+      });
+      throw new functions.https.HttpsError(
+        "internal",
+        "Failed to connect ED connector",
+        String(e?.message || e)
+      );
+    }
+  }
+);
+
+export const edConnectorDisconnectFn = europeFunctions.https.onCall(
+  async (_data, context) => {
+    const uid = requireAuth(context);
+
+    try {
+      await edConnectorService.disconnect(uid);
+      // For convenience, return a simple status the UI can use.
+      return { status: "not_connected" };
+    } catch (e: any) {
+      logger.error("edConnectorDisconnectFn.failed", {
+        uid,
+        error: String(e),
+      });
+      throw new functions.https.HttpsError(
+        "internal",
+        "Failed to disconnect ED connector",
+        String(e?.message || e)
+      );
+    }
+  }
+);
+
+export const edConnectorTestFn = europeFunctions.https.onCall(
+  async (_data, context) => {
+    const uid = requireAuth(context);
+
+    try {
+      const config = await edConnectorService.test(uid);
+      return config;
+    } catch (e: any) {
+      logger.error("edConnectorTestFn.failed", {
+        uid,
+        error: String(e),
+      });
+      throw new functions.https.HttpsError(
+        "internal",
+        "Failed to test ED connector",
+        String(e?.message || e)
+      );
+    }
+  }
+);
 
 /* =========================================================
  *                MOODLE CONNECTOR
