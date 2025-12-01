@@ -228,6 +228,30 @@ class EpflCampusViewModelTest {
     assertFalse(state.showClipboardSuggestion)
   }
 
+  @Test
+  fun `acceptClipboardUrl sets URL when detected`() = runTest {
+    whenever(mockRepository.isValidIcsUrl(any())).thenReturn(true)
+    whenever(mockRepository.isLikelyEpflUrl(any())).thenReturn(true)
+
+    val viewModel = createViewModel()
+    // Use reflection to set detected URL
+    val field = viewModel.javaClass.getDeclaredField("_uiState")
+    field.isAccessible = true
+    @Suppress("UNCHECKED_CAST")
+    val stateFlow =
+        field.get(viewModel) as kotlinx.coroutines.flow.MutableStateFlow<EpflCampusUiState>
+    stateFlow.value =
+        stateFlow.value.copy(
+            detectedClipboardUrl = "https://epfl.ch/cal.ics", showClipboardSuggestion = true)
+
+    viewModel.acceptClipboardUrl()
+    val state = viewModel.uiState.first()
+
+    assertEquals("https://epfl.ch/cal.ics", state.icsUrlInput)
+    assertFalse(state.showClipboardSuggestion)
+    assertNull(state.detectedClipboardUrl)
+  }
+
   // ===== clearError and clearSuccessMessage tests =====
 
   @Test
