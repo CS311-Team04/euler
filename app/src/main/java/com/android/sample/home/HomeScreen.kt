@@ -431,10 +431,10 @@ fun HomeScreen(
                                     title = item.source.title,
                                     url = item.source.url,
                                     retrievedAt = item.source.retrievedAt,
-                                    isScheduleSource = item.source.isScheduleSource,
+                                    compactType = item.source.compactType,
                                     onVisit =
                                         if (item.source.url != null &&
-                                            !item.source.isScheduleSource) {
+                                            item.source.compactType == CompactSourceType.NONE) {
                                           {
                                             val intent =
                                                 Intent(
@@ -944,13 +944,19 @@ private fun SourceCard(
     title: String,
     url: String?,
     retrievedAt: Long,
-    isScheduleSource: Boolean = false,
+    compactType: CompactSourceType = CompactSourceType.NONE,
     onVisit: (() -> Unit)? = null
 ) {
   val colorScheme = MaterialTheme.colorScheme
 
-  if (isScheduleSource) {
-    // Compact schedule indicator - just a small inline badge
+  if (compactType != CompactSourceType.NONE) {
+    // Compact indicator - small inline badge with emoji based on type
+    val emoji =
+        when (compactType) {
+          CompactSourceType.SCHEDULE -> "📅"
+          CompactSourceType.FOOD -> "🍴"
+          else -> ""
+        }
     Row(
         modifier =
             Modifier.clip(RoundedCornerShape(8.dp))
@@ -964,7 +970,7 @@ private fun SourceCard(
               modifier = Modifier.size(12.dp))
           Spacer(Modifier.width(6.dp))
           Text(
-              text = "📅 $siteLabel",
+              text = "$emoji $siteLabel",
               color = colorScheme.onSurfaceVariant,
               style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp))
         }
