@@ -131,7 +131,6 @@ fun HomeScreen(
 
   // File picker for attachments (PDF for printing)
   val context = LocalContext.current
-  val scope = rememberCoroutineScope()
 
   // Get EPFL Print access token if connected
   val printRepository = remember { com.android.sample.epfl.print.EpflPrintRepository(context) }

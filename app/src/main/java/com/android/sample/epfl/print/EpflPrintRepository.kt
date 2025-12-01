@@ -147,7 +147,7 @@ class EpflPrintRepository(
 
       val success = response?.get("success") as? Boolean ?: false
 
-      if (success) {
+      if (success && response != null) {
         val accessToken = response["accessToken"] as? String ?: return null
         val newRefreshToken = response["refreshToken"] as? String
         val expiresIn = (response["expiresIn"] as? Number)?.toLong() ?: 3600

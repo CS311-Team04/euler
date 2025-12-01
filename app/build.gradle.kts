@@ -217,6 +217,9 @@ dependencies {
     // CustomTabs for Firebase OAuth browser flow
     implementation("androidx.browser:browser:1.8.0")
 
+    // Security Crypto for EncryptedSharedPreferences (EPFL Print tokens)
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
