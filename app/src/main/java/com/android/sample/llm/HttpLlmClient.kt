@@ -138,7 +138,9 @@ internal fun parseBotReply(body: String, gson: Gson): BotReply {
   val url = json.getTrimmedString(JSON_KEY_PRIMARY_URL)
   val edIntentDetected = json.getBoolean(JSON_KEY_ED_INTENT_DETECTED)
   val edIntent = json.getTrimmedString(JSON_KEY_ED_INTENT)
-  return BotReply(replyText, url, edIntentDetected, edIntent)
+  val edFormattedQuestion = json.getTrimmedString(JSON_KEY_ED_FORMATTED_QUESTION)
+  val edFormattedTitle = json.getTrimmedString(JSON_KEY_ED_FORMATTED_TITLE)
+  return BotReply(replyText, url, edIntentDetected, edIntent, edFormattedQuestion, edFormattedTitle)
 }
 
 private fun JsonObject.getTrimmedString(key: String): String? {
@@ -166,5 +168,7 @@ private const val JSON_KEY_REPLY = "reply"
 private const val JSON_KEY_PRIMARY_URL = "primary_url"
 private const val JSON_KEY_ED_INTENT_DETECTED = "ed_intent_detected"
 private const val JSON_KEY_ED_INTENT = "ed_intent"
+private const val JSON_KEY_ED_FORMATTED_QUESTION = "ed_formatted_question"
+private const val JSON_KEY_ED_FORMATTED_TITLE = "ed_formatted_title"
 // Standard localhost identifier - safe loopback address (RFC 5735)
 private const val LOCALHOST = "localhost"

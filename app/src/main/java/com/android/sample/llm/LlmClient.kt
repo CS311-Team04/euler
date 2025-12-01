@@ -16,12 +16,16 @@ import kotlinx.coroutines.withTimeoutOrNull
  * @param url Optional URL source reference
  * @param edIntentDetected Whether an ED Discussion posting intent was detected
  * @param edIntent The type of ED intent detected (e.g., "post_question")
+ * @param edFormattedQuestion The formatted question for ED post (when edIntentDetected is true)
+ * @param edFormattedTitle The formatted title for ED post (when edIntentDetected is true)
  */
 data class BotReply(
     val reply: String,
     val url: String?,
     val edIntentDetected: Boolean = false,
-    val edIntent: String? = null
+    val edIntent: String? = null,
+    val edFormattedQuestion: String? = null,
+    val edFormattedTitle: String? = null
 )
 
 /**
@@ -181,6 +185,22 @@ class FirebaseFunctionsLlmClient(
         null
       }
 
+  private fun parseEdFormattedQuestion(map: Map<String, Any?>): String? =
+      try {
+        map[KEY_ED_FORMATTED_QUESTION] as? String
+      } catch (e: ClassCastException) {
+        Log.w(TAG, "Failed to cast ed_formatted_question to String", e)
+        null
+      }
+
+  private fun parseEdFormattedTitle(map: Map<String, Any?>): String? =
+      try {
+        map[KEY_ED_FORMATTED_TITLE] as? String
+      } catch (e: ClassCastException) {
+        Log.w(TAG, "Failed to cast ed_formatted_title to String", e)
+        null
+      }
+
   private fun buildBotReply(map: Map<String, Any?>, replyText: String): BotReply {
     val url = parsePrimaryUrl(map)
     val edIntentDetected = parseEdIntentDetected(map)
@@ -190,7 +210,10 @@ class FirebaseFunctionsLlmClient(
       Log.d(TAG, "ED intent detected: $edIntent")
     }
 
-    return BotReply(replyText, url, edIntentDetected, edIntent)
+    val edFormattedQuestion = parseEdFormattedQuestion(map)
+    val edFormattedTitle = parseEdFormattedTitle(map)
+    return BotReply(
+        replyText, url, edIntentDetected, edIntent, edFormattedQuestion, edFormattedTitle)
   }
 
   companion object {
@@ -208,6 +231,8 @@ class FirebaseFunctionsLlmClient(
     private const val KEY_PRIMARY_URL = "primary_url"
     private const val KEY_ED_INTENT_DETECTED = "ed_intent_detected"
     private const val KEY_ED_INTENT = "ed_intent"
+    private const val KEY_ED_FORMATTED_QUESTION = "ed_formatted_question"
+    private const val KEY_ED_FORMATTED_TITLE = "ed_formatted_title"
 
     /**
      * Creates a region-scoped [FirebaseFunctions] instance and wires the local emulator when

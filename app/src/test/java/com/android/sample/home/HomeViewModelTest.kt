@@ -1600,4 +1600,91 @@ class HomeViewModelTest {
     assertEquals("Normal response", reply.reply)
     assertEquals("https://epfl.ch", reply.url)
   }
+
+  @Test
+  fun botReply_with_ed_intent_includes_formatted_fields() {
+    val reply =
+        BotReply(
+            reply = "ED intent response",
+            url = null,
+            edIntentDetected = true,
+            edIntent = "post_question",
+            edFormattedQuestion = "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
+            edFormattedTitle = "Question 5 Modstoch")
+
+    assertTrue(reply.edIntentDetected)
+    assertEquals("post_question", reply.edIntent)
+    assertEquals(
+        "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !", reply.edFormattedQuestion)
+    assertEquals("Question 5 Modstoch", reply.edFormattedTitle)
+  }
+
+  @Test
+  fun homeViewModel_creates_PostOnEd_when_ed_intent_detected() = runTest {
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.setEdIntentResponseWithFormatted(
+        reply = "Voici votre question formatée pour ED.",
+        intent = "post_question",
+        formattedQuestion =
+            "Bonjour,\n\nComment résoudre la question 5 de Modstoch S9 ?\n\nMerci d'avance !",
+        formattedTitle = "Question 5 Modstoch S9")
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val repo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel = HomeViewModel(fakeLlm, auth, repo)
+
+    viewModel.updateMessageDraft("Poste sur ed comment résoudre la question 5 modstoch")
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    val state = viewModel.uiState.value
+    assertNotNull("pendingAction should be set", state.pendingAction)
+    assertTrue("pendingAction should be PostOnEd", state.pendingAction is PendingAction.PostOnEd)
+    val postOnEd = state.pendingAction as PendingAction.PostOnEd
+    assertEquals("Question 5 Modstoch S9", postOnEd.draftTitle)
+    assertEquals(
+        "Bonjour,\n\nComment résoudre la question 5 de Modstoch S9 ?\n\nMerci d'avance !",
+        postOnEd.draftBody)
+  }
+
+  @Test
+  fun homeViewModel_creates_PostOnEd_with_fallback_when_formatted_fields_missing() = runTest {
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.setEdIntentResponse(
+        reply = "Je vais vous aider à poster sur ED.", intent = "post_question")
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val repo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel = HomeViewModel(fakeLlm, auth, repo)
+
+    val question = "Poste sur ed ma question"
+    viewModel.updateMessageDraft(question)
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    val state = viewModel.uiState.value
+    assertNotNull("pendingAction should be set", state.pendingAction)
+    assertTrue("pendingAction should be PostOnEd", state.pendingAction is PendingAction.PostOnEd)
+    val postOnEd = state.pendingAction as PendingAction.PostOnEd
+    assertEquals("", postOnEd.draftTitle) // Falls back to empty string
+    assertEquals(question, postOnEd.draftBody) // Falls back to original question
+  }
 }

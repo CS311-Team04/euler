@@ -684,11 +684,18 @@ class HomeViewModel(
                 TAG,
                 "startStreaming: received reply, length=${reply.reply.length}, edIntentDetected=${reply.edIntentDetected}, edIntent=${reply.edIntent}")
 
-            // Handle ED intent detection - log for now, can be extended for UI actions
-            if (reply.edIntentDetected) {
-              Log.d(TAG, "ED intent detected: ${reply.edIntent} - will show ED-specific response")
-              // TODO: Could trigger ED connector flow here if needed
-              // For now, the reply already contains the appropriate message
+            // Handle ED intent detection - create PostOnEd pending action
+            if (reply.edIntentDetected && reply.edIntent == "post_question") {
+              Log.d(TAG, "ED intent detected: ${reply.edIntent} - creating PostOnEd pending action")
+              val formattedQuestion = reply.edFormattedQuestion ?: question
+              val formattedTitle = reply.edFormattedTitle ?: ""
+
+              _uiState.update { state ->
+                state.copy(
+                    pendingAction =
+                        PendingAction.PostOnEd(
+                            draftTitle = formattedTitle, draftBody = formattedQuestion))
+              }
             }
 
             // simulate stream into the placeholder AI message

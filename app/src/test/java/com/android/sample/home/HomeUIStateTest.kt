@@ -664,4 +664,95 @@ class HomeUIStateMoreTest {
     assertFalse(state.component13())
     assertFalse(state.component14())
   }
+
+  @Test
+  fun HomeUiState_default_pendingAction_is_null() {
+    val state = HomeUiState()
+    assertNull(state.pendingAction)
+  }
+
+  @Test
+  fun PendingAction_PostOnEd_stores_title_and_body() {
+    val postOnEd =
+        PendingAction.PostOnEd(
+            draftTitle = "Question 5 Modstoch",
+            draftBody = "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !")
+
+    assertEquals("Question 5 Modstoch", postOnEd.draftTitle)
+    assertEquals(
+        "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !", postOnEd.draftBody)
+  }
+
+  @Test
+  fun PendingAction_PostOnEd_default_values() {
+    val postOnEd = PendingAction.PostOnEd()
+
+    assertEquals("", postOnEd.draftTitle)
+    assertEquals("", postOnEd.draftBody)
+  }
+
+  @Test
+  fun PendingAction_PostOnEd_equality() {
+    val post1 = PendingAction.PostOnEd(draftTitle = "Title", draftBody = "Body")
+    val post2 = PendingAction.PostOnEd(draftTitle = "Title", draftBody = "Body")
+
+    assertEquals(post1, post2)
+    assertEquals(post1.hashCode(), post2.hashCode())
+  }
+
+  @Test
+  fun PendingAction_PostOnEd_inequality_different_title() {
+    val post1 = PendingAction.PostOnEd(draftTitle = "Title1", draftBody = "Body")
+    val post2 = PendingAction.PostOnEd(draftTitle = "Title2", draftBody = "Body")
+
+    assertNotEquals(post1, post2)
+  }
+
+  @Test
+  fun PendingAction_PostOnEd_inequality_different_body() {
+    val post1 = PendingAction.PostOnEd(draftTitle = "Title", draftBody = "Body1")
+    val post2 = PendingAction.PostOnEd(draftTitle = "Title", draftBody = "Body2")
+
+    assertNotEquals(post1, post2)
+  }
+
+  @Test
+  fun HomeUiState_with_PostOnEd_pendingAction() {
+    val postOnEd = PendingAction.PostOnEd(draftTitle = "Title", draftBody = "Body")
+    val state = HomeUiState(pendingAction = postOnEd)
+
+    assertNotNull(state.pendingAction)
+    assertTrue(state.pendingAction is PendingAction.PostOnEd)
+    val post = state.pendingAction as PendingAction.PostOnEd
+    assertEquals("Title", post.draftTitle)
+    assertEquals("Body", post.draftBody)
+  }
+
+  @Test
+  fun HomeUiState_copy_clears_pendingAction() {
+    val postOnEd = PendingAction.PostOnEd(draftTitle = "Title", draftBody = "Body")
+    val state1 = HomeUiState(pendingAction = postOnEd)
+    val state2 = state1.copy(pendingAction = null)
+
+    assertNotNull(state1.pendingAction)
+    assertNull(state2.pendingAction)
+  }
+
+  @Test
+  fun PendingAction_PostOnEd_copy_works() {
+    val original = PendingAction.PostOnEd(draftTitle = "Old Title", draftBody = "Old Body")
+    val copied = original.copy(draftTitle = "New Title")
+
+    assertEquals("New Title", copied.draftTitle)
+    assertEquals("Old Body", copied.draftBody)
+  }
+
+  @Test
+  fun PendingAction_PostOnEd_toString_includes_properties() {
+    val post = PendingAction.PostOnEd(draftTitle = "Title", draftBody = "Body")
+    val toString = post.toString()
+
+    assertTrue(toString.contains("Title"))
+    assertTrue(toString.contains("Body"))
+  }
 }
