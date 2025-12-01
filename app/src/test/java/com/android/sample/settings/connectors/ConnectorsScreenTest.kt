@@ -83,7 +83,7 @@ class ConnectorsScreenTest {
 
     composeRule.onNodeWithText("courses").assertIsDisplayed()
     composeRule.onNodeWithText("Q&A platform").assertIsDisplayed()
-    composeRule.onNodeWithText("EPFL services").assertIsDisplayed()
+    composeRule.onNodeWithText("EPFL schedule").assertIsDisplayed()
     composeRule.onNodeWithText("Pers. services").assertIsDisplayed()
   }
 
@@ -248,7 +248,7 @@ class ConnectorsScreenTest {
 
     composeRule.onNodeWithText("courses").assertIsDisplayed()
     composeRule.onNodeWithText("Q&A platform").assertIsDisplayed()
-    composeRule.onNodeWithText("EPFL services").assertIsDisplayed()
+    composeRule.onNodeWithText("EPFL schedule").assertIsDisplayed()
     composeRule.onNodeWithText("Pers. services").assertIsDisplayed()
   }
 

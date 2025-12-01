@@ -1,15 +1,24 @@
 package com.android.sample.settings.connectors
 
+import com.android.sample.epfl.EpflScheduleRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Test
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
 
 class ConnectorsViewModelTest {
 
+  private fun createViewModel(): ConnectorsViewModel {
+    val mockRepository = mock<EpflScheduleRepository>()
+    whenever(mockRepository.isAuthenticated()).thenReturn(false)
+    return ConnectorsViewModel(epflScheduleRepository = mockRepository)
+  }
+
   @Test
   fun `initial state has 4 connectors all not connected`() = runTest {
-    val viewModel = ConnectorsViewModel()
+    val viewModel = createViewModel()
     val uiState = viewModel.uiState.first()
 
     assertEquals(4, uiState.connectors.size)
@@ -19,7 +28,7 @@ class ConnectorsViewModelTest {
 
   @Test
   fun `connectConnector sets connector to connected`() = runTest {
-    val viewModel = ConnectorsViewModel()
+    val viewModel = createViewModel()
 
     viewModel.connectConnector("moodle")
     val uiState = viewModel.uiState.first()
@@ -35,7 +44,7 @@ class ConnectorsViewModelTest {
 
   @Test
   fun `connectConnector with non-existent id does nothing`() = runTest {
-    val viewModel = ConnectorsViewModel()
+    val viewModel = createViewModel()
     val initialState = viewModel.uiState.first()
 
     viewModel.connectConnector("non_existent")
@@ -46,7 +55,7 @@ class ConnectorsViewModelTest {
 
   @Test
   fun `showDisconnectConfirmation sets pending connector`() = runTest {
-    val viewModel = ConnectorsViewModel()
+    val viewModel = createViewModel()
     val connector = Connector(id = "test", name = "Test", description = "Desc", isConnected = true)
 
     viewModel.showDisconnectConfirmation(connector)
@@ -58,7 +67,7 @@ class ConnectorsViewModelTest {
 
   @Test
   fun `disconnectConnector sets connector to not connected and clears pending`() = runTest {
-    val viewModel = ConnectorsViewModel()
+    val viewModel = createViewModel()
 
     // First connect a connector
     viewModel.connectConnector("moodle")
@@ -80,7 +89,7 @@ class ConnectorsViewModelTest {
 
   @Test
   fun `disconnectConnector with non-existent id only clears pending`() = runTest {
-    val viewModel = ConnectorsViewModel()
+    val viewModel = createViewModel()
     val connector = Connector(id = "test", name = "Test", description = "Desc", isConnected = true)
 
     viewModel.showDisconnectConfirmation(connector)
@@ -92,7 +101,7 @@ class ConnectorsViewModelTest {
 
   @Test
   fun `dismissDisconnectConfirmation clears pending connector`() = runTest {
-    val viewModel = ConnectorsViewModel()
+    val viewModel = createViewModel()
     val connector = Connector(id = "test", name = "Test", description = "Desc", isConnected = true)
 
     viewModel.showDisconnectConfirmation(connector)
@@ -106,7 +115,7 @@ class ConnectorsViewModelTest {
 
   @Test
   fun `multiple connect operations work correctly`() = runTest {
-    val viewModel = ConnectorsViewModel()
+    val viewModel = createViewModel()
 
     viewModel.connectConnector("moodle")
     viewModel.connectConnector("ed")
@@ -125,7 +134,7 @@ class ConnectorsViewModelTest {
 
   @Test
   fun `connect then disconnect then connect again works`() = runTest {
-    val viewModel = ConnectorsViewModel()
+    val viewModel = createViewModel()
 
     viewModel.connectConnector("moodle")
     var uiState = viewModel.uiState.first()
