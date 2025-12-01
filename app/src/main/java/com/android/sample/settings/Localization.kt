@@ -200,7 +200,27 @@ object Localization {
           "recent_cs220_exam" to "CS220 Final Exam retrieval",
           "recent_linear_algebra" to "Linear Algebra help",
           "recent_deadline" to "Project deadline query",
-          "recent_registration" to "Course registration info") + edTranslationsEn()
+          "recent_registration" to "Course registration info",
+
+          // EPFL Campus Connector
+          "epfl_campus_title" to "EPFL Campus",
+          "epfl_campus_subtitle" to "Connect your schedule",
+          "epfl_instructions_title" to "How to connect",
+          "epfl_step_1" to "Open EPFL Campus app → My Schedule",
+          "epfl_step_2" to "Tap 📤 → 'Copy .ics link to clipboard' ",
+          "epfl_step_3" to "Come back here and paste it below",
+          "epfl_open_campus" to "Open EPFL Campus",
+          "epfl_paste_url" to "Paste your ICS URL",
+          "epfl_connect" to "Connect Schedule",
+          "epfl_syncing" to "Syncing...",
+          "epfl_connected" to "Connected",
+          "epfl_weekly_classes" to "weekly classes",
+          "epfl_exams" to "exams",
+          "epfl_last_sync" to "Last sync",
+          "epfl_disconnect" to "Disconnect",
+          "epfl_connected_info" to
+              "Your schedule is now connected to the AI assistant.",
+          "epfl_clipboard_detected" to "ICS URL detected!") + edTranslationsEn()
 
   private fun french() =
       mapOf(
@@ -280,7 +300,27 @@ object Localization {
           "recent_cs220_exam" to "Récupération examen final CS220",
           "recent_linear_algebra" to "Aide en algèbre linéaire",
           "recent_deadline" to "Requête date limite projet",
-          "recent_registration" to "Info inscription aux cours") + edTranslationsFr()
+          "recent_registration" to "Info inscription aux cours",
+
+          // EPFL Campus Connector
+          "epfl_campus_title" to "EPFL Campus",
+          "epfl_campus_subtitle" to "Connectez votre emploi du temps",
+          "epfl_instructions_title" to "Comment se connecter",
+          "epfl_step_1" to "Ouvrez EPFL Campus → Horaire",
+          "epfl_step_2" to "Tapez ⚙️ → Copier le lien .ics",
+          "epfl_step_3" to "Revenez et collez le ici.",
+          "epfl_open_campus" to "Ouvrir EPFL Campus",
+          "epfl_paste_url" to "Collez votre URL ICS",
+          "epfl_connect" to "Connecter l'emploi du temps",
+          "epfl_syncing" to "Synchronisation...",
+          "epfl_connected" to "Connecté",
+          "epfl_weekly_classes" to "cours/semaine",
+          "epfl_exams" to "examens",
+          "epfl_last_sync" to "Dernière sync",
+          "epfl_disconnect" to "Déconnecter",
+          "epfl_connected_info" to
+              "Votre emploi du temps est maintenant connecté à l'assistant IA.",
+          "epfl_clipboard_detected" to "URL ICS détectée !") + edTranslationsFr()
 
   private fun german() =
       mapOf(
