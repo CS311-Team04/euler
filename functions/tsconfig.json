@@ -10,7 +10,8 @@
     "rootDir": "src",
     "sourceMap": true,
     "noImplicitReturns": true,
-    "noUnusedLocals": true
+    "noUnusedLocals": true,
+    "types": ["node", "jest"]
   },
-  "include": ["src"]
+  "include": ["src/**/*.ts"]
 }

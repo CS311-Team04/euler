@@ -3,8 +3,14 @@ package com.android.sample.VoiceChat.Backend
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.android.sample.BuildConfig
+import com.android.sample.conversations.ConversationRepository
+import com.android.sample.conversations.ConversationTitleFormatter
 import com.android.sample.llm.FirebaseFunctionsLlmClient
 import com.android.sample.llm.LlmClient
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.functions.FirebaseFunctions
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -20,7 +26,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * Coordinates speech-to-text transcripts with the custom LLM and delegates playback to the UI.
@@ -30,11 +35,30 @@ import kotlinx.coroutines.withContext
  * - Call the LLM asynchronously when the user finishes speaking.
  * - Emit `SpeechRequest` events that the UI layer can render via any `SpeechPlayback`.
  * - Provide synthesized audio level samples so the visualizer stays animated while TTS runs.
+ * - Create and manage conversations in Firestore (same as text mode).
+ * - Persist voice interactions to maintain context and memory.
  */
 class VoiceChatViewModel(
     private val llmClient: LlmClient = FirebaseFunctionsLlmClient(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
+    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
 ) : ViewModel() {
+
+  private val repo = ConversationRepository(auth, db)
+  private var currentConversationId: String? = null
+
+  /**
+   * Firebase Functions handle for title generation. Uses local emulator when configured via
+   * BuildConfig flags.
+   */
+  private val functions: FirebaseFunctions by lazy {
+    FirebaseFunctions.getInstance(BuildConfig.FUNCTIONS_REGION).apply {
+      if (BuildConfig.USE_FUNCTIONS_EMULATOR) {
+        useEmulator(BuildConfig.FUNCTIONS_HOST, BuildConfig.FUNCTIONS_PORT)
+      }
+    }
+  }
 
   private val _uiState = MutableStateFlow(VoiceChatUiState())
   val uiState: StateFlow<VoiceChatUiState> = _uiState.asStateFlow()
@@ -50,6 +74,32 @@ class VoiceChatViewModel(
   private var levelAnimationJob: Job? = null
   private var lastEmittedLevel: Float = 0f
 
+  /**
+   * Returns true when the user is **not** authenticated. Guest mode disables Firestore persistence
+   * and keeps all messages in memory only.
+   */
+  private fun isGuest(): Boolean = auth.currentUser == null
+
+  /**
+   * Prepares for voice mode activation. Resets the current conversation so that a new one will be
+   * created automatically on the first message (same pattern as text mode).
+   *
+   * This ensures that each voice mode session starts with a fresh conversation, maintaining context
+   * and memory within that session.
+   *
+   * This method is called when the voice screen is opened. In guest mode, this is a no-op.
+   */
+  fun initializeConversation() {
+    // Reset conversation ID so a new conversation is created on first message
+    // This ensures each voice mode activation starts a fresh conversation
+    currentConversationId = null
+    if (isGuest()) {
+      Log.d(TAG, "Guest mode: conversation will not be persisted")
+    } else {
+      Log.d(TAG, "Ready to create new conversation on first voice message")
+    }
+  }
+
   /** Receives live partial transcripts from the STT layer so the UI can reflect them instantly. */
   fun onUserTranscript(transcript: String) {
     _uiState.update { it.copy(lastTranscript = transcript, lastError = null) }
@@ -58,6 +108,9 @@ class VoiceChatViewModel(
   /**
    * Handles the final transcript of a user utterance by launching an LLM request and, once
    * completed, emitting a [SpeechRequest] for playback.
+   *
+   * Creates a conversation on the first message (if signed in) and persists all messages to
+   * Firestore to maintain context and memory, just like text mode.
    */
   fun handleUserUtterance(transcript: String) {
     val cleaned = transcript.trim()
@@ -66,41 +119,120 @@ class VoiceChatViewModel(
     currentGenerationJob?.cancel()
     currentGenerationJob =
         viewModelScope.launch {
-          _uiState.update {
-            it.copy(
-                lastTranscript = cleaned,
-                isGenerating = true,
-                isSpeaking = false,
-                lastError = null,
-            )
-          }
-
+          updateStateForNewUtterance(cleaned)
           try {
-            val reply = withContext(ioDispatcher) { llmClient.generateReply(cleaned) }
-            val spokenText = sanitizeForSpeech(reply.reply)
-            val request =
-                SpeechRequest(text = spokenText, utteranceId = UUID.randomUUID().toString())
-
-            _uiState.update {
-              it.copy(lastAiReply = reply.reply, isGenerating = false, lastError = null)
-            }
-
-            if (!_speechRequests.tryEmit(request)) {
-              _speechRequests.emit(request)
-            }
+            val cid = ensureConversationExists(cleaned)
+            persistUserMessage(cid, cleaned)
+            val reply = generateAiReply(cleaned)
+            updateStateWithReply(reply.reply)
+            persistAiMessage(cid, reply.reply)
+            emitSpeechRequest(reply.reply)
           } catch (cancelled: CancellationException) {
             throw cancelled
           } catch (t: Throwable) {
-            Log.e(TAG, "LLM generation failed", t)
-            _uiState.update {
-              it.copy(
-                  isGenerating = false,
-                  isSpeaking = false,
-                  lastError = t.message ?: "Unable to generate response",
-              )
-            }
+            handleGenerationError(t)
           }
         }
+  }
+
+  /** Updates UI state when starting to process a new user utterance. */
+  private fun updateStateForNewUtterance(cleaned: String) {
+    _uiState.update {
+      it.copy(
+          lastTranscript = cleaned,
+          isGenerating = true,
+          isSpeaking = false,
+          lastError = null,
+      )
+    }
+  }
+
+  /**
+   * Ensures a conversation exists for the current session. Returns conversation ID if signed in,
+   * null if guest mode.
+   *
+   * Creates a conversation with a quick title, then upgrades it in the background using
+   * generateTitleFn (same pattern as text mode).
+   */
+  private suspend fun ensureConversationExists(cleaned: String): String? {
+    if (isGuest()) {
+      return null // Guest mode: no Firestore persistence
+    }
+    return currentConversationId
+        ?: run {
+          // Create new conversation on first message (same pattern as text mode)
+          val quickTitle = ConversationTitleFormatter.localTitleFrom(cleaned)
+          val newId = repo.startNewConversation(quickTitle)
+          currentConversationId = newId
+          Log.d(TAG, "Created new voice conversation: $newId with title: $quickTitle")
+
+          // Upgrade title in background (once)
+          viewModelScope.launch {
+            try {
+              val good = ConversationTitleFormatter.fetchTitle(functions, cleaned, TAG)
+              if (good.isNotBlank() && good != quickTitle) {
+                repo.updateConversationTitle(newId, good)
+                Log.d(TAG, "Upgraded conversation title: $newId -> $good")
+              }
+            } catch (e: Exception) {
+              // Keep provisional title on error
+              Log.d(TAG, "Failed to upgrade title, keeping provisional: ${e.message}")
+            }
+          }
+
+          newId
+        }
+  }
+
+  /** Persists user message to Firestore if conversation ID exists. */
+  private suspend fun persistUserMessage(cid: String?, message: String) {
+    if (cid == null) return
+    try {
+      repo.appendMessage(cid, "user", message)
+      Log.d(TAG, "Persisted user message to conversation: $cid")
+    } catch (e: Exception) {
+      Log.w(TAG, "Failed to persist user message: ${e.message}")
+    }
+  }
+
+  /** Generates AI reply using the LLM client. */
+  private suspend fun generateAiReply(cleaned: String) = llmClient.generateReply(cleaned)
+
+  /** Updates UI state with the AI reply. */
+  private fun updateStateWithReply(reply: String) {
+    _uiState.update { it.copy(lastAiReply = reply, isGenerating = false, lastError = null) }
+  }
+
+  /** Persists AI message to Firestore if conversation ID exists. */
+  private suspend fun persistAiMessage(cid: String?, reply: String) {
+    if (cid == null) return
+    try {
+      repo.appendMessage(cid, "assistant", reply)
+      Log.d(TAG, "Persisted assistant message to conversation: $cid")
+    } catch (e: Exception) {
+      Log.w(TAG, "Failed to persist assistant message: ${e.message}")
+    }
+  }
+
+  /** Emits a speech request for TTS playback. */
+  private suspend fun emitSpeechRequest(reply: String) {
+    val spokenText = sanitizeForSpeech(reply)
+    val request = SpeechRequest(text = spokenText, utteranceId = UUID.randomUUID().toString())
+    if (!_speechRequests.tryEmit(request)) {
+      _speechRequests.emit(request)
+    }
+  }
+
+  /** Handles errors during LLM generation and updates UI state accordingly. */
+  private fun handleGenerationError(t: Throwable) {
+    Log.e(TAG, "LLM generation failed", t)
+    _uiState.update {
+      it.copy(
+          isGenerating = false,
+          isSpeaking = false,
+          lastError = t.message ?: "Unable to generate response",
+      )
+    }
   }
 
   /** Allows other components (STT/TTS) to bubble a recoverable error into the UI banner. */
@@ -137,6 +269,9 @@ class VoiceChatViewModel(
     currentGenerationJob = null
     stopLevelAnimation()
     _uiState.update { it.copy(isGenerating = false, isSpeaking = false) }
+    // Note: We keep currentConversationId so that if the user returns to voice mode,
+    // they can continue the same conversation. To start a new conversation, the user
+    // should use the text mode or we could add a "new conversation" action.
   }
 
   override fun onCleared() {

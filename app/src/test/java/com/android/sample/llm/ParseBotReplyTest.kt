@@ -2,6 +2,7 @@ package com.android.sample.llm
 
 import com.google.gson.Gson
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -180,5 +181,80 @@ class ParseBotReplyTest {
 
     assertEquals("Test reply", result.reply)
     assertNull("Whitespace-only URL should be ignored", result.url)
+  }
+
+  // ==================== ED INTENT TESTS ====================
+
+  @Test
+  fun parseBotReply_parses_ed_intent_detected_true() {
+    val body = """{"reply":"ED response","ed_intent_detected":true,"ed_intent":"post_question"}"""
+    val result = parseBotReply(body, gson)
+
+    assertEquals("ED response", result.reply)
+    assertTrue(result.edIntentDetected)
+    assertEquals("post_question", result.edIntent)
+  }
+
+  @Test
+  fun parseBotReply_parses_ed_intent_detected_false() {
+    val body = """{"reply":"Normal response","ed_intent_detected":false,"ed_intent":null}"""
+    val result = parseBotReply(body, gson)
+
+    assertEquals("Normal response", result.reply)
+    assertFalse(result.edIntentDetected)
+    assertNull(result.edIntent)
+  }
+
+  @Test
+  fun parseBotReply_defaults_ed_intent_when_missing() {
+    val body = """{"reply":"Response without ED fields"}"""
+    val result = parseBotReply(body, gson)
+
+    assertEquals("Response without ED fields", result.reply)
+    assertFalse(result.edIntentDetected)
+    assertNull(result.edIntent)
+  }
+
+  @Test
+  fun parseBotReply_handles_all_ed_intent_types() {
+    val types = listOf("post_question", "post_answer", "post_comment")
+    for (intentType in types) {
+      val body = """{"reply":"Response","ed_intent_detected":true,"ed_intent":"$intentType"}"""
+      val result = parseBotReply(body, gson)
+
+      assertTrue("Should detect ED intent for type: $intentType", result.edIntentDetected)
+      assertEquals(intentType, result.edIntent)
+    }
+  }
+
+  @Test
+  fun parseBotReply_handles_invalid_ed_intent_detected_type() {
+    // Non-boolean ed_intent_detected should default to false
+    val body = """{"reply":"Response","ed_intent_detected":"not-a-boolean"}"""
+    val result = parseBotReply(body, gson)
+
+    assertFalse(result.edIntentDetected)
+  }
+
+  @Test
+  fun parseBotReply_handles_invalid_ed_intent_type() {
+    // Non-string ed_intent should default to null
+    val body = """{"reply":"Response","ed_intent_detected":true,"ed_intent":123}"""
+    val result = parseBotReply(body, gson)
+
+    assertTrue(result.edIntentDetected)
+    assertNull("Non-string ed_intent should be null", result.edIntent)
+  }
+
+  @Test
+  fun parseBotReply_full_response_with_all_fields() {
+    val body =
+        """{"reply":"Full response","primary_url":"https://epfl.ch","ed_intent_detected":true,"ed_intent":"post_question"}"""
+    val result = parseBotReply(body, gson)
+
+    assertEquals("Full response", result.reply)
+    assertEquals("https://epfl.ch", result.url)
+    assertTrue(result.edIntentDetected)
+    assertEquals("post_question", result.edIntent)
   }
 }

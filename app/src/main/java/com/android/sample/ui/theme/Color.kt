@@ -82,8 +82,12 @@ val EulerAccentRed = EulerRed // alias pour Connectors UI
 
 // Muted grays (brand-safe)
 val EulerGrayDark = Color(0XFF424242) // ex #757575
+val EulerGrayLight = LightOnSurfaceVariant
 val textConnectors = Color.Gray.copy(alpha = 0.3f) // ex #9E9E9E
 val textConnectorsLight = Color.Gray.copy(alpha = 0.5f)
+
+// EPFL grayscale logos backgrounds (optional utility)
+val ConnectorLogoBackground = LightBackground.copy(alpha = 0.03f)
 
 // Shadow colors
 val EulerShadowSpot = Color.Black.copy(alpha = 0.15f)
@@ -106,3 +110,8 @@ val ed2 = Color(0xFFEC4899)
 
 // IS-Academia brand colors
 val isAcademiaR = Color(0xFFC62828)
+
+// Container Color for connectors Screen
+val containerColor = Color.Transparent
+// preview BackGround color
+const val previewBgColor: Long = 0xFF0D0D0D // long because preview takes Long type for color
