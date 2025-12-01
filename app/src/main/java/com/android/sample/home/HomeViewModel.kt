@@ -6,12 +6,14 @@ import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.sample.BuildConfig
+import com.android.sample.Chat.ChatAttachment
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
 import com.android.sample.conversations.AuthNotReadyException
 import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.ConversationTitleFormatter
 import com.android.sample.conversations.MessageDTO
+import com.android.sample.llm.AttachmentData
 import com.android.sample.llm.FirebaseFunctionsLlmClient
 import com.android.sample.llm.LlmClient
 import com.android.sample.network.NetworkConnectivityMonitor
@@ -441,6 +443,16 @@ class HomeViewModel(
     _uiState.update { it.copy(messageDraft = text) }
   }
 
+  /** Set a file attachment for the next message (e.g., PDF for printing). */
+  fun setAttachment(attachment: ChatAttachment) {
+    _uiState.update { it.copy(pendingAttachment = attachment) }
+  }
+
+  /** Clear the pending attachment. */
+  fun clearAttachment() {
+    _uiState.update { it.copy(pendingAttachment = null) }
+  }
+
   /** Dismiss the offline message. */
   fun dismissOfflineMessage() {
     _uiState.update { it.copy(showOfflineMessage = false) }
@@ -522,12 +534,29 @@ class HomeViewModel(
       return
     }
     val msg = current.messageDraft.trim()
-    if (msg.isEmpty()) return
+    val attachment = current.pendingAttachment
+    
+    // Allow sending with just attachment or just text
+    if (msg.isEmpty() && attachment == null) return
 
     val now = System.currentTimeMillis()
+    
+    // Build display text for the user message
+    val displayText = if (attachment != null && msg.isNotEmpty()) {
+      "📎 ${attachment.fileName}\n$msg"
+    } else if (attachment != null) {
+      "📎 ${attachment.fileName}"
+    } else {
+      msg
+    }
+    
     val userMsg =
         ChatUIModel(
-            id = UUID.randomUUID().toString(), text = msg, timestamp = now, type = ChatType.USER)
+            id = UUID.randomUUID().toString(), 
+            text = displayText, 
+            timestamp = now, 
+            type = ChatType.USER,
+            attachment = attachment)
     val aiMessageId = UUID.randomUUID().toString()
     val placeholder =
         ChatUIModel(
@@ -537,11 +566,12 @@ class HomeViewModel(
             type = ChatType.AI,
             isThinking = true)
 
-    // UI optimiste : on ajoute user + placeholder, on vide l'input, on marque l'état de streaming
+    // UI optimiste : on ajoute user + placeholder, on vide l'input et attachment, on marque l'état de streaming
     _uiState.update { st ->
       st.copy(
           messages = st.messages + userMsg + placeholder,
           messageDraft = "",
+          pendingAttachment = null,
           isSending = true,
           streamingMessageId = aiMessageId,
           streamingSequence = st.streamingSequence + 1)
@@ -550,6 +580,16 @@ class HomeViewModel(
     viewModelScope.launch(exceptionHandler) {
       try {
         Log.d(TAG, "sendMessage: starting, message='${msg.take(50)}...'")
+        // Convert ChatAttachment to AttachmentData for the LLM client
+        val attachmentData = attachment?.let {
+          AttachmentData(
+            fileName = it.fileName,
+            mimeType = it.mimeType,
+            base64Data = it.base64Data,
+            printAccessToken = it.printAccessToken
+          )
+        }
+        
         // GUEST: no Firestore, just streaming UI
         if (isGuest()) {
           Log.d(TAG, "sendMessage: guest mode, starting streaming")
@@ -558,7 +598,8 @@ class HomeViewModel(
               messageId = aiMessageId,
               conversationId = null,
               summary = null,
-              transcript = null)
+              transcript = null,
+              attachment = attachmentData)
           return@launch
         }
 
@@ -622,7 +663,8 @@ class HomeViewModel(
             messageId = aiMessageId,
             conversationId = conversationId,
             summary = summary,
-            transcript = recentTranscript)
+            transcript = recentTranscript,
+            attachment = attachmentData)
       } catch (_: AuthNotReadyException) {
         // L'auth n'est pas prête : côté UI, on signale une erreur de streaming / envoi
         try {
@@ -650,13 +692,15 @@ class HomeViewModel(
       }
     }
   }
-  /** Streaming helper using [LlmClient] and optional summary/transcript. */
+  
+  /** Streaming helper using [LlmClient] and optional summary/transcript/attachment. */
   private fun startStreaming(
       question: String,
       messageId: String,
       conversationId: String?,
       summary: String?,
-      transcript: String?
+      transcript: String?,
+      attachment: AttachmentData? = null
   ) {
     activeStreamJob?.cancel()
     userCancelledStream = false
@@ -666,12 +710,15 @@ class HomeViewModel(
           try {
             Log.d(
                 TAG,
-                "startStreaming: calling llmClient.generateReply for messageId=$messageId, question='${question.take(50)}...'")
+                "startStreaming: calling llmClient.generateReply for messageId=$messageId, question='${question.take(50)}...', hasAttachment=${attachment != null}")
             val reply =
                 try {
                   withContext(Dispatchers.IO) {
                     llmClient.generateReply(
-                        prompt = question, summary = summary, transcript = transcript)
+                        prompt = question, 
+                        summary = summary, 
+                        transcript = transcript,
+                        attachment = attachment)
                   }
                 } catch (e: FirebaseFunctionsException) {
                   Log.e(
@@ -691,7 +738,7 @@ class HomeViewModel(
                 }
             Log.d(
                 TAG,
-                "startStreaming: received reply, length=${reply.reply.length}, edIntentDetected=${reply.edIntentDetected}, edIntent=${reply.edIntent}")
+                "startStreaming: received reply, length=${reply.reply.length}, edIntentDetected=${reply.edIntentDetected}, printIntentDetected=${reply.printIntentDetected}")
 
             // Handle ED intent detection - log for now, can be extended for UI actions
             if (reply.edIntentDetected) {

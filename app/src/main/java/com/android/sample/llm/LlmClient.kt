@@ -34,6 +34,16 @@ enum class SourceType {
 }
 
 /**
+ * Attachment data to send with a message (e.g., PDF for printing)
+ */
+data class AttachmentData(
+    val fileName: String,
+    val mimeType: String,
+    val base64Data: String,
+    val printAccessToken: String? = null // OAuth token for EPFL Print (if connected)
+)
+
+/**
  * Response from the LLM backend.
  *
  * @param reply The text response from the LLM
@@ -41,13 +51,17 @@ enum class SourceType {
  * @param sourceType The type of source used for the answer
  * @param edIntentDetected Whether an ED Discussion posting intent was detected
  * @param edIntent The type of ED intent detected (e.g., "post_question")
+ * @param printIntentDetected Whether a print intent was detected
+ * @param printJobId The ID of the submitted print job (if any)
  */
 data class BotReply(
     val reply: String,
     val url: String?,
     val sourceType: SourceType = SourceType.NONE,
     val edIntentDetected: Boolean = false,
-    val edIntent: String? = null
+    val edIntent: String? = null,
+    val printIntentDetected: Boolean = false,
+    val printJobId: String? = null
 )
 
 /**
@@ -64,13 +78,17 @@ interface LlmClient {
   suspend fun generateReply(prompt: String): BotReply
 
   /**
-   * Advanced API: prompt + optional rolling summary + recent transcript.
+   * Advanced API: prompt + optional rolling summary + recent transcript + attachment.
    *
    * Default implementation simply ignores the extra context and delegates to [generateReply].
    * Implementations that support RAG can override this.
    */
-  suspend fun generateReply(prompt: String, summary: String?, transcript: String?): BotReply =
-      generateReply(prompt)
+  suspend fun generateReply(
+      prompt: String, 
+      summary: String?, 
+      transcript: String?,
+      attachment: AttachmentData? = null
+  ): BotReply = generateReply(prompt)
 }
 
 /**
@@ -88,7 +106,7 @@ class FirebaseFunctionsLlmClient(
 
   /** Backwards-compatible entry point: no summary / transcript context. */
   override suspend fun generateReply(prompt: String): BotReply =
-      generateReply(prompt = prompt, summary = null, transcript = null)
+      generateReply(prompt = prompt, summary = null, transcript = null, attachment = null)
 
   /**
    * Calls the Cloud Function `answerWithRagFn` and extracts the `reply` field.
@@ -97,6 +115,7 @@ class FirebaseFunctionsLlmClient(
    * - "question": the user prompt
    * - "summary": optional rolling summary of the conversation
    * - "recentTranscript": optional recent transcript
+   * - "attachment": optional file attachment (for printing)
    *
    * When the function fails (timeout, malformed response, empty reply) the optional fallback is
    * invoked before ultimately throwing an [IllegalStateException].
@@ -104,10 +123,11 @@ class FirebaseFunctionsLlmClient(
   override suspend fun generateReply(
       prompt: String,
       summary: String?,
-      transcript: String?
+      transcript: String?,
+      attachment: AttachmentData?
   ): BotReply =
       withContext(Dispatchers.IO) {
-        val data = buildRequestPayload(prompt, summary, transcript)
+        val data = buildRequestPayload(prompt, summary, transcript, attachment)
         val result = callFirebaseFunction(data)
 
         if (result == null) {
@@ -136,11 +156,20 @@ class FirebaseFunctionsLlmClient(
   private fun buildRequestPayload(
       prompt: String,
       summary: String?,
-      transcript: String?
+      transcript: String?,
+      attachment: AttachmentData?
   ): HashMap<String, Any> =
       hashMapOf<String, Any>(KEY_QUESTION to prompt).apply {
         summary?.let { put(KEY_SUMMARY, it) }
         transcript?.let { put(KEY_TRANSCRIPT, it) }
+        attachment?.let { 
+          put(KEY_ATTACHMENT, hashMapOf(
+            "fileName" to it.fileName,
+            "mimeType" to it.mimeType,
+            "base64Data" to it.base64Data,
+            "printAccessToken" to (it.printAccessToken ?: "")
+          ))
+        }
       }
 
   private suspend fun callFirebaseFunction(
@@ -215,17 +244,38 @@ class FirebaseFunctionsLlmClient(
         SourceType.NONE
       }
 
+  private fun parsePrintIntentDetected(map: Map<String, Any?>): Boolean =
+      try {
+        map[KEY_PRINT_INTENT_DETECTED] as? Boolean ?: false
+      } catch (e: ClassCastException) {
+        Log.w(TAG, "Failed to cast print_intent_detected to Boolean", e)
+        false
+      }
+
+  private fun parsePrintJobId(map: Map<String, Any?>): String? =
+      try {
+        map[KEY_PRINT_JOB_ID] as? String
+      } catch (e: ClassCastException) {
+        Log.w(TAG, "Failed to cast print_job_id to String", e)
+        null
+      }
+
   private fun buildBotReply(map: Map<String, Any?>, replyText: String): BotReply {
     val url = parsePrimaryUrl(map)
     val sourceType = parseSourceType(map)
     val edIntentDetected = parseEdIntentDetected(map)
     val edIntent = parseEdIntentType(map)
+    val printIntentDetected = parsePrintIntentDetected(map)
+    val printJobId = parsePrintJobId(map)
 
     if (edIntentDetected) {
       Log.d(TAG, "ED intent detected: $edIntent")
     }
+    if (printIntentDetected) {
+      Log.d(TAG, "Print intent detected, jobId: $printJobId")
+    }
 
-    return BotReply(replyText, url, sourceType, edIntentDetected, edIntent)
+    return BotReply(replyText, url, sourceType, edIntentDetected, edIntent, printIntentDetected, printJobId)
   }
 
   companion object {
@@ -237,6 +287,7 @@ class FirebaseFunctionsLlmClient(
     private const val KEY_QUESTION = "question"
     private const val KEY_SUMMARY = "summary"
     private const val KEY_TRANSCRIPT = "recentTranscript"
+    private const val KEY_ATTACHMENT = "attachment"
 
     // Response payload keys
     private const val KEY_REPLY = "reply"
@@ -244,6 +295,8 @@ class FirebaseFunctionsLlmClient(
     private const val KEY_SOURCE_TYPE = "source_type"
     private const val KEY_ED_INTENT_DETECTED = "ed_intent_detected"
     private const val KEY_ED_INTENT = "ed_intent"
+    private const val KEY_PRINT_INTENT_DETECTED = "print_intent_detected"
+    private const val KEY_PRINT_JOB_ID = "print_job_id"
 
     /**
      * Creates a region-scoped [FirebaseFunctions] instance and wires the local emulator when

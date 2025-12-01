@@ -24,6 +24,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
@@ -49,6 +51,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.util.Base64
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.android.sample.Chat.ChatAttachment
 import com.android.sample.Chat.ChatMessage
 import com.android.sample.Chat.ChatType
 import com.android.sample.R
@@ -122,6 +128,43 @@ fun HomeScreen(
   DisposableEffect(audioController) { onDispose { audioController.stop() } }
 
   LaunchedEffect(ui.messages) { audioController.handleMessagesChanged(ui.messages) }
+
+  // File picker for attachments (PDF for printing)
+  val context = LocalContext.current
+  val scope = rememberCoroutineScope()
+  
+  // Get EPFL Print access token if connected
+  val printRepository = remember { com.android.sample.epfl.print.EpflPrintRepository(context) }
+  
+  val filePickerLauncher = rememberLauncherForActivityResult(
+      contract = ActivityResultContracts.GetContent()
+  ) { uri ->
+      uri?.let {
+          val contentResolver = context.contentResolver
+          val mimeType = contentResolver.getType(uri) ?: "application/pdf"
+          // Only accept PDF, JPEG, PNG for printing
+          if (mimeType in listOf("application/pdf", "image/jpeg", "image/png")) {
+              val fileName = uri.lastPathSegment?.substringAfterLast("/") ?: "document"
+              contentResolver.openInputStream(uri)?.use { inputStream ->
+                  val bytes = inputStream.readBytes()
+                  val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                  // Get print token if available (with auto-refresh)
+                  scope.launch {
+                      val printToken = printRepository.getAccessTokenRefreshing()
+                      viewModel.setAttachment(
+                          ChatAttachment(
+                              fileName = fileName,
+                              mimeType = mimeType,
+                              base64Data = base64,
+                              sizeBytes = bytes.size.toLong(),
+                              printAccessToken = printToken
+                          )
+                      )
+                  }
+              }
+          }
+      }
+  }
 
   val ranNewChatOnce = remember { mutableStateOf(false) }
   LaunchedEffect(forceNewChatOnFirstOpen) {
@@ -354,9 +397,9 @@ fun HomeScreen(
                         placeholder = Localization.t("message_euler"),
                         enabled = !ui.isSending && !ui.isOffline,
                         isSending = ui.isSending,
-                        canSend = ui.messageDraft.isNotBlank() && !ui.isSending && !ui.isOffline,
+                        canSend = (ui.messageDraft.isNotBlank() || ui.pendingAttachment != null) && !ui.isSending && !ui.isOffline,
                         onSendClick = {
-                          if (ui.messageDraft.isNotBlank() && !ui.isSending && !ui.isOffline) {
+                          if ((ui.messageDraft.isNotBlank() || ui.pendingAttachment != null) && !ui.isSending && !ui.isOffline) {
                             onSendMessage(ui.messageDraft)
                             viewModel.sendMessage()
                           }
@@ -374,6 +417,12 @@ fun HomeScreen(
                             onVoiceChatClick()
                           }
                         },
+                        onAttachClick = {
+                          // Open file picker for PDF/images
+                          filePickerLauncher.launch("*/*")
+                        },
+                        attachmentName = ui.pendingAttachment?.fileName,
+                        onClearAttachment = { viewModel.clearAttachment() },
                         speechHelperAvailable = speechHelper != null && !ui.isOffline,
                         textPrimary = textPrimary,
                         textSecondary = textSecondary,
@@ -551,6 +600,7 @@ private fun DeleteMenuItem(onClick: () -> Unit) {
  * - Vertically centered placeholder text
  * - Properly aligned microphone and voice/send buttons
  * - Smooth transition from voice mode to send button
+ * - Attachment button for file uploads (PDF for printing)
  */
 @Composable
 private fun ChatInputBar(
@@ -563,122 +613,184 @@ private fun ChatInputBar(
     onSendClick: () -> Unit,
     onMicClick: () -> Unit,
     onVoiceModeClick: () -> Unit,
+    onAttachClick: () -> Unit,
+    attachmentName: String?,
+    onClearAttachment: () -> Unit,
     speechHelperAvailable: Boolean,
     textPrimary: Color,
     textSecondary: Color,
     surfaceVariantColor: Color,
     modifier: Modifier = Modifier
 ) {
-  OutlinedTextField(
-      value = value,
-      onValueChange = onValueChange,
-      placeholder = {
+  Column(modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+    // Show attachment preview if present
+    attachmentName?.let { fileName ->
+      Row(
+          modifier = Modifier
+              .fillMaxWidth()
+              .padding(bottom = 8.dp)
+              .background(
+                  surfaceVariantColor.copy(alpha = 0.7f),
+                  RoundedCornerShape(12.dp)
+              )
+              .padding(horizontal = 12.dp, vertical = 8.dp),
+          verticalAlignment = Alignment.CenterVertically
+      ) {
+        Icon(
+            Icons.Default.Description,
+            contentDescription = null,
+            tint = EulerRed,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.width(8.dp))
         Text(
-            text = placeholder,
-            color = textSecondary,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Normal)
-      },
-      modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp).height(52.dp),
-      enabled = enabled,
-      singleLine = true,
-      textStyle =
-          MaterialTheme.typography.bodyMedium.copy(
-              fontSize = 15.sp, fontWeight = FontWeight.Normal),
-      trailingIcon = {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(end = 4.dp)) {
-              // Microphone button
-              IconButton(
-                  onClick = onMicClick,
-                  enabled = speechHelperAvailable && enabled,
-                  modifier = Modifier.size(40.dp).testTag(HomeTags.MicBtn)) {
-                    Icon(
-                        Icons.Default.Mic,
-                        contentDescription = Localization.t("dictate"),
-                        tint = textSecondary,
-                        modifier = Modifier.size(22.dp))
-                  }
+            text = fileName,
+            color = textPrimary,
+            fontSize = 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        IconButton(
+            onClick = onClearAttachment,
+            modifier = Modifier.size(24.dp)
+        ) {
+          Icon(
+              Icons.Default.Close,
+              contentDescription = "Remove attachment",
+              tint = textSecondary,
+              modifier = Modifier.size(16.dp)
+          )
+        }
+      }
+    }
 
-              // Voice mode / Send button - sized to match chatbox height with tiny margin (52dp -
-              // 9dp margin = 43dp)
-              Box(
-                  modifier = Modifier.size(43.dp).offset(y = (-1).dp),
-                  contentAlignment = Alignment.Center) {
-                    Crossfade(targetState = canSend, label = "voice-to-send-transition") {
-                        readyToSend ->
-                      if (!readyToSend) {
-                        // Voice mode button - circular with waveform icon
-                        Surface(
-                            onClick = onVoiceModeClick,
-                            modifier = Modifier.fillMaxSize().testTag(HomeTags.VoiceBtn),
-                            shape = CircleShape,
-                            color = textSecondary.copy(alpha = 0.2f),
-                            tonalElevation = 0.dp,
-                            shadowElevation = 0.dp) {
-                              Box(
-                                  modifier = Modifier.fillMaxSize(),
-                                  contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        Icons.Default.GraphicEq,
-                                        contentDescription = "Voice mode",
-                                        tint = textSecondary,
-                                        modifier = Modifier.size(18.dp))
-                                  }
-                            }
-                      } else {
-                        // Red send button - transitions from voice mode, matches chatbox height
-                        Surface(
-                            onClick = onSendClick,
-                            modifier = Modifier.fillMaxSize().testTag(HomeTags.SendBtn),
-                            shape = CircleShape,
-                            color = EulerRed,
-                            tonalElevation = 0.dp,
-                            shadowElevation = 0.dp) {
-                              Box(
-                                  modifier = Modifier.fillMaxSize(),
-                                  contentAlignment = Alignment.Center) {
-                                    if (isSending) {
-                                      CircularProgressIndicator(
-                                          strokeWidth = 2.dp,
-                                          modifier = Modifier.size(18.dp),
-                                          color = Color.White)
-                                    } else {
-                                      val icon =
-                                          try {
-                                            androidx.compose.material.icons.Icons.Rounded.Send
-                                          } catch (_: Throwable) {
-                                            androidx.compose.material.icons.Icons.Default.Send
-                                          }
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        placeholder = {
+          Text(
+              text = placeholder,
+              color = textSecondary,
+              fontSize = 15.sp,
+              fontWeight = FontWeight.Normal)
+        },
+        modifier = Modifier.fillMaxWidth().height(52.dp),
+        enabled = enabled,
+        singleLine = true,
+        textStyle =
+            MaterialTheme.typography.bodyMedium.copy(
+                fontSize = 15.sp, fontWeight = FontWeight.Normal),
+        leadingIcon = {
+          // Attachment button
+          IconButton(
+              onClick = onAttachClick,
+              enabled = enabled,
+              modifier = Modifier.size(40.dp)
+          ) {
+            Icon(
+                Icons.Default.AttachFile,
+                contentDescription = "Attach file",
+                tint = if (attachmentName != null) EulerRed else textSecondary,
+                modifier = Modifier.size(22.dp)
+            )
+          }
+        },
+        trailingIcon = {
+          Row(
+              horizontalArrangement = Arrangement.spacedBy(8.dp),
+              verticalAlignment = Alignment.CenterVertically,
+              modifier = Modifier.padding(end = 4.dp)) {
+                // Microphone button
+                IconButton(
+                    onClick = onMicClick,
+                    enabled = speechHelperAvailable && enabled,
+                    modifier = Modifier.size(40.dp).testTag(HomeTags.MicBtn)) {
+                      Icon(
+                          Icons.Default.Mic,
+                          contentDescription = Localization.t("dictate"),
+                          tint = textSecondary,
+                          modifier = Modifier.size(22.dp))
+                    }
+
+                // Voice mode / Send button - sized to match chatbox height with tiny margin (52dp -
+                // 9dp margin = 43dp)
+                Box(
+                    modifier = Modifier.size(43.dp).offset(y = (-1).dp),
+                    contentAlignment = Alignment.Center) {
+                      Crossfade(targetState = canSend, label = "voice-to-send-transition") {
+                          readyToSend ->
+                        if (!readyToSend) {
+                          // Voice mode button - circular with waveform icon
+                          Surface(
+                              onClick = onVoiceModeClick,
+                              modifier = Modifier.fillMaxSize().testTag(HomeTags.VoiceBtn),
+                              shape = CircleShape,
+                              color = textSecondary.copy(alpha = 0.2f),
+                              tonalElevation = 0.dp,
+                              shadowElevation = 0.dp) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center) {
                                       Icon(
-                                          imageVector = icon,
-                                          contentDescription = Localization.t("send"),
-                                          tint = Color.White,
+                                          Icons.Default.GraphicEq,
+                                          contentDescription = "Voice mode",
+                                          tint = textSecondary,
                                           modifier = Modifier.size(18.dp))
                                     }
-                                  }
-                            }
+                              }
+                        } else {
+                          // Red send button - transitions from voice mode, matches chatbox height
+                          Surface(
+                              onClick = onSendClick,
+                              modifier = Modifier.fillMaxSize().testTag(HomeTags.SendBtn),
+                              shape = CircleShape,
+                              color = EulerRed,
+                              tonalElevation = 0.dp,
+                              shadowElevation = 0.dp) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center) {
+                                      if (isSending) {
+                                        CircularProgressIndicator(
+                                            strokeWidth = 2.dp,
+                                            modifier = Modifier.size(18.dp),
+                                            color = Color.White)
+                                      } else {
+                                        val icon =
+                                            try {
+                                              androidx.compose.material.icons.Icons.Rounded.Send
+                                            } catch (_: Throwable) {
+                                              androidx.compose.material.icons.Icons.Default.Send
+                                            }
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = Localization.t("send"),
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp))
+                                      }
+                                    }
+                              }
+                        }
                       }
                     }
-                  }
-            }
-      },
-      shape = RoundedCornerShape(50.dp),
-      colors =
-          OutlinedTextFieldDefaults.colors(
-              focusedTextColor = textPrimary,
-              unfocusedTextColor = textPrimary,
-              disabledTextColor = textPrimary.copy(alpha = 0.6f),
-              cursorColor = textPrimary,
-              focusedPlaceholderColor = textSecondary,
-              unfocusedPlaceholderColor = textSecondary,
-              focusedBorderColor = textSecondary.copy(alpha = 0.5f),
-              unfocusedBorderColor = textSecondary.copy(alpha = 0.35f),
-              focusedContainerColor = surfaceVariantColor,
-              unfocusedContainerColor = surfaceVariantColor,
-              disabledContainerColor = surfaceVariantColor))
+              }
+        },
+        shape = RoundedCornerShape(50.dp),
+        colors =
+            OutlinedTextFieldDefaults.colors(
+                focusedTextColor = textPrimary,
+                unfocusedTextColor = textPrimary,
+                disabledTextColor = textPrimary.copy(alpha = 0.6f),
+                cursorColor = textPrimary,
+                focusedPlaceholderColor = textSecondary,
+                unfocusedPlaceholderColor = textSecondary,
+                focusedBorderColor = textSecondary.copy(alpha = 0.5f),
+                unfocusedBorderColor = textSecondary.copy(alpha = 0.35f),
+                focusedContainerColor = surfaceVariantColor,
+                unfocusedContainerColor = surfaceVariantColor,
+                disabledContainerColor = surfaceVariantColor))
+  }
 }
 
 /** Simple delete confirmation modal with "Delete chat?" title and Cancel/Delete buttons. */

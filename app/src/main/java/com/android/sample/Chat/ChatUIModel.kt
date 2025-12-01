@@ -13,16 +13,28 @@ enum class ChatType {
 }
 
 /**
+ * Attachment for a chat message (e.g., PDF for printing).
+ */
+data class ChatAttachment(
+    val fileName: String,
+    val mimeType: String,
+    val base64Data: String,
+    val sizeBytes: Long,
+    val printAccessToken: String? = null // OAuth token for EPFL Print (if connected)
+)
+
+/**
  * UI model for a single chat message.
  *
  * This is a presentation-layer model for Compose. It encodes who spoke, the display text, when it
- * was produced, and an optional flag for a “still generating” placeholder.
+ * was produced, and an optional flag for a "still generating" placeholder.
  *
  * @property id Stable unique ID (UUID recommended). Use as the LazyColumn `key`.
  * @property text Display text of the message (already formatted for UI if needed).
  * @property timestamp Epoch millis (System.currentTimeMillis) for ordering/labels.
  * @property type Speaker role (USER/AI) to drive alignment and styling.
- * @property isThinking True if this represents a “thinking/placeholder” entry.
+ * @property isThinking True if this represents a "thinking/placeholder" entry.
+ * @property attachment Optional file attachment (e.g., for print requests).
  */
 data class ChatUIModel(
     val id: String,
@@ -30,5 +42,6 @@ data class ChatUIModel(
     val timestamp: Long,
     val type: ChatType,
     val isThinking: Boolean = false,
-    val source: SourceMeta? = null
+    val source: SourceMeta? = null,
+    val attachment: ChatAttachment? = null
 )

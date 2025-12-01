@@ -755,7 +755,124 @@ export const indexChunksFn = europeFunctions.https.onCall(async (data: IndexChun
   }
 });
 
-export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerWithRagInput, context) => {
+// === PRINT INTENT DETECTION ===
+const PRINT_PATTERNS = [
+  /\b(print|imprimer?|imprime|impression|printer?)\b/i,
+  /\b(envoyer?\s+(à\s+l'?)?imprimante)\b/i,
+  /\b(send\s+to\s+printer)\b/i,
+];
+
+interface PrintIntentResult {
+  detected: boolean;
+  copies: number;
+  color: "bw" | "color";
+  duplex: boolean;
+}
+
+function detectPrintIntent(question: string, hasAttachment: boolean): PrintIntentResult {
+  if (!hasAttachment) {
+    return { detected: false, copies: 1, color: "bw", duplex: true };
+  }
+  
+  const isMatch = PRINT_PATTERNS.some(p => p.test(question));
+  if (!isMatch) {
+    return { detected: false, copies: 1, color: "bw", duplex: true };
+  }
+  
+  // Extract print options from natural language
+  let copies = 1;
+  const copiesMatch = question.match(/(\d+)\s*(copies?|exemplaires?)/i);
+  if (copiesMatch) {
+    copies = Math.min(parseInt(copiesMatch[1], 10), 20); // cap at 20
+  }
+  
+  const wantsColor = /\b(couleur|color|colou?r)\b/i.test(question);
+  const wantsBW = /\b(noir\s+et\s+blanc|n[&]?b|black\s*(and|&)?\s*white|b[&]?w)\b/i.test(question);
+  const color: "bw" | "color" = wantsColor && !wantsBW ? "color" : "bw";
+  
+  const wantsOneSided = /\b(recto|one[- ]?sided?|single[- ]?sided?)\b/i.test(question);
+  const duplex = !wantsOneSided;
+  
+  return { detected: true, copies, color, duplex };
+}
+
+interface AttachmentInput {
+  fileName: string;
+  mimeType: string;
+  base64Data: string;
+  printAccessToken?: string; // OAuth token for EPFL Print
+}
+
+// PocketCampus CloudPrint API configuration
+const POCKETCAMPUS_BASE_URL = "https://campus.epfl.ch/deploy/backend_proxy/14620";
+
+/**
+ * Submit a print job to PocketCampus CloudPrint API
+ */
+async function submitToPocketCampus(
+  accessToken: string,
+  fileBuffer: Buffer,
+  fileName: string,
+  mimeType: string,
+  options: { copies: number; color: "bw" | "color"; duplex: boolean }
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const FormData = (await import("form-data")).default;
+    const formData = new FormData();
+    
+    // Add file to form data
+    formData.append("file", fileBuffer, {
+      filename: fileName,
+      contentType: mimeType,
+    });
+    
+    // Add print options - based on discovered PocketCampus API
+    formData.append("printer", "myPrint");
+    formData.append("copies", String(options.copies));
+    formData.append("pageRange", "ENTIRE_DOCUMENT");
+    formData.append("paperSize", "4"); // A4
+    formData.append("duplex", options.duplex ? "1" : "none");
+    formData.append("color", options.color === "bw" ? "1" : "color");
+    formData.append("pagesPerSheet", "___NO__SELECTION__VALUE___");
+    formData.append("stapling", "___NO__SELECTION__VALUE___");
+    formData.append("holePunching", "___NO__SELECTION__VALUE___");
+    
+    const xhrId = Math.floor(Math.random() * 1000000);
+    const response = await fetch(
+      `${POCKETCAMPUS_BASE_URL}/js-cloudprint?xhrId=${xhrId}`,
+      {
+        method: "POST",
+        headers: {
+          ...formData.getHeaders(),
+          "Authorization": `Bearer ${accessToken}`,
+          "Accept": "application/json",
+        },
+        body: formData as any,
+      }
+    );
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.error("PocketCampus API error", { status: response.status, error: errorText });
+      
+      // Check if token expired (401/403) - client should refresh and retry
+      if (response.status === 401 || response.status === 403) {
+        return { success: false, error: "TOKEN_EXPIRED" };
+      }
+      
+      return { success: false, error: `API error: ${response.status}` };
+    }
+    
+    const result = await response.json();
+    logger.info("PocketCampus API success", { result });
+    return { success: true, message: "Print job submitted successfully" };
+  } catch (error) {
+    logger.error("PocketCampus API exception", { error: String(error) });
+    return { success: false, error: String(error) };
+  }
+}
+
+export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerWithRagInput & { attachment?: AttachmentInput }, context) => {
   try {
     const question = String(data?.question || "").trim();
     const topK = Number(data?.topK ?? 2);
@@ -763,10 +880,104 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
     const summary = typeof data?.summary === "string" ? data.summary : undefined;
     const recentTranscript =
       typeof (data as any)?.recentTranscript === "string" ? (data as any).recentTranscript : undefined;
+    const attachment = data?.attachment;
     // Get uid from auth context for schedule integration
     const uid = context.auth?.uid;
     
-    if (!question) throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
+    // Allow empty question if there's an attachment (for print-only requests)
+    if (!question && !attachment) {
+      throw new functions.https.HttpsError("invalid-argument", "Missing 'question' or attachment");
+    }
+
+    // === PRINT INTENT DETECTION ===
+    const printIntent = detectPrintIntent(question || "print", !!attachment);
+    if (printIntent.detected && attachment && uid) {
+      logger.info("answerWithRagFn.printIntentDetected", {
+        uid,
+        fileName: attachment.fileName,
+        mimeType: attachment.mimeType,
+        copies: printIntent.copies,
+        color: printIntent.color,
+        duplex: printIntent.duplex,
+      });
+
+      // Check if we have an access token for printing
+      const accessToken = attachment.printAccessToken;
+      
+      if (!accessToken) {
+        return {
+          reply: "Pour imprimer, vous devez d'abord connecter votre compte EPFL Print dans les paramètres de l'application (Connecteurs → EPFL Print).",
+          primary_url: null,
+          best_score: 0,
+          sources: [],
+          ed_intent_detected: false,
+          ed_intent: null,
+          print_intent_detected: true,
+          print_job_id: null,
+        };
+      }
+
+      // Decode the base64 file data
+      const fileBuffer = Buffer.from(attachment.base64Data, "base64");
+      
+      // Submit print job to PocketCampus CloudPrint API
+      const jobId = `job-${Date.now()}`;
+      const printResult = await submitToPocketCampus(
+        accessToken,
+        fileBuffer,
+        attachment.fileName,
+        attachment.mimeType,
+        {
+          copies: printIntent.copies,
+          color: printIntent.color,
+          duplex: printIntent.duplex,
+        }
+      );
+
+      // Store the print job in Firestore for tracking
+      await db.collection("users").doc(uid).collection("printJobs").add({
+        jobId,
+        fileName: attachment.fileName,
+        mimeType: attachment.mimeType,
+        copies: printIntent.copies,
+        color: printIntent.color,
+        duplex: printIntent.duplex,
+        status: printResult.success ? "submitted" : "failed",
+        error: printResult.error,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      if (!printResult.success) {
+        return {
+          reply: `❌ Échec de l'envoi à l'imprimante.\n\nErreur: ${printResult.error}\n\nVeuillez vérifier votre connexion EPFL Print dans les paramètres et réessayer.`,
+          primary_url: null,
+          best_score: 0,
+          sources: [],
+          ed_intent_detected: false,
+          ed_intent: null,
+          print_intent_detected: true,
+          print_job_id: null,
+        };
+      }
+
+      const optionsText = [
+        `${printIntent.copies} ${printIntent.copies > 1 ? "copies" : "copie"}`,
+        printIntent.color === "color" ? "couleur" : "noir et blanc",
+        printIntent.duplex ? "recto-verso" : "recto seul",
+      ].join(", ");
+
+      return {
+        reply: `✅ Document envoyé à l'impression !\n\n📄 **${attachment.fileName}**\n⚙️ Options: ${optionsText}\n\nRendez-vous à n'importe quelle imprimante EPFL, passez votre carte Camipro et sélectionnez "Secure Print" pour récupérer votre document.`,
+        primary_url: null,
+        best_score: 0,
+        sources: [],
+        ed_intent_detected: false,
+        ed_intent: null,
+        print_intent_detected: true,
+        print_job_id: jobId,
+      };
+    }
+    // === End Print Intent Detection ===
 
     // === ED Intent Detection (fast, regex-based) ===
     const edIntentResult = detectPostToEdIntentCore(question);
@@ -789,6 +1000,8 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
         sources: [],
         ed_intent_detected: true,
         ed_intent: edIntentResult.ed_intent,
+        print_intent_detected: false,
+        print_job_id: null,
       };
     }
     // === End ED Intent Detection ===
@@ -800,6 +1013,7 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
       hasTranscript: Boolean(recentTranscript),
       transcriptLen: recentTranscript ? recentTranscript.length : 0,
       hasUid: Boolean(uid),
+      hasAttachment: Boolean(attachment),
       topK,
       model: model ?? process.env.APERTUS_MODEL_ID!,
     });
@@ -808,6 +1022,8 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
       ...ragResult,
       ed_intent_detected: false,
       ed_intent: null,
+      print_intent_detected: false,
+      print_job_id: null,
     };
   } catch (e: any) {
     logger.error("answerWithRagFn.failed", { error: String(e) });
@@ -1957,3 +2173,13 @@ export const getFoodContextHttp = europeFunctions.https.onRequest(async (req, re
     res.status(500).json({ error: String(e) });
   }
 });
+
+// =============================================================================
+// EPFL PRINT FUNCTIONS
+// =============================================================================
+export { 
+  epflPrintExchangeTokenFn,
+  epflPrintSubmitJobFn,
+  epflPrintGetBalanceFn,
+  epflPrintRefreshTokenFn 
+} from "./print/epflPrintFunctions";

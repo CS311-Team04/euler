@@ -1,5 +1,6 @@
 package com.android.sample.home
 
+import com.android.sample.Chat.ChatAttachment
 import com.android.sample.Chat.ChatUIModel
 
 /**
@@ -13,6 +14,7 @@ data class HomeUiState(
     val systems: List<SystemItem> = emptyList(),
     val messages: List<ChatUIModel> = emptyList(),
     val messageDraft: String = "",
+    val pendingAttachment: ChatAttachment? = null,
     val streamingMessageId: String? = null,
     val streamingSequence: Int = 0,
     val isDrawerOpen: Boolean = false,
