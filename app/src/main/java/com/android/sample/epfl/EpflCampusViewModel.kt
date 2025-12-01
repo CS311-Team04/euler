@@ -163,24 +163,29 @@ class EpflCampusViewModel(
 
   /** Open EPFL Campus app or web */
   fun openEpflCampus(context: Context) {
-    // Try to open PocketCampus app first
-    val pocketCampusPackage = "org.pocketcampus.android.platform"
+    // Try to open EPFL Campus (PocketCampus) app first
+    val pocketCampusPackage = "org.pocketcampus"
 
     try {
+      // Check if the app is installed (requires <queries> in manifest for Android 11+)
+      context.packageManager.getPackageInfo(pocketCampusPackage, 0)
       val launchIntent = context.packageManager.getLaunchIntentForPackage(pocketCampusPackage)
       if (launchIntent != null) {
+        launchIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
         context.startActivity(launchIntent)
         return
       }
-    } catch (e: Exception) {
+    } catch (e: android.content.pm.PackageManager.NameNotFoundException) {
       // App not installed, fall through to web
+    } catch (e: Exception) {
+      // Other error, fall through to web
     }
 
-    // Fallback to IS-Academia web
+    // Fallback to EPFL Campus web
     try {
       val webIntent =
           Intent(Intent.ACTION_VIEW).apply {
-            data = Uri.parse("https://isa.epfl.ch/imoniteur_ISAP/!gedpublicreports.html")
+            data = Uri.parse("https://campus.epfl.ch")
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
           }
       context.startActivity(webIntent)
