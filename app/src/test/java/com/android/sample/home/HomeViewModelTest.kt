@@ -10,6 +10,7 @@ import com.android.sample.conversations.MessageDTO
 import com.android.sample.llm.BotReply
 import com.android.sample.llm.FakeLlmClient
 import com.android.sample.llm.LlmClient
+import com.android.sample.llm.SourceType
 import com.android.sample.profile.UserProfile
 import com.android.sample.util.MainDispatcherRule
 import com.google.android.gms.tasks.Tasks
@@ -414,7 +415,11 @@ class HomeViewModelTest {
         object : LlmClient {
           override suspend fun generateReply(prompt: String): BotReply =
               BotReply(
-                  "Voici un lien utile.", "https://www.epfl.ch/education/projects", false, null)
+                  "Voici un lien utile.",
+                  "https://www.epfl.ch/education/projects",
+                  SourceType.RAG,
+                  false,
+                  null)
         })
 
     viewModel.updateMessageDraft("Où trouver des projets ?")
