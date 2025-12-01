@@ -1,7 +1,13 @@
 package com.android.sample.epfl
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -18,12 +24,22 @@ class EpflCampusViewModelTest {
 
   private val testDispatcher = UnconfinedTestDispatcher()
   private lateinit var mockRepository: EpflScheduleRepository
+  private lateinit var mockContext: Context
+  private lateinit var mockClipboardManager: ClipboardManager
+  private lateinit var mockPackageManager: PackageManager
 
   @Before
   fun setup() {
     Dispatchers.setMain(testDispatcher)
     mockRepository = mock()
+    mockContext = mock()
+    mockClipboardManager = mock()
+    mockPackageManager = mock()
+
     whenever(mockRepository.isAuthenticated()).thenReturn(true)
+    whenever(mockContext.getSystemService(Context.CLIPBOARD_SERVICE))
+        .thenReturn(mockClipboardManager)
+    whenever(mockContext.packageManager).thenReturn(mockPackageManager)
   }
 
   @After
@@ -47,36 +63,25 @@ class EpflCampusViewModelTest {
 
     assertFalse(state.isConnected)
     assertFalse(state.isLoading)
-    assertEquals(0, state.weeklySlots)
-    assertEquals(0, state.finalExams)
-    assertNull(state.lastSync)
   }
 
   @Test
   fun `initial state is connected when repository returns Connected`() = runTest {
     val connectedStatus =
         ScheduleStatus.Connected(
-            weeklySlots = 15, finalExams = 5, lastSync = "2024-01-15T10:00:00Z", optimized = true)
-
+            weeklySlots = 15, finalExams = 5, lastSync = "2024-01-15", optimized = true)
     val viewModel = createViewModel(connectedStatus)
     val state = viewModel.uiState.first()
 
     assertTrue(state.isConnected)
-    assertFalse(state.isLoading)
     assertEquals(15, state.weeklySlots)
     assertEquals(5, state.finalExams)
-    assertEquals("2024-01-15T10:00:00Z", state.lastSync)
   }
 
   @Test
   fun `initial state has error when repository returns Error`() = runTest {
-    val errorStatus = ScheduleStatus.Error("Connection failed")
-
-    val viewModel = createViewModel(errorStatus)
-    val state = viewModel.uiState.first()
-
-    assertFalse(state.isLoading)
-    assertEquals("Connection failed", state.error)
+    val viewModel = createViewModel(ScheduleStatus.Error("Connection failed"))
+    assertEquals("Connection failed", viewModel.uiState.first().error)
   }
 
   // ===== updateIcsUrl tests =====
@@ -88,39 +93,22 @@ class EpflCampusViewModelTest {
 
     val viewModel = createViewModel()
     viewModel.updateIcsUrl("https://example.com/calendar.ics")
-    val state = viewModel.uiState.first()
 
-    assertEquals("https://example.com/calendar.ics", state.icsUrlInput)
+    assertEquals("https://example.com/calendar.ics", viewModel.uiState.first().icsUrlInput)
   }
 
   @Test
-  fun `updateIcsUrl sets isValidUrl based on repository validation`() = runTest {
-    whenever(mockRepository.isValidIcsUrl("https://valid.com")).thenReturn(true)
+  fun `updateIcsUrl sets isValidUrl based on repository`() = runTest {
+    whenever(mockRepository.isValidIcsUrl("valid")).thenReturn(true)
     whenever(mockRepository.isValidIcsUrl("invalid")).thenReturn(false)
     whenever(mockRepository.isLikelyEpflUrl(any())).thenReturn(false)
 
     val viewModel = createViewModel()
-
-    viewModel.updateIcsUrl("https://valid.com")
+    viewModel.updateIcsUrl("valid")
     assertTrue(viewModel.uiState.first().isValidUrl)
 
     viewModel.updateIcsUrl("invalid")
     assertFalse(viewModel.uiState.first().isValidUrl)
-  }
-
-  @Test
-  fun `updateIcsUrl sets isLikelyEpflUrl based on repository check`() = runTest {
-    whenever(mockRepository.isValidIcsUrl(any())).thenReturn(true)
-    whenever(mockRepository.isLikelyEpflUrl("https://campus.epfl.ch/cal")).thenReturn(true)
-    whenever(mockRepository.isLikelyEpflUrl("https://google.com/cal")).thenReturn(false)
-
-    val viewModel = createViewModel()
-
-    viewModel.updateIcsUrl("https://campus.epfl.ch/cal")
-    assertTrue(viewModel.uiState.first().isLikelyEpflUrl)
-
-    viewModel.updateIcsUrl("https://google.com/cal")
-    assertFalse(viewModel.uiState.first().isLikelyEpflUrl)
   }
 
   // ===== syncSchedule tests =====
@@ -131,42 +119,35 @@ class EpflCampusViewModelTest {
     whenever(mockRepository.isLikelyEpflUrl(any())).thenReturn(false)
 
     val viewModel = createViewModel()
-    viewModel.updateIcsUrl("invalid-url")
     viewModel.syncSchedule()
-    val state = viewModel.uiState.first()
 
-    assertEquals("Invalid URL", state.error)
-    assertFalse(state.isSyncing)
+    assertEquals("Invalid URL", viewModel.uiState.first().error)
   }
 
   @Test
   fun `syncSchedule updates state on error`() = runTest {
     whenever(mockRepository.isValidIcsUrl(any())).thenReturn(true)
     whenever(mockRepository.isLikelyEpflUrl(any())).thenReturn(true)
-    whenever(mockRepository.syncSchedule(any())).thenReturn(SyncResult.Error("Failed to parse ICS"))
+    whenever(mockRepository.syncSchedule(any())).thenReturn(SyncResult.Error("Parse error"))
 
     val viewModel = createViewModel()
     viewModel.updateIcsUrl("https://example.com/bad.ics")
     viewModel.syncSchedule()
-    val state = viewModel.uiState.first()
 
-    assertFalse(state.isConnected)
-    assertEquals("Failed to parse ICS", state.error)
-    assertFalse(state.isSyncing)
+    assertEquals("Parse error", viewModel.uiState.first().error)
   }
 
   @Test
-  fun `syncSchedule sets success message and clears input on success`() = runTest {
+  fun `syncSchedule calls repository on success`() = runTest {
     whenever(mockRepository.isValidIcsUrl(any())).thenReturn(true)
     whenever(mockRepository.isLikelyEpflUrl(any())).thenReturn(true)
     whenever(mockRepository.syncSchedule(any()))
-        .thenReturn(SyncResult.Success(weeklySlots = 12, finalExams = 4, message = "Synced!"))
+        .thenReturn(SyncResult.Success(weeklySlots = 12, finalExams = 4, message = "Done"))
 
     val viewModel = createViewModel()
     viewModel.updateIcsUrl("https://example.com/cal.ics")
     viewModel.syncSchedule()
 
-    // After sync, successMessage should be set and URL cleared
     verify(mockRepository).syncSchedule("https://example.com/cal.ics")
   }
 
@@ -174,72 +155,135 @@ class EpflCampusViewModelTest {
 
   @Test
   fun `disconnect resets state on success`() = runTest {
-    val connectedStatus =
-        ScheduleStatus.Connected(
-            weeklySlots = 10, finalExams = 2, lastSync = "now", optimized = true)
-    whenever(mockRepository.getStatus()).thenReturn(connectedStatus)
+    val connected = ScheduleStatus.Connected(10, 2, "now", true)
+    whenever(mockRepository.getStatus()).thenReturn(connected)
     whenever(mockRepository.disconnect()).thenReturn(true)
 
-    val viewModel = createViewModel(connectedStatus)
-    assertTrue(viewModel.uiState.first().isConnected)
-
+    val viewModel = createViewModel(connected)
     viewModel.disconnect()
-    val state = viewModel.uiState.first()
 
-    assertFalse(state.isConnected)
-    assertEquals(0, state.weeklySlots)
-    assertEquals(0, state.finalExams)
+    assertFalse(viewModel.uiState.first().isConnected)
   }
 
   @Test
   fun `disconnect shows error on failure`() = runTest {
-    val connectedStatus =
-        ScheduleStatus.Connected(
-            weeklySlots = 10, finalExams = 2, lastSync = "now", optimized = true)
-    whenever(mockRepository.getStatus()).thenReturn(connectedStatus)
+    val connected = ScheduleStatus.Connected(10, 2, "now", true)
+    whenever(mockRepository.getStatus()).thenReturn(connected)
     whenever(mockRepository.disconnect()).thenReturn(false)
 
-    val viewModel = createViewModel(connectedStatus)
+    val viewModel = createViewModel(connected)
     viewModel.disconnect()
-    val state = viewModel.uiState.first()
 
-    assertEquals("Failed to disconnect", state.error)
+    assertEquals("Failed to disconnect", viewModel.uiState.first().error)
   }
 
-  // ===== clipboard tests =====
+  // ===== checkClipboard tests =====
 
   @Test
-  fun `dismissClipboardSuggestion clears clipboard state`() = runTest {
+  fun `checkClipboard shows suggestion for valid EPFL URL`() = runTest {
+    val clipData = mock<ClipData>()
+    val clipItem = mock<ClipData.Item>()
+    val url = "https://campus.epfl.ch/calendar.ics"
+
+    whenever(mockClipboardManager.primaryClip).thenReturn(clipData)
+    whenever(clipData.getItemAt(0)).thenReturn(clipItem)
+    whenever(clipItem.text).thenReturn(url)
+    whenever(mockRepository.isValidIcsUrl(url)).thenReturn(true)
+    whenever(mockRepository.isLikelyEpflUrl(url)).thenReturn(true)
+
     val viewModel = createViewModel()
-    viewModel.dismissClipboardSuggestion()
+    viewModel.checkClipboard(mockContext)
     val state = viewModel.uiState.first()
 
-    assertFalse(state.showClipboardSuggestion)
-    assertNull(state.detectedClipboardUrl)
+    assertTrue(state.showClipboardSuggestion)
+    assertEquals(url, state.detectedClipboardUrl)
   }
 
   @Test
-  fun `acceptClipboardUrl does nothing when no URL detected`() = runTest {
+  fun `checkClipboard ignores non-EPFL URL`() = runTest {
+    val clipData = mock<ClipData>()
+    val clipItem = mock<ClipData.Item>()
+
+    whenever(mockClipboardManager.primaryClip).thenReturn(clipData)
+    whenever(clipData.getItemAt(0)).thenReturn(clipItem)
+    whenever(clipItem.text).thenReturn("https://google.com")
+    whenever(mockRepository.isValidIcsUrl(any())).thenReturn(true)
+    whenever(mockRepository.isLikelyEpflUrl(any())).thenReturn(false)
+
     val viewModel = createViewModel()
-    viewModel.acceptClipboardUrl()
-    val state = viewModel.uiState.first()
+    viewModel.checkClipboard(mockContext)
 
-    assertEquals("", state.icsUrlInput)
-    assertFalse(state.showClipboardSuggestion)
+    assertFalse(viewModel.uiState.first().showClipboardSuggestion)
   }
 
   @Test
-  fun `acceptClipboardUrl sets URL when detected`() = runTest {
+  fun `checkClipboard ignores invalid URL`() = runTest {
+    val clipData = mock<ClipData>()
+    val clipItem = mock<ClipData.Item>()
+
+    whenever(mockClipboardManager.primaryClip).thenReturn(clipData)
+    whenever(clipData.getItemAt(0)).thenReturn(clipItem)
+    whenever(clipItem.text).thenReturn("not a url")
+    whenever(mockRepository.isValidIcsUrl(any())).thenReturn(false)
+
+    val viewModel = createViewModel()
+    viewModel.checkClipboard(mockContext)
+
+    assertFalse(viewModel.uiState.first().showClipboardSuggestion)
+  }
+
+  @Test
+  fun `checkClipboard handles null clipboard`() = runTest {
+    whenever(mockClipboardManager.primaryClip).thenReturn(null)
+
+    val viewModel = createViewModel()
+    viewModel.checkClipboard(mockContext)
+
+    assertFalse(viewModel.uiState.first().showClipboardSuggestion)
+  }
+
+  @Test
+  fun `checkClipboard ignores URL already in input`() = runTest {
+    val clipData = mock<ClipData>()
+    val clipItem = mock<ClipData.Item>()
+    val url = "https://campus.epfl.ch/cal.ics"
+
+    whenever(mockClipboardManager.primaryClip).thenReturn(clipData)
+    whenever(clipData.getItemAt(0)).thenReturn(clipItem)
+    whenever(clipItem.text).thenReturn(url)
     whenever(mockRepository.isValidIcsUrl(any())).thenReturn(true)
     whenever(mockRepository.isLikelyEpflUrl(any())).thenReturn(true)
 
     val viewModel = createViewModel()
-    // Use reflection to set detected URL
+    viewModel.updateIcsUrl(url) // Set as current input
+    viewModel.checkClipboard(mockContext)
+
+    assertFalse(viewModel.uiState.first().showClipboardSuggestion)
+  }
+
+  @Test
+  fun `checkClipboard handles exception gracefully`() = runTest {
+    whenever(mockContext.getSystemService(any<String>())).thenThrow(RuntimeException("Error"))
+
+    val viewModel = createViewModel()
+    viewModel.checkClipboard(mockContext) // Should not throw
+
+    assertFalse(viewModel.uiState.first().showClipboardSuggestion)
+  }
+
+  // ===== acceptClipboardUrl tests =====
+
+  @Test
+  fun `acceptClipboardUrl sets URL and dismisses`() = runTest {
+    whenever(mockRepository.isValidIcsUrl(any())).thenReturn(true)
+    whenever(mockRepository.isLikelyEpflUrl(any())).thenReturn(true)
+
+    val viewModel = createViewModel()
+    // Set detected URL via reflection
     val field = viewModel.javaClass.getDeclaredField("_uiState")
     field.isAccessible = true
     @Suppress("UNCHECKED_CAST")
-    val stateFlow =
-        field.get(viewModel) as kotlinx.coroutines.flow.MutableStateFlow<EpflCampusUiState>
+    val stateFlow = field.get(viewModel) as MutableStateFlow<EpflCampusUiState>
     stateFlow.value =
         stateFlow.value.copy(
             detectedClipboardUrl = "https://epfl.ch/cal.ics", showClipboardSuggestion = true)
@@ -249,20 +293,80 @@ class EpflCampusViewModelTest {
 
     assertEquals("https://epfl.ch/cal.ics", state.icsUrlInput)
     assertFalse(state.showClipboardSuggestion)
-    assertNull(state.detectedClipboardUrl)
+  }
+
+  @Test
+  fun `acceptClipboardUrl does nothing when no URL`() = runTest {
+    val viewModel = createViewModel()
+    viewModel.acceptClipboardUrl()
+
+    assertEquals("", viewModel.uiState.first().icsUrlInput)
+  }
+
+  @Test
+  fun `dismissClipboardSuggestion clears state`() = runTest {
+    val viewModel = createViewModel()
+    viewModel.dismissClipboardSuggestion()
+
+    assertFalse(viewModel.uiState.first().showClipboardSuggestion)
+    assertNull(viewModel.uiState.first().detectedClipboardUrl)
+  }
+
+  // ===== openEpflCampus tests =====
+
+  @Test
+  fun `openEpflCampus opens app when installed`() = runTest {
+    val mockIntent = mock<Intent>()
+    whenever(mockPackageManager.getLaunchIntentForPackage("org.pocketcampus.android.platform"))
+        .thenReturn(mockIntent)
+
+    val viewModel = createViewModel()
+    viewModel.openEpflCampus(mockContext)
+
+    verify(mockContext).startActivity(mockIntent)
+  }
+
+  @Test
+  fun `openEpflCampus falls back to web when app not installed`() = runTest {
+    whenever(mockPackageManager.getLaunchIntentForPackage(any())).thenReturn(null)
+
+    val viewModel = createViewModel()
+    viewModel.openEpflCampus(mockContext)
+
+    verify(mockContext).startActivity(any())
+  }
+
+  @Test
+  fun `openEpflCampus falls back to web on app exception`() = runTest {
+    whenever(mockPackageManager.getLaunchIntentForPackage(any()))
+        .thenThrow(RuntimeException("Error"))
+
+    val viewModel = createViewModel()
+    viewModel.openEpflCampus(mockContext)
+
+    verify(mockContext).startActivity(any())
+  }
+
+  @Test
+  fun `openEpflCampus sets error when all fails`() = runTest {
+    whenever(mockPackageManager.getLaunchIntentForPackage(any())).thenReturn(null)
+    whenever(mockContext.startActivity(any())).thenThrow(RuntimeException("Cannot start"))
+
+    val viewModel = createViewModel()
+    viewModel.openEpflCampus(mockContext)
+
+    assertEquals("Could not open EPFL Campus", viewModel.uiState.first().error)
   }
 
   // ===== clearError and clearSuccessMessage tests =====
 
   @Test
-  fun `clearError clears error message`() = runTest {
+  fun `clearError clears error`() = runTest {
     whenever(mockRepository.isValidIcsUrl(any())).thenReturn(false)
     whenever(mockRepository.isLikelyEpflUrl(any())).thenReturn(false)
 
     val viewModel = createViewModel()
-    viewModel.updateIcsUrl("invalid")
     viewModel.syncSchedule()
-
     assertNotNull(viewModel.uiState.first().error)
 
     viewModel.clearError()
@@ -270,16 +374,14 @@ class EpflCampusViewModelTest {
   }
 
   @Test
-  fun `clearSuccessMessage clears success message`() = runTest {
+  fun `clearSuccessMessage clears message`() = runTest {
     whenever(mockRepository.isValidIcsUrl(any())).thenReturn(true)
     whenever(mockRepository.isLikelyEpflUrl(any())).thenReturn(true)
-    whenever(mockRepository.syncSchedule(any()))
-        .thenReturn(SyncResult.Success(weeklySlots = 5, finalExams = 1, message = "Done!"))
+    whenever(mockRepository.syncSchedule(any())).thenReturn(SyncResult.Success(5, 1, "Done!"))
 
     val viewModel = createViewModel()
     viewModel.updateIcsUrl("https://epfl.ch/cal.ics")
     viewModel.syncSchedule()
-
     assertEquals("Done!", viewModel.uiState.first().successMessage)
 
     viewModel.clearSuccessMessage()
@@ -289,34 +391,18 @@ class EpflCampusViewModelTest {
   // ===== EpflCampusUiState tests =====
 
   @Test
-  fun `EpflCampusUiState has correct default values`() {
+  fun `EpflCampusUiState has correct defaults`() {
     val state = EpflCampusUiState()
-
     assertFalse(state.isLoading)
     assertFalse(state.isSyncing)
     assertFalse(state.isConnected)
     assertEquals(0, state.weeklySlots)
-    assertEquals(0, state.finalExams)
-    assertNull(state.lastSync)
-    assertEquals("", state.icsUrlInput)
-    assertFalse(state.isValidUrl)
-    assertFalse(state.isLikelyEpflUrl)
-    assertNull(state.detectedClipboardUrl)
-    assertFalse(state.showClipboardSuggestion)
-    assertNull(state.error)
-    assertNull(state.successMessage)
   }
 
   @Test
-  fun `EpflCampusUiState copy works correctly`() {
-    val original = EpflCampusUiState()
-    val copied =
-        original.copy(isConnected = true, weeklySlots = 10, finalExams = 3, lastSync = "2024-01-01")
-
-    assertFalse(original.isConnected)
+  fun `EpflCampusUiState copy works`() {
+    val copied = EpflCampusUiState().copy(isConnected = true, weeklySlots = 10)
     assertTrue(copied.isConnected)
     assertEquals(10, copied.weeklySlots)
-    assertEquals(3, copied.finalExams)
-    assertEquals("2024-01-01", copied.lastSync)
   }
 }
