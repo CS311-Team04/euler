@@ -55,6 +55,14 @@ object Localization {
           "disconnect_confirm_message" to "Are you sure you want to disconnect %s?",
           "cancel" to "Cancel",
           "ed_connect_generic_error" to "Failed to connect to ED. Please try again.",
+          "ed_connect_invalid_credentials" to "Invalid credentials. Please check your API token.",
+          "ed_connect_api_unreachable" to "ED API is unreachable. Please check your connection.",
+          "settings_connectors_ed_title" to "Connect to ED",
+          "settings_connectors_ed_api_token_label" to "ED API token",
+          "settings_connectors_ed_base_url_label" to "Base URL (optional)",
+          "settings_connectors_ed_load_error" to "Failed to load ED connector status",
+          "settings_connectors_ed_status_error" to
+              "Unable to load ED connector status. Please try again later.",
 
           // Home Screen - Navigation
           "menu" to "Menu",
@@ -135,6 +143,16 @@ object Localization {
           "disconnect_confirm_message" to "Êtes-vous sûr de vouloir déconnecter %s?",
           "cancel" to "Annuler",
           "ed_connect_generic_error" to "La connexion à ED a échoué. Veuillez réessayer.",
+          "ed_connect_invalid_credentials" to
+              "Identifiants invalides. Veuillez vérifier votre jeton API.",
+          "ed_connect_api_unreachable" to
+              "L'API ED est inaccessible. Veuillez vérifier votre connexion.",
+          "settings_connectors_ed_title" to "Se connecter à ED",
+          "settings_connectors_ed_api_token_label" to "Jeton API ED",
+          "settings_connectors_ed_base_url_label" to "URL de base (optionnel)",
+          "settings_connectors_ed_load_error" to "Échec du chargement du statut du connecteur ED",
+          "settings_connectors_ed_status_error" to
+              "Impossible de charger le statut du connecteur ED. Veuillez réessayer plus tard.",
 
           // Home Screen - Navigation
           "menu" to "Menu",
@@ -215,6 +233,18 @@ object Localization {
           "disconnect_confirm_title" to "Trennen?",
           "disconnect_confirm_message" to "Möchten Sie %s wirklich trennen?",
           "cancel" to "Abbrechen",
+          "ed_connect_generic_error" to
+              "Verbindung zu ED fehlgeschlagen. Bitte versuchen Sie es erneut.",
+          "ed_connect_invalid_credentials" to
+              "Ungültige Anmeldedaten. Bitte überprüfen Sie Ihr API-Token.",
+          "ed_connect_api_unreachable" to
+              "ED-API ist nicht erreichbar. Bitte überprüfen Sie Ihre Verbindung.",
+          "settings_connectors_ed_title" to "Mit ED verbinden",
+          "settings_connectors_ed_api_token_label" to "ED API-Token",
+          "settings_connectors_ed_base_url_label" to "Basis-URL (optional)",
+          "settings_connectors_ed_load_error" to "Fehler beim Laden des ED-Connector-Status",
+          "settings_connectors_ed_status_error" to
+              "ED-Connector-Status konnte nicht geladen werden. Bitte versuchen Sie es später erneut.",
 
           // Home Screen - Navigation
           "menu" to "Menü",
@@ -295,6 +325,17 @@ object Localization {
           "disconnect_confirm_title" to "¿Desconectar?",
           "disconnect_confirm_message" to "¿Está seguro de que desea desconectar %s?",
           "cancel" to "Cancelar",
+          "ed_connect_generic_error" to "Error al conectar con ED. Por favor, inténtelo de nuevo.",
+          "ed_connect_invalid_credentials" to
+              "Credenciales inválidas. Por favor, verifique su token API.",
+          "ed_connect_api_unreachable" to
+              "La API de ED no es accesible. Por favor, verifique su conexión.",
+          "settings_connectors_ed_title" to "Conectar a ED",
+          "settings_connectors_ed_api_token_label" to "Token API de ED",
+          "settings_connectors_ed_base_url_label" to "URL base (opcional)",
+          "settings_connectors_ed_load_error" to "Error al cargar el estado del conector ED",
+          "settings_connectors_ed_status_error" to
+              "No se pudo cargar el estado del conector ED. Por favor, inténtelo más tarde.",
 
           // Home Screen - Navigation
           "menu" to "Menú",
@@ -375,6 +416,17 @@ object Localization {
           "disconnect_confirm_title" to "Disconnettere?",
           "disconnect_confirm_message" to "Sei sicuro di voler disconnettere %s?",
           "cancel" to "Annulla",
+          "ed_connect_generic_error" to "Connessione a ED fallita. Riprova.",
+          "ed_connect_invalid_credentials" to "Credenziali non valide. Controlla il tuo token API.",
+          "ed_connect_api_unreachable" to
+              "L'API ED non è raggiungibile. Controlla la tua connessione.",
+          "settings_connectors_ed_title" to "Connetti a ED",
+          "settings_connectors_ed_api_token_label" to "Token API ED",
+          "settings_connectors_ed_base_url_label" to "URL base (opzionale)",
+          "settings_connectors_ed_load_error" to
+              "Errore nel caricamento dello stato del connettore ED",
+          "settings_connectors_ed_status_error" to
+              "Impossibile caricare lo stato del connettore ED. Riprova più tardi.",
 
           // Home Screen - Navigation
           "menu" to "Menu",
@@ -455,6 +507,15 @@ object Localization {
           "disconnect_confirm_title" to "Desconectar?",
           "disconnect_confirm_message" to "Tem certeza de que deseja desconectar %s?",
           "cancel" to "Cancelar",
+          "ed_connect_generic_error" to "Falha ao conectar ao ED. Tente novamente.",
+          "ed_connect_invalid_credentials" to "Credenciais inválidas. Verifique seu token API.",
+          "ed_connect_api_unreachable" to "A API ED não está acessível. Verifique sua conexão.",
+          "settings_connectors_ed_title" to "Conectar ao ED",
+          "settings_connectors_ed_api_token_label" to "Token API do ED",
+          "settings_connectors_ed_base_url_label" to "URL base (opcional)",
+          "settings_connectors_ed_load_error" to "Falha ao carregar o status do conector ED",
+          "settings_connectors_ed_status_error" to
+              "Não foi possível carregar o status do conector ED. Tente novamente mais tarde.",
 
           // Home Screen - Navigation
           "menu" to "Menu",
@@ -535,6 +596,14 @@ object Localization {
           "disconnect_confirm_title" to "断开连接?",
           "disconnect_confirm_message" to "您确定要断开 %s 的连接吗?",
           "cancel" to "取消",
+          "ed_connect_generic_error" to "连接到 ED 失败。请重试。",
+          "ed_connect_invalid_credentials" to "凭据无效。请检查您的 API 令牌。",
+          "ed_connect_api_unreachable" to "ED API 无法访问。请检查您的连接。",
+          "settings_connectors_ed_title" to "连接到 ED",
+          "settings_connectors_ed_api_token_label" to "ED API 令牌",
+          "settings_connectors_ed_base_url_label" to "基础 URL（可选）",
+          "settings_connectors_ed_load_error" to "加载 ED 连接器状态失败",
+          "settings_connectors_ed_status_error" to "无法加载 ED 连接器状态。请稍后再试。",
 
           // Home Screen - Navigation
           "menu" to "菜单",

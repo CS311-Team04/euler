@@ -13,12 +13,16 @@ private const val FN_TEST = "edConnectorTestFn"
  * the backend.
  */
 open class EdConnectorRemoteDataSource(
-    private val functions: FirebaseFunctions? = null,
+    functions: FirebaseFunctions? = null,
 ) {
+  private val functions: FirebaseFunctions =
+      requireNotNull(functions) {
+        "FirebaseFunctions must not be null in EdConnectorRemoteDataSource"
+      }
 
   /** Gets the current ED connector status from the backend. */
   open suspend fun getStatus(): EdConnectorConfigRemote {
-    val result = functions!!.getHttpsCallable(FN_STATUS).call().await()
+    val result = functions.getHttpsCallable(FN_STATUS).call().await()
     return mapEdConnectorConfig(result.getData())
   }
 
@@ -32,19 +36,19 @@ open class EdConnectorRemoteDataSource(
       payload["baseUrl"] = baseUrl
     }
 
-    val result = functions!!.getHttpsCallable(FN_CONNECT).call(payload).await()
+    val result = functions.getHttpsCallable(FN_CONNECT).call(payload).await()
     return mapEdConnectorConfig(result.getData())
   }
 
   /** Disconnects the ED connector. */
   open suspend fun disconnect(): EdConnectorConfigRemote {
-    val result = functions!!.getHttpsCallable(FN_DISCONNECT).call().await()
+    val result = functions.getHttpsCallable(FN_DISCONNECT).call().await()
     return mapEdConnectorConfig(result.getData())
   }
 
   /** Tests the ED connector connection. */
   suspend fun test(): EdConnectorConfigRemote {
-    val result = functions!!.getHttpsCallable(FN_TEST).call().await()
+    val result = functions.getHttpsCallable(FN_TEST).call().await()
     return mapEdConnectorConfig(result.getData())
   }
 }

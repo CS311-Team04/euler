@@ -1,5 +1,6 @@
 package com.android.sample.settings.connectors
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.sample.settings.Localization
@@ -142,9 +143,10 @@ class ConnectorsViewModel(
           state.copy(connectors = updatedConnectors, isLoadingEd = false, edError = null)
         }
       } catch (e: Exception) {
+        Log.e("ConnectorsViewModel", "Failed to refresh ED connector status", e)
         _uiState.update { state ->
           state.copy(
-              isLoadingEd = false, edError = e.message ?: "Failed to load ED connector status")
+              isLoadingEd = false, edError = Localization.t("settings_connectors_ed_status_error"))
         }
       }
     }

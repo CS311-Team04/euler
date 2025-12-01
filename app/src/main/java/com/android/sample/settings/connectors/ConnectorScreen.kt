@@ -303,7 +303,7 @@ internal fun EdConnectDialog(
       onDismissRequest = { if (!isLoading) onDismiss() },
       title = {
         Text(
-            text = "Connect to ED",
+            text = Localization.t("settings_connectors_ed_title"),
             color = colors.textPrimary,
             fontSize = Dimens.DialogTitleFontSize,
             fontWeight = FontWeight.SemiBold,
@@ -315,7 +315,7 @@ internal fun EdConnectDialog(
           OutlinedTextField(
               value = token,
               onValueChange = { token = it },
-              label = { Text("ED API token") },
+              label = { Text(Localization.t("settings_connectors_ed_api_token_label")) },
               singleLine = true,
               enabled = !isLoading,
           )
@@ -324,7 +324,7 @@ internal fun EdConnectDialog(
           OutlinedTextField(
               value = baseUrl,
               onValueChange = { baseUrl = it },
-              label = { Text("Base URL (optional)") },
+              label = { Text(Localization.t("settings_connectors_ed_base_url_label")) },
               singleLine = true,
               enabled = !isLoading,
           )
@@ -354,7 +354,7 @@ internal fun EdConnectDialog(
                     modifier = Modifier.size(18.dp), strokeWidth = Dimens.CardBorderWidth)
               } else {
                 Text(
-                    "Connect",
+                    Localization.t("connect"),
                     color = colors.onPrimaryColor,
                     fontSize = Dimens.DialogTextFontSize,
                     fontWeight = FontWeight.SemiBold)
@@ -366,7 +366,7 @@ internal fun EdConnectDialog(
             onClick = { if (!isLoading) onDismiss() },
             shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
               Text(
-                  "Cancel",
+                  Localization.t("cancel"),
                   color = colors.textPrimary,
                   fontSize = Dimens.DialogTextFontSize,
                   fontWeight = FontWeight.Medium)

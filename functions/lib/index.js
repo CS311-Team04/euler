@@ -37,7 +37,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.edConnectorTestFn = exports.edConnectorDisconnectFn = exports.edConnectorConnectFn = exports.edConnectorStatusFn = exports.generateTitleFn = exports.answerWithRagHttp = exports.indexChunksHttp = exports.answerWithRagFn = exports.indexChunksFn = exports.ping = exports.onMessageCreate = void 0;
+exports.generateTitleFn = exports.answerWithRagHttp = exports.indexChunksHttp = exports.answerWithRagFn = exports.indexChunksFn = exports.ping = exports.onMessageCreate = void 0;
 exports.apertusChatFnCore = apertusChatFnCore;
 exports.generateTitleCore = generateTitleCore;
 exports.indexChunksCore = indexChunksCore;
@@ -50,9 +50,6 @@ const openai_1 = __importDefault(require("openai"));
 const node_crypto_1 = require("node:crypto");
 const functions = __importStar(require("firebase-functions/v1"));
 const firebase_admin_1 = __importDefault(require("firebase-admin"));
-const EdConnectorRepository_1 = require("./connectors/ed/EdConnectorRepository");
-const EdConnectorService_1 = require("./connectors/ed/EdConnectorService");
-const secretCrypto_1 = require("./security/secretCrypto");
 const europeFunctions = functions.region("europe-west6");
 /* ---------- helpers ---------- */
 function withV1(url) {
@@ -89,9 +86,6 @@ if (!firebase_admin_1.default.apps.length) {
     firebase_admin_1.default.initializeApp();
 }
 const db = firebase_admin_1.default.firestore();
-// ED Discussion connector (stored in Firestore under connectors_ed/{userId})
-const edConnectorRepository = new EdConnectorRepository_1.EdConnectorRepository(db);
-const edConnectorService = new EdConnectorService_1.EdConnectorService(edConnectorRepository, secretCrypto_1.encryptSecret, secretCrypto_1.decryptSecret, "https://eu.edstem.org/api");
 // Embeddings = Jina
 const EMBED_URL = withV1(process.env.EMBED_BASE_URL) + "/embeddings";
 const EMBED_KEY = process.env.EMBED_API_KEY;
@@ -452,7 +446,7 @@ async function answerWithRagCore({ question, topK, model, summary, recentTranscr
     const usedContextByModel = marker ? marker[1].toUpperCase() === "YES" : false;
     const reply = rawReply.replace(/\s*USED_CONTEXT=(YES|NO)\s*$/i, "").trim();
     // Only expose a URL when BOTH gates pass: we have chosen context and the model says it used it
-    const primary_url = (chosen.length > 0 || usedContextByModel) ? (chosen[0]?.url ?? null) : null;
+    const primary_url = (chosen.length > 0 && usedContextByModel) ? (chosen[0]?.url ?? null) : null;
     return {
         reply,
         primary_url,
@@ -618,13 +612,6 @@ function checkKey(req) {
         throw e;
     }
 }
-function requireAuth(context) {
-    const uid = context.auth?.uid;
-    if (!uid) {
-        throw new functions.https.HttpsError("unauthenticated", "Authentication is required");
-    }
-    return uid;
-}
 exports.indexChunksHttp = europeFunctions.https.onRequest(async (req, res) => {
     try {
         if (req.method !== "POST") {
@@ -659,70 +646,5 @@ exports.generateTitleFn = europeFunctions.https.onCall(async (data) => {
     if (!q)
         throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
     return await generateTitleCore({ question: q, model });
-});
-exports.edConnectorStatusFn = europeFunctions.https.onCall(async (_data, context) => {
-    const uid = requireAuth(context);
-    try {
-        const config = await edConnectorService.getStatus(uid);
-        return config;
-    }
-    catch (e) {
-        logger.error("edConnectorStatusFn.failed", {
-            uid,
-            error: String(e),
-        });
-        throw new functions.https.HttpsError("internal", "Failed to get ED connector status", String(e?.message || e));
-    }
-});
-exports.edConnectorConnectFn = europeFunctions.https.onCall(async (data, context) => {
-    const uid = requireAuth(context);
-    const apiToken = String(data?.apiToken || "").trim();
-    const baseUrl = typeof data?.baseUrl === "string" ? data.baseUrl : undefined;
-    if (!apiToken) {
-        throw new functions.https.HttpsError("invalid-argument", "Missing 'apiToken'");
-    }
-    try {
-        const config = await edConnectorService.connect(uid, {
-            apiToken,
-            baseUrl,
-        });
-        return config;
-    }
-    catch (e) {
-        logger.error("edConnectorConnectFn.failed", {
-            uid,
-            error: String(e),
-        });
-        throw new functions.https.HttpsError("internal", "Failed to connect ED connector", String(e?.message || e));
-    }
-});
-exports.edConnectorDisconnectFn = europeFunctions.https.onCall(async (_data, context) => {
-    const uid = requireAuth(context);
-    try {
-        await edConnectorService.disconnect(uid);
-        // For convenience, return a simple status the UI can use.
-        return { status: "not_connected" };
-    }
-    catch (e) {
-        logger.error("edConnectorDisconnectFn.failed", {
-            uid,
-            error: String(e),
-        });
-        throw new functions.https.HttpsError("internal", "Failed to disconnect ED connector", String(e?.message || e));
-    }
-});
-exports.edConnectorTestFn = europeFunctions.https.onCall(async (_data, context) => {
-    const uid = requireAuth(context);
-    try {
-        const config = await edConnectorService.test(uid);
-        return config;
-    }
-    catch (e) {
-        logger.error("edConnectorTestFn.failed", {
-            uid,
-            error: String(e),
-        });
-        throw new functions.https.HttpsError("internal", "Failed to test ED connector", String(e?.message || e));
-    }
 });
 //# sourceMappingURL=index.js.map
