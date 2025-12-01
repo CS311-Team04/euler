@@ -1,14 +1,34 @@
 package com.android.sample.settings.connectors
 
 import com.android.sample.epfl.EpflScheduleRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Test
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ConnectorsViewModelTest {
+
+  private val testDispatcher = UnconfinedTestDispatcher()
+
+  @Before
+  fun setup() {
+    Dispatchers.setMain(testDispatcher)
+  }
+
+  @After
+  fun teardown() {
+    Dispatchers.resetMain()
+  }
 
   private fun createViewModel(): ConnectorsViewModel {
     val mockRepository = mock<EpflScheduleRepository>()
