@@ -58,6 +58,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -107,7 +108,7 @@ fun EpflCampusConnectorScreen(
     onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
   }
 
-  Box(modifier = Modifier.fillMaxSize().background(background)) {
+  Box(modifier = Modifier.fillMaxSize().background(background).testTag("epfl_screen")) {
     Column(
         modifier =
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 100.dp)) {
@@ -115,12 +116,13 @@ fun EpflCampusConnectorScreen(
           Row(
               modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
               verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBackClick, modifier = Modifier.size(36.dp)) {
-                  Icon(
-                      imageVector = Icons.Filled.Close,
-                      contentDescription = Localization.t("close"),
-                      tint = textPrimary)
-                }
+                IconButton(
+                    onClick = onBackClick, modifier = Modifier.size(36.dp).testTag("back_button")) {
+                      Icon(
+                          imageVector = Icons.Filled.Close,
+                          contentDescription = Localization.t("close"),
+                          tint = textPrimary)
+                    }
                 Text(
                     text = Localization.t("epfl_campus_title"),
                     color = textPrimary,
@@ -144,7 +146,8 @@ fun EpflCampusConnectorScreen(
                 if (uiState.isLoading) {
                   // Loading state
                   Box(
-                      modifier = Modifier.fillMaxWidth().padding(32.dp),
+                      modifier =
+                          Modifier.fillMaxWidth().padding(32.dp).testTag("loading_indicator"),
                       contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = accentRed)
                       }
@@ -157,12 +160,13 @@ fun EpflCampusConnectorScreen(
                       surface = surface,
                       textPrimary = textPrimary,
                       textSecondary = textSecondary,
-                      accentGreen = accentGreen)
+                      accentGreen = accentGreen,
+                      modifier = Modifier.testTag("connected_card"))
 
                   // Disconnect button
                   OutlinedButton(
                       onClick = { viewModel.disconnect() },
-                      modifier = Modifier.fillMaxWidth(),
+                      modifier = Modifier.fillMaxWidth().testTag("disconnect_button"),
                       colors = ButtonDefaults.outlinedButtonColors(contentColor = accentRed),
                       border =
                           ButtonDefaults.outlinedButtonBorder.copy(
@@ -176,12 +180,13 @@ fun EpflCampusConnectorScreen(
                       }
                 } else {
                   // Not connected - show instructions and input
-                  InstructionsCard(surface, textPrimary, textSecondary)
+                  InstructionsCard(
+                      surface, textPrimary, textSecondary, Modifier.testTag("instructions_card"))
 
                   // Open EPFL Campus button
                   Button(
                       onClick = { viewModel.openEpflCampus(context) },
-                      modifier = Modifier.fillMaxWidth(),
+                      modifier = Modifier.fillMaxWidth().testTag("open_campus_button"),
                       colors = ButtonDefaults.buttonColors(containerColor = accentRed)) {
                         Icon(
                             Icons.Filled.OpenInNew,
@@ -212,7 +217,8 @@ fun EpflCampusConnectorScreen(
     // Clipboard suggestion banner
     AnimatedVisibility(
         visible = uiState.showClipboardSuggestion,
-        modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+        modifier =
+            Modifier.align(Alignment.BottomCenter).padding(16.dp).testTag("clipboard_banner"),
         enter = slideInVertically { it } + fadeIn(),
         exit = slideOutVertically { it } + fadeOut()) {
           ClipboardSuggestionBanner(
@@ -227,7 +233,8 @@ fun EpflCampusConnectorScreen(
     // Error snackbar
     uiState.error?.let { error ->
       Snackbar(
-          modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+          modifier =
+              Modifier.align(Alignment.BottomCenter).padding(16.dp).testTag("error_snackbar"),
           action = {
             TextButton(onClick = { viewModel.clearError() }) {
               Text("OK", color = colorScheme.inversePrimary)
@@ -240,7 +247,8 @@ fun EpflCampusConnectorScreen(
     // Success snackbar
     uiState.successMessage?.let { message ->
       Snackbar(
-          modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+          modifier =
+              Modifier.align(Alignment.BottomCenter).padding(16.dp).testTag("success_snackbar"),
           containerColor = accentGreen.copy(alpha = 0.9f),
           action = {
             TextButton(onClick = { viewModel.clearSuccessMessage() }) {
@@ -303,10 +311,11 @@ private fun ConnectedCard(
     surface: androidx.compose.ui.graphics.Color,
     textPrimary: androidx.compose.ui.graphics.Color,
     textSecondary: androidx.compose.ui.graphics.Color,
-    accentGreen: androidx.compose.ui.graphics.Color
+    accentGreen: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier
 ) {
   Card(
-      modifier = Modifier.fillMaxWidth(),
+      modifier = modifier.fillMaxWidth(),
       colors = CardDefaults.cardColors(containerColor = surface),
       shape = RoundedCornerShape(16.dp)) {
         Column(modifier = Modifier.padding(20.dp)) {
@@ -377,10 +386,11 @@ private fun ConnectedCard(
 private fun InstructionsCard(
     surface: androidx.compose.ui.graphics.Color,
     textPrimary: androidx.compose.ui.graphics.Color,
-    textSecondary: androidx.compose.ui.graphics.Color
+    textSecondary: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier
 ) {
   Card(
-      modifier = Modifier.fillMaxWidth(),
+      modifier = modifier.fillMaxWidth(),
       colors = CardDefaults.cardColors(containerColor = surface),
       shape = RoundedCornerShape(16.dp)) {
         Column(modifier = Modifier.padding(20.dp)) {
@@ -454,7 +464,7 @@ private fun IcsUrlInput(
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().testTag("url_input"),
         placeholder = {
           Text("https://campus.epfl.ch/deploy/...", color = textSecondary.copy(alpha = 0.5f))
         },
@@ -487,7 +497,7 @@ private fun IcsUrlInput(
 
     Button(
         onClick = onSync,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().testTag("connect_button"),
         enabled = isValid && !isSyncing,
         colors =
             ButtonDefaults.buttonColors(

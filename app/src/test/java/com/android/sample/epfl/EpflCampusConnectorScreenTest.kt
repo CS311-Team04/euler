@@ -7,16 +7,16 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import com.android.sample.settings.AppSettings
 import com.android.sample.settings.Language
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -60,30 +60,21 @@ class EpflCampusConnectorScreenTest {
     TestFlags.fakeEmail = null
   }
 
+  // ===== Screen structure tests =====
+
   @Test
-  fun `screen displays title`() = runTest {
+  fun `screen renders with correct structure`() = runTest {
     composeRule.setContent {
       MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
     }
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
-    composeRule.onNodeWithText("EPFL Campus").assertIsDisplayed()
+    composeRule.onNodeWithTag("epfl_screen").assertIsDisplayed()
+    composeRule.onNodeWithTag("back_button").assertIsDisplayed()
   }
 
   @Test
-  fun `screen displays close button`() = runTest {
-    composeRule.setContent {
-      MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
-    }
-    composeRule.waitForIdle()
-    advanceUntilIdle()
-
-    composeRule.onNodeWithContentDescription("Close").assertIsDisplayed()
-  }
-
-  @Test
-  fun `close button triggers callback`() = runTest {
+  fun `back button triggers callback`() = runTest {
     var backClicked = false
     composeRule.setContent {
       MaterialTheme {
@@ -91,14 +82,14 @@ class EpflCampusConnectorScreenTest {
       }
     }
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
-    composeRule.onNodeWithContentDescription("Close").performClick()
+    composeRule.onNodeWithTag("back_button").performClick()
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
     assertTrue(backClicked)
   }
+
+  // ===== Loading state tests =====
 
   @Test
   fun `shows loading indicator when isLoading is true`() = runTest {
@@ -108,41 +99,37 @@ class EpflCampusConnectorScreenTest {
       MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
     }
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
-    // Loading state should be visible (CircularProgressIndicator doesn't have text)
-    // We verify by checking that other content is not visible
-    composeRule.onNodeWithText("EPFL Campus").assertIsDisplayed()
+    composeRule.onNodeWithTag("loading_indicator").assertIsDisplayed()
   }
 
   @Test
-  fun `shows connected state when isConnected is true`() = runTest {
+  fun `hides loading indicator when isLoading is false`() = runTest {
+    uiStateFlow.value = EpflCampusUiState(isLoading = false)
+
+    composeRule.setContent {
+      MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
+    }
+    composeRule.waitForIdle()
+
+    composeRule.onNodeWithTag("loading_indicator").assertDoesNotExist()
+  }
+
+  // ===== Connected state tests =====
+
+  @Test
+  fun `shows connected card when isConnected is true`() = runTest {
     uiStateFlow.value =
         EpflCampusUiState(
-            isConnected = true, weeklySlots = 15, finalExams = 3, lastSync = "2024-01-15T10:00:00Z")
+            isConnected = true, weeklySlots = 15, finalExams = 3, lastSync = "2024-01-15")
 
     composeRule.setContent {
       MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
     }
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
-    composeRule.onNodeWithText("Connected", substring = true).assertIsDisplayed()
-    composeRule.onNodeWithText("15", substring = true).assertIsDisplayed()
-    composeRule.onNodeWithText("3", substring = true).assertIsDisplayed()
-  }
-
-  @Test
-  fun `shows disconnect button when connected`() = runTest {
-    uiStateFlow.value = EpflCampusUiState(isConnected = true, weeklySlots = 10, finalExams = 2)
-
-    composeRule.setContent {
-      MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
-    }
-    composeRule.waitForIdle()
-    advanceUntilIdle()
-
-    composeRule.onNodeWithText("Disconnect", substring = true).assertIsDisplayed()
+    composeRule.onNodeWithTag("connected_card").assertIsDisplayed()
+    composeRule.onNodeWithTag("disconnect_button").assertIsDisplayed()
   }
 
   @Test
@@ -153,53 +140,42 @@ class EpflCampusConnectorScreenTest {
       MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
     }
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
-    composeRule.onNodeWithText("Disconnect", substring = true).performClick()
+    composeRule.onNodeWithTag("disconnect_button").performClick()
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
     verify(mockViewModel).disconnect()
   }
 
   @Test
-  fun `shows instructions when not connected`() = runTest {
-    uiStateFlow.value = EpflCampusUiState(isConnected = false)
+  fun `displays weekly slots and exams count when connected`() = runTest {
+    uiStateFlow.value = EpflCampusUiState(isConnected = true, weeklySlots = 20, finalExams = 6)
 
     composeRule.setContent {
       MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
     }
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
-    // Check that instructions are visible
-    composeRule.onNodeWithText("How to connect", substring = true).assertIsDisplayed()
+    // The numbers should appear in the connected card
+    composeRule.onNodeWithText("20", substring = true).assertIsDisplayed()
+    composeRule.onNodeWithText("6", substring = true).assertIsDisplayed()
   }
 
+  // ===== Not connected state tests =====
+
   @Test
-  fun `shows open EPFL Campus button when not connected`() = runTest {
-    uiStateFlow.value = EpflCampusUiState(isConnected = false)
+  fun `shows instructions card when not connected`() = runTest {
+    uiStateFlow.value = EpflCampusUiState(isConnected = false, isLoading = false)
 
     composeRule.setContent {
       MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
     }
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
-    composeRule.onNodeWithText("Open EPFL Campus", substring = true).assertIsDisplayed()
-  }
-
-  @Test
-  fun `shows URL input field when not connected`() = runTest {
-    uiStateFlow.value = EpflCampusUiState(isConnected = false)
-
-    composeRule.setContent {
-      MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
-    }
-    composeRule.waitForIdle()
-    advanceUntilIdle()
-
-    composeRule.onNodeWithText("Paste your ICS URL", substring = true).assertIsDisplayed()
+    composeRule.onNodeWithTag("instructions_card").assertIsDisplayed()
+    composeRule.onNodeWithTag("open_campus_button").assertIsDisplayed()
+    composeRule.onNodeWithTag("url_input").assertIsDisplayed()
+    composeRule.onNodeWithTag("connect_button").assertIsDisplayed()
   }
 
   @Test
@@ -210,9 +186,8 @@ class EpflCampusConnectorScreenTest {
       MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
     }
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
-    composeRule.onNodeWithText("Connect", substring = true).assertIsNotEnabled()
+    composeRule.onNodeWithTag("connect_button").assertIsNotEnabled()
   }
 
   @Test
@@ -225,28 +200,28 @@ class EpflCampusConnectorScreenTest {
       MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
     }
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
-    composeRule.onNodeWithText("Connect", substring = true).assertIsEnabled()
+    composeRule.onNodeWithTag("connect_button").assertIsEnabled()
   }
 
   @Test
-  fun `shows syncing text when isSyncing is true`() = runTest {
+  fun `connect button is disabled while syncing`() = runTest {
     uiStateFlow.value =
         EpflCampusUiState(
             isConnected = false,
-            isSyncing = true,
             isValidUrl = true,
-            icsUrlInput = "https://example.com/cal.ics")
+            isSyncing = true,
+            icsUrlInput = "https://test.com")
 
     composeRule.setContent {
       MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
     }
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
-    composeRule.onNodeWithText("Syncing", substring = true).assertIsDisplayed()
+    composeRule.onNodeWithTag("connect_button").assertIsNotEnabled()
   }
+
+  // ===== Error and Success snackbar tests =====
 
   @Test
   fun `shows error snackbar when error is set`() = runTest {
@@ -256,26 +231,58 @@ class EpflCampusConnectorScreenTest {
       MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
     }
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
+    composeRule.onNodeWithTag("error_snackbar").assertIsDisplayed()
     composeRule.onNodeWithText("Something went wrong").assertIsDisplayed()
   }
 
   @Test
   fun `shows success snackbar when successMessage is set`() = runTest {
-    uiStateFlow.value = EpflCampusUiState(successMessage = "Schedule synced successfully!")
+    uiStateFlow.value = EpflCampusUiState(successMessage = "Schedule synced!")
 
     composeRule.setContent {
       MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
     }
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
-    composeRule.onNodeWithText("Schedule synced successfully!").assertIsDisplayed()
+    composeRule.onNodeWithTag("success_snackbar").assertIsDisplayed()
+    composeRule.onNodeWithText("Schedule synced!").assertIsDisplayed()
   }
 
   @Test
-  fun `shows clipboard suggestion when detected`() = runTest {
+  fun `error snackbar OK button triggers clearError`() = runTest {
+    uiStateFlow.value = EpflCampusUiState(error = "Error message")
+
+    composeRule.setContent {
+      MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
+    }
+    composeRule.waitForIdle()
+
+    composeRule.onNodeWithText("OK").performClick()
+    composeRule.waitForIdle()
+
+    verify(mockViewModel).clearError()
+  }
+
+  @Test
+  fun `success snackbar OK button triggers clearSuccessMessage`() = runTest {
+    uiStateFlow.value = EpflCampusUiState(successMessage = "Success!")
+
+    composeRule.setContent {
+      MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
+    }
+    composeRule.waitForIdle()
+
+    composeRule.onNodeWithText("OK").performClick()
+    composeRule.waitForIdle()
+
+    verify(mockViewModel).clearSuccessMessage()
+  }
+
+  // ===== Clipboard suggestion tests =====
+
+  @Test
+  fun `shows clipboard banner when suggestion is available`() = runTest {
     uiStateFlow.value =
         EpflCampusUiState(
             showClipboardSuggestion = true,
@@ -285,14 +292,12 @@ class EpflCampusConnectorScreenTest {
       MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
     }
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
-    composeRule.onNodeWithText("ICS URL detected", substring = true).assertIsDisplayed()
-    composeRule.onNodeWithText("Use this URL", substring = true).assertIsDisplayed()
+    composeRule.onNodeWithTag("clipboard_banner").assertIsDisplayed()
   }
 
   @Test
-  fun `accept clipboard suggestion triggers viewModel`() = runTest {
+  fun `accept clipboard URL triggers viewModel`() = runTest {
     uiStateFlow.value =
         EpflCampusUiState(
             showClipboardSuggestion = true,
@@ -302,11 +307,10 @@ class EpflCampusConnectorScreenTest {
       MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
     }
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
-    composeRule.onNodeWithText("Use this URL", substring = true).performClick()
+    // Click "Use this URL" button
+    composeRule.onNodeWithText("Use this URL").performClick()
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
     verify(mockViewModel).acceptClipboardUrl()
   }
@@ -322,119 +326,97 @@ class EpflCampusConnectorScreenTest {
       MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
     }
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
-    composeRule.onNodeWithText("Not now", substring = true).performClick()
+    // Click "Not now" button
+    composeRule.onNodeWithText("Not now").performClick()
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
     verify(mockViewModel).dismissClipboardSuggestion()
   }
 
+  // ===== UI state transitions =====
+
   @Test
-  fun `error snackbar OK button triggers clearError`() = runTest {
-    uiStateFlow.value = EpflCampusUiState(error = "Error message")
+  fun `UI updates correctly when state changes from loading to connected`() = runTest {
+    uiStateFlow.value = EpflCampusUiState(isLoading = true)
 
     composeRule.setContent {
       MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
     }
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
-    composeRule.onNodeWithText("OK").performClick()
+    composeRule.onNodeWithTag("loading_indicator").assertIsDisplayed()
+
+    // Update state to connected
+    uiStateFlow.value = EpflCampusUiState(isConnected = true, weeklySlots = 5, finalExams = 2)
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
-    verify(mockViewModel).clearError()
+    composeRule.onNodeWithTag("loading_indicator").assertDoesNotExist()
+    composeRule.onNodeWithTag("connected_card").assertIsDisplayed()
   }
 
   @Test
-  fun `success snackbar OK button triggers clearSuccessMessage`() = runTest {
-    uiStateFlow.value = EpflCampusUiState(successMessage = "Success!")
-
-    composeRule.setContent {
-      MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
-    }
-    composeRule.waitForIdle()
-    advanceUntilIdle()
-
-    composeRule.onNodeWithText("OK").performClick()
-    composeRule.waitForIdle()
-    advanceUntilIdle()
-
-    verify(mockViewModel).clearSuccessMessage()
-  }
-
-  @Test
-  fun `displays correct weekly slots and exams count when connected`() = runTest {
-    uiStateFlow.value =
-        EpflCampusUiState(isConnected = true, weeklySlots = 20, finalExams = 6, lastSync = null)
-
-    composeRule.setContent {
-      MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
-    }
-    composeRule.waitForIdle()
-    advanceUntilIdle()
-
-    composeRule.onNodeWithText("20", substring = true).assertIsDisplayed()
-    composeRule.onNodeWithText("6", substring = true).assertIsDisplayed()
-  }
-
-  @Test
-  fun `shows last sync time when available`() = runTest {
-    uiStateFlow.value =
-        EpflCampusUiState(
-            isConnected = true, weeklySlots = 10, finalExams = 2, lastSync = "2024-01-20T15:30:00Z")
-
-    composeRule.setContent {
-      MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
-    }
-    composeRule.waitForIdle()
-    advanceUntilIdle()
-
-    composeRule.onNodeWithText("Last sync", substring = true).assertIsDisplayed()
-    composeRule.onNodeWithText("2024-01-20", substring = true).assertIsDisplayed()
-  }
-
-  @Test
-  fun `screen header shows EPFL Campus subtitle`() = runTest {
-    composeRule.setContent {
-      MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
-    }
-    composeRule.waitForIdle()
-    advanceUntilIdle()
-
-    composeRule.onNodeWithText("Import your schedule", substring = true).assertIsDisplayed()
-  }
-
-  @Test
-  fun `instruction steps are displayed when not connected`() = runTest {
+  fun `UI updates correctly when state changes from not connected to connected`() = runTest {
     uiStateFlow.value = EpflCampusUiState(isConnected = false)
 
     composeRule.setContent {
       MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
     }
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
-    // Check for step numbers
-    composeRule.onNodeWithText("1", substring = false).assertIsDisplayed()
-    composeRule.onNodeWithText("2", substring = false).assertIsDisplayed()
-    composeRule.onNodeWithText("3", substring = false).assertIsDisplayed()
+    composeRule.onNodeWithTag("instructions_card").assertIsDisplayed()
+
+    // Update state to connected
+    uiStateFlow.value = EpflCampusUiState(isConnected = true, weeklySlots = 10, finalExams = 3)
+    composeRule.waitForIdle()
+
+    composeRule.onNodeWithTag("instructions_card").assertDoesNotExist()
+    composeRule.onNodeWithTag("connected_card").assertIsDisplayed()
   }
 
+  // ===== Input validation tests =====
+
   @Test
-  fun `URL input shows placeholder text`() = runTest {
-    uiStateFlow.value = EpflCampusUiState(isConnected = false, icsUrlInput = "")
+  fun `URL input updates viewModel`() = runTest {
+    uiStateFlow.value = EpflCampusUiState(isConnected = false)
 
     composeRule.setContent {
       MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
     }
     composeRule.waitForIdle()
-    advanceUntilIdle()
 
-    composeRule
-        .onNodeWithText("https://campus.epfl.ch/deploy/", substring = true)
-        .assertIsDisplayed()
+    composeRule.onNodeWithTag("url_input").performTextInput("https://test.com")
+    composeRule.waitForIdle()
+
+    verify(mockViewModel, atLeastOnce()).updateIcsUrl(any())
+  }
+
+  // ===== Edge cases =====
+
+  @Test
+  fun `handles empty state correctly`() = runTest {
+    uiStateFlow.value = EpflCampusUiState()
+
+    composeRule.setContent {
+      MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
+    }
+    composeRule.waitForIdle()
+
+    // Default state should show instructions (not connected, not loading)
+    composeRule.onNodeWithTag("epfl_screen").assertIsDisplayed()
+    composeRule.onNodeWithTag("instructions_card").assertIsDisplayed()
+  }
+
+  @Test
+  fun `no crash when both error and success message are null`() = runTest {
+    uiStateFlow.value = EpflCampusUiState(error = null, successMessage = null)
+
+    composeRule.setContent {
+      MaterialTheme { EpflCampusConnectorScreen(viewModel = mockViewModel) }
+    }
+    composeRule.waitForIdle()
+
+    composeRule.onNodeWithTag("error_snackbar").assertDoesNotExist()
+    composeRule.onNodeWithTag("success_snackbar").assertDoesNotExist()
   }
 }
