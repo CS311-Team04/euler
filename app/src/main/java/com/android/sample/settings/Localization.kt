@@ -218,8 +218,7 @@ object Localization {
           "epfl_exams" to "exams",
           "epfl_last_sync" to "Last sync",
           "epfl_disconnect" to "Disconnect",
-          "epfl_connected_info" to
-              "Your schedule is now connected to the AI assistant.",
+          "epfl_connected_info" to "Your schedule is now connected to the AI assistant.",
           "epfl_clipboard_detected" to "ICS URL detected!") + edTranslationsEn()
 
   private fun french() =
