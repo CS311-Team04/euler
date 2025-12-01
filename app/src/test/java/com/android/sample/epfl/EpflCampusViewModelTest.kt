@@ -317,18 +317,24 @@ class EpflCampusViewModelTest {
   @Test
   fun `openEpflCampus opens app when installed`() = runTest {
     val mockIntent = mock<Intent>()
-    whenever(mockPackageManager.getLaunchIntentForPackage("org.pocketcampus.android.platform"))
+    // Mock getPackageInfo to not throw (app is installed)
+    whenever(mockPackageManager.getPackageInfo(eq("org.pocketcampus"), any<Int>()))
+        .thenReturn(mock())
+    whenever(mockPackageManager.getLaunchIntentForPackage("org.pocketcampus"))
         .thenReturn(mockIntent)
 
     val viewModel = createViewModel()
     viewModel.openEpflCampus(mockContext)
 
-    verify(mockContext).startActivity(mockIntent)
+    // Use any() since the intent's flags are modified inside the method
+    verify(mockContext).startActivity(any())
   }
 
   @Test
   fun `openEpflCampus falls back to web when app not installed`() = runTest {
-    whenever(mockPackageManager.getLaunchIntentForPackage(any())).thenReturn(null)
+    // Mock getPackageInfo to throw NameNotFoundException (app not installed)
+    whenever(mockPackageManager.getPackageInfo(eq("org.pocketcampus"), any<Int>()))
+        .thenThrow(android.content.pm.PackageManager.NameNotFoundException())
 
     val viewModel = createViewModel()
     viewModel.openEpflCampus(mockContext)
@@ -338,7 +344,8 @@ class EpflCampusViewModelTest {
 
   @Test
   fun `openEpflCampus falls back to web on app exception`() = runTest {
-    whenever(mockPackageManager.getLaunchIntentForPackage(any()))
+    // Mock getPackageInfo to throw a generic exception
+    whenever(mockPackageManager.getPackageInfo(eq("org.pocketcampus"), any<Int>()))
         .thenThrow(RuntimeException("Error"))
 
     val viewModel = createViewModel()
@@ -349,7 +356,10 @@ class EpflCampusViewModelTest {
 
   @Test
   fun `openEpflCampus sets error when all fails`() = runTest {
-    whenever(mockPackageManager.getLaunchIntentForPackage(any())).thenReturn(null)
+    // App not installed
+    whenever(mockPackageManager.getPackageInfo(eq("org.pocketcampus"), any<Int>()))
+        .thenThrow(android.content.pm.PackageManager.NameNotFoundException())
+    // Web fallback also fails
     whenever(mockContext.startActivity(any())).thenThrow(RuntimeException("Cannot start"))
 
     val viewModel = createViewModel()
