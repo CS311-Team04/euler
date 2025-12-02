@@ -167,7 +167,27 @@ class FirebaseFunctionsLlmClientTest {
 
     override suspend fun generateReply(prompt: String): BotReply {
       prompts += prompt
-      return BotReply(reply, null, false, null)
+      return BotReply(reply, null, SourceType.NONE, false, null)
     }
+  }
+
+  // SourceType tests
+  @Test
+  fun `SourceType fromString returns SCHEDULE for schedule`() {
+    assertEquals(SourceType.SCHEDULE, SourceType.fromString("schedule"))
+    assertEquals(SourceType.SCHEDULE, SourceType.fromString("SCHEDULE"))
+  }
+
+  @Test
+  fun `SourceType fromString returns RAG for rag`() {
+    assertEquals(SourceType.RAG, SourceType.fromString("rag"))
+    assertEquals(SourceType.RAG, SourceType.fromString("RAG"))
+  }
+
+  @Test
+  fun `SourceType fromString returns NONE for unknown`() {
+    assertEquals(SourceType.NONE, SourceType.fromString("unknown"))
+    assertEquals(SourceType.NONE, SourceType.fromString(null))
+    assertEquals(SourceType.NONE, SourceType.fromString(""))
   }
 }
