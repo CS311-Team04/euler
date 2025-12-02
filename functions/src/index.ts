@@ -13,6 +13,7 @@ import { EdConnectorRepository } from "./connectors/ed/EdConnectorRepository";
 import { EdConnectorService } from "./connectors/ed/EdConnectorService";
 import { encryptSecret, decryptSecret } from "./security/secretCrypto";
 import { detectPostToEdIntentCore, buildEdIntentPromptForApertus } from "./edIntent";
+import { getMapContext, MapContextResult } from "./map/mapContextProvider";
 
 
 const europeFunctions = functions.region("europe-west6");
@@ -395,7 +396,10 @@ type AnswerWithRagInput = {
 };
 
 // Schedule-related question patterns
-const SCHEDULE_PATTERNS = /\b(horaire|schedule|timetable|cours|class|lecture|planning|agenda|calendrier|calendar|demain|tomorrow|aujourd'hui|today|cette semaine|this week|prochaine|next|quand|when|heure|time|salle|room|où|where|leçon|lesson)\b/i;
+const SCHEDULE_PATTERNS = /\b(horaire|schedule|timetable|cours|class|lecture|planning|agenda|calendrier|calendar|demain|tomorrow|aujourd'hui|today|cette semaine|this week|prochaine|next|quand|when|heure|time|salle|room|leçon|lesson)\b/i;
+
+// Map-related question patterns (additional check alongside intent detection)
+const MAP_PATTERNS = /\b(imprimante[s]?|distributeur[s]?|restaurant[s]?|cafét[ée]ria|bancomat|atm|plan|carte|où|localiser|trouver|aller|chemin|rolex|innovation\s+park|swisstech)\b/i;
 
 export async function answerWithRagCore({
   question, topK, model, summary, recentTranscript, uid, client,
@@ -418,6 +422,27 @@ export async function answerWithRagCore({
       }
     } catch (e) {
       logger.warn("answerWithRagCore.scheduleContextFailed", { error: String(e) });
+    }
+  }
+
+  // Check if this is a map-related question and fetch map context
+  let mapContext = "";
+  let mapResult: MapContextResult | null = null;
+  const isMapQuestion = MAP_PATTERNS.test(q);
+  
+  if (isMapQuestion) {
+    try {
+      mapResult = await getMapContext(q);
+      if (mapResult.detected && mapResult.context) {
+        mapContext = mapResult.context;
+        logger.info("answerWithRagCore.mapContext", {
+          intentType: mapResult.intentType,
+          building: mapResult.building,
+          contextLen: mapContext.length,
+        });
+      }
+    } catch (e) {
+      logger.warn("answerWithRagCore.mapContextFailed", { error: String(e) });
     }
   }
 
@@ -485,6 +510,10 @@ export async function answerWithRagCore({
   const scheduleInstructions = scheduleContext ? 
     "HORAIRE: Liste uniquement les cours demandés (tirets). Pas de commentaires après." : "";
 
+  // Build map-specific instructions if map context is present
+  const mapInstructions = mapContext ?
+    "PLAN/MAP: Utilise les données du plan EPFL ci-dessous pour répondre. Sois précis sur les localisations et le nombre d'éléments." : "";
+
   const prompt = [
     "Consigne: réponds brièvement et directement, sans introduction, sans méta‑commentaires et sans phrases de conclusion.",
     "Format:",
@@ -495,12 +524,14 @@ export async function answerWithRagCore({
     "- Si la question concerne l'utilisateur (section, identité, langue/préférences, horaire personnel), réponds UNIQUEMENT à partir du résumé/ fenêtre récente/ emploi du temps et ignore le contexte RAG.",
     "- Si le résumé contient des faits pertinents (ex.: section IC, langue, préférences), utilise‑les et ne redemande pas ces informations.",
     scheduleInstructions,
+    mapInstructions,
     trimmedSummary ? `\nRésumé conversationnel (à utiliser, ne pas afficher tel quel):\n${trimmedSummary}\n` : "",
     trimmedTranscript ? `Fenêtre récente (ne pas afficher):\n${trimmedTranscript}\n` : "",
     scheduleContext ? `\nEmploi du temps EPFL de l'utilisateur (UTILISER UNIQUEMENT CECI pour les questions d'horaire):\n${scheduleContext}\n` : "",
-    context && !scheduleContext ? `Contexte RAG:\n${context}\n` : "", // Only include RAG if NOT a schedule question
+    mapContext ? `\nDonnées du plan EPFL (UTILISER CECI pour les questions de localisation/orientation):\n${mapContext}\n` : "",
+    context && !scheduleContext && !mapContext ? `Contexte RAG:\n${context}\n` : "", // Only include RAG if NOT a schedule or map question
     `Question: ${question}`,
-    !scheduleContext ? "Si l'information n'est pas dans le résumé ni le contexte, dis que tu ne sais pas." : "",
+    !scheduleContext && !mapContext ? "Si l'information n'est pas dans le résumé ni le contexte, dis que tu ne sais pas." : "",
   ].filter(Boolean).join("\n");
 
   logger.info("answerWithRagCore.context", {
@@ -509,6 +540,9 @@ export async function answerWithRagCore({
     trimmedSummaryLen: trimmedSummary.length,
     hasTranscript: Boolean(trimmedTranscript),
     transcriptLen: trimmedTranscript.length,
+    hasMapContext: Boolean(mapContext),
+    mapContextLen: mapContext.length,
+    mapIntentType: mapResult?.intentType,
     titles: chosen.map(c => c.title).filter(Boolean).slice(0, 5),
     summaryHead: trimmedSummary.slice(0, 120),
   });
@@ -540,6 +574,9 @@ export async function answerWithRagCore({
     scheduleContext
       ? "Emploi du temps EPFL de l'utilisateur (utiliser pour questions d'horaire, cours, salles):\n" + scheduleContext
       : "",
+    mapContext
+      ? "Données du plan EPFL (utiliser pour questions de localisation, imprimantes, distributeurs, restaurants):\n" + mapContext
+      : "",
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -558,19 +595,22 @@ export async function answerWithRagCore({
   const rawReply = chat.choices?.[0]?.message?.content ?? "";
   const reply = rawReply.replace(/\s*USED_CONTEXT=(YES|NO)\s*$/i, "").trim();
 
-  // Determine source type: schedule takes priority over RAG for schedule questions
+  // Determine source type: schedule/map take priority over RAG
   const usedSchedule = isScheduleQuestion && scheduleContext.length > 0;
-  const usedRag = chosen.length > 0 && !usedSchedule;
+  const usedMap = mapResult?.detected && mapContext.length > 0;
+  const usedRag = chosen.length > 0 && !usedSchedule && !usedMap;
   
-  // source_type: "schedule" | "rag" | "none"
-  let source_type: "schedule" | "rag" | "none" = "none";
+  // source_type: "schedule" | "map" | "rag" | "none"
+  let source_type: "schedule" | "map" | "rag" | "none" = "none";
   if (usedSchedule) {
     source_type = "schedule";
+  } else if (usedMap) {
+    source_type = "map";
   } else if (usedRag) {
     source_type = "rag";
   }
 
-  // Only expose a URL when using RAG (not schedule)
+  // Only expose a URL when using RAG (not schedule/map)
   const primary_url = usedRag ? (chosen[0]?.url ?? null) : null;
 
   return {
@@ -578,7 +618,8 @@ export async function answerWithRagCore({
     primary_url,
     best_score: bestScore,
     sources: usedRag ? chosen.map((c, i) => ({ idx: i + 1, title: c.title, url: c.url, score: c.score })) : [],
-    source_type, // "schedule", "rag", or "none"
+    source_type, // "schedule", "map", "rag", or "none"
+    map_intent: usedMap ? mapResult?.intentType : undefined,
   };
 }
 
