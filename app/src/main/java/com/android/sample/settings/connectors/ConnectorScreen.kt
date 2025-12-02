@@ -1,14 +1,20 @@
 package com.android.sample.settings.connectors
 
+import android.annotation.SuppressLint
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,6 +23,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.android.sample.settings.AppSettings
 import com.android.sample.settings.AppearanceMode
@@ -165,8 +173,8 @@ fun ConnectorsScreen(
     Column(modifier = Modifier.fillMaxSize()) {
       ConnectorsTopBar(onBackClick = onBackClick, colors = connectorState.colors)
 
-      // Small indicator while testing/loading ED status
-      if (uiState.isLoadingEd) {
+      // Small indicator while testing/loading ED or Moodle status
+      if (uiState.isLoadingEd || uiState.isLoadingMoodle) {
         LinearProgressIndicator(
             modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.ScreenHorizontalPadding))
         Spacer(modifier = Modifier.height(Dimens.ScreenContentSpacing))
@@ -176,6 +184,20 @@ fun ConnectorsScreen(
 
       // ED error message (e.g.: "Failed to load ED connector status")
       uiState.edError?.let { errorText ->
+        Text(
+            text = errorText,
+            color = connectorState.colors.accentRed,
+            fontSize = Dimens.CardStatusFontSize,
+            textAlign = TextAlign.Center,
+            modifier =
+                Modifier.fillMaxWidth()
+                    .padding(
+                        horizontal = Dimens.ScreenHorizontalPadding,
+                        vertical = Dimens.CardStatusButtonSpacer))
+      }
+
+      // Moodle error message (e.g.: "Failed to load Moodle connector status")
+      uiState.moodleError?.let { errorText ->
         Text(
             text = errorText,
             color = connectorState.colors.accentRed,
@@ -223,6 +245,17 @@ fun ConnectorsScreen(
           error = uiState.edConnectError,
           onConfirm = { token, baseUrl -> viewModel.confirmEdConnect(token, baseUrl) },
           onDismiss = { viewModel.dismissEdConnectDialog() },
+      )
+    }
+
+    if (uiState.isMoodleConnectDialogOpen) {
+      MoodleConnectDialog(
+          colors = connectorState.colors,
+          isDark = connectorState.isDark,
+          isLoading = uiState.isMoodleConnecting,
+          error = uiState.moodleConnectError,
+          onConfirm = { baseUrl, token -> viewModel.confirmMoodleConnect(baseUrl, token) },
+          onDismiss = { viewModel.dismissMoodleConnectDialog() },
       )
     }
   }
@@ -374,6 +407,223 @@ internal fun EdConnectDialog(
       },
       containerColor = getDialogSurfaceColor(isDark),
       shape = RoundedCornerShape(Dimens.DialogCornerRadius))
+}
+
+/** Full-screen bottom sheet for Moodle WebView - stays within the app. */
+@OptIn(ExperimentalMaterial3Api::class)
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+internal fun MoodleConnectDialog(
+    colors: ConnectorsColors,
+    isDark: Boolean,
+    isLoading: Boolean,
+    error: String?,
+    onConfirm: (baseUrl: String, token: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+  val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+  var baseUrl by remember { mutableStateOf("https://euler-swent.moodlecloud.com") }
+  var token by remember { mutableStateOf("") }
+  var showTokenInput by remember { mutableStateOf(false) }
+
+  ModalBottomSheet(
+      onDismissRequest = { if (!isLoading) onDismiss() },
+      sheetState = sheetState,
+      containerColor = getDialogSurfaceColor(isDark),
+      dragHandle = {}) {
+        Column(
+            modifier =
+                Modifier.fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+              // Title bar
+              Row(
+                  modifier = Modifier.fillMaxWidth(),
+                  horizontalArrangement = Arrangement.SpaceBetween,
+                  verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = Localization.t("settings_connectors_moodle_title"),
+                        color = colors.textPrimary,
+                        fontSize = Dimens.DialogTitleFontSize,
+                        fontWeight = FontWeight.SemiBold)
+
+                    IconButton(onClick = { if (!isLoading) onDismiss() }) {
+                      Icon(
+                          Icons.Default.Close,
+                          contentDescription = Localization.t("close"),
+                          tint = colors.textPrimary)
+                    }
+                  }
+
+              if (!showTokenInput) {
+                Text(
+                    text = Localization.t("settings_connectors_moodle_webview_instructions"),
+                    color = colors.textSecondary,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(bottom = 4.dp))
+
+                // Full-screen WebView
+                AndroidView(
+                    factory = { context ->
+                      WebView(context).apply {
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.loadWithOverviewMode = false
+                        settings.useWideViewPort = true
+                        settings.builtInZoomControls = true
+                        settings.displayZoomControls = false
+                        settings.setSupportZoom(true)
+                        isVerticalScrollBarEnabled = true
+                        isHorizontalScrollBarEnabled = true
+                        settings.setSupportMultipleWindows(false)
+                        settings.javaScriptCanOpenWindowsAutomatically = false
+                        settings.cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
+                        settings.mixedContentMode =
+                            android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+
+                        isFocusable = true
+                        isFocusableInTouchMode = true
+                        isClickable = true
+                        isLongClickable = true
+
+                        webViewClient =
+                            object : WebViewClient() {
+                              override fun onPageFinished(view: WebView?, url: String?) {
+                                super.onPageFinished(view, url)
+                                view?.post {
+                                  view.requestFocus()
+                                  view.requestLayout()
+                                }
+                                if (url?.contains("/login/index.php") == true ||
+                                    url?.contains("/my/") == true) {
+                                  view?.loadUrl(
+                                      "$baseUrl/admin/settings.php?section=webservicetokens")
+                                }
+                              }
+
+                              override fun shouldOverrideUrlLoading(
+                                  view: WebView?,
+                                  request: android.webkit.WebResourceRequest?
+                              ): Boolean {
+                                return false
+                              }
+                            }
+
+                        loadUrl("$baseUrl/login/index.php")
+                      }
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .weight(1f)
+                            .background(
+                                colors.background.copy(alpha = 0.05f),
+                                RoundedCornerShape(8.dp)),
+                    update = { webView ->
+                      webView.settings.javaScriptEnabled = true
+                      webView.settings.setSupportZoom(true)
+                      webView.post { webView.requestFocus() }
+                    })
+
+                Button(
+                    onClick = { showTokenInput = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
+                      Text(
+                          Localization.t("settings_connectors_moodle_enter_token"),
+                          color = colors.onPrimaryColor,
+                          fontSize = Dimens.DialogTextFontSize,
+                          fontWeight = FontWeight.SemiBold)
+                    }
+                } else {
+                  // Token input fields
+                  OutlinedTextField(
+                      value = baseUrl,
+                      onValueChange = { baseUrl = it },
+                      label = { Text(Localization.t("settings_connectors_moodle_base_url_label")) },
+                      singleLine = true,
+                      enabled = !isLoading,
+                      modifier = Modifier.fillMaxWidth())
+
+                  OutlinedTextField(
+                      value = token,
+                      onValueChange = { token = it },
+                      label = { Text(Localization.t("settings_connectors_moodle_token_label")) },
+                      singleLine = true,
+                      enabled = !isLoading,
+                      modifier = Modifier.fillMaxWidth(),
+                      placeholder = {
+                        Text(Localization.t("settings_connectors_moodle_token_placeholder"))
+                      })
+
+                  Text(
+                      text = Localization.t("settings_connectors_moodle_token_instructions"),
+                      color = colors.textSecondary,
+                      fontSize = 12.sp,
+                      modifier = Modifier.padding(vertical = 4.dp))
+                }
+
+              if (!error.isNullOrBlank()) {
+                Text(
+                    text = error,
+                    color = colors.accentRed,
+                    fontSize = Dimens.DialogTextFontSize,
+                    textAlign = TextAlign.Start)
+              }
+
+              // Action buttons
+              if (showTokenInput) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                      TextButton(
+                          onClick = { if (!isLoading) onDismiss() },
+                          modifier = Modifier.weight(1f),
+                          shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
+                            Text(
+                                Localization.t("cancel"),
+                                color = colors.textPrimary,
+                                fontSize = Dimens.DialogTextFontSize,
+                                fontWeight = FontWeight.Medium)
+                          }
+
+                      Button(
+                          onClick = {
+                            val trimmedBaseUrl = baseUrl.trim()
+                            val trimmedToken = token.trim()
+                            if (trimmedBaseUrl.isNotBlank() && trimmedToken.isNotBlank()) {
+                              onConfirm(trimmedBaseUrl, trimmedToken)
+                            }
+                          },
+                          enabled = baseUrl.isNotBlank() && token.isNotBlank() && !isLoading,
+                          modifier = Modifier.weight(1f),
+                          shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
+                            if (isLoading) {
+                              CircularProgressIndicator(
+                                  modifier = Modifier.size(18.dp),
+                                  strokeWidth = Dimens.CardBorderWidth)
+                            } else {
+                              Text(
+                                  Localization.t("connect"),
+                                  color = colors.onPrimaryColor,
+                                  fontSize = Dimens.DialogTextFontSize,
+                                  fontWeight = FontWeight.SemiBold)
+                            }
+                          }
+                    }
+              } else {
+                TextButton(
+                    onClick = { if (!isLoading) onDismiss() },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
+                      Text(
+                          Localization.t("cancel"),
+                          color = colors.textPrimary,
+                          fontSize = Dimens.DialogTextFontSize,
+                          fontWeight = FontWeight.Medium)
+                    }
+              }
+            }
+      }
 }
 
 @Preview(showBackground = true, backgroundColor = previewBgColor)

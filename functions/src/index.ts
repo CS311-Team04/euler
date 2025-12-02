@@ -947,12 +947,9 @@ export const edConnectorTestFn = europeFunctions.https.onCall(
 import { MoodleConnectorRepository } from "./connectors/moodle/MoodleConnectorRepository";
 import { MoodleConnectorService } from "./connectors/moodle/MoodleConnectorService";
 
-// simple placeholder encryption for dev.
-const encrypt = (plain: string): string => plain; // todo
-const decrypt = (cipher: string): string => cipher; // to do
-
+// Use the same encryption as ED connector
 const moodleRepo = new MoodleConnectorRepository(db);
-const moodleService = new MoodleConnectorService(moodleRepo, encrypt, decrypt);
+const moodleService = new MoodleConnectorService(moodleRepo, encryptSecret, decryptSecret);
 // callable functions
 export const connectorsMoodleStatusFn = europeFunctions.https.onCall(
   async (data, context) => {

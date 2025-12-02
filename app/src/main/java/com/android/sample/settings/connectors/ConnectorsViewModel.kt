@@ -39,13 +39,18 @@ class ConnectorsViewModel(
     private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("europe-west6"),
     private val edRemoteDataSource: EdConnectorRemoteDataSource =
         EdConnectorRemoteDataSource(functions),
+    private val moodleRemoteDataSource: MoodleConnectorRemoteDataSource =
+        MoodleConnectorRemoteDataSource(functions),
 ) : ViewModel() {
   private val _uiState =
-      MutableStateFlow(ConnectorsUiState(connectors = mockConnectors, isLoadingEd = true))
+      MutableStateFlow(
+          ConnectorsUiState(
+              connectors = mockConnectors, isLoadingEd = true, isLoadingMoodle = true))
   val uiState: StateFlow<ConnectorsUiState> = _uiState.asStateFlow()
 
   init {
     refreshEdStatus()
+    refreshMoodleStatus()
   }
 
   /** Connects a connector (no confirmation needed). */
@@ -53,6 +58,12 @@ class ConnectorsViewModel(
     if (connectorId == "ed") {
       // For ED, open the connection dialog (token)
       _uiState.update { it.copy(isEdConnectDialogOpen = true, edConnectError = null) }
+      return
+    }
+
+    if (connectorId == "moodle") {
+      // For Moodle, open the connection dialog (WebView for seamless auth)
+      _uiState.update { it.copy(isMoodleConnectDialogOpen = true, moodleConnectError = null) }
       return
     }
 
@@ -78,6 +89,8 @@ class ConnectorsViewModel(
   fun disconnectConnector(connectorId: String) {
     if (connectorId == "ed") {
       disconnectEdConnector()
+    } else if (connectorId == "moodle") {
+      disconnectMoodleConnector()
     } else {
       _uiState.update { currentState ->
         currentState.copy(
@@ -211,6 +224,126 @@ class ConnectorsViewModel(
           state.copy(
               isEdConnecting = false,
               edConnectError = Localization.t("ed_connect_generic_error"),
+          )
+        }
+      }
+    }
+  }
+
+  /** Refreshes the Moodle connector status from the backend. */
+  private fun refreshMoodleStatus() {
+    viewModelScope.launch {
+      try {
+        // Indicate loading, reset Moodle error
+        _uiState.update { it.copy(isLoadingMoodle = true, moodleError = null) }
+
+        val config: MoodleConnectorConfigRemote = moodleRemoteDataSource.getStatus()
+
+        _uiState.update { state ->
+          val updatedConnectors =
+              state.connectors.map { connector ->
+                if (connector.id == "moodle") {
+                  connector.copy(
+                      isConnected = config.status == MoodleConnectorStatusRemote.CONNECTED)
+                } else {
+                  connector
+                }
+              }
+
+          state.copy(connectors = updatedConnectors, isLoadingMoodle = false, moodleError = null)
+        }
+      } catch (e: Exception) {
+        Log.e("ConnectorsViewModel", "Failed to refresh Moodle connector status", e)
+        _uiState.update { state ->
+          state.copy(
+              isLoadingMoodle = false,
+              moodleError = Localization.t("settings_connectors_moodle_status_error"))
+        }
+      }
+    }
+  }
+
+  private fun disconnectMoodleConnector() {
+    viewModelScope.launch {
+      _uiState.update { it.copy(pendingConnectorForDisconnect = null) }
+      try {
+        moodleRemoteDataSource.disconnect()
+        _uiState.update { current ->
+          current.copy(
+              connectors =
+                  current.connectors.map { connector ->
+                    if (connector.id == "moodle") {
+                      connector.copy(isConnected = false)
+                    } else {
+                      connector
+                    }
+                  })
+        }
+      } catch (_: Exception) {
+        // For now, we don't handle user-facing errors here yet.
+      }
+    }
+  }
+
+  /** Closes the Moodle connection dialog. */
+  fun dismissMoodleConnectDialog() {
+    _uiState.update { it.copy(isMoodleConnectDialogOpen = false, moodleConnectError = null) }
+  }
+
+  /** Confirms Moodle connection with base URL and token. */
+  fun confirmMoodleConnect(baseUrl: String, token: String) {
+    viewModelScope.launch {
+      // Indicate we are connecting
+      _uiState.update { it.copy(isMoodleConnecting = true, moodleConnectError = null) }
+
+      try {
+        val config = moodleRemoteDataSource.connect(baseUrl, token)
+        android.util.Log.d(
+            "MOODLE_CONNECT",
+            "config after connect: status=${config.status}, lastError=${config.lastError}")
+
+        if (config.status == MoodleConnectorStatusRemote.CONNECTED) {
+          // Success: set Moodle to "connected" and close the dialog
+          _uiState.update { state ->
+            val updatedConnectors =
+                state.connectors.map { connector ->
+                  if (connector.id == "moodle") {
+                    connector.copy(isConnected = true)
+                  } else {
+                    connector
+                  }
+                }
+
+            state.copy(
+                connectors = updatedConnectors,
+                isMoodleConnecting = false,
+                isMoodleConnectDialogOpen = false,
+                moodleConnectError = null,
+            )
+          }
+        } else {
+          // Backend returned ERROR
+          _uiState.update { state ->
+            val friendlyMessageKey =
+                when (config.lastError) {
+                  "invalid_credentials" -> "moodle_connect_invalid_credentials"
+                  "api_unreachable" -> "moodle_connect_api_unreachable"
+                  else -> "moodle_connect_generic_error"
+                }
+            val friendlyMessage = Localization.t(friendlyMessageKey)
+
+            state.copy(
+                isMoodleConnecting = false,
+                moodleConnectError = friendlyMessage,
+            )
+          }
+        }
+      } catch (e: Exception) {
+        // Network error / other
+        _uiState.update { state ->
+          state.copy(
+              isMoodleConnecting = false,
+              moodleConnectError = Localization.t("moodle_connect_generic_error"),
           )
         }
       }

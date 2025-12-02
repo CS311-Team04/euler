@@ -12,4 +12,9 @@ data class ConnectorsUiState(
     val isEdConnectDialogOpen: Boolean = false,
     val isEdConnecting: Boolean = false,
     val edConnectError: String? = null,
+    val isLoadingMoodle: Boolean = false,
+    val moodleError: String? = null,
+    val isMoodleConnectDialogOpen: Boolean = false,
+    val isMoodleConnecting: Boolean = false,
+    val moodleConnectError: String? = null,
 )
