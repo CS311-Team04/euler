@@ -5,14 +5,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.sample.settings.Localization
 import com.google.firebase.functions.FirebaseFunctions
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withContext
 
 /** Mock data for connectors. In the future, this will come from a repository. */
 private val mockConnectors =
@@ -374,15 +372,17 @@ class ConnectorsViewModel(
       }
 
       // Token fetched successfully, now connect
-      val token = tokenResult.getOrNull() ?: run {
-        _uiState.update { state ->
-          state.copy(
-              isMoodleConnecting = false,
-              moodleConnectError = Localization.t("moodle_connect_generic_error"),
-          )
-        }
-        return@launch
-      }
+      val token =
+          tokenResult.getOrNull()
+              ?: run {
+                _uiState.update { state ->
+                  state.copy(
+                      isMoodleConnecting = false,
+                      moodleConnectError = Localization.t("moodle_connect_generic_error"),
+                  )
+                }
+                return@launch
+              }
       confirmMoodleConnect(baseUrl, token)
     }
   }
