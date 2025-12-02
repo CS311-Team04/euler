@@ -5,18 +5,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.sample.settings.Localization
 import com.google.firebase.functions.FirebaseFunctions
-import com.google.gson.Gson
-import com.google.gson.annotations.SerializedName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import java.net.URLEncoder
 
 /** Mock data for connectors. In the future, this will come from a repository. */
 private val mockConnectors =
@@ -297,17 +293,9 @@ class ConnectorsViewModel(
     _uiState.update { it.copy(isMoodleConnectDialogOpen = false, moodleConnectError = null) }
   }
 
-  /** Data class for Moodle token API response. */
-  private data class MoodleTokenResponse(
-      @SerializedName("token") val token: String?,
-      @SerializedName("privatetoken") val privatetoken: String?,
-      @SerializedName("error") val error: String?,
-      @SerializedName("errorcode") val errorCode: String?
-  )
-
   /**
-   * Fetches a Moodle token using username and password.
-   * Calls the Moodle token endpoint: /login/token.php
+   * Fetches a Moodle token using username and password via Firebase Function.
+   * This is more secure as credentials are sent server-side only.
    */
   suspend fun fetchMoodleToken(
       baseUrl: String,
@@ -315,53 +303,38 @@ class ConnectorsViewModel(
       password: String
   ): Result<String> = withContext(Dispatchers.IO) {
     try {
-      // Normalize baseUrl (remove trailing slash)
-      val normalizedBaseUrl = baseUrl.trimEnd('/')
+      val functions = FirebaseFunctions.getInstance("europe-west6")
+      val fetchTokenFn = functions.getHttpsCallable("connectorsMoodleFetchTokenFn")
       
-      // Build token endpoint URL
-      val tokenUrl =
-          "$normalizedBaseUrl/login/token.php?username=${URLEncoder.encode(username, "UTF-8")}&password=${URLEncoder.encode(password, "UTF-8")}&service=moodle_mobile_app"
+      val data = hashMapOf(
+          "baseUrl" to baseUrl.trim(),
+          "username" to username.trim(),
+          "password" to password.trim()
+      )
       
-      Log.d("MOODLE_TOKEN", "Fetching token from: $tokenUrl")
+      Log.d("MOODLE_TOKEN", "Fetching token via Firebase Function")
       
-      // Make HTTP request
-      val client = OkHttpClient()
-      val request = Request.Builder().url(tokenUrl).get().build()
+      val result = fetchTokenFn.call(data).await()
+      val responseData = result.getData() as? Map<*, *>
+      val token = responseData?.get("token") as? String
       
-      val response = client.newCall(request).execute()
-      val responseBody = response.body?.string()
-      
-      if (!response.isSuccessful || responseBody == null) {
-        Log.e("MOODLE_TOKEN", "Failed to fetch token: ${response.code} - $responseBody")
-        return@withContext Result.failure(
-            Exception("Failed to fetch token: HTTP ${response.code}"))
-      }
-      
-      Log.d("MOODLE_TOKEN", "Token response: $responseBody")
-      
-      // Parse JSON response
-      val gson = Gson()
-      val tokenResponse = gson.fromJson(responseBody, MoodleTokenResponse::class.java)
-      
-      // Check for errors in response
-      if (tokenResponse.error != null) {
-        Log.e("MOODLE_TOKEN", "Moodle error: ${tokenResponse.error} (${tokenResponse.errorCode})")
-        return@withContext Result.failure(
-            Exception("Moodle error: ${tokenResponse.error}"))
-      }
-      
-      // Extract token (use 'token' field, not 'privatetoken')
-      val token = tokenResponse.token
       if (token.isNullOrBlank()) {
-        Log.e("MOODLE_TOKEN", "No token in response")
+        Log.e("MOODLE_TOKEN", "No token in Firebase Function response")
         return@withContext Result.failure(Exception("No token received from Moodle"))
       }
       
       Log.d("MOODLE_TOKEN", "Successfully fetched token: ${token.take(10)}...")
       Result.success(token)
     } catch (e: Exception) {
-      Log.e("MOODLE_TOKEN", "Exception fetching token", e)
-      Result.failure(e)
+      Log.e("MOODLE_TOKEN", "Exception fetching token via Firebase Function", e)
+      // Extract user-friendly error message
+      val errorMessage = when {
+        e.message?.contains("unauthenticated") == true -> "Authentication required"
+        e.message?.contains("invalid-argument") == true -> "Invalid credentials"
+        e.message?.contains("Failed to fetch token") == true -> "Invalid credentials or Moodle server error"
+        else -> e.message ?: "Failed to fetch token"
+      }
+      Result.failure(Exception(errorMessage))
     }
   }
 

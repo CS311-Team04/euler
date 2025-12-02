@@ -968,6 +968,87 @@ export const connectorsMoodleStatusFn = europeFunctions.https.onCall(
     };
   }
 );
+
+// Fetches a Moodle token using username and password (server-side for security)
+export const connectorsMoodleFetchTokenFn = europeFunctions.https.onCall(
+  async (
+    data: { baseUrl: string; username: string; password: string },
+    context
+  ) => {
+    if (!context.auth?.uid) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "User must be authenticated"
+      );
+    }
+
+    const { baseUrl, username, password } = data;
+
+    // Validate inputs
+    if (!baseUrl || !username || !password) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "baseUrl, username, and password are required"
+      );
+    }
+
+    try {
+      // Normalize baseUrl (remove trailing slash)
+      const normalizedBaseUrl = baseUrl.trim().replace(/\/$/, "");
+
+      // Build token endpoint URL - credentials sent server-side only
+      const tokenUrl = `${normalizedBaseUrl}/login/token.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&service=moodle_mobile_app`;
+
+      logger.info("Fetching Moodle token", {
+        baseUrl: normalizedBaseUrl,
+        userId: context.auth.uid,
+      });
+
+      // Call Moodle API server-side (credentials never exposed to client)
+      const response = await fetch(tokenUrl);
+      const responseBody = await response.json();
+
+      if (!response.ok || responseBody.error) {
+        const errorMsg = responseBody.error || `HTTP ${response.status}`;
+        logger.error("Failed to fetch Moodle token", {
+          error: errorMsg,
+          userId: context.auth.uid,
+        });
+        throw new functions.https.HttpsError(
+          "internal",
+          "Failed to fetch token from Moodle",
+          errorMsg
+        );
+      }
+
+      if (!responseBody.token) {
+        logger.error("No token in Moodle response", {
+          userId: context.auth.uid,
+        });
+        throw new functions.https.HttpsError(
+          "internal",
+          "No token received from Moodle"
+        );
+      }
+
+      // Return only the token (credentials never returned to client)
+      return { token: responseBody.token };
+    } catch (e: any) {
+      if (e instanceof functions.https.HttpsError) {
+        throw e;
+      }
+      logger.error("Exception fetching Moodle token", {
+        error: String(e),
+        userId: context.auth.uid,
+      });
+      throw new functions.https.HttpsError(
+        "internal",
+        "Failed to fetch token from Moodle",
+        String(e?.message || e)
+      );
+    }
+  }
+);
 // attempts to connect to Moodle with provided baseUrl and token
 export const connectorsMoodleConnectFn = europeFunctions.https.onCall(
   async (data, context) => {
