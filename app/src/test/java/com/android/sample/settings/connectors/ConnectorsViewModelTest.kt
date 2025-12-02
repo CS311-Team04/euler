@@ -7,12 +7,13 @@ import com.google.firebase.functions.HttpsCallableResult
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkStatic
+import com.android.sample.util.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -56,6 +57,8 @@ private class MockEdConnectorRemoteDataSource :
 @RunWith(RobolectricTestRunner::class)
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConnectorsViewModelTest {
+
+  @get:Rule val dispatcherRule = MainDispatcherRule()
 
   private fun createViewModel(): ConnectorsViewModel {
     // We don't need a real FirebaseFunctions instance since we override all methods
@@ -305,13 +308,10 @@ class ConnectorsViewModelTest {
   }
 
   @Test
-  fun `connectMoodleWithCredentials fetches token and connects successfully`() = runTest {
+  fun `connectMoodleWithCredentials fetches token and connects successfully`() =
+      runTest(dispatcherRule.dispatcher) {
     val mockFunctions = mockk<FirebaseFunctions>(relaxed = true)
     val mockMoodleDataSource = mockk<MoodleConnectorRemoteDataSource>(relaxed = true)
-
-    // Mock Firebase Functions static method
-    mockkStatic(FirebaseFunctions::class)
-    every { FirebaseFunctions.getInstance(any<String>()) } returns mockFunctions
 
     val mockCallable = mockk<HttpsCallableReference>(relaxed = true)
     val mockResult = mockk<HttpsCallableResult>(relaxed = true)
@@ -337,7 +337,7 @@ class ConnectorsViewModelTest {
         password = "testpass")
     advanceUntilIdle()
 
-    val uiState = viewModel.uiState.first()
+    val uiState = viewModel.uiState.value
     assertTrue(uiState.connectors.find { it.id == "moodle" }!!.isConnected)
     assertFalse(uiState.isMoodleConnecting)
     assertFalse(uiState.isMoodleConnectDialogOpen)
@@ -345,13 +345,10 @@ class ConnectorsViewModelTest {
   }
 
   @Test
-  fun `connectMoodleWithCredentials handles token fetch failure`() = runTest {
+  fun `connectMoodleWithCredentials handles token fetch failure`() =
+      runTest(dispatcherRule.dispatcher) {
     val mockFunctions = mockk<FirebaseFunctions>(relaxed = true)
     val mockMoodleDataSource = mockk<MoodleConnectorRemoteDataSource>(relaxed = true)
-
-    // Mock Firebase Functions static method
-    mockkStatic(FirebaseFunctions::class)
-    every { FirebaseFunctions.getInstance(any<String>()) } returns mockFunctions
 
     // Mock Firebase Function call to throw exception
     val mockCallable = mockk<HttpsCallableReference>(relaxed = true)
@@ -370,20 +367,17 @@ class ConnectorsViewModelTest {
         password = "wrongpass")
     advanceUntilIdle()
 
-    val uiState = viewModel.uiState.first()
+    val uiState = viewModel.uiState.value
     assertFalse(uiState.connectors.find { it.id == "moodle" }!!.isConnected)
     assertFalse(uiState.isMoodleConnecting)
     assertNotNull(uiState.moodleConnectError)
   }
 
   @Test
-  fun `connectMoodleWithCredentials handles invalid credentials error`() = runTest {
+  fun `connectMoodleWithCredentials handles invalid credentials error`() =
+      runTest(dispatcherRule.dispatcher) {
     val mockFunctions = mockk<FirebaseFunctions>(relaxed = true)
     val mockMoodleDataSource = mockk<MoodleConnectorRemoteDataSource>(relaxed = true)
-
-    // Mock Firebase Functions static method
-    mockkStatic(FirebaseFunctions::class)
-    every { FirebaseFunctions.getInstance(any<String>()) } returns mockFunctions
 
     // Mock Firebase Function call to return error
     val mockCallable = mockk<HttpsCallableReference>(relaxed = true)
@@ -403,7 +397,7 @@ class ConnectorsViewModelTest {
         password = "wrongpass")
     advanceUntilIdle()
 
-    val uiState = viewModel.uiState.first()
+    val uiState = viewModel.uiState.value
     assertFalse(uiState.connectors.find { it.id == "moodle" }!!.isConnected)
     assertFalse(uiState.isMoodleConnecting)
     assertNotNull(uiState.moodleConnectError)
