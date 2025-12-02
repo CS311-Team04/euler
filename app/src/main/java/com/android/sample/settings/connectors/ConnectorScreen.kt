@@ -260,6 +260,74 @@ fun ConnectorsScreen(
 internal fun getDialogSurfaceColor(isDark: Boolean) =
     if (isDark) DarkSurface else ConnectorsLightSurface
 
+/** Reusable dialog title component. */
+@Composable
+internal fun DialogTitle(text: String, colors: ConnectorsColors) {
+  Text(
+      text = text,
+      color = colors.textPrimary,
+      fontSize = Dimens.DialogTitleFontSize,
+      fontWeight = FontWeight.SemiBold,
+      textAlign = TextAlign.Center,
+      modifier = Modifier.fillMaxWidth())
+}
+
+/** Reusable dialog dismiss button component. */
+@Composable
+internal fun DialogDismissButton(
+    colors: ConnectorsColors,
+    isLoading: Boolean,
+    onDismiss: () -> Unit,
+) {
+  TextButton(
+      onClick = { if (!isLoading) onDismiss() },
+      shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
+        Text(
+            Localization.t("cancel"),
+            color = colors.textPrimary,
+            fontSize = Dimens.DialogTextFontSize,
+            fontWeight = FontWeight.Medium)
+      }
+}
+
+/** Reusable dialog confirm button with loading indicator. */
+@Composable
+internal fun DialogConfirmButton(
+    colors: ConnectorsColors,
+    isLoading: Boolean,
+    enabled: Boolean,
+    buttonText: String,
+    onConfirm: () -> Unit,
+) {
+  Button(
+      onClick = onConfirm,
+      enabled = enabled && !isLoading,
+      shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
+        if (isLoading) {
+          CircularProgressIndicator(
+              modifier = Modifier.size(18.dp), strokeWidth = Dimens.CardBorderWidth)
+        } else {
+          Text(
+              buttonText,
+              color = colors.onPrimaryColor,
+              fontSize = Dimens.DialogTextFontSize,
+              fontWeight = FontWeight.SemiBold)
+        }
+      }
+}
+
+/** Reusable error text component for dialogs. */
+@Composable
+internal fun DialogErrorText(error: String?, colors: ConnectorsColors) {
+  if (!error.isNullOrBlank()) {
+    Text(
+        text = error,
+        color = colors.accentRed,
+        fontSize = Dimens.DialogTextFontSize,
+        textAlign = TextAlign.Start)
+  }
+}
+
 /** Clean and minimal disconnect confirmation dialog */
 @Composable
 internal fun DisconnectConfirmationDialog(
@@ -271,15 +339,7 @@ internal fun DisconnectConfirmationDialog(
 ) {
   AlertDialog(
       onDismissRequest = onDismiss,
-      title = {
-        Text(
-            text = Localization.t("disconnect_confirm_title"),
-            color = colors.textPrimary,
-            fontSize = Dimens.DialogTitleFontSize,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth())
-      },
+      title = { DialogTitle(Localization.t("disconnect_confirm_title"), colors) },
       text = {
         Text(
             text = Localization.t("disconnect_confirm_message").replace("%s", connectorName),
@@ -300,16 +360,7 @@ internal fun DisconnectConfirmationDialog(
                   fontWeight = FontWeight.SemiBold)
             }
       },
-      dismissButton = {
-        TextButton(
-            onClick = onDismiss, shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
-              Text(
-                  Localization.t("cancel"),
-                  color = colors.textPrimary,
-                  fontSize = Dimens.DialogTextFontSize,
-                  fontWeight = FontWeight.Medium)
-            }
-      },
+      dismissButton = { DialogDismissButton(colors, isLoading = false, onDismiss) },
       containerColor = getDialogSurfaceColor(isDark),
       shape = RoundedCornerShape(Dimens.DialogCornerRadius))
 }
@@ -329,15 +380,7 @@ internal fun EdConnectDialog(
 
   AlertDialog(
       onDismissRequest = { if (!isLoading) onDismiss() },
-      title = {
-        Text(
-            text = Localization.t("settings_connectors_ed_title"),
-            color = colors.textPrimary,
-            fontSize = Dimens.DialogTitleFontSize,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth())
-      },
+      title = { DialogTitle(Localization.t("settings_connectors_ed_title"), colors) },
       text = {
         Column {
           OutlinedTextField(
@@ -359,47 +402,23 @@ internal fun EdConnectDialog(
 
           if (!error.isNullOrBlank()) {
             Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = error,
-                color = colors.accentRed,
-                fontSize = Dimens.DialogTextFontSize,
-                textAlign = TextAlign.Start,
-            )
+            DialogErrorText(error, colors)
           }
         }
       },
       confirmButton = {
-        Button(
-            onClick = {
+        DialogConfirmButton(
+            colors = colors,
+            isLoading = isLoading,
+            enabled = token.isNotBlank(),
+            buttonText = Localization.t("connect"),
+            onConfirm = {
               val trimmedToken = token.trim()
               val trimmedBaseUrl = baseUrl.trim().ifBlank { null }
               onConfirm(trimmedToken, trimmedBaseUrl)
-            },
-            enabled = token.isNotBlank() && !isLoading,
-            shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
-              if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp), strokeWidth = Dimens.CardBorderWidth)
-              } else {
-                Text(
-                    Localization.t("connect"),
-                    color = colors.onPrimaryColor,
-                    fontSize = Dimens.DialogTextFontSize,
-                    fontWeight = FontWeight.SemiBold)
-              }
-            }
+            })
       },
-      dismissButton = {
-        TextButton(
-            onClick = { if (!isLoading) onDismiss() },
-            shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
-              Text(
-                  Localization.t("cancel"),
-                  color = colors.textPrimary,
-                  fontSize = Dimens.DialogTextFontSize,
-                  fontWeight = FontWeight.Medium)
-            }
-      },
+      dismissButton = { DialogDismissButton(colors, isLoading, onDismiss) },
       containerColor = getDialogSurfaceColor(isDark),
       shape = RoundedCornerShape(Dimens.DialogCornerRadius))
 }
@@ -418,109 +437,138 @@ internal fun MoodleConnectDialog(
   var username by remember { mutableStateOf("") }
   var password by remember { mutableStateOf("") }
 
+  val isFormValid = baseUrl.isNotBlank() && username.isNotBlank() && password.isNotBlank()
+
   AlertDialog(
       onDismissRequest = { if (!isLoading) onDismiss() },
-      title = {
-        Text(
-            text = Localization.t("settings_connectors_moodle_title"),
-            color = colors.textPrimary,
-            fontSize = Dimens.DialogTitleFontSize,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth())
-      },
+      title = { MoodleDialogTitle(colors) },
       text = {
-        Column(
-            modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-              // Base URL field
-              OutlinedTextField(
-                  value = baseUrl,
-                  onValueChange = { baseUrl = it },
-                  label = { Text(Localization.t("settings_connectors_moodle_base_url_label")) },
-                  singleLine = true,
-                  enabled = !isLoading,
-                  modifier = Modifier.fillMaxWidth())
-
-              // Username field
-              OutlinedTextField(
-                  value = username,
-                  onValueChange = { username = it },
-                  label = { Text("Username") },
-                  singleLine = true,
-                  enabled = !isLoading,
-                  modifier = Modifier.fillMaxWidth())
-
-              // Password field
-              OutlinedTextField(
-                  value = password,
-                  onValueChange = { password = it },
-                  label = { Text("Password") },
-                  singleLine = true,
-                  enabled = !isLoading,
-                  visualTransformation =
-                      androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                  modifier = Modifier.fillMaxWidth())
-
-              // Instructions
-              Text(
-                  text = "Enter your Moodle credentials to connect automatically.",
-                  color = colors.textSecondary,
-                  fontSize = 12.sp,
-                  modifier = Modifier.padding(vertical = 4.dp))
-
-              // Error message
-              if (!error.isNullOrBlank()) {
-                Text(
-                    text = error,
-                    color = colors.accentRed,
-                    fontSize = Dimens.DialogTextFontSize,
-                    textAlign = TextAlign.Start)
-              }
-            }
+        MoodleDialogContent(
+            baseUrl = baseUrl,
+            username = username,
+            password = password,
+            error = error,
+            colors = colors,
+            isLoading = isLoading,
+            onBaseUrlChange = { baseUrl = it },
+            onUsernameChange = { username = it },
+            onPasswordChange = { password = it })
       },
       confirmButton = {
-        Button(
-            onClick = {
-              val trimmedBaseUrl = baseUrl.trim()
-              val trimmedUsername = username.trim()
-              val trimmedPassword = password.trim()
-              if (trimmedBaseUrl.isNotBlank() &&
-                  trimmedUsername.isNotBlank() &&
-                  trimmedPassword.isNotBlank()) {
-                onConfirm(trimmedBaseUrl, trimmedUsername, trimmedPassword)
-              }
-            },
-            enabled =
-                baseUrl.isNotBlank() &&
-                    username.isNotBlank() &&
-                    password.isNotBlank() &&
-                    !isLoading,
-            shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
-              if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp), strokeWidth = Dimens.CardBorderWidth)
-              } else {
-                Text(
-                    Localization.t("connect"),
-                    color = colors.onPrimaryColor,
-                    fontSize = Dimens.DialogTextFontSize,
-                    fontWeight = FontWeight.SemiBold)
-              }
-            }
+        MoodleDialogConfirmButton(
+            colors = colors,
+            isLoading = isLoading,
+            isFormValid = isFormValid,
+            onConfirm = { onConfirm(baseUrl.trim(), username.trim(), password.trim()) })
       },
       dismissButton = {
-        TextButton(
-            onClick = { if (!isLoading) onDismiss() },
-            shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
-              Text(
-                  Localization.t("cancel"),
-                  color = colors.textPrimary,
-                  fontSize = Dimens.DialogTextFontSize,
-                  fontWeight = FontWeight.Medium)
-            }
+        MoodleDialogDismissButton(colors = colors, isLoading = isLoading, onDismiss = onDismiss)
       },
       containerColor = getDialogSurfaceColor(isDark),
       shape = RoundedCornerShape(Dimens.DialogCornerRadius))
+}
+
+@Composable
+private fun MoodleDialogTitle(colors: ConnectorsColors) {
+  DialogTitle(Localization.t("settings_connectors_moodle_title"), colors)
+}
+
+@Composable
+private fun MoodleDialogContent(
+    baseUrl: String,
+    username: String,
+    password: String,
+    error: String?,
+    colors: ConnectorsColors,
+    isLoading: Boolean,
+    onBaseUrlChange: (String) -> Unit,
+    onUsernameChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+) {
+  Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    MoodleTextField(
+        value = baseUrl,
+        onValueChange = onBaseUrlChange,
+        label = Localization.t("settings_connectors_moodle_base_url_label"),
+        enabled = !isLoading)
+
+    MoodleTextField(
+        value = username,
+        onValueChange = onUsernameChange,
+        label = Localization.t("settings_connectors_moodle_username_label"),
+        enabled = !isLoading)
+
+    MoodlePasswordField(
+        value = password,
+        onValueChange = onPasswordChange,
+        label = Localization.t("settings_connectors_moodle_password_label"),
+        enabled = !isLoading)
+
+    Text(
+        text = Localization.t("settings_connectors_moodle_login_instructions"),
+        color = colors.textSecondary,
+        fontSize = 12.sp,
+        modifier = Modifier.padding(vertical = 4.dp))
+
+    DialogErrorText(error, colors)
+  }
+}
+
+@Composable
+private fun MoodleTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    enabled: Boolean,
+) {
+  OutlinedTextField(
+      value = value,
+      onValueChange = onValueChange,
+      label = { Text(label) },
+      singleLine = true,
+      enabled = enabled,
+      modifier = Modifier.fillMaxWidth())
+}
+
+@Composable
+private fun MoodlePasswordField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    enabled: Boolean,
+) {
+  OutlinedTextField(
+      value = value,
+      onValueChange = onValueChange,
+      label = { Text(label) },
+      singleLine = true,
+      enabled = enabled,
+      visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+      modifier = Modifier.fillMaxWidth())
+}
+
+@Composable
+private fun MoodleDialogConfirmButton(
+    colors: ConnectorsColors,
+    isLoading: Boolean,
+    isFormValid: Boolean,
+    onConfirm: () -> Unit,
+) {
+  DialogConfirmButton(
+      colors = colors,
+      isLoading = isLoading,
+      enabled = isFormValid,
+      buttonText = Localization.t("connect"),
+      onConfirm = onConfirm)
+}
+
+@Composable
+private fun MoodleDialogDismissButton(
+    colors: ConnectorsColors,
+    isLoading: Boolean,
+    onDismiss: () -> Unit,
+) {
+  DialogDismissButton(colors, isLoading, onDismiss)
 }
 
 @Preview(showBackground = true, backgroundColor = previewBgColor)
