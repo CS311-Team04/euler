@@ -69,7 +69,7 @@ class EpflCampusViewModel(
     _uiState.value =
         _uiState.value.copy(
             icsUrlInput = url,
-            isValidUrl = repository.isValidIcsUrl(url),
+            isValidUrl = repository.isValidHttpUrl(url),
             isLikelyEpflUrl = repository.isLikelyEpflUrl(url))
   }
 
@@ -79,7 +79,7 @@ class EpflCampusViewModel(
       val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
       val clip = clipboard?.primaryClip?.getItemAt(0)?.text?.toString()
 
-      if (clip != null && repository.isValidIcsUrl(clip)) {
+      if (clip != null && repository.isValidHttpUrl(clip)) {
         // Check if it looks like an EPFL/calendar URL
         if (repository.isLikelyEpflUrl(clip) && clip != _uiState.value.icsUrlInput) {
           _uiState.value =
@@ -109,7 +109,7 @@ class EpflCampusViewModel(
   /** Sync schedule from the current ICS URL */
   fun syncSchedule() {
     val url = _uiState.value.icsUrlInput
-    if (!repository.isValidIcsUrl(url)) {
+    if (!repository.isValidHttpUrl(url)) {
       _uiState.value = _uiState.value.copy(error = "Invalid URL")
       return
     }
@@ -167,18 +167,15 @@ class EpflCampusViewModel(
     val pocketCampusPackage = "org.pocketcampus"
 
     try {
-      // Check if the app is installed (requires <queries> in manifest for Android 11+)
-      context.packageManager.getPackageInfo(pocketCampusPackage, 0)
+      // getLaunchIntentForPackage returns null if app isn't installed
       val launchIntent = context.packageManager.getLaunchIntentForPackage(pocketCampusPackage)
       if (launchIntent != null) {
         launchIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
         context.startActivity(launchIntent)
         return
       }
-    } catch (e: android.content.pm.PackageManager.NameNotFoundException) {
-      // App not installed, fall through to web
     } catch (e: Exception) {
-      // Other error, fall through to web
+      // Error getting launch intent, fall through to web
     }
 
     // Fallback to EPFL Campus web

@@ -43,36 +43,36 @@ class EpflScheduleRepositoryTest {
     assertFalse(repository.isAuthenticated())
   }
 
-  // ===== isValidIcsUrl tests =====
+  // ===== isValidHttpUrl tests =====
 
   @Test
-  fun `isValidIcsUrl returns true for https URL`() {
-    assertTrue(repository.isValidIcsUrl("https://example.com/calendar.ics"))
+  fun `isValidHttpUrl returns true for https URL`() {
+    assertTrue(repository.isValidHttpUrl("https://example.com/calendar.ics"))
   }
 
   @Test
-  fun `isValidIcsUrl returns true for http URL`() {
-    assertTrue(repository.isValidIcsUrl("http://example.com/calendar.ics"))
+  fun `isValidHttpUrl returns true for http URL`() {
+    assertTrue(repository.isValidHttpUrl("http://example.com/calendar.ics"))
   }
 
   @Test
-  fun `isValidIcsUrl returns false for empty string`() {
-    assertFalse(repository.isValidIcsUrl(""))
+  fun `isValidHttpUrl returns false for empty string`() {
+    assertFalse(repository.isValidHttpUrl(""))
   }
 
   @Test
-  fun `isValidIcsUrl returns false for non-URL string`() {
-    assertFalse(repository.isValidIcsUrl("not a url"))
+  fun `isValidHttpUrl returns false for non-URL string`() {
+    assertFalse(repository.isValidHttpUrl("not a url"))
   }
 
   @Test
-  fun `isValidIcsUrl returns false for ftp URL`() {
-    assertFalse(repository.isValidIcsUrl("ftp://example.com/calendar.ics"))
+  fun `isValidHttpUrl returns false for ftp URL`() {
+    assertFalse(repository.isValidHttpUrl("ftp://example.com/calendar.ics"))
   }
 
   @Test
-  fun `isValidIcsUrl trims whitespace`() {
-    assertTrue(repository.isValidIcsUrl("  https://example.com/calendar.ics  "))
+  fun `isValidHttpUrl trims whitespace`() {
+    assertTrue(repository.isValidHttpUrl("  https://example.com/calendar.ics  "))
   }
 
   // ===== isLikelyEpflUrl tests =====
@@ -93,12 +93,12 @@ class EpflScheduleRepositoryTest {
   }
 
   @Test
-  fun `isLikelyEpflUrl returns true for URL containing epfl`() {
-    assertTrue(repository.isLikelyEpflUrl("https://schedule.epfl.example.com/"))
+  fun `isLikelyEpflUrl returns true for URL containing epfl ch domain`() {
+    assertTrue(repository.isLikelyEpflUrl("https://schedule.epfl.ch/something"))
   }
 
   @Test
-  fun `isLikelyEpflUrl returns true for URL containing isa dot`() {
+  fun `isLikelyEpflUrl returns true for URL containing isa epfl`() {
     assertTrue(repository.isLikelyEpflUrl("https://isa.epfl.ch/something"))
   }
 
@@ -108,8 +108,9 @@ class EpflScheduleRepositoryTest {
   }
 
   @Test
-  fun `isLikelyEpflUrl returns true for URL with ics extension`() {
-    assertTrue(repository.isLikelyEpflUrl("https://example.com/calendar.ics"))
+  fun `isLikelyEpflUrl returns false for generic ics URL`() {
+    // Generic .ics URLs should NOT match - they could be from any calendar provider
+    assertFalse(repository.isLikelyEpflUrl("https://calendar.google.com/calendar.ics"))
   }
 
   @Test

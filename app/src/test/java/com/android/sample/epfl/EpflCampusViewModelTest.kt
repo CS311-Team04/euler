@@ -88,7 +88,7 @@ class EpflCampusViewModelTest {
 
   @Test
   fun `updateIcsUrl updates input value`() = runTest {
-    whenever(mockRepository.isValidIcsUrl(any())).thenReturn(true)
+    whenever(mockRepository.isValidHttpUrl(any())).thenReturn(true)
     whenever(mockRepository.isLikelyEpflUrl(any())).thenReturn(true)
 
     val viewModel = createViewModel()
@@ -99,8 +99,8 @@ class EpflCampusViewModelTest {
 
   @Test
   fun `updateIcsUrl sets isValidUrl based on repository`() = runTest {
-    whenever(mockRepository.isValidIcsUrl("valid")).thenReturn(true)
-    whenever(mockRepository.isValidIcsUrl("invalid")).thenReturn(false)
+    whenever(mockRepository.isValidHttpUrl("valid")).thenReturn(true)
+    whenever(mockRepository.isValidHttpUrl("invalid")).thenReturn(false)
     whenever(mockRepository.isLikelyEpflUrl(any())).thenReturn(false)
 
     val viewModel = createViewModel()
@@ -115,7 +115,7 @@ class EpflCampusViewModelTest {
 
   @Test
   fun `syncSchedule sets error when URL is invalid`() = runTest {
-    whenever(mockRepository.isValidIcsUrl(any())).thenReturn(false)
+    whenever(mockRepository.isValidHttpUrl(any())).thenReturn(false)
     whenever(mockRepository.isLikelyEpflUrl(any())).thenReturn(false)
 
     val viewModel = createViewModel()
@@ -126,7 +126,7 @@ class EpflCampusViewModelTest {
 
   @Test
   fun `syncSchedule updates state on error`() = runTest {
-    whenever(mockRepository.isValidIcsUrl(any())).thenReturn(true)
+    whenever(mockRepository.isValidHttpUrl(any())).thenReturn(true)
     whenever(mockRepository.isLikelyEpflUrl(any())).thenReturn(true)
     whenever(mockRepository.syncSchedule(any())).thenReturn(SyncResult.Error("Parse error"))
 
@@ -139,7 +139,7 @@ class EpflCampusViewModelTest {
 
   @Test
   fun `syncSchedule calls repository on success`() = runTest {
-    whenever(mockRepository.isValidIcsUrl(any())).thenReturn(true)
+    whenever(mockRepository.isValidHttpUrl(any())).thenReturn(true)
     whenever(mockRepository.isLikelyEpflUrl(any())).thenReturn(true)
     whenever(mockRepository.syncSchedule(any()))
         .thenReturn(SyncResult.Success(weeklySlots = 12, finalExams = 4, message = "Done"))
@@ -188,7 +188,7 @@ class EpflCampusViewModelTest {
     whenever(mockClipboardManager.primaryClip).thenReturn(clipData)
     whenever(clipData.getItemAt(0)).thenReturn(clipItem)
     whenever(clipItem.text).thenReturn(url)
-    whenever(mockRepository.isValidIcsUrl(url)).thenReturn(true)
+    whenever(mockRepository.isValidHttpUrl(url)).thenReturn(true)
     whenever(mockRepository.isLikelyEpflUrl(url)).thenReturn(true)
 
     val viewModel = createViewModel()
@@ -207,7 +207,7 @@ class EpflCampusViewModelTest {
     whenever(mockClipboardManager.primaryClip).thenReturn(clipData)
     whenever(clipData.getItemAt(0)).thenReturn(clipItem)
     whenever(clipItem.text).thenReturn("https://google.com")
-    whenever(mockRepository.isValidIcsUrl(any())).thenReturn(true)
+    whenever(mockRepository.isValidHttpUrl(any())).thenReturn(true)
     whenever(mockRepository.isLikelyEpflUrl(any())).thenReturn(false)
 
     val viewModel = createViewModel()
@@ -224,7 +224,7 @@ class EpflCampusViewModelTest {
     whenever(mockClipboardManager.primaryClip).thenReturn(clipData)
     whenever(clipData.getItemAt(0)).thenReturn(clipItem)
     whenever(clipItem.text).thenReturn("not a url")
-    whenever(mockRepository.isValidIcsUrl(any())).thenReturn(false)
+    whenever(mockRepository.isValidHttpUrl(any())).thenReturn(false)
 
     val viewModel = createViewModel()
     viewModel.checkClipboard(mockContext)
@@ -251,7 +251,7 @@ class EpflCampusViewModelTest {
     whenever(mockClipboardManager.primaryClip).thenReturn(clipData)
     whenever(clipData.getItemAt(0)).thenReturn(clipItem)
     whenever(clipItem.text).thenReturn(url)
-    whenever(mockRepository.isValidIcsUrl(any())).thenReturn(true)
+    whenever(mockRepository.isValidHttpUrl(any())).thenReturn(true)
     whenever(mockRepository.isLikelyEpflUrl(any())).thenReturn(true)
 
     val viewModel = createViewModel()
@@ -275,7 +275,7 @@ class EpflCampusViewModelTest {
 
   @Test
   fun `acceptClipboardUrl sets URL and dismisses`() = runTest {
-    whenever(mockRepository.isValidIcsUrl(any())).thenReturn(true)
+    whenever(mockRepository.isValidHttpUrl(any())).thenReturn(true)
     whenever(mockRepository.isLikelyEpflUrl(any())).thenReturn(true)
 
     val viewModel = createViewModel()
@@ -317,9 +317,7 @@ class EpflCampusViewModelTest {
   @Test
   fun `openEpflCampus opens app when installed`() = runTest {
     val mockIntent = mock<Intent>()
-    // Mock getPackageInfo to not throw (app is installed)
-    whenever(mockPackageManager.getPackageInfo(eq("org.pocketcampus"), any<Int>()))
-        .thenReturn(mock())
+    // getLaunchIntentForPackage returns intent when app is installed
     whenever(mockPackageManager.getLaunchIntentForPackage("org.pocketcampus"))
         .thenReturn(mockIntent)
 
@@ -332,33 +330,33 @@ class EpflCampusViewModelTest {
 
   @Test
   fun `openEpflCampus falls back to web when app not installed`() = runTest {
-    // Mock getPackageInfo to throw NameNotFoundException (app not installed)
-    whenever(mockPackageManager.getPackageInfo(eq("org.pocketcampus"), any<Int>()))
-        .thenThrow(android.content.pm.PackageManager.NameNotFoundException())
+    // getLaunchIntentForPackage returns null when app is not installed
+    whenever(mockPackageManager.getLaunchIntentForPackage("org.pocketcampus")).thenReturn(null)
 
     val viewModel = createViewModel()
     viewModel.openEpflCampus(mockContext)
 
+    // Should open web fallback
     verify(mockContext).startActivity(any())
   }
 
   @Test
   fun `openEpflCampus falls back to web on app exception`() = runTest {
-    // Mock getPackageInfo to throw a generic exception
-    whenever(mockPackageManager.getPackageInfo(eq("org.pocketcampus"), any<Int>()))
+    // getLaunchIntentForPackage throws an exception
+    whenever(mockPackageManager.getLaunchIntentForPackage("org.pocketcampus"))
         .thenThrow(RuntimeException("Error"))
 
     val viewModel = createViewModel()
     viewModel.openEpflCampus(mockContext)
 
+    // Should open web fallback
     verify(mockContext).startActivity(any())
   }
 
   @Test
   fun `openEpflCampus sets error when all fails`() = runTest {
-    // App not installed
-    whenever(mockPackageManager.getPackageInfo(eq("org.pocketcampus"), any<Int>()))
-        .thenThrow(android.content.pm.PackageManager.NameNotFoundException())
+    // App not installed (returns null)
+    whenever(mockPackageManager.getLaunchIntentForPackage("org.pocketcampus")).thenReturn(null)
     // Web fallback also fails
     whenever(mockContext.startActivity(any())).thenThrow(RuntimeException("Cannot start"))
 
@@ -372,7 +370,7 @@ class EpflCampusViewModelTest {
 
   @Test
   fun `clearError clears error`() = runTest {
-    whenever(mockRepository.isValidIcsUrl(any())).thenReturn(false)
+    whenever(mockRepository.isValidHttpUrl(any())).thenReturn(false)
     whenever(mockRepository.isLikelyEpflUrl(any())).thenReturn(false)
 
     val viewModel = createViewModel()
@@ -385,7 +383,7 @@ class EpflCampusViewModelTest {
 
   @Test
   fun `clearSuccessMessage clears message`() = runTest {
-    whenever(mockRepository.isValidIcsUrl(any())).thenReturn(true)
+    whenever(mockRepository.isValidHttpUrl(any())).thenReturn(true)
     whenever(mockRepository.isLikelyEpflUrl(any())).thenReturn(true)
     whenever(mockRepository.syncSchedule(any())).thenReturn(SyncResult.Success(5, 1, "Done!"))
 
