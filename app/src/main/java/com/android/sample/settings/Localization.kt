@@ -47,7 +47,8 @@ object Localization {
       mapOf(
           "moodle_connect_generic_error" to "Failed to connect to Moodle. Please try again.",
           "moodle_connect_invalid_credentials" to "Invalid credentials. Please check your token.",
-          "moodle_connect_api_unreachable" to "Moodle API is unreachable. Please check your connection.",
+          "moodle_connect_api_unreachable" to
+              "Moodle API is unreachable. Please check your connection.",
           "settings_connectors_moodle_title" to "Connect to Moodle",
           "settings_connectors_moodle_base_url_label" to "Moodle URL",
           "settings_connectors_moodle_token_label" to "Web service token",
@@ -91,7 +92,8 @@ object Localization {
           "settings_connectors_moodle_webview_instructions" to
               "Connectez-vous à votre compte Moodle. Après la connexion, cliquez sur le bouton ci-dessous pour entrer votre jeton.",
           "settings_connectors_moodle_enter_token" to "Je me suis connecté, entrer le jeton",
-          "settings_connectors_moodle_load_error" to "Échec du chargement du statut du connecteur Moodle",
+          "settings_connectors_moodle_load_error" to
+              "Échec du chargement du statut du connecteur Moodle",
           "settings_connectors_moodle_status_error" to
               "Impossible de charger le statut du connecteur Moodle. Veuillez réessayer plus tard.")
 
@@ -127,7 +129,8 @@ object Localization {
           "settings_connectors_moodle_webview_instructions" to
               "Melden Sie sich bei Ihrem Moodle-Konto an. Nach der Anmeldung klicken Sie auf die Schaltfläche unten, um Ihr Token einzugeben.",
           "settings_connectors_moodle_enter_token" to "Ich habe mich angemeldet, Token eingeben",
-          "settings_connectors_moodle_load_error" to "Fehler beim Laden des Moodle-Connector-Status",
+          "settings_connectors_moodle_load_error" to
+              "Fehler beim Laden des Moodle-Connector-Status",
           "settings_connectors_moodle_status_error" to
               "Moodle-Connector-Status konnte nicht geladen werden. Bitte versuchen Sie es später erneut.")
 
@@ -147,7 +150,8 @@ object Localization {
 
   private fun moodleTranslationsEs() =
       mapOf(
-          "moodle_connect_generic_error" to "Error al conectar con Moodle. Por favor, inténtelo de nuevo.",
+          "moodle_connect_generic_error" to
+              "Error al conectar con Moodle. Por favor, inténtelo de nuevo.",
           "moodle_connect_invalid_credentials" to
               "Credenciales inválidas. Por favor, verifique su token.",
           "moodle_connect_api_unreachable" to
@@ -161,7 +165,8 @@ object Localization {
           "settings_connectors_moodle_webview_instructions" to
               "Inicie sesión en su cuenta de Moodle. Después de iniciar sesión, haga clic en el botón a continuación para ingresar su token.",
           "settings_connectors_moodle_enter_token" to "He iniciado sesión, ingresar token",
-          "settings_connectors_moodle_load_error" to "Error al cargar el estado del conector Moodle",
+          "settings_connectors_moodle_load_error" to
+              "Error al cargar el estado del conector Moodle",
           "settings_connectors_moodle_status_error" to
               "No se pudo cargar el estado del conector Moodle. Por favor, inténtelo más tarde.")
 
@@ -226,7 +231,8 @@ object Localization {
           "settings_connectors_moodle_webview_instructions" to
               "Faça login na sua conta Moodle. Após o login, clique no botão abaixo para inserir seu token.",
           "settings_connectors_moodle_enter_token" to "Fiz login, inserir token",
-          "settings_connectors_moodle_load_error" to "Falha ao carregar o status do conector Moodle",
+          "settings_connectors_moodle_load_error" to
+              "Falha ao carregar o status do conector Moodle",
           "settings_connectors_moodle_status_error" to
               "Não foi possível carregar o status do conector Moodle. Tente novamente mais tarde.")
 
@@ -252,8 +258,7 @@ object Localization {
           "settings_connectors_moodle_token_placeholder" to "输入您的 Moodle 令牌",
           "settings_connectors_moodle_token_instructions" to
               "登录后，转到站点管理 > 服务器 > Web 服务 > 管理令牌以生成令牌。",
-          "settings_connectors_moodle_webview_instructions" to
-              "登录您的 Moodle 帐户。登录后，点击下面的按钮输入您的令牌。",
+          "settings_connectors_moodle_webview_instructions" to "登录您的 Moodle 帐户。登录后，点击下面的按钮输入您的令牌。",
           "settings_connectors_moodle_enter_token" to "我已登录，输入令牌",
           "settings_connectors_moodle_load_error" to "加载 Moodle 连接器状态失败",
           "settings_connectors_moodle_status_error" to "无法加载 Moodle 连接器状态。请稍后再试。")
@@ -335,7 +340,9 @@ object Localization {
           "recent_cs220_exam" to "CS220 Final Exam retrieval",
           "recent_linear_algebra" to "Linear Algebra help",
           "recent_deadline" to "Project deadline query",
-          "recent_registration" to "Course registration info") + edTranslationsEn() + moodleTranslationsEn()
+          "recent_registration" to "Course registration info") +
+          edTranslationsEn() +
+          moodleTranslationsEn()
 
   private fun french() =
       mapOf(
@@ -415,7 +422,9 @@ object Localization {
           "recent_cs220_exam" to "Récupération examen final CS220",
           "recent_linear_algebra" to "Aide en algèbre linéaire",
           "recent_deadline" to "Requête date limite projet",
-          "recent_registration" to "Info inscription aux cours") + edTranslationsFr() + moodleTranslationsFr()
+          "recent_registration" to "Info inscription aux cours") +
+          edTranslationsFr() +
+          moodleTranslationsFr()
 
   private fun german() =
       mapOf(
@@ -507,7 +516,9 @@ object Localization {
           "recent_cs220_exam" to "CS220 Abschlussprüfung Abruf",
           "recent_linear_algebra" to "Lineare Algebra Hilfe",
           "recent_deadline" to "Projekt-Frist Anfrage",
-          "recent_registration" to "Kursanmeldung Info") + edTranslationsDe() + moodleTranslationsDe()
+          "recent_registration" to "Kursanmeldung Info") +
+          edTranslationsDe() +
+          moodleTranslationsDe()
 
   private fun spanish() =
       mapOf(
@@ -587,7 +598,9 @@ object Localization {
           "recent_cs220_exam" to "Recuperación examen final CS220",
           "recent_linear_algebra" to "Ayuda con álgebra lineal",
           "recent_deadline" to "Consulta fecha límite proyecto",
-          "recent_registration" to "Info inscripción cursos") + edTranslationsEs() + moodleTranslationsEs()
+          "recent_registration" to "Info inscripción cursos") +
+          edTranslationsEs() +
+          moodleTranslationsEs()
 
   private fun italian() =
       mapOf(
@@ -667,7 +680,9 @@ object Localization {
           "recent_cs220_exam" to "Recupero esame finale CS220",
           "recent_linear_algebra" to "Aiuto con algebra lineare",
           "recent_deadline" to "Richiesta scadenza progetto",
-          "recent_registration" to "Info iscrizione corsi") + edTranslationsIt() + moodleTranslationsIt()
+          "recent_registration" to "Info iscrizione corsi") +
+          edTranslationsIt() +
+          moodleTranslationsIt()
 
   private fun portuguese() =
       mapOf(
@@ -747,7 +762,9 @@ object Localization {
           "recent_cs220_exam" to "Recuperação exame final CS220",
           "recent_linear_algebra" to "Ajuda com álgebra linear",
           "recent_deadline" to "Consulta prazo projeto",
-          "recent_registration" to "Info inscrição cursos") + edTranslationsPt() + moodleTranslationsPt()
+          "recent_registration" to "Info inscrição cursos") +
+          edTranslationsPt() +
+          moodleTranslationsPt()
 
   private fun chinese() =
       mapOf(

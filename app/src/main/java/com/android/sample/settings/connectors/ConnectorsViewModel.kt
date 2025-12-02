@@ -294,62 +294,65 @@ class ConnectorsViewModel(
   }
 
   /**
-   * Fetches a Moodle token using username and password via Firebase Function.
-   * This is more secure as credentials are sent server-side only.
+   * Fetches a Moodle token using username and password via Firebase Function. This is more secure
+   * as credentials are sent server-side only.
    */
   suspend fun fetchMoodleToken(
       baseUrl: String,
       username: String,
       password: String
-  ): Result<String> = withContext(Dispatchers.IO) {
-    try {
-      val functions = FirebaseFunctions.getInstance("europe-west6")
-      val fetchTokenFn = functions.getHttpsCallable("connectorsMoodleFetchTokenFn")
-      
-      val data = hashMapOf(
-          "baseUrl" to baseUrl.trim(),
-          "username" to username.trim(),
-          "password" to password.trim()
-      )
-      
-      Log.d("MOODLE_TOKEN", "Fetching token via Firebase Function")
-      
-      val result = fetchTokenFn.call(data).await()
-      val responseData = result.getData() as? Map<*, *>
-      val token = responseData?.get("token") as? String
-      
-      if (token.isNullOrBlank()) {
-        Log.e("MOODLE_TOKEN", "No token in Firebase Function response")
-        return@withContext Result.failure(Exception("No token received from Moodle"))
+  ): Result<String> =
+      withContext(Dispatchers.IO) {
+        try {
+          val functions = FirebaseFunctions.getInstance("europe-west6")
+          val fetchTokenFn = functions.getHttpsCallable("connectorsMoodleFetchTokenFn")
+
+          val data =
+              hashMapOf(
+                  "baseUrl" to baseUrl.trim(),
+                  "username" to username.trim(),
+                  "password" to password.trim())
+
+          Log.d("MOODLE_TOKEN", "Fetching token via Firebase Function")
+
+          val result = fetchTokenFn.call(data).await()
+          val responseData = result.getData() as? Map<*, *>
+          val token = responseData?.get("token") as? String
+
+          if (token.isNullOrBlank()) {
+            Log.e("MOODLE_TOKEN", "No token in Firebase Function response")
+            return@withContext Result.failure(Exception("No token received from Moodle"))
+          }
+
+          Log.d("MOODLE_TOKEN", "Successfully fetched token: ${token.take(10)}...")
+          Result.success(token)
+        } catch (e: Exception) {
+          Log.e("MOODLE_TOKEN", "Exception fetching token via Firebase Function", e)
+          // Extract user-friendly error message
+          val errorMessage =
+              when {
+                e.message?.contains("unauthenticated") == true -> "Authentication required"
+                e.message?.contains("invalid-argument") == true -> "Invalid credentials"
+                e.message?.contains("Failed to fetch token") == true ->
+                    "Invalid credentials or Moodle server error"
+                else -> e.message ?: "Failed to fetch token"
+              }
+          Result.failure(Exception(errorMessage))
+        }
       }
-      
-      Log.d("MOODLE_TOKEN", "Successfully fetched token: ${token.take(10)}...")
-      Result.success(token)
-    } catch (e: Exception) {
-      Log.e("MOODLE_TOKEN", "Exception fetching token via Firebase Function", e)
-      // Extract user-friendly error message
-      val errorMessage = when {
-        e.message?.contains("unauthenticated") == true -> "Authentication required"
-        e.message?.contains("invalid-argument") == true -> "Invalid credentials"
-        e.message?.contains("Failed to fetch token") == true -> "Invalid credentials or Moodle server error"
-        else -> e.message ?: "Failed to fetch token"
-      }
-      Result.failure(Exception(errorMessage))
-    }
-  }
 
   /**
-   * Fetches Moodle token and connects automatically.
-   * This is the main entry point for Moodle connection flow.
+   * Fetches Moodle token and connects automatically. This is the main entry point for Moodle
+   * connection flow.
    */
   fun connectMoodleWithCredentials(baseUrl: String, username: String, password: String) {
     viewModelScope.launch {
       // Indicate we are fetching token
       _uiState.update { it.copy(isMoodleConnecting = true, moodleConnectError = null) }
-      
+
       // Fetch token from Moodle API
       val tokenResult = fetchMoodleToken(baseUrl, username, password)
-      
+
       tokenResult.fold(
           onSuccess = { token ->
             // Token fetched successfully, now connect
@@ -366,7 +369,7 @@ class ConnectorsViewModel(
                       Localization.t("moodle_connect_api_unreachable")
                   else -> Localization.t("moodle_connect_generic_error")
                 }
-            
+
             _uiState.update { state ->
               state.copy(
                   isMoodleConnecting = false,

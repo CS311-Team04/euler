@@ -24,8 +24,8 @@ enum class MoodleConnectorStatusRemote {
 }
 
 /**
- * "Remote" model for Moodle config as returned by callables. This is the type used in the ViewModel /
- * UI.
+ * "Remote" model for Moodle config as returned by callables. This is the type used in the ViewModel
+ * / UI.
  */
 data class MoodleConnectorConfigRemote(
     val status: MoodleConnectorStatusRemote,
@@ -47,4 +47,3 @@ fun mapMoodleConnectorConfig(raw: Any?): MoodleConnectorConfigRemote {
       lastTestAt = lastTestAt,
       lastError = lastError)
 }
-

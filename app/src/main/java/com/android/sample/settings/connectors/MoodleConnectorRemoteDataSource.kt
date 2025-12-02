@@ -9,8 +9,8 @@ private const val FN_DISCONNECT = "connectorsMoodleDisconnectFn"
 private const val FN_TEST = "connectorsMoodleTestFn"
 
 /**
- * Small data source to call Moodle Cloud Functions. Each method returns the current config returned by
- * the backend.
+ * Small data source to call Moodle Cloud Functions. Each method returns the current config returned
+ * by the backend.
  */
 open class MoodleConnectorRemoteDataSource(
     functions: FirebaseFunctions? = null,
@@ -50,4 +50,3 @@ open class MoodleConnectorRemoteDataSource(
     return mapMoodleConnectorConfig(result.getData())
   }
 }
-

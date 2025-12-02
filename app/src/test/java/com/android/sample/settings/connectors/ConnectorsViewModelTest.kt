@@ -190,43 +190,39 @@ class ConnectorsViewModelTest {
     val mockFunctions = mockk<FirebaseFunctions>(relaxed = true)
     val mockEdDataSource = MockEdConnectorRemoteDataSource()
     val mockMoodleDataSource = mockk<MoodleConnectorRemoteDataSource>(relaxed = true)
-    val viewModel = ConnectorsViewModel(
-        functions = mockFunctions,
-        edRemoteDataSource = mockEdDataSource,
-        moodleRemoteDataSource = mockMoodleDataSource
-    )
+    val viewModel =
+        ConnectorsViewModel(
+            functions = mockFunctions,
+            edRemoteDataSource = mockEdDataSource,
+            moodleRemoteDataSource = mockMoodleDataSource)
     advanceUntilIdle()
-    
+
     // Connect moodle (opens dialog, then we need to confirm with credentials)
     viewModel.connectConnector("moodle")
     var uiState = viewModel.uiState.first()
     assertTrue(uiState.isMoodleConnectDialogOpen)
-    
+
     // Mock successful connection
-    coEvery { mockMoodleDataSource.connect(any(), any()) } returns MoodleConnectorConfigRemote(
-        status = MoodleConnectorStatusRemote.CONNECTED,
-        lastTestAt = null,
-        lastError = null
-    )
-    
+    coEvery { mockMoodleDataSource.connect(any(), any()) } returns
+        MoodleConnectorConfigRemote(
+            status = MoodleConnectorStatusRemote.CONNECTED, lastTestAt = null, lastError = null)
+
     // Confirm connection with token
     viewModel.confirmMoodleConnect("https://test.com", "test-token")
     advanceUntilIdle()
     uiState = viewModel.uiState.first()
     assertTrue(uiState.connectors.find { it.id == "moodle" }!!.isConnected)
-    
+
     // Disconnect
     viewModel.showDisconnectConfirmation(uiState.connectors.find { it.id == "moodle" }!!)
-    coEvery { mockMoodleDataSource.disconnect() } returns MoodleConnectorConfigRemote(
-        status = MoodleConnectorStatusRemote.NOT_CONNECTED,
-        lastTestAt = null,
-        lastError = null
-    )
+    coEvery { mockMoodleDataSource.disconnect() } returns
+        MoodleConnectorConfigRemote(
+            status = MoodleConnectorStatusRemote.NOT_CONNECTED, lastTestAt = null, lastError = null)
     viewModel.disconnectConnector("moodle")
     advanceUntilIdle()
     uiState = viewModel.uiState.first()
     assertFalse(uiState.connectors.find { it.id == "moodle" }!!.isConnected)
-    
+
     // Connect again (opens dialog)
     viewModel.connectConnector("moodle")
     assertTrue(viewModel.uiState.first().isMoodleConnectDialogOpen)
@@ -312,37 +308,33 @@ class ConnectorsViewModelTest {
   fun `connectMoodleWithCredentials fetches token and connects successfully`() = runTest {
     val mockFunctions = mockk<FirebaseFunctions>(relaxed = true)
     val mockMoodleDataSource = mockk<MoodleConnectorRemoteDataSource>(relaxed = true)
-    
+
     // Mock Firebase Functions static method
     mockkStatic(FirebaseFunctions::class)
     every { FirebaseFunctions.getInstance(any<String>()) } returns mockFunctions
-    
+
     val mockCallable = mockk<HttpsCallableReference>(relaxed = true)
     val mockResult = mockk<HttpsCallableResult>(relaxed = true)
     val mockData = mapOf("token" to "test-moodle-token-123")
-    
+
     every { mockFunctions.getHttpsCallable("connectorsMoodleFetchTokenFn") } returns mockCallable
     every { mockCallable.call(any()) } returns Tasks.forResult(mockResult)
     every { mockResult.getData() } returns mockData
 
     // Mock successful connection
-    coEvery { mockMoodleDataSource.connect(any(), any()) } returns MoodleConnectorConfigRemote(
-        status = MoodleConnectorStatusRemote.CONNECTED,
-        lastTestAt = null,
-        lastError = null
-    )
+    coEvery { mockMoodleDataSource.connect(any(), any()) } returns
+        MoodleConnectorConfigRemote(
+            status = MoodleConnectorStatusRemote.CONNECTED, lastTestAt = null, lastError = null)
 
-    val viewModel = ConnectorsViewModel(
-        functions = mockFunctions,
-        moodleRemoteDataSource = mockMoodleDataSource
-    )
+    val viewModel =
+        ConnectorsViewModel(
+            functions = mockFunctions, moodleRemoteDataSource = mockMoodleDataSource)
     advanceUntilIdle()
 
     viewModel.connectMoodleWithCredentials(
         baseUrl = "https://euler-swent.moodlecloud.com",
         username = "testuser",
-        password = "testpass"
-    )
+        password = "testpass")
     advanceUntilIdle()
 
     val uiState = viewModel.uiState.first()
@@ -356,27 +348,26 @@ class ConnectorsViewModelTest {
   fun `connectMoodleWithCredentials handles token fetch failure`() = runTest {
     val mockFunctions = mockk<FirebaseFunctions>(relaxed = true)
     val mockMoodleDataSource = mockk<MoodleConnectorRemoteDataSource>(relaxed = true)
-    
+
     // Mock Firebase Functions static method
     mockkStatic(FirebaseFunctions::class)
     every { FirebaseFunctions.getInstance(any<String>()) } returns mockFunctions
-    
+
     // Mock Firebase Function call to throw exception
     val mockCallable = mockk<HttpsCallableReference>(relaxed = true)
     every { mockFunctions.getHttpsCallable("connectorsMoodleFetchTokenFn") } returns mockCallable
-    every { mockCallable.call(any()) } returns Tasks.forException(Exception("Failed to fetch token"))
+    every { mockCallable.call(any()) } returns
+        Tasks.forException(Exception("Failed to fetch token"))
 
-    val viewModel = ConnectorsViewModel(
-        functions = mockFunctions,
-        moodleRemoteDataSource = mockMoodleDataSource
-    )
+    val viewModel =
+        ConnectorsViewModel(
+            functions = mockFunctions, moodleRemoteDataSource = mockMoodleDataSource)
     advanceUntilIdle()
 
     viewModel.connectMoodleWithCredentials(
         baseUrl = "https://euler-swent.moodlecloud.com",
         username = "testuser",
-        password = "wrongpass"
-    )
+        password = "wrongpass")
     advanceUntilIdle()
 
     val uiState = viewModel.uiState.first()
@@ -389,29 +380,27 @@ class ConnectorsViewModelTest {
   fun `connectMoodleWithCredentials handles invalid credentials error`() = runTest {
     val mockFunctions = mockk<FirebaseFunctions>(relaxed = true)
     val mockMoodleDataSource = mockk<MoodleConnectorRemoteDataSource>(relaxed = true)
-    
+
     // Mock Firebase Functions static method
     mockkStatic(FirebaseFunctions::class)
     every { FirebaseFunctions.getInstance(any<String>()) } returns mockFunctions
-    
+
     // Mock Firebase Function call to return error
     val mockCallable = mockk<HttpsCallableReference>(relaxed = true)
     val mockException = Exception("invalid-argument: Invalid credentials")
-    
+
     every { mockFunctions.getHttpsCallable("connectorsMoodleFetchTokenFn") } returns mockCallable
     every { mockCallable.call(any()) } returns Tasks.forException(mockException)
 
-    val viewModel = ConnectorsViewModel(
-        functions = mockFunctions,
-        moodleRemoteDataSource = mockMoodleDataSource
-    )
+    val viewModel =
+        ConnectorsViewModel(
+            functions = mockFunctions, moodleRemoteDataSource = mockMoodleDataSource)
     advanceUntilIdle()
 
     viewModel.connectMoodleWithCredentials(
         baseUrl = "https://euler-swent.moodlecloud.com",
         username = "wronguser",
-        password = "wrongpass"
-    )
+        password = "wrongpass")
     advanceUntilIdle()
 
     val uiState = viewModel.uiState.first()
@@ -426,18 +415,15 @@ class ConnectorsViewModelTest {
   fun `confirmMoodleConnect with success updates connector state`() = runTest {
     val mockFunctions = mockk<FirebaseFunctions>(relaxed = true)
     val mockMoodleDataSource = mockk<MoodleConnectorRemoteDataSource>(relaxed = true)
-    val viewModel = ConnectorsViewModel(
-        functions = mockFunctions,
-        moodleRemoteDataSource = mockMoodleDataSource
-    )
+    val viewModel =
+        ConnectorsViewModel(
+            functions = mockFunctions, moodleRemoteDataSource = mockMoodleDataSource)
     advanceUntilIdle()
 
     // Mock successful connection
-    coEvery { mockMoodleDataSource.connect(any(), any()) } returns MoodleConnectorConfigRemote(
-        status = MoodleConnectorStatusRemote.CONNECTED,
-        lastTestAt = null,
-        lastError = null
-    )
+    coEvery { mockMoodleDataSource.connect(any(), any()) } returns
+        MoodleConnectorConfigRemote(
+            status = MoodleConnectorStatusRemote.CONNECTED, lastTestAt = null, lastError = null)
 
     viewModel.connectConnector("moodle")
     viewModel.confirmMoodleConnect("https://euler-swent.moodlecloud.com", "test-token")
@@ -454,18 +440,17 @@ class ConnectorsViewModelTest {
   fun `confirmMoodleConnect with error shows error message`() = runTest {
     val mockFunctions = mockk<FirebaseFunctions>(relaxed = true)
     val mockMoodleDataSource = mockk<MoodleConnectorRemoteDataSource>(relaxed = true)
-    val viewModel = ConnectorsViewModel(
-        functions = mockFunctions,
-        moodleRemoteDataSource = mockMoodleDataSource
-    )
+    val viewModel =
+        ConnectorsViewModel(
+            functions = mockFunctions, moodleRemoteDataSource = mockMoodleDataSource)
     advanceUntilIdle()
 
     // Mock connection failure
-    coEvery { mockMoodleDataSource.connect(any(), any()) } returns MoodleConnectorConfigRemote(
-        status = MoodleConnectorStatusRemote.ERROR,
-        lastTestAt = null,
-        lastError = "invalid_credentials"
-    )
+    coEvery { mockMoodleDataSource.connect(any(), any()) } returns
+        MoodleConnectorConfigRemote(
+            status = MoodleConnectorStatusRemote.ERROR,
+            lastTestAt = null,
+            lastError = "invalid_credentials")
 
     viewModel.connectConnector("moodle")
     viewModel.confirmMoodleConnect("https://euler-swent.moodlecloud.com", "invalid-token")
