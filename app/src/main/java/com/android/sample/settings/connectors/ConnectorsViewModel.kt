@@ -5,11 +5,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.sample.settings.Localization
 import com.google.firebase.functions.FirebaseFunctions
+import com.google.gson.Gson
+import com.google.gson.annotations.SerializedName
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.net.URLEncoder
 
 /** Mock data for connectors. In the future, this will come from a repository. */
 private val mockConnectors =
@@ -288,6 +295,113 @@ class ConnectorsViewModel(
   /** Closes the Moodle connection dialog. */
   fun dismissMoodleConnectDialog() {
     _uiState.update { it.copy(isMoodleConnectDialogOpen = false, moodleConnectError = null) }
+  }
+
+  /** Data class for Moodle token API response. */
+  private data class MoodleTokenResponse(
+      @SerializedName("token") val token: String?,
+      @SerializedName("privatetoken") val privatetoken: String?,
+      @SerializedName("error") val error: String?,
+      @SerializedName("errorcode") val errorCode: String?
+  )
+
+  /**
+   * Fetches a Moodle token using username and password.
+   * Calls the Moodle token endpoint: /login/token.php
+   */
+  suspend fun fetchMoodleToken(
+      baseUrl: String,
+      username: String,
+      password: String
+  ): Result<String> = withContext(Dispatchers.IO) {
+    try {
+      // Normalize baseUrl (remove trailing slash)
+      val normalizedBaseUrl = baseUrl.trimEnd('/')
+      
+      // Build token endpoint URL
+      val tokenUrl =
+          "$normalizedBaseUrl/login/token.php?username=${URLEncoder.encode(username, "UTF-8")}&password=${URLEncoder.encode(password, "UTF-8")}&service=moodle_mobile_app"
+      
+      Log.d("MOODLE_TOKEN", "Fetching token from: $tokenUrl")
+      
+      // Make HTTP request
+      val client = OkHttpClient()
+      val request = Request.Builder().url(tokenUrl).get().build()
+      
+      val response = client.newCall(request).execute()
+      val responseBody = response.body?.string()
+      
+      if (!response.isSuccessful || responseBody == null) {
+        Log.e("MOODLE_TOKEN", "Failed to fetch token: ${response.code} - $responseBody")
+        return@withContext Result.failure(
+            Exception("Failed to fetch token: HTTP ${response.code}"))
+      }
+      
+      Log.d("MOODLE_TOKEN", "Token response: $responseBody")
+      
+      // Parse JSON response
+      val gson = Gson()
+      val tokenResponse = gson.fromJson(responseBody, MoodleTokenResponse::class.java)
+      
+      // Check for errors in response
+      if (tokenResponse.error != null) {
+        Log.e("MOODLE_TOKEN", "Moodle error: ${tokenResponse.error} (${tokenResponse.errorCode})")
+        return@withContext Result.failure(
+            Exception("Moodle error: ${tokenResponse.error}"))
+      }
+      
+      // Extract token (use 'token' field, not 'privatetoken')
+      val token = tokenResponse.token
+      if (token.isNullOrBlank()) {
+        Log.e("MOODLE_TOKEN", "No token in response")
+        return@withContext Result.failure(Exception("No token received from Moodle"))
+      }
+      
+      Log.d("MOODLE_TOKEN", "Successfully fetched token: ${token.take(10)}...")
+      Result.success(token)
+    } catch (e: Exception) {
+      Log.e("MOODLE_TOKEN", "Exception fetching token", e)
+      Result.failure(e)
+    }
+  }
+
+  /**
+   * Fetches Moodle token and connects automatically.
+   * This is the main entry point for Moodle connection flow.
+   */
+  fun connectMoodleWithCredentials(baseUrl: String, username: String, password: String) {
+    viewModelScope.launch {
+      // Indicate we are fetching token
+      _uiState.update { it.copy(isMoodleConnecting = true, moodleConnectError = null) }
+      
+      // Fetch token from Moodle API
+      val tokenResult = fetchMoodleToken(baseUrl, username, password)
+      
+      tokenResult.fold(
+          onSuccess = { token ->
+            // Token fetched successfully, now connect
+            confirmMoodleConnect(baseUrl, token)
+          },
+          onFailure = { error ->
+            // Failed to fetch token
+            val errorMessage =
+                when {
+                  error.message?.contains("HTTP 401") == true ||
+                      error.message?.contains("invalid") == true ->
+                      Localization.t("moodle_connect_invalid_credentials")
+                  error.message?.contains("HTTP") == true ->
+                      Localization.t("moodle_connect_api_unreachable")
+                  else -> Localization.t("moodle_connect_generic_error")
+                }
+            
+            _uiState.update { state ->
+              state.copy(
+                  isMoodleConnecting = false,
+                  moodleConnectError = errorMessage,
+              )
+            }
+          })
+    }
   }
 
   /** Confirms Moodle connection with base URL and token. */

@@ -1,8 +1,5 @@
 package com.android.sample.settings.connectors
 
-import android.annotation.SuppressLint
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -24,7 +21,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.android.sample.settings.AppSettings
 import com.android.sample.settings.AppearanceMode
@@ -254,7 +250,9 @@ fun ConnectorsScreen(
           isDark = connectorState.isDark,
           isLoading = uiState.isMoodleConnecting,
           error = uiState.moodleConnectError,
-          onConfirm = { baseUrl, token -> viewModel.confirmMoodleConnect(baseUrl, token) },
+          onConfirm = { baseUrl, username, password ->
+            viewModel.connectMoodleWithCredentials(baseUrl, username, password)
+          },
           onDismiss = { viewModel.dismissMoodleConnectDialog() },
       )
     }
@@ -409,159 +407,71 @@ internal fun EdConnectDialog(
       shape = RoundedCornerShape(Dimens.DialogCornerRadius))
 }
 
-/** Full-screen bottom sheet for Moodle WebView - stays within the app. */
-@OptIn(ExperimentalMaterial3Api::class)
-@SuppressLint("SetJavaScriptEnabled")
+/** Simple dialog for Moodle connection with username/password form. */
 @Composable
 internal fun MoodleConnectDialog(
     colors: ConnectorsColors,
     isDark: Boolean,
     isLoading: Boolean,
     error: String?,
-    onConfirm: (baseUrl: String, token: String) -> Unit,
+    onConfirm: (baseUrl: String, username: String, password: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-  val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
   var baseUrl by remember { mutableStateOf("https://euler-swent.moodlecloud.com") }
-  var token by remember { mutableStateOf("") }
-  var showTokenInput by remember { mutableStateOf(false) }
+  var username by remember { mutableStateOf("") }
+  var password by remember { mutableStateOf("") }
 
-  ModalBottomSheet(
+  AlertDialog(
       onDismissRequest = { if (!isLoading) onDismiss() },
-      sheetState = sheetState,
-      containerColor = getDialogSurfaceColor(isDark),
-      dragHandle = {}) {
+      title = {
+        Text(
+            text = Localization.t("settings_connectors_moodle_title"),
+            color = colors.textPrimary,
+            fontSize = Dimens.DialogTitleFontSize,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth())
+      },
+      text = {
         Column(
-            modifier =
-                Modifier.fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
-              // Title bar
-              Row(
-                  modifier = Modifier.fillMaxWidth(),
-                  horizontalArrangement = Arrangement.SpaceBetween,
-                  verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = Localization.t("settings_connectors_moodle_title"),
-                        color = colors.textPrimary,
-                        fontSize = Dimens.DialogTitleFontSize,
-                        fontWeight = FontWeight.SemiBold)
+              // Base URL field
+              OutlinedTextField(
+                  value = baseUrl,
+                  onValueChange = { baseUrl = it },
+                  label = { Text(Localization.t("settings_connectors_moodle_base_url_label")) },
+                  singleLine = true,
+                  enabled = !isLoading,
+                  modifier = Modifier.fillMaxWidth())
 
-                    IconButton(onClick = { if (!isLoading) onDismiss() }) {
-                      Icon(
-                          Icons.Default.Close,
-                          contentDescription = Localization.t("close"),
-                          tint = colors.textPrimary)
-                    }
-                  }
+              // Username field
+              OutlinedTextField(
+                  value = username,
+                  onValueChange = { username = it },
+                  label = { Text("Username") },
+                  singleLine = true,
+                  enabled = !isLoading,
+                  modifier = Modifier.fillMaxWidth())
 
-              if (!showTokenInput) {
-                Text(
-                    text = Localization.t("settings_connectors_moodle_webview_instructions"),
-                    color = colors.textSecondary,
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(bottom = 4.dp))
+              // Password field
+              OutlinedTextField(
+                  value = password,
+                  onValueChange = { password = it },
+                  label = { Text("Password") },
+                  singleLine = true,
+                  enabled = !isLoading,
+                  visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                  modifier = Modifier.fillMaxWidth())
 
-                // Full-screen WebView
-                AndroidView(
-                    factory = { context ->
-                      WebView(context).apply {
-                        settings.javaScriptEnabled = true
-                        settings.domStorageEnabled = true
-                        settings.loadWithOverviewMode = false
-                        settings.useWideViewPort = true
-                        settings.builtInZoomControls = true
-                        settings.displayZoomControls = false
-                        settings.setSupportZoom(true)
-                        isVerticalScrollBarEnabled = true
-                        isHorizontalScrollBarEnabled = true
-                        settings.setSupportMultipleWindows(false)
-                        settings.javaScriptCanOpenWindowsAutomatically = false
-                        settings.cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
-                        settings.mixedContentMode =
-                            android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+              // Instructions
+              Text(
+                  text = "Enter your Moodle credentials to connect automatically.",
+                  color = colors.textSecondary,
+                  fontSize = 12.sp,
+                  modifier = Modifier.padding(vertical = 4.dp))
 
-                        isFocusable = true
-                        isFocusableInTouchMode = true
-                        isClickable = true
-                        isLongClickable = true
-
-                        webViewClient =
-                            object : WebViewClient() {
-                              override fun onPageFinished(view: WebView?, url: String?) {
-                                super.onPageFinished(view, url)
-                                view?.post {
-                                  view.requestFocus()
-                                  view.requestLayout()
-                                }
-                                if (url?.contains("/login/index.php") == true ||
-                                    url?.contains("/my/") == true) {
-                                  view?.loadUrl(
-                                      "$baseUrl/admin/settings.php?section=webservicetokens")
-                                }
-                              }
-
-                              override fun shouldOverrideUrlLoading(
-                                  view: WebView?,
-                                  request: android.webkit.WebResourceRequest?
-                              ): Boolean {
-                                return false
-                              }
-                            }
-
-                        loadUrl("$baseUrl/login/index.php")
-                      }
-                    },
-                    modifier =
-                        Modifier.fillMaxWidth()
-                            .weight(1f)
-                            .background(
-                                colors.background.copy(alpha = 0.05f),
-                                RoundedCornerShape(8.dp)),
-                    update = { webView ->
-                      webView.settings.javaScriptEnabled = true
-                      webView.settings.setSupportZoom(true)
-                      webView.post { webView.requestFocus() }
-                    })
-
-                Button(
-                    onClick = { showTokenInput = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
-                      Text(
-                          Localization.t("settings_connectors_moodle_enter_token"),
-                          color = colors.onPrimaryColor,
-                          fontSize = Dimens.DialogTextFontSize,
-                          fontWeight = FontWeight.SemiBold)
-                    }
-                } else {
-                  // Token input fields
-                  OutlinedTextField(
-                      value = baseUrl,
-                      onValueChange = { baseUrl = it },
-                      label = { Text(Localization.t("settings_connectors_moodle_base_url_label")) },
-                      singleLine = true,
-                      enabled = !isLoading,
-                      modifier = Modifier.fillMaxWidth())
-
-                  OutlinedTextField(
-                      value = token,
-                      onValueChange = { token = it },
-                      label = { Text(Localization.t("settings_connectors_moodle_token_label")) },
-                      singleLine = true,
-                      enabled = !isLoading,
-                      modifier = Modifier.fillMaxWidth(),
-                      placeholder = {
-                        Text(Localization.t("settings_connectors_moodle_token_placeholder"))
-                      })
-
-                  Text(
-                      text = Localization.t("settings_connectors_moodle_token_instructions"),
-                      color = colors.textSecondary,
-                      fontSize = 12.sp,
-                      modifier = Modifier.padding(vertical = 4.dp))
-                }
-
+              // Error message
               if (!error.isNullOrBlank()) {
                 Text(
                     text = error,
@@ -569,61 +479,51 @@ internal fun MoodleConnectDialog(
                     fontSize = Dimens.DialogTextFontSize,
                     textAlign = TextAlign.Start)
               }
-
-              // Action buttons
-              if (showTokenInput) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                      TextButton(
-                          onClick = { if (!isLoading) onDismiss() },
-                          modifier = Modifier.weight(1f),
-                          shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
-                            Text(
-                                Localization.t("cancel"),
-                                color = colors.textPrimary,
-                                fontSize = Dimens.DialogTextFontSize,
-                                fontWeight = FontWeight.Medium)
-                          }
-
-                      Button(
-                          onClick = {
-                            val trimmedBaseUrl = baseUrl.trim()
-                            val trimmedToken = token.trim()
-                            if (trimmedBaseUrl.isNotBlank() && trimmedToken.isNotBlank()) {
-                              onConfirm(trimmedBaseUrl, trimmedToken)
-                            }
-                          },
-                          enabled = baseUrl.isNotBlank() && token.isNotBlank() && !isLoading,
-                          modifier = Modifier.weight(1f),
-                          shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
-                            if (isLoading) {
-                              CircularProgressIndicator(
-                                  modifier = Modifier.size(18.dp),
-                                  strokeWidth = Dimens.CardBorderWidth)
-                            } else {
-                              Text(
-                                  Localization.t("connect"),
-                                  color = colors.onPrimaryColor,
-                                  fontSize = Dimens.DialogTextFontSize,
-                                  fontWeight = FontWeight.SemiBold)
-                            }
-                          }
-                    }
+            }
+      },
+      confirmButton = {
+        Button(
+            onClick = {
+              val trimmedBaseUrl = baseUrl.trim()
+              val trimmedUsername = username.trim()
+              val trimmedPassword = password.trim()
+              if (trimmedBaseUrl.isNotBlank() &&
+                  trimmedUsername.isNotBlank() &&
+                  trimmedPassword.isNotBlank()) {
+                onConfirm(trimmedBaseUrl, trimmedUsername, trimmedPassword)
+              }
+            },
+            enabled =
+                baseUrl.isNotBlank() &&
+                    username.isNotBlank() &&
+                    password.isNotBlank() &&
+                    !isLoading,
+            shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
+              if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp), strokeWidth = Dimens.CardBorderWidth)
               } else {
-                TextButton(
-                    onClick = { if (!isLoading) onDismiss() },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
-                      Text(
-                          Localization.t("cancel"),
-                          color = colors.textPrimary,
-                          fontSize = Dimens.DialogTextFontSize,
-                          fontWeight = FontWeight.Medium)
-                    }
+                Text(
+                    Localization.t("connect"),
+                    color = colors.onPrimaryColor,
+                    fontSize = Dimens.DialogTextFontSize,
+                    fontWeight = FontWeight.SemiBold)
               }
             }
-      }
+      },
+      dismissButton = {
+        TextButton(
+            onClick = { if (!isLoading) onDismiss() },
+            shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
+              Text(
+                  Localization.t("cancel"),
+                  color = colors.textPrimary,
+                  fontSize = Dimens.DialogTextFontSize,
+                  fontWeight = FontWeight.Medium)
+            }
+      },
+      containerColor = getDialogSurfaceColor(isDark),
+      shape = RoundedCornerShape(Dimens.DialogCornerRadius))
 }
 
 @Preview(showBackground = true, backgroundColor = previewBgColor)

@@ -23,7 +23,11 @@ export class MoodleConnectorRepository {
   }
 
   async saveConfig(userId: string, config: MoodleConnectorConfig): Promise<void> {
-    await this.docRef(userId).set(config, { merge: true });
+    // Ensure we never save an unencrypted token field
+    const safeConfig: any = { ...config };
+    // Explicitly remove any 'token' field if it exists (should only have tokenEncrypted)
+    delete safeConfig.token;
+    await this.docRef(userId).set(safeConfig, { merge: true });
   }
 
   async deleteConfig(userId: string): Promise<void> {
