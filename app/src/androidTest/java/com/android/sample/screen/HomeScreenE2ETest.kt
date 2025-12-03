@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNode
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -105,10 +106,23 @@ class HomeScreenE2ETest {
     // Wait for the UI to update after clicking send
     composeRule.waitForIdle()
 
-    // Wait for the message to appear in the chat (message is added immediately in sendMessage)
+    // Wait for the user message to appear in the chat (message is added immediately in sendMessage)
+    // Use a combination of test tag and text for more reliable finding
     composeRule.waitUntilAtLeastOneExists(
-        hasText(testMessage, substring = true), timeoutMillis = 10_000)
-    composeRule.onNodeWithText(testMessage, substring = true).assertIsDisplayed()
+        hasTestTag("chat_user_text") and hasText(testMessage, substring = true),
+        timeoutMillis = 10_000)
+
+    // Find the message node that matches both the tag and text
+    val messageNode =
+        composeRule.onNode(
+            hasTestTag("chat_user_text") and hasText(testMessage, substring = true),
+            useUnmergedTree = true)
+
+    // Wait a bit more for the LazyColumn to finish rendering and scrolling
+    composeRule.waitForIdle()
+
+    // Verify the message exists and is displayed
+    messageNode.assertExists().assertIsDisplayed()
 
     // Note: LLM response verification removed as HomeViewModel doesn't accept FakeLlmClient
     // The message should appear in the chat UI
