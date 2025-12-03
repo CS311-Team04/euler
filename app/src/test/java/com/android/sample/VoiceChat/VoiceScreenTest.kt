@@ -80,7 +80,7 @@ class VoiceScreenTest {
   }
 
   private fun createVoiceViewModel(fakeLlm: FakeLlmClient = FakeLlmClient()): VoiceChatViewModel =
-      VoiceChatViewModel(fakeLlm, dispatcherRule.dispatcher)
+      VoiceChatViewModel(fakeLlm)
 
   @Test(timeout = 5000)
   fun voiceScreen_displays() {
