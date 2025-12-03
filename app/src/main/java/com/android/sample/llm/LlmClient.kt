@@ -184,53 +184,21 @@ class FirebaseFunctionsLlmClient(
         null
       }
 
-  private fun parsePrimaryUrl(map: Map<String, Any?>): String? =
-      try {
-        map[KEY_PRIMARY_URL] as? String
-      } catch (e: ClassCastException) {
-        Log.w(TAG, "Failed to cast primary_url to String", e)
-        null
-      }
+  private fun parsePrimaryUrl(map: Map<String, Any?>): String? = map[KEY_PRIMARY_URL] as? String
 
   private fun parseEdIntentDetected(map: Map<String, Any?>): Boolean =
-      try {
-        map[KEY_ED_INTENT_DETECTED] as? Boolean ?: false
-      } catch (e: ClassCastException) {
-        Log.w(TAG, "Failed to cast ed_intent_detected to Boolean", e)
-        false
-      }
+      map[KEY_ED_INTENT_DETECTED] as? Boolean ?: false
 
-  private fun parseEdIntentType(map: Map<String, Any?>): String? =
-      try {
-        map[KEY_ED_INTENT] as? String
-      } catch (e: ClassCastException) {
-        Log.w(TAG, "Failed to cast ed_intent to String", e)
-        null
-      }
+  private fun parseEdIntentType(map: Map<String, Any?>): String? = map[KEY_ED_INTENT] as? String
 
   private fun parseSourceType(map: Map<String, Any?>): SourceType =
-      try {
-        SourceType.fromString(map[KEY_SOURCE_TYPE] as? String)
-      } catch (e: ClassCastException) {
-        Log.w(TAG, "Failed to cast source_type to String", e)
-        SourceType.NONE
-      }
+      SourceType.fromString(map[KEY_SOURCE_TYPE] as? String)
 
   private fun parseEdFormattedQuestion(map: Map<String, Any?>): String? =
-      try {
-        map[KEY_ED_FORMATTED_QUESTION] as? String
-      } catch (e: ClassCastException) {
-        Log.w(TAG, "Failed to cast ed_formatted_question to String", e)
-        null
-      }
+      map[KEY_ED_FORMATTED_QUESTION] as? String
 
   private fun parseEdFormattedTitle(map: Map<String, Any?>): String? =
-      try {
-        map[KEY_ED_FORMATTED_TITLE] as? String
-      } catch (e: ClassCastException) {
-        Log.w(TAG, "Failed to cast ed_formatted_title to String", e)
-        null
-      }
+      map[KEY_ED_FORMATTED_TITLE] as? String
 
   private fun buildBotReply(map: Map<String, Any?>, replyText: String): BotReply {
     val url = parsePrimaryUrl(map)

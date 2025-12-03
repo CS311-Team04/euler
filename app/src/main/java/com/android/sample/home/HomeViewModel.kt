@@ -44,10 +44,11 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
 data class SourceMeta(
-    val siteLabel: String, // e.g. "EPFL.ch Website"
+    val siteLabel: String, // e.g. "EPFL.ch Website" or "Your Schedule"
     val title: String, // e.g. "Projet de Semestre – Bachelor"
-    val url: String,
-    val retrievedAt: Long = System.currentTimeMillis()
+    val url: String?, // null for schedule sources
+    val retrievedAt: Long = System.currentTimeMillis(),
+    val isScheduleSource: Boolean = false // true if from user's EPFL schedule
 )
 /**
  * HomeViewModel
@@ -76,6 +77,7 @@ class HomeViewModel(
   companion object {
     private const val TAG = "HomeViewModel"
     private const val DEFAULT_USER_NAME = "Student"
+    private const val ED_INTENT_POST_QUESTION = "post_question"
 
     // Global exception handler for uncaught coroutine exceptions
     private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -685,7 +687,7 @@ class HomeViewModel(
                 "startStreaming: received reply, length=${reply.reply.length}, edIntentDetected=${reply.edIntentDetected}, edIntent=${reply.edIntent}")
 
             // Handle ED intent detection - create PostOnEd pending action
-            if (reply.edIntentDetected && reply.edIntent == "post_question") {
+            if (reply.edIntentDetected && reply.edIntent == ED_INTENT_POST_QUESTION) {
               Log.d(TAG, "ED intent detected: ${reply.edIntent} - creating PostOnEd pending action")
               val formattedQuestion = reply.edFormattedQuestion ?: question
               val formattedTitle = reply.edFormattedTitle ?: ""
@@ -701,11 +703,31 @@ class HomeViewModel(
             // simulate stream into the placeholder AI message
             simulateStreamingFromText(messageId, reply.reply)
 
-            // add optional source card
-            reply.url?.let { url ->
-              val meta =
-                  SourceMeta(
-                      siteLabel = buildSiteLabel(url), title = buildFallbackTitle(url), url = url)
+            // add optional source card based on source type
+            val meta: SourceMeta? =
+                when (reply.sourceType) {
+                  com.android.sample.llm.SourceType.SCHEDULE -> {
+                    // Schedule source - show a small indicator
+                    SourceMeta(
+                        siteLabel = "Your EPFL Schedule",
+                        title = "Retrieved from your connected calendar",
+                        url = null,
+                        isScheduleSource = true)
+                  }
+                  com.android.sample.llm.SourceType.RAG -> {
+                    // RAG source - show the web source card if URL exists
+                    reply.url?.let { url ->
+                      SourceMeta(
+                          siteLabel = buildSiteLabel(url),
+                          title = buildFallbackTitle(url),
+                          url = url,
+                          isScheduleSource = false)
+                    }
+                  }
+                  com.android.sample.llm.SourceType.NONE -> null
+                }
+
+            meta?.let { sourceMeta ->
               _uiState.update { s ->
                 s.copy(
                     messages =
@@ -715,7 +737,7 @@ class HomeViewModel(
                                 text = "",
                                 timestamp = System.currentTimeMillis(),
                                 type = ChatType.AI,
-                                source = meta),
+                                source = sourceMeta),
                     streamingSequence = s.streamingSequence + 1)
               }
             }

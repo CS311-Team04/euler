@@ -106,8 +106,13 @@ class HomeScreenE2ETest {
     composeRule.waitForIdle()
 
     // Wait for the message to appear in the chat (message is added immediately in sendMessage)
+    // Try using testTag first, then fallback to text search
+    composeRule.waitUntilAtLeastOneExists(hasTestTag("chat_user_text"), timeoutMillis = 10_000)
+    composeRule.onNodeWithTag("chat_user_text").assertIsDisplayed()
+
+    // Also verify the text content
     composeRule.waitUntilAtLeastOneExists(
-        hasText(testMessage, substring = true), timeoutMillis = 10_000)
+        hasText(testMessage, substring = true), timeoutMillis = 5_000)
     composeRule.onNodeWithText(testMessage, substring = true).assertIsDisplayed()
 
     // Note: LLM response verification removed as HomeViewModel doesn't accept FakeLlmClient

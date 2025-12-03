@@ -685,7 +685,7 @@ class HomeUIStateMoreTest {
 
   @Test
   fun PendingAction_PostOnEd_default_values() {
-    val postOnEd = PendingAction.PostOnEd()
+    val postOnEd = PendingAction.PostOnEd(draftTitle = "", draftBody = "")
 
     assertEquals("", postOnEd.draftTitle)
     assertEquals("", postOnEd.draftBody)
