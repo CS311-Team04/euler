@@ -1405,6 +1405,27 @@ function generateScheduleForDateRange(schedule: OptimizedSchedule, startDate: Da
 /** Sync user's EPFL schedule from ICS URL */
 type SyncScheduleInput = { icsUrl: string };
 
+// Allowlist of hosts that are permitted for ICS URL fetching (SSRF protection)
+const ALLOWED_ICS_HOSTS = [
+  'campus.epfl.ch',
+  'isa.epfl.ch',
+  'isacademia.epfl.ch',
+  'edu.epfl.ch',
+  'moodle.epfl.ch',
+];
+
+function isAllowedIcsHost(urlString: string): boolean {
+  try {
+    const parsed = new URL(urlString);
+    const host = parsed.hostname.toLowerCase();
+    return ALLOWED_ICS_HOSTS.some(allowed => 
+      host === allowed || host.endsWith('.' + allowed)
+    );
+  } catch {
+    return false;
+  }
+}
+
 export async function syncEpflScheduleCore(uid: string, { icsUrl }: SyncScheduleInput) {
   // Validate URL
   if (!icsUrl || typeof icsUrl !== 'string') {
@@ -1415,6 +1436,12 @@ export async function syncEpflScheduleCore(uid: string, { icsUrl }: SyncSchedule
   const url = icsUrl.trim();
   if (!url.startsWith('http://') && !url.startsWith('https://')) {
     throw new Error("Invalid URL format");
+  }
+  
+  // SSRF protection: Only allow fetching from known EPFL hosts
+  if (!isAllowedIcsHost(url)) {
+    logger.warn("syncEpflSchedule.rejectedHost", { uid, urlPreview: url.slice(0, 60) });
+    throw new Error("URL must be from an EPFL domain (campus.epfl.ch, isa.epfl.ch, etc.)");
   }
   
   // Fetch the ICS file
