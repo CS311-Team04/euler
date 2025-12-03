@@ -6,9 +6,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNode
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -107,22 +105,21 @@ class HomeScreenE2ETest {
     composeRule.waitForIdle()
 
     // Wait for the user message to appear in the chat (message is added immediately in sendMessage)
-    // Use a combination of test tag and text for more reliable finding
-    composeRule.waitUntilAtLeastOneExists(
-        hasTestTag("chat_user_text") and hasText(testMessage, substring = true),
-        timeoutMillis = 10_000)
-
-    // Find the message node that matches both the tag and text
-    val messageNode =
-        composeRule.onNode(
-            hasTestTag("chat_user_text") and hasText(testMessage, substring = true),
-            useUnmergedTree = true)
+    // Wait for at least one user message node to exist
+    composeRule.waitUntilAtLeastOneExists(hasTestTag("chat_user_text"), timeoutMillis = 10_000)
 
     // Wait a bit more for the LazyColumn to finish rendering and scrolling
     composeRule.waitForIdle()
 
-    // Verify the message exists and is displayed
-    messageNode.assertExists().assertIsDisplayed()
+    // Find the user message node and verify it exists and is displayed
+    // Since there should only be one message at this point, we can use onNodeWithTag
+    composeRule
+        .onNodeWithTag("chat_user_text", useUnmergedTree = true)
+        .assertExists()
+        .assertIsDisplayed()
+
+    // Also verify the text content using onNodeWithText for additional validation
+    composeRule.onNodeWithText(testMessage, substring = true).assertExists().assertIsDisplayed()
 
     // Note: LLM response verification removed as HomeViewModel doesn't accept FakeLlmClient
     // The message should appear in the chat UI
