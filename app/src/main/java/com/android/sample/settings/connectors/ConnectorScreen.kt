@@ -14,6 +14,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -389,6 +392,11 @@ internal fun EdConnectDialog(
               label = { Text(Localization.t("settings_connectors_ed_api_token_label")) },
               singleLine = true,
               enabled = !isLoading,
+              keyboardOptions =
+                  KeyboardOptions(
+                      autoCorrect = false,
+                      keyboardType = KeyboardType.Text,
+                      imeAction = ImeAction.Done),
           )
           Spacer(modifier = Modifier.height(12.dp))
 
@@ -398,6 +406,11 @@ internal fun EdConnectDialog(
               label = { Text(Localization.t("settings_connectors_ed_base_url_label")) },
               singleLine = true,
               enabled = !isLoading,
+              keyboardOptions =
+                  KeyboardOptions(
+                      autoCorrect = false,
+                      keyboardType = KeyboardType.Uri,
+                      imeAction = ImeAction.Done),
           )
 
           if (!error.isNullOrBlank()) {
@@ -527,6 +540,9 @@ private fun MoodleTextField(
       label = { Text(label) },
       singleLine = true,
       enabled = enabled,
+      keyboardOptions =
+          KeyboardOptions(
+              autoCorrect = false, keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
       modifier = Modifier.fillMaxWidth())
 }
 
@@ -544,6 +560,11 @@ private fun MoodlePasswordField(
       singleLine = true,
       enabled = enabled,
       visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+      keyboardOptions =
+          KeyboardOptions(
+              autoCorrect = false,
+              keyboardType = KeyboardType.Password,
+              imeAction = ImeAction.Done),
       modifier = Modifier.fillMaxWidth())
 }
 
