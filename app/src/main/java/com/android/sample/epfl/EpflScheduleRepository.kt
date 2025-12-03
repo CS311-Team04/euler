@@ -105,8 +105,8 @@ class EpflScheduleRepository(
     }
   }
 
-  /** Validate if a URL looks like an ICS URL */
-  fun isValidIcsUrl(url: String): Boolean {
+  /** Validate if a URL has a valid HTTP/HTTPS scheme */
+  fun isValidHttpUrl(url: String): Boolean {
     val trimmed = url.trim()
     return trimmed.startsWith("http://") || trimmed.startsWith("https://")
   }
@@ -116,16 +116,18 @@ class EpflScheduleRepository(
    *
    * EPFL Campus ICS URLs look like:
    * https://campus.epfl.ch/deploy/backend_proxy/{id}/raw-isacademia?action=get_ics&key={key}
+   *
+   * Note: We intentionally do NOT match generic ".ics" URLs since those could be from any calendar
+   * provider (Google, Outlook, etc.). Only match EPFL-specific patterns.
    */
   fun isLikelyEpflUrl(url: String): Boolean {
     val lower = url.lowercase()
     return lower.contains("campus.epfl.ch") ||
         lower.contains("raw-isacademia") ||
         lower.contains("action=get_ics") ||
-        lower.contains("epfl") ||
-        lower.contains("isa.") ||
-        lower.contains("isacademia") ||
-        lower.contains(".ics")
+        lower.contains(".epfl.ch") ||
+        lower.contains("isa.epfl") ||
+        lower.contains("isacademia")
   }
 }
 

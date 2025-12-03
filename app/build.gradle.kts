@@ -349,7 +349,7 @@ tasks.register("jacocoTestReport", JacocoReport::class) {
     executionData.setFrom(fileTree(project.layout.buildDirectory.get()) {
         include("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec")
         // Exclude Android test coverage to avoid JaCoCo conflicts
-        // include("outputs/code_coverage/debugAndroidTest/connected/*/coverage.ec")
+        include("outputs/code_coverage/debugAndroidTest/connected/*/coverage.ec")
     })
 
     doLast {
@@ -375,14 +375,13 @@ sonar {
         // Basic source configuration - relative to project root
         property("sonar.sources", "src/main/java")
 
-        // Only add tests if directory exists and has content
         val testDir = file("src/test/java")
         if (testDir.exists() && testDir.listFiles()?.isNotEmpty() == true) {
             property("sonar.tests", "src/test/java")
         }
 
         // Basic exclusions
-        property("sonar.exclusions", "**/build/**,**/R.java,**/R.kt,**/BuildConfig.*,**/*.xml,**/res/**")
+        property("sonar.exclusions", "**/build/**,**/R.java,**/R.kt,**/BuildConfig.*,**/*.xml,**/res/**,**/.github/workflows/ci.yml")
 
         // Coverage - only if report exists
         val coverageReport = file("${project.layout.buildDirectory.get()}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml")
