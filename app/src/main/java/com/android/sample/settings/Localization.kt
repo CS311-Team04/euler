@@ -214,13 +214,6 @@ object Localization {
               "settings_connectors_moodle_password_label" to "Password",
               "settings_connectors_moodle_login_instructions" to
                   "Enter your Moodle credentials to connect. Your password will be securely sent to your Moodle server.",
-              "settings_connectors_moodle_token_label" to "Web service token",
-              "settings_connectors_moodle_token_placeholder" to "Enter your Moodle token",
-              "settings_connectors_moodle_token_instructions" to
-                  "After logging in, go to Site administration > Server > Web services > Manage tokens to generate a token.",
-              "settings_connectors_moodle_webview_instructions" to
-                  "Log in to your Moodle account. After logging in, click the button below to enter your token.",
-              "settings_connectors_moodle_enter_token" to "I've logged in, enter token",
               "settings_connectors_moodle_load_error" to "Failed to load Moodle connector status",
               "settings_connectors_moodle_status_error" to
                   "Unable to load Moodle connector status. Please try again later.")
@@ -318,13 +311,6 @@ object Localization {
               "settings_connectors_moodle_password_label" to "Mot de passe",
               "settings_connectors_moodle_login_instructions" to
                   "Entrez vos identifiants Moodle pour vous connecter. Votre mot de passe sera envoyé de manière sécurisée à votre serveur Moodle.",
-              "settings_connectors_moodle_token_label" to "Jeton de service web",
-              "settings_connectors_moodle_token_placeholder" to "Entrez votre jeton Moodle",
-              "settings_connectors_moodle_token_instructions" to
-                  "Après vous être connecté, allez dans Administration du site > Serveur > Services web > Gérer les jetons pour générer un jeton.",
-              "settings_connectors_moodle_webview_instructions" to
-                  "Connectez-vous à votre compte Moodle. Après la connexion, cliquez sur le bouton ci-dessous pour entrer votre jeton.",
-              "settings_connectors_moodle_enter_token" to "Je me suis connecté, entrer le jeton",
               "settings_connectors_moodle_load_error" to
                   "Échec du chargement du statut du connecteur Moodle",
               "settings_connectors_moodle_status_error" to
@@ -435,14 +421,6 @@ object Localization {
               "settings_connectors_moodle_password_label" to "Passwort",
               "settings_connectors_moodle_login_instructions" to
                   "Geben Sie Ihre Moodle-Anmeldedaten ein, um sich zu verbinden. Ihr Passwort wird sicher an Ihren Moodle-Server gesendet.",
-              "settings_connectors_moodle_token_label" to "Web-Service-Token",
-              "settings_connectors_moodle_token_placeholder" to "Geben Sie Ihr Moodle-Token ein",
-              "settings_connectors_moodle_token_instructions" to
-                  "Nach der Anmeldung gehen Sie zu Website-Administration > Server > Web-Services > Token verwalten, um ein Token zu generieren.",
-              "settings_connectors_moodle_webview_instructions" to
-                  "Melden Sie sich bei Ihrem Moodle-Konto an. Nach der Anmeldung klicken Sie auf die Schaltfläche unten, um Ihr Token einzugeben.",
-              "settings_connectors_moodle_enter_token" to
-                  "Ich habe mich angemeldet, Token eingeben",
               "settings_connectors_moodle_load_error" to
                   "Fehler beim Laden des Moodle-Connector-Status",
               "settings_connectors_moodle_status_error" to
@@ -541,13 +519,6 @@ object Localization {
               "settings_connectors_moodle_password_label" to "Contraseña",
               "settings_connectors_moodle_login_instructions" to
                   "Ingrese sus credenciales de Moodle para conectarse. Su contraseña se enviará de forma segura a su servidor Moodle.",
-              "settings_connectors_moodle_token_label" to "Token de servicio web",
-              "settings_connectors_moodle_token_placeholder" to "Ingrese su token de Moodle",
-              "settings_connectors_moodle_token_instructions" to
-                  "Después de iniciar sesión, vaya a Administración del sitio > Servidor > Servicios web > Gestionar tokens para generar un token.",
-              "settings_connectors_moodle_webview_instructions" to
-                  "Inicie sesión en su cuenta de Moodle. Después de iniciar sesión, haga clic en el botón a continuación para ingresar su token.",
-              "settings_connectors_moodle_enter_token" to "He iniciado sesión, ingresar token",
               "settings_connectors_moodle_load_error" to
                   "Error al cargar el estado del conector Moodle",
               "settings_connectors_moodle_status_error" to
@@ -645,13 +616,6 @@ object Localization {
               "settings_connectors_moodle_password_label" to "Password",
               "settings_connectors_moodle_login_instructions" to
                   "Inserisci le tue credenziali Moodle per connetterti. La tua password verrà inviata in modo sicuro al tuo server Moodle.",
-              "settings_connectors_moodle_token_label" to "Token servizio web",
-              "settings_connectors_moodle_token_placeholder" to "Inserisci il tuo token Moodle",
-              "settings_connectors_moodle_token_instructions" to
-                  "Dopo il login, vai a Amministrazione sito > Server > Servizi web > Gestisci token per generare un token.",
-              "settings_connectors_moodle_webview_instructions" to
-                  "Accedi al tuo account Moodle. Dopo il login, clicca sul pulsante qui sotto per inserire il tuo token.",
-              "settings_connectors_moodle_enter_token" to "Ho fatto login, inserisci token",
               "settings_connectors_moodle_load_error" to
                   "Errore nel caricamento dello stato del connettore Moodle",
               "settings_connectors_moodle_status_error" to
@@ -748,13 +712,6 @@ object Localization {
               "settings_connectors_moodle_password_label" to "Senha",
               "settings_connectors_moodle_login_instructions" to
                   "Digite suas credenciais do Moodle para conectar. Sua senha será enviada com segurança para o servidor Moodle.",
-              "settings_connectors_moodle_token_label" to "Token de serviço web",
-              "settings_connectors_moodle_token_placeholder" to "Digite seu token Moodle",
-              "settings_connectors_moodle_token_instructions" to
-                  "Após fazer login, vá para Administração do site > Servidor > Serviços web > Gerenciar tokens para gerar um token.",
-              "settings_connectors_moodle_webview_instructions" to
-                  "Faça login na sua conta Moodle. Após o login, clique no botão abaixo para inserir seu token.",
-              "settings_connectors_moodle_enter_token" to "Fiz login, inserir token",
               "settings_connectors_moodle_load_error" to
                   "Falha ao carregar o status do conector Moodle",
               "settings_connectors_moodle_status_error" to
@@ -849,13 +806,6 @@ object Localization {
               "settings_connectors_moodle_password_label" to "密码",
               "settings_connectors_moodle_login_instructions" to
                   "输入您的 Moodle 凭据以连接。您的密码将安全地发送到您的 Moodle 服务器。",
-              "settings_connectors_moodle_token_label" to "Web 服务令牌",
-              "settings_connectors_moodle_token_placeholder" to "输入您的 Moodle 令牌",
-              "settings_connectors_moodle_token_instructions" to
-                  "登录后，转到站点管理 > 服务器 > Web 服务 > 管理令牌以生成令牌。",
-              "settings_connectors_moodle_webview_instructions" to
-                  "登录您的 Moodle 帐户。登录后，点击下面的按钮输入您的令牌。",
-              "settings_connectors_moodle_enter_token" to "我已登录，输入令牌",
               "settings_connectors_moodle_load_error" to "加载 Moodle 连接器状态失败",
               "settings_connectors_moodle_status_error" to "无法加载 Moodle 连接器状态。请稍后再试。")
 }
