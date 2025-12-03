@@ -10,10 +10,32 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
+ * Source type for the response
+ * - "schedule": answer came from user's EPFL schedule
+ * - "rag": answer came from RAG/web sources
+ * - "none": no external source used
+ */
+enum class SourceType {
+  SCHEDULE,
+  RAG,
+  NONE;
+
+  companion object {
+    fun fromString(s: String?): SourceType =
+        when (s?.lowercase()) {
+          "schedule" -> SCHEDULE
+          "rag" -> RAG
+          else -> NONE
+        }
+  }
+}
+
+/**
  * Response from the LLM backend.
  *
  * @param reply The text response from the LLM
  * @param url Optional URL source reference
+ * @param sourceType The type of source used for the answer
  * @param edIntentDetected Whether an ED Discussion posting intent was detected
  * @param edIntent The type of ED intent detected (e.g., "post_question")
  * @param edFormattedQuestion The formatted question for ED post (when edIntentDetected is true)
@@ -22,6 +44,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 data class BotReply(
     val reply: String,
     val url: String?,
+    val sourceType: SourceType = SourceType.NONE,
     val edIntentDetected: Boolean = false,
     val edIntent: String? = null,
     val edFormattedQuestion: String? = null,
@@ -185,6 +208,14 @@ class FirebaseFunctionsLlmClient(
         null
       }
 
+  private fun parseSourceType(map: Map<String, Any?>): SourceType =
+      try {
+        SourceType.fromString(map[KEY_SOURCE_TYPE] as? String)
+      } catch (e: ClassCastException) {
+        Log.w(TAG, "Failed to cast source_type to String", e)
+        SourceType.NONE
+      }
+
   private fun parseEdFormattedQuestion(map: Map<String, Any?>): String? =
       try {
         map[KEY_ED_FORMATTED_QUESTION] as? String
@@ -203,6 +234,7 @@ class FirebaseFunctionsLlmClient(
 
   private fun buildBotReply(map: Map<String, Any?>, replyText: String): BotReply {
     val url = parsePrimaryUrl(map)
+    val sourceType = parseSourceType(map)
     val edIntentDetected = parseEdIntentDetected(map)
     val edIntent = parseEdIntentType(map)
 
@@ -213,7 +245,13 @@ class FirebaseFunctionsLlmClient(
     val edFormattedQuestion = parseEdFormattedQuestion(map)
     val edFormattedTitle = parseEdFormattedTitle(map)
     return BotReply(
-        replyText, url, edIntentDetected, edIntent, edFormattedQuestion, edFormattedTitle)
+        replyText,
+        url,
+        sourceType,
+        edIntentDetected,
+        edIntent,
+        edFormattedQuestion,
+        edFormattedTitle)
   }
 
   companion object {
@@ -229,6 +267,7 @@ class FirebaseFunctionsLlmClient(
     // Response payload keys
     private const val KEY_REPLY = "reply"
     private const val KEY_PRIMARY_URL = "primary_url"
+    private const val KEY_SOURCE_TYPE = "source_type"
     private const val KEY_ED_INTENT_DETECTED = "ed_intent_detected"
     private const val KEY_ED_INTENT = "ed_intent"
     private const val KEY_ED_FORMATTED_QUESTION = "ed_formatted_question"
