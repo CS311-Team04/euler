@@ -37,7 +37,9 @@ class NavGraphVoiceChatCoverageTest {
   @After
   fun tearDown() {
     appNavControllerObserver = null
-    speechHelper.destroy()
+    if (this::speechHelper.isInitialized) {
+      speechHelper.destroy()
+    }
   }
 
   @Test
