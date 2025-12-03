@@ -12,10 +12,16 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+private const val MOODLE_CONNECTOR_ID = "moodle"
+
 /** Mock data for connectors. In the future, this will come from a repository. */
 private val mockConnectors =
     listOf(
-        Connector(id = "moodle", name = "Moodle", description = "courses", isConnected = false),
+        Connector(
+            id = MOODLE_CONNECTOR_ID,
+            name = "Moodle",
+            description = "courses",
+            isConnected = false),
         Connector(id = "ed", name = "Ed", description = "Q&A platform", isConnected = false),
         Connector(
             id = "epfl_campus",
@@ -62,7 +68,7 @@ class ConnectorsViewModel(
       return
     }
 
-    if (connectorId == "moodle") {
+    if (connectorId == MOODLE_CONNECTOR_ID) {
       // For Moodle, open the connection dialog (WebView for seamless auth)
       _uiState.update { it.copy(isMoodleConnectDialogOpen = true, moodleConnectError = null) }
       return
@@ -90,7 +96,7 @@ class ConnectorsViewModel(
   fun disconnectConnector(connectorId: String) {
     if (connectorId == "ed") {
       disconnectEdConnector()
-    } else if (connectorId == "moodle") {
+    } else if (connectorId == MOODLE_CONNECTOR_ID) {
       disconnectMoodleConnector()
     } else {
       _uiState.update { currentState ->
@@ -243,7 +249,7 @@ class ConnectorsViewModel(
         _uiState.update { state ->
           val updatedConnectors =
               state.connectors.map { connector ->
-                if (connector.id == "moodle") {
+                if (connector.id == MOODLE_CONNECTOR_ID) {
                   connector.copy(
                       isConnected = config.status == MoodleConnectorStatusRemote.CONNECTED)
                 } else {
@@ -273,7 +279,7 @@ class ConnectorsViewModel(
           current.copy(
               connectors =
                   current.connectors.map { connector ->
-                    if (connector.id == "moodle") {
+                    if (connector.id == MOODLE_CONNECTOR_ID) {
                       connector.copy(isConnected = false)
                     } else {
                       connector
@@ -320,7 +326,7 @@ class ConnectorsViewModel(
         return Result.failure(Exception("No token received from Moodle"))
       }
 
-      Log.d("MOODLE_TOKEN", "Successfully fetched token: ${token.take(10)}...")
+      Log.d("MOODLE_TOKEN", "Successfully fetched token")
       Result.success(token)
     } catch (e: Exception) {
       Log.e("MOODLE_TOKEN", "Exception fetching token via Firebase Function", e)
@@ -354,9 +360,6 @@ class ConnectorsViewModel(
         val error = tokenResult.exceptionOrNull() ?: Exception("Unknown error")
         val errorMessage =
             when {
-              error.message?.contains("HTTP 401") == true ||
-                  error.message?.contains("invalid") == true ->
-                  Localization.t("moodle_connect_invalid_credentials")
               error.message?.contains("HTTP") == true ->
                   Localization.t("moodle_connect_api_unreachable")
               else -> Localization.t("moodle_connect_generic_error")
@@ -404,7 +407,7 @@ class ConnectorsViewModel(
           _uiState.update { state ->
             val updatedConnectors =
                 state.connectors.map { connector ->
-                  if (connector.id == "moodle") {
+                  if (connector.id == MOODLE_CONNECTOR_ID) {
                     connector.copy(isConnected = true)
                   } else {
                     connector
@@ -423,7 +426,7 @@ class ConnectorsViewModel(
           _uiState.update { state ->
             val friendlyMessageKey =
                 when (config.lastError) {
-                  "invalid_credentials" -> "moodle_connect_invalid_credentials"
+                  "invalid_credentials" -> "moodle_connect_api_unreachable"
                   "api_unreachable" -> "moodle_connect_api_unreachable"
                   else -> "moodle_connect_generic_error"
                 }

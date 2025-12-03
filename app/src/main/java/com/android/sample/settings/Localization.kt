@@ -204,8 +204,6 @@ object Localization {
           edTranslationsEn() +
           mapOf(
               "moodle_connect_generic_error" to "Failed to connect to Moodle. Please try again.",
-              "moodle_connect_invalid_credentials" to
-                  "Invalid credentials. Please check your token.",
               "moodle_connect_api_unreachable" to
                   "Moodle API is unreachable. Please check your connection.",
               "settings_connectors_moodle_title" to "Connect to Moodle",
@@ -301,8 +299,6 @@ object Localization {
           mapOf(
               "moodle_connect_generic_error" to
                   "La connexion à Moodle a échoué. Veuillez réessayer.",
-              "moodle_connect_invalid_credentials" to
-                  "Identifiants invalides. Veuillez vérifier votre jeton.",
               "moodle_connect_api_unreachable" to
                   "L'API Moodle est inaccessible. Veuillez vérifier votre connexion.",
               "settings_connectors_moodle_title" to "Se connecter à Moodle",
@@ -411,8 +407,6 @@ object Localization {
           mapOf(
               "moodle_connect_generic_error" to
                   "Verbindung zu Moodle fehlgeschlagen. Bitte versuchen Sie es erneut.",
-              "moodle_connect_invalid_credentials" to
-                  "Ungültige Anmeldedaten. Bitte überprüfen Sie Ihr Token.",
               "moodle_connect_api_unreachable" to
                   "Moodle-API ist nicht erreichbar. Bitte überprüfen Sie Ihre Verbindung.",
               "settings_connectors_moodle_title" to "Mit Moodle verbinden",
@@ -509,8 +503,6 @@ object Localization {
           mapOf(
               "moodle_connect_generic_error" to
                   "Error al conectar con Moodle. Por favor, inténtelo de nuevo.",
-              "moodle_connect_invalid_credentials" to
-                  "Credenciales inválidas. Por favor, verifique su token.",
               "moodle_connect_api_unreachable" to
                   "La API de Moodle no es accesible. Por favor, verifique su conexión.",
               "settings_connectors_moodle_title" to "Conectar a Moodle",
@@ -606,8 +598,6 @@ object Localization {
           edTranslationsIt() +
           mapOf(
               "moodle_connect_generic_error" to "Connessione a Moodle fallita. Riprova.",
-              "moodle_connect_invalid_credentials" to
-                  "Credenziali non valide. Controlla il tuo token.",
               "moodle_connect_api_unreachable" to
                   "L'API Moodle non è raggiungibile. Controlla la tua connessione.",
               "settings_connectors_moodle_title" to "Connetti a Moodle",
@@ -703,7 +693,6 @@ object Localization {
           edTranslationsPt() +
           mapOf(
               "moodle_connect_generic_error" to "Falha ao conectar ao Moodle. Tente novamente.",
-              "moodle_connect_invalid_credentials" to "Credenciais inválidas. Verifique seu token.",
               "moodle_connect_api_unreachable" to
                   "A API Moodle não está acessível. Verifique sua conexão.",
               "settings_connectors_moodle_title" to "Conectar ao Moodle",
@@ -798,7 +787,6 @@ object Localization {
           edTranslationsZh() +
           mapOf(
               "moodle_connect_generic_error" to "连接到 Moodle 失败。请重试。",
-              "moodle_connect_invalid_credentials" to "凭据无效。请检查您的令牌。",
               "moodle_connect_api_unreachable" to "Moodle API 无法访问。请检查您的连接。",
               "settings_connectors_moodle_title" to "连接到 Moodle",
               "settings_connectors_moodle_base_url_label" to "Moodle URL",
