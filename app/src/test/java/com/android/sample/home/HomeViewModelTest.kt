@@ -10,6 +10,7 @@ import com.android.sample.conversations.MessageDTO
 import com.android.sample.llm.BotReply
 import com.android.sample.llm.FakeLlmClient
 import com.android.sample.llm.LlmClient
+import com.android.sample.llm.SourceType
 import com.android.sample.profile.UserProfile
 import com.android.sample.util.MainDispatcherRule
 import com.google.android.gms.tasks.Tasks
@@ -414,7 +415,11 @@ class HomeViewModelTest {
         object : LlmClient {
           override suspend fun generateReply(prompt: String): BotReply =
               BotReply(
-                  "Voici un lien utile.", "https://www.epfl.ch/education/projects", false, null)
+                  "Voici un lien utile.",
+                  "https://www.epfl.ch/education/projects",
+                  SourceType.RAG,
+                  false,
+                  null)
         })
 
     viewModel.updateMessageDraft("Où trouver des projets ?")
@@ -429,6 +434,36 @@ class HomeViewModelTest {
     assertEquals("https://www.epfl.ch/education/projects", sourceCard!!.source?.url)
     assertEquals("EPFL.ch Website", sourceCard.source?.siteLabel)
   }
+
+  @Test
+  fun sendMessage_guest_appends_schedule_source_card_when_llm_returns_schedule_type() =
+      runBlocking {
+        val viewModel = HomeViewModel()
+        viewModel.setPrivateField(
+            "llmClient",
+            object : LlmClient {
+              override suspend fun generateReply(prompt: String): BotReply =
+                  BotReply(
+                      "You have a lecture at 10:00 in CM1.",
+                      null, // No URL for schedule sources
+                      SourceType.SCHEDULE,
+                      false,
+                      null)
+            })
+
+        viewModel.updateMessageDraft("What's my schedule today?")
+        viewModel.sendMessage()
+        dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.awaitStreamingCompletion()
+
+        val messages = viewModel.uiState.value.messages
+        val sourceCard = messages.lastOrNull { it.source != null }
+        assertNotNull("Expected a schedule source card message", sourceCard)
+        assertNull(sourceCard!!.source?.url) // Schedule sources have no URL
+        assertEquals("Your EPFL Schedule", sourceCard.source?.siteLabel)
+        assertTrue(sourceCard.source?.isScheduleSource == true)
+      }
 
   @Test
   fun sendMessage_failure_surfaces_error_message() = runBlocking {
