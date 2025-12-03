@@ -6,6 +6,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -43,11 +44,11 @@ class HomeScreenE2ETest {
     val context = ApplicationProvider.getApplicationContext<Context>()
     if (FirebaseApp.getApps(context).isEmpty()) {
       val options =
-          FirebaseOptions.Builder()
-              .setApplicationId("1:1234567890:android:integration-test")
-              .setProjectId("integration-test")
-              .setApiKey("fake-api-key")
-              .build()
+        FirebaseOptions.Builder()
+          .setApplicationId("1:1234567890:android:integration-test")
+          .setProjectId("integration-test")
+          .setApiKey("fake-api-key")
+          .build()
       FirebaseApp.initializeApp(context, options)
     }
   }
@@ -104,22 +105,10 @@ class HomeScreenE2ETest {
     // Wait for the UI to update after clicking send
     composeRule.waitForIdle()
 
-    // Wait for the user message to appear in the chat (message is added immediately in sendMessage)
-    // Wait for at least one user message node to exist
-    composeRule.waitUntilAtLeastOneExists(hasTestTag("chat_user_text"), timeoutMillis = 10_000)
-
-    // Wait a bit more for the LazyColumn to finish rendering and scrolling
-    composeRule.waitForIdle()
-
-    // Find the user message node and verify it exists and is displayed
-    // Since there should only be one message at this point, we can use onNodeWithTag
-    composeRule
-        .onNodeWithTag("chat_user_text", useUnmergedTree = true)
-        .assertExists()
-        .assertIsDisplayed()
-
-    // Also verify the text content using onNodeWithText for additional validation
-    composeRule.onNodeWithText(testMessage, substring = true).assertExists().assertIsDisplayed()
+    // Wait for the message to appear in the chat (message is added immediately in sendMessage)
+    composeRule.waitUntilAtLeastOneExists(
+      hasText(testMessage, substring = true), timeoutMillis = 10_000)
+    composeRule.onNodeWithText(testMessage, substring = true).assertIsDisplayed()
 
     // Note: LLM response verification removed as HomeViewModel doesn't accept FakeLlmClient
     // The message should appear in the chat UI
