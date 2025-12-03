@@ -5,6 +5,7 @@ class FakeLlmClient : LlmClient {
   val prompts = mutableListOf<String>()
   var nextReply: String = "test-reply"
   var nextUrl: String? = null
+  var nextSourceType: SourceType = SourceType.NONE
   var nextEdIntentDetected: Boolean = false
   var nextEdIntent: String? = null
   var nextEdFormattedQuestion: String? = null
@@ -17,6 +18,7 @@ class FakeLlmClient : LlmClient {
     return BotReply(
         nextReply,
         nextUrl,
+        nextSourceType,
         nextEdIntentDetected,
         nextEdIntent,
         nextEdFormattedQuestion,
@@ -34,8 +36,8 @@ class FakeLlmClient : LlmClient {
   fun setEdIntentResponseWithFormatted(
       reply: String,
       intent: String,
-      formattedQuestion: String? = null,
-      formattedTitle: String? = null
+      formattedQuestion: String,
+      formattedTitle: String
   ) {
     nextReply = reply
     nextEdIntentDetected = true
@@ -48,6 +50,7 @@ class FakeLlmClient : LlmClient {
   fun resetToDefault() {
     nextReply = "test-reply"
     nextUrl = null
+    nextSourceType = SourceType.NONE
     nextEdIntentDetected = false
     nextEdIntent = null
     nextEdFormattedQuestion = null
