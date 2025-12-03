@@ -3,6 +3,8 @@ package com.android.sample.settings.connectors
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.android.sample.epfl.EpflScheduleRepository
+import com.android.sample.epfl.ScheduleStatus
 import com.android.sample.settings.Localization
 import com.google.firebase.functions.FirebaseFunctions
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +41,7 @@ class ConnectorsViewModel(
     private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("europe-west6"),
     private val edRemoteDataSource: EdConnectorRemoteDataSource =
         EdConnectorRemoteDataSource(functions),
+    private val epflScheduleRepository: EpflScheduleRepository = EpflScheduleRepository(),
 ) : ViewModel() {
   private val _uiState =
       MutableStateFlow(ConnectorsUiState(connectors = mockConnectors, isLoadingEd = true))
@@ -46,6 +49,7 @@ class ConnectorsViewModel(
 
   init {
     refreshEdStatus()
+    refreshEpflCampusStatus()
   }
 
   /** Connects a connector (no confirmation needed). */
@@ -148,6 +152,31 @@ class ConnectorsViewModel(
           state.copy(
               isLoadingEd = false, edError = Localization.t("settings_connectors_ed_status_error"))
         }
+      }
+    }
+  }
+
+  /** Refreshes the EPFL Campus connector status from the backend. */
+  private fun refreshEpflCampusStatus() {
+    viewModelScope.launch {
+      try {
+        val status = epflScheduleRepository.getStatus()
+        val isConnected = status is ScheduleStatus.Connected
+
+        _uiState.update { state ->
+          val updatedConnectors =
+              state.connectors.map { connector ->
+                if (connector.id == "epfl_campus") {
+                  connector.copy(isConnected = isConnected)
+                } else {
+                  connector
+                }
+              }
+          state.copy(connectors = updatedConnectors)
+        }
+      } catch (e: Exception) {
+        Log.e("ConnectorsViewModel", "Failed to refresh EPFL Campus connector status", e)
+        // Don't show error to user for EPFL Campus - just leave as disconnected
       }
     }
   }

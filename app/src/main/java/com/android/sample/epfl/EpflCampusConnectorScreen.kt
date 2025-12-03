@@ -165,7 +165,10 @@ fun EpflCampusConnectorScreen(
 
                   // Disconnect button
                   OutlinedButton(
-                      onClick = { viewModel.disconnect() },
+                      onClick = {
+                        viewModel.disconnect()
+                        onBackClick() // Navigate back to Connectors screen after disconnect
+                      },
                       modifier = Modifier.fillMaxWidth().testTag("disconnect_button"),
                       colors = ButtonDefaults.outlinedButtonColors(contentColor = accentRed),
                       border =
@@ -203,10 +206,8 @@ fun EpflCampusConnectorScreen(
                       value = uiState.icsUrlInput,
                       onValueChange = { viewModel.updateIcsUrl(it) },
                       isValid = uiState.isValidUrl,
-                      isLikelyEpfl = uiState.isLikelyEpflUrl,
                       isSyncing = uiState.isSyncing,
                       onSync = { viewModel.syncSchedule() },
-                      surface = surface,
                       textPrimary = textPrimary,
                       textSecondary = textSecondary,
                       accentRed = accentRed)
@@ -444,10 +445,8 @@ private fun IcsUrlInput(
     value: String,
     onValueChange: (String) -> Unit,
     isValid: Boolean,
-    isLikelyEpfl: Boolean,
     isSyncing: Boolean,
     onSync: () -> Unit,
-    surface: androidx.compose.ui.graphics.Color,
     textPrimary: androidx.compose.ui.graphics.Color,
     textSecondary: androidx.compose.ui.graphics.Color,
     accentRed: androidx.compose.ui.graphics.Color
@@ -461,37 +460,15 @@ private fun IcsUrlInput(
 
     Spacer(modifier = Modifier.height(8.dp))
 
-    OutlinedTextField(
+    IcsUrlTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth().testTag("url_input"),
-        placeholder = {
-          Text("https://campus.epfl.ch/deploy/...", color = textSecondary.copy(alpha = 0.5f))
-        },
-        leadingIcon = {
-          Icon(
-              Icons.Filled.Link,
-              contentDescription = null,
-              tint = if (isValid) accentRed else textSecondary)
-        },
-        trailingIcon = {
-          if (value.isNotEmpty()) {
-            IconButton(onClick = { onValueChange("") }) {
-              Icon(Icons.Filled.Close, contentDescription = "Clear", tint = textSecondary)
-            }
-          }
-        },
-        colors =
-            OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = accentRed,
-                unfocusedBorderColor = textSecondary.copy(alpha = 0.3f),
-                focusedTextColor = textPrimary,
-                unfocusedTextColor = textPrimary),
-        shape = RoundedCornerShape(12.dp),
-        singleLine = true,
-        keyboardOptions =
-            KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = { if (isValid) onSync() }))
+        isValid = isValid,
+        textPrimary = textPrimary,
+        textSecondary = textSecondary,
+        accentRed = accentRed,
+        isSyncing = isSyncing,
+        onSync = onSync)
 
     Spacer(modifier = Modifier.height(16.dp))
 
@@ -513,6 +490,51 @@ private fun IcsUrlInput(
           Text(if (isSyncing) Localization.t("epfl_syncing") else Localization.t("epfl_connect"))
         }
   }
+}
+
+/** Extracted text field to reduce cognitive complexity of IcsUrlInput */
+@Composable
+private fun IcsUrlTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    isValid: Boolean,
+    textPrimary: androidx.compose.ui.graphics.Color,
+    textSecondary: androidx.compose.ui.graphics.Color,
+    accentRed: androidx.compose.ui.graphics.Color,
+    isSyncing: Boolean,
+    onSync: () -> Unit
+) {
+  OutlinedTextField(
+      value = value,
+      onValueChange = onValueChange,
+      modifier = Modifier.fillMaxWidth().testTag("url_input"),
+      placeholder = {
+        Text("https://campus.epfl.ch/deploy/...", color = textSecondary.copy(alpha = 0.5f))
+      },
+      leadingIcon = {
+        Icon(
+            Icons.Filled.Link,
+            contentDescription = null,
+            tint = if (isValid) accentRed else textSecondary)
+      },
+      trailingIcon = {
+        if (value.isNotEmpty()) {
+          IconButton(onClick = { onValueChange("") }) {
+            Icon(Icons.Filled.Close, contentDescription = "Clear", tint = textSecondary)
+          }
+        }
+      },
+      colors =
+          OutlinedTextFieldDefaults.colors(
+              focusedBorderColor = accentRed,
+              unfocusedBorderColor = textSecondary.copy(alpha = 0.3f),
+              focusedTextColor = textPrimary,
+              unfocusedTextColor = textPrimary),
+      shape = RoundedCornerShape(12.dp),
+      singleLine = true,
+      keyboardOptions =
+          KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+      keyboardActions = KeyboardActions(onDone = { if (isValid && !isSyncing) onSync() }))
 }
 
 @Composable

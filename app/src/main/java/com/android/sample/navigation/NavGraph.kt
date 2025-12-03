@@ -498,7 +498,7 @@ fun AppNav(
                 isProfileEnabled = !homeUiState.isGuest,
                 showProfileWarning = homeUiState.showGuestProfileWarning,
                 onDismissProfileWarning = { homeViewModel.hideGuestProfileWarning() },
-                onConnectorsClick = { nav.navigate(Routes.EpflCampus) })
+                onConnectorsClick = { nav.navigate(Routes.Connectors) })
           }
 
           composable(Routes.Profile) {

@@ -1,6 +1,9 @@
 package com.android.sample.settings.connectors
 
+import com.android.sample.epfl.EpflScheduleRepository
+import com.android.sample.epfl.ScheduleStatus
 import com.google.firebase.functions.FirebaseFunctions
+import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -56,7 +59,12 @@ class ConnectorsViewModelTest {
     // Mock FirebaseFunctions to avoid initialization issues in CI
     val mockFunctions = mockk<FirebaseFunctions>(relaxed = true)
     val mockDataSource = MockEdConnectorRemoteDataSource()
-    return ConnectorsViewModel(functions = mockFunctions, edRemoteDataSource = mockDataSource)
+    val mockEpflRepo = mockk<EpflScheduleRepository>(relaxed = true)
+    coEvery { mockEpflRepo.getStatus() } returns ScheduleStatus.NotConnected
+    return ConnectorsViewModel(
+        functions = mockFunctions,
+        edRemoteDataSource = mockDataSource,
+        epflScheduleRepository = mockEpflRepo)
   }
 
   @Test
@@ -196,8 +204,13 @@ class ConnectorsViewModelTest {
   fun `disconnectConnector for ED calls remote data source`() = runTest {
     val mockFunctions = mockk<FirebaseFunctions>(relaxed = true)
     val mockDataSource = MockEdConnectorRemoteDataSource()
+    val mockEpflRepo = mockk<EpflScheduleRepository>(relaxed = true)
+    coEvery { mockEpflRepo.getStatus() } returns ScheduleStatus.NotConnected
     val viewModel =
-        ConnectorsViewModel(functions = mockFunctions, edRemoteDataSource = mockDataSource)
+        ConnectorsViewModel(
+            functions = mockFunctions,
+            edRemoteDataSource = mockDataSource,
+            epflScheduleRepository = mockEpflRepo)
     advanceUntilIdle()
     viewModel.connectConnector("ed")
     viewModel.confirmEdConnect("test-token", null)
@@ -216,8 +229,13 @@ class ConnectorsViewModelTest {
   fun `confirmEdConnect with success updates connector state`() = runTest {
     val mockFunctions = mockk<FirebaseFunctions>(relaxed = true)
     val mockDataSource = MockEdConnectorRemoteDataSource().apply { connectShouldSucceed = true }
+    val mockEpflRepo = mockk<EpflScheduleRepository>(relaxed = true)
+    coEvery { mockEpflRepo.getStatus() } returns ScheduleStatus.NotConnected
     val viewModel =
-        ConnectorsViewModel(functions = mockFunctions, edRemoteDataSource = mockDataSource)
+        ConnectorsViewModel(
+            functions = mockFunctions,
+            edRemoteDataSource = mockDataSource,
+            epflScheduleRepository = mockEpflRepo)
     advanceUntilIdle()
     viewModel.connectConnector("ed")
     viewModel.confirmEdConnect("test-token", "https://test.com")
@@ -239,8 +257,13 @@ class ConnectorsViewModelTest {
             connectShouldSucceed = false
             connectError = error
           }
+      val mockEpflRepo = mockk<EpflScheduleRepository>(relaxed = true)
+      coEvery { mockEpflRepo.getStatus() } returns ScheduleStatus.NotConnected
       val viewModel =
-          ConnectorsViewModel(functions = mockFunctions, edRemoteDataSource = mockDataSource)
+          ConnectorsViewModel(
+              functions = mockFunctions,
+              edRemoteDataSource = mockDataSource,
+              epflScheduleRepository = mockEpflRepo)
       advanceUntilIdle()
       viewModel.connectConnector("ed")
       viewModel.confirmEdConnect("test-token", null)
@@ -256,8 +279,13 @@ class ConnectorsViewModelTest {
   fun `confirmEdConnect with network exception shows generic error`() = runTest {
     val mockFunctions = mockk<FirebaseFunctions>(relaxed = true)
     val mockDataSource = MockEdConnectorRemoteDataSource().apply { shouldThrowException = true }
+    val mockEpflRepo = mockk<EpflScheduleRepository>(relaxed = true)
+    coEvery { mockEpflRepo.getStatus() } returns ScheduleStatus.NotConnected
     val viewModel =
-        ConnectorsViewModel(functions = mockFunctions, edRemoteDataSource = mockDataSource)
+        ConnectorsViewModel(
+            functions = mockFunctions,
+            edRemoteDataSource = mockDataSource,
+            epflScheduleRepository = mockEpflRepo)
     advanceUntilIdle()
     viewModel.connectConnector("ed")
     viewModel.confirmEdConnect("test-token", null)
