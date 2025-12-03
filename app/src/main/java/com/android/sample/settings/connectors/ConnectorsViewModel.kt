@@ -63,8 +63,8 @@ class ConnectorsViewModel(
     }
 
     if (connectorId == "moodle") {
-      // For Moodle, open the connection dialog (WebView for seamless auth)
-      _uiState.update { it.copy(isMoodleConnectDialogOpen = true, moodleConnectError = null) }
+      // For Moodle, simulate a redirect delay before showing the login dialog
+      simulateMoodleRedirect()
       return
     }
 
@@ -78,6 +78,25 @@ class ConnectorsViewModel(
                   it
                 }
               })
+    }
+  }
+
+  /** Simulates a redirect to Moodle with a short loading delay. */
+  private fun simulateMoodleRedirect() {
+    viewModelScope.launch {
+      // Show loading state
+      _uiState.update { it.copy(isMoodleRedirecting = true) }
+
+      // Simulate redirect delay (feels like we're connecting to Moodle)
+      kotlinx.coroutines.delay(1000L)
+
+      // Open the Moodle login dialog
+      _uiState.update {
+        it.copy(
+            isMoodleRedirecting = false,
+            isMoodleConnectDialogOpen = true,
+            moodleConnectError = null)
+      }
     }
   }
 

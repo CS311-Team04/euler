@@ -14,6 +14,7 @@ data class ConnectorsUiState(
     val edConnectError: String? = null,
     val isLoadingMoodle: Boolean = false,
     val moodleError: String? = null,
+    val isMoodleRedirecting: Boolean = false, // Simulates redirect to Moodle
     val isMoodleConnectDialogOpen: Boolean = false,
     val isMoodleConnecting: Boolean = false,
     val moodleConnectError: String? = null,

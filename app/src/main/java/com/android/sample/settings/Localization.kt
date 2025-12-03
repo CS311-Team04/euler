@@ -205,13 +205,17 @@ object Localization {
           mapOf(
               "moodle_connect_generic_error" to "Failed to connect to Moodle. Please try again.",
               "moodle_connect_invalid_credentials" to
-                  "Invalid credentials. Please check your token.",
+                  "Invalid credentials. Please check your username and password.",
               "moodle_connect_api_unreachable" to
                   "Moodle API is unreachable. Please check your connection.",
               "settings_connectors_moodle_title" to "Connect to Moodle",
               "settings_connectors_moodle_base_url_label" to "Moodle URL",
               "settings_connectors_moodle_username_label" to "Username",
               "settings_connectors_moodle_password_label" to "Password",
+              "settings_connectors_moodle_login_title" to "Log in",
+              "settings_connectors_moodle_login_button" to "Log in",
+              "settings_connectors_moodle_forgot_password" to "Forgot password?",
+              "settings_connectors_moodle_redirecting" to "Connecting to Moodle...",
               "settings_connectors_moodle_login_instructions" to
                   "Enter your Moodle credentials to connect. Your password will be securely sent to your Moodle server.",
               "settings_connectors_moodle_token_label" to "Web service token",
@@ -309,13 +313,17 @@ object Localization {
               "moodle_connect_generic_error" to
                   "La connexion à Moodle a échoué. Veuillez réessayer.",
               "moodle_connect_invalid_credentials" to
-                  "Identifiants invalides. Veuillez vérifier votre jeton.",
+                  "Identifiants invalides. Veuillez vérifier votre nom d'utilisateur et mot de passe.",
               "moodle_connect_api_unreachable" to
                   "L'API Moodle est inaccessible. Veuillez vérifier votre connexion.",
               "settings_connectors_moodle_title" to "Se connecter à Moodle",
               "settings_connectors_moodle_base_url_label" to "URL Moodle",
               "settings_connectors_moodle_username_label" to "Nom d'utilisateur",
               "settings_connectors_moodle_password_label" to "Mot de passe",
+              "settings_connectors_moodle_login_title" to "Connexion",
+              "settings_connectors_moodle_login_button" to "Connexion",
+              "settings_connectors_moodle_forgot_password" to "Mot de passe perdu ?",
+              "settings_connectors_moodle_redirecting" to "Connexion à Moodle...",
               "settings_connectors_moodle_login_instructions" to
                   "Entrez vos identifiants Moodle pour vous connecter. Votre mot de passe sera envoyé de manière sécurisée à votre serveur Moodle.",
               "settings_connectors_moodle_token_label" to "Jeton de service web",
@@ -426,13 +434,17 @@ object Localization {
               "moodle_connect_generic_error" to
                   "Verbindung zu Moodle fehlgeschlagen. Bitte versuchen Sie es erneut.",
               "moodle_connect_invalid_credentials" to
-                  "Ungültige Anmeldedaten. Bitte überprüfen Sie Ihr Token.",
+                  "Ungültige Anmeldedaten. Bitte überprüfen Sie Ihren Benutzernamen und Ihr Passwort.",
               "moodle_connect_api_unreachable" to
                   "Moodle-API ist nicht erreichbar. Bitte überprüfen Sie Ihre Verbindung.",
               "settings_connectors_moodle_title" to "Mit Moodle verbinden",
               "settings_connectors_moodle_base_url_label" to "Moodle-URL",
               "settings_connectors_moodle_username_label" to "Benutzername",
               "settings_connectors_moodle_password_label" to "Passwort",
+              "settings_connectors_moodle_login_title" to "Anmelden",
+              "settings_connectors_moodle_login_button" to "Anmelden",
+              "settings_connectors_moodle_forgot_password" to "Passwort vergessen?",
+              "settings_connectors_moodle_redirecting" to "Verbindung zu Moodle...",
               "settings_connectors_moodle_login_instructions" to
                   "Geben Sie Ihre Moodle-Anmeldedaten ein, um sich zu verbinden. Ihr Passwort wird sicher an Ihren Moodle-Server gesendet.",
               "settings_connectors_moodle_token_label" to "Web-Service-Token",
@@ -532,13 +544,17 @@ object Localization {
               "moodle_connect_generic_error" to
                   "Error al conectar con Moodle. Por favor, inténtelo de nuevo.",
               "moodle_connect_invalid_credentials" to
-                  "Credenciales inválidas. Por favor, verifique su token.",
+                  "Credenciales inválidas. Por favor, verifique su nombre de usuario y contraseña.",
               "moodle_connect_api_unreachable" to
                   "La API de Moodle no es accesible. Por favor, verifique su conexión.",
               "settings_connectors_moodle_title" to "Conectar a Moodle",
               "settings_connectors_moodle_base_url_label" to "URL de Moodle",
               "settings_connectors_moodle_username_label" to "Nombre de usuario",
               "settings_connectors_moodle_password_label" to "Contraseña",
+              "settings_connectors_moodle_login_title" to "Iniciar sesión",
+              "settings_connectors_moodle_login_button" to "Iniciar sesión",
+              "settings_connectors_moodle_forgot_password" to "¿Olvidó su contraseña?",
+              "settings_connectors_moodle_redirecting" to "Conectando a Moodle...",
               "settings_connectors_moodle_login_instructions" to
                   "Ingrese sus credenciales de Moodle para conectarse. Su contraseña se enviará de forma segura a su servidor Moodle.",
               "settings_connectors_moodle_token_label" to "Token de servicio web",
@@ -636,13 +652,17 @@ object Localization {
           mapOf(
               "moodle_connect_generic_error" to "Connessione a Moodle fallita. Riprova.",
               "moodle_connect_invalid_credentials" to
-                  "Credenziali non valide. Controlla il tuo token.",
+                  "Credenziali non valide. Controlla il tuo nome utente e password.",
               "moodle_connect_api_unreachable" to
                   "L'API Moodle non è raggiungibile. Controlla la tua connessione.",
               "settings_connectors_moodle_title" to "Connetti a Moodle",
               "settings_connectors_moodle_base_url_label" to "URL Moodle",
               "settings_connectors_moodle_username_label" to "Nome utente",
               "settings_connectors_moodle_password_label" to "Password",
+              "settings_connectors_moodle_login_title" to "Accedi",
+              "settings_connectors_moodle_login_button" to "Accedi",
+              "settings_connectors_moodle_forgot_password" to "Password dimenticata?",
+              "settings_connectors_moodle_redirecting" to "Connessione a Moodle...",
               "settings_connectors_moodle_login_instructions" to
                   "Inserisci le tue credenziali Moodle per connetterti. La tua password verrà inviata in modo sicuro al tuo server Moodle.",
               "settings_connectors_moodle_token_label" to "Token servizio web",
@@ -739,13 +759,17 @@ object Localization {
           edTranslationsPt() +
           mapOf(
               "moodle_connect_generic_error" to "Falha ao conectar ao Moodle. Tente novamente.",
-              "moodle_connect_invalid_credentials" to "Credenciais inválidas. Verifique seu token.",
+              "moodle_connect_invalid_credentials" to "Credenciais inválidas. Verifique seu nome de usuário e senha.",
               "moodle_connect_api_unreachable" to
                   "A API Moodle não está acessível. Verifique sua conexão.",
               "settings_connectors_moodle_title" to "Conectar ao Moodle",
               "settings_connectors_moodle_base_url_label" to "URL do Moodle",
               "settings_connectors_moodle_username_label" to "Nome de usuário",
               "settings_connectors_moodle_password_label" to "Senha",
+              "settings_connectors_moodle_login_title" to "Entrar",
+              "settings_connectors_moodle_login_button" to "Entrar",
+              "settings_connectors_moodle_forgot_password" to "Esqueceu a senha?",
+              "settings_connectors_moodle_redirecting" to "Conectando ao Moodle...",
               "settings_connectors_moodle_login_instructions" to
                   "Digite suas credenciais do Moodle para conectar. Sua senha será enviada com segurança para o servidor Moodle.",
               "settings_connectors_moodle_token_label" to "Token de serviço web",
@@ -841,12 +865,16 @@ object Localization {
           edTranslationsZh() +
           mapOf(
               "moodle_connect_generic_error" to "连接到 Moodle 失败。请重试。",
-              "moodle_connect_invalid_credentials" to "凭据无效。请检查您的令牌。",
+              "moodle_connect_invalid_credentials" to "凭据无效。请检查您的用户名和密码。",
               "moodle_connect_api_unreachable" to "Moodle API 无法访问。请检查您的连接。",
               "settings_connectors_moodle_title" to "连接到 Moodle",
               "settings_connectors_moodle_base_url_label" to "Moodle URL",
               "settings_connectors_moodle_username_label" to "用户名",
               "settings_connectors_moodle_password_label" to "密码",
+              "settings_connectors_moodle_login_title" to "登录",
+              "settings_connectors_moodle_login_button" to "登录",
+              "settings_connectors_moodle_forgot_password" to "忘记密码？",
+              "settings_connectors_moodle_redirecting" to "正在连接 Moodle...",
               "settings_connectors_moodle_login_instructions" to
                   "输入您的 Moodle 凭据以连接。您的密码将安全地发送到您的 Moodle 服务器。",
               "settings_connectors_moodle_token_label" to "Web 服务令牌",

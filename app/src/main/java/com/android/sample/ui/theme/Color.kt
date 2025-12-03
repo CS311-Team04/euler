@@ -104,6 +104,19 @@ val MoodleYellow = Color(0xFFFFC107)
 val MoodleGray1 = Color(0xFF757575)
 val MoodleGray2 = Color(0xFF9E9E9E)
 
+// Moodle Login UI colors (matching official Moodle login page)
+val MoodleLoginBackground = Color(0xFFECECEC) // Light gray background
+val MoodleLoginCardBackground = Color(0xFFFFFFFF) // White card
+val MoodleLoginTitleBlue = Color(0xFF1D3557) // "Connexion" title blue
+val MoodleLoginButtonBlue = Color(0xFF2E6DA4) // Blue button
+val MoodleLoginButtonHover = Color(0xFF255C8A) // Darker blue for press
+val MoodleLoginInputBorder = Color(0xFFCED4DA) // Input border color
+val MoodleLoginInputBorderFocused = Color(0xFF80BDFF) // Input border focused
+val MoodleLoginPlaceholder = Color(0xFF6C757D) // Placeholder text
+val MoodleLoginText = Color(0xFF333333) // Main text color
+val MoodleLoginLink = Color(0xFF2E6DA4) // Link color (same as button)
+val MoodleLoginError = Color(0xFFDC3545) // Error text color (Bootstrap red)
+
 // ED logo
 val ed1 = Color(0xFF6B46C1)
 val ed2 = Color(0xFFEC4899)
