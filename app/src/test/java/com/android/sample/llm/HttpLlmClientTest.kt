@@ -8,6 +8,7 @@ import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
@@ -446,5 +447,102 @@ class HttpLlmClientTest {
 
     // Should either fail validation or connection, but not crash
     assertNotNull("Expected an error for unknown host", error)
+  }
+
+  // ==================== ED FORMATTED QUESTION/TITLE TESTS ====================
+
+  @Test
+  fun generateReply_parses_ed_formatted_question() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody(
+                """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question","ed_formatted_question":"Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !"}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertEquals(
+        "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
+        reply.edIntent.formattedQuestion)
+    assertNull(reply.edIntent.formattedTitle)
+  }
+
+  @Test
+  fun generateReply_parses_ed_formatted_title() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody(
+                """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question","ed_formatted_title":"Question 5 Modstoch"}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertEquals("Question 5 Modstoch", reply.edIntent.formattedTitle)
+    assertNull(reply.edIntent.formattedQuestion)
+  }
+
+  @Test
+  fun generateReply_parses_both_formatted_fields() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody(
+                """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question","ed_formatted_question":"Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !","ed_formatted_title":"Question 5 Modstoch"}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertEquals(
+        "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
+        reply.edIntent.formattedQuestion)
+    assertEquals("Question 5 Modstoch", reply.edIntent.formattedTitle)
+  }
+
+  @Test
+  fun generateReply_defaults_formatted_fields_when_missing() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody(
+                """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question"}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertNull(reply.edIntent.formattedQuestion)
+    assertNull(reply.edIntent.formattedTitle)
+  }
+
+  @Test
+  fun generateReply_complete_ed_response() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody(
+                """{"reply":"Response","primary_url":"https://epfl.ch","ed_intent_detected":true,"ed_intent":"post_question","ed_formatted_question":"Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !","ed_formatted_title":"Question 5 Modstoch"}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertEquals("Response", reply.reply)
+    assertEquals("https://epfl.ch", reply.url)
+    assertTrue(reply.edIntent.detected)
+    assertEquals("post_question", reply.edIntent.intent)
+    assertEquals(
+        "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
+        reply.edIntent.formattedQuestion)
+    assertEquals("Question 5 Modstoch", reply.edIntent.formattedTitle)
   }
 }

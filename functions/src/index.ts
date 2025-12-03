@@ -13,6 +13,7 @@ import { EdConnectorRepository } from "./connectors/ed/EdConnectorRepository";
 import { EdConnectorService } from "./connectors/ed/EdConnectorService";
 import { encryptSecret, decryptSecret } from "./security/secretCrypto";
 import { detectPostToEdIntentCore, buildEdIntentPromptForApertus } from "./edIntent";
+import { parseEdPostResponse } from "./edIntentParser";
 
 
 const europeFunctions = functions.region("europe-west6");
@@ -755,11 +756,14 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
         questionLen: question.length,
       });
       
-      // Hybrid approach: REGEX detects, Apertus responds naturally
-      const { reply } = await apertusChatFnCore({
+      // Hybrid approach: REGEX detects, Apertus responds naturally and formats the question
+      const { reply: rawReply } = await apertusChatFnCore({
         messages: [{ role: "user", content: buildEdIntentPromptForApertus(question) }],
         temperature: 0.3,
       });
+
+      // Parse the response to extract formatted question and title
+      const { reply, formattedQuestion, formattedTitle } = parseEdPostResponse(rawReply);
 
       return {
         reply,
@@ -768,6 +772,8 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
         sources: [],
         ed_intent_detected: true,
         ed_intent: edIntentResult.ed_intent,
+        ed_formatted_question: formattedQuestion,
+        ed_formatted_title: formattedTitle,
       };
     }
     // === End ED Intent Detection ===
@@ -848,11 +854,14 @@ export const answerWithRagHttp = europeFunctions.https.onRequest(async (req: fun
         questionLen: question.length,
       });
       
-      // Hybrid approach: REGEX detects, Apertus responds naturally
-      const { reply } = await apertusChatFnCore({
+      // Hybrid approach: REGEX detects, Apertus responds naturally and formats the question
+      const { reply: rawReply } = await apertusChatFnCore({
         messages: [{ role: "user", content: buildEdIntentPromptForApertus(question) }],
         temperature: 0.3,
       });
+
+      // Parse the response to extract formatted question and title
+      const { reply, formattedQuestion, formattedTitle } = parseEdPostResponse(rawReply);
 
       res.status(200).json({
         reply,
@@ -861,6 +870,8 @@ export const answerWithRagHttp = europeFunctions.https.onRequest(async (req: fun
         sources: [],
         ed_intent_detected: true,
         ed_intent: edIntentResult.ed_intent,
+        ed_formatted_question: formattedQuestion,
+        ed_formatted_title: formattedTitle,
       });
       return;
     }
