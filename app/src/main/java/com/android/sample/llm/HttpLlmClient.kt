@@ -139,11 +139,16 @@ internal fun parseBotReply(body: String, gson: Gson): BotReply {
   val sourceType =
       com.android.sample.llm.SourceType.fromString(json.getTrimmedString(JSON_KEY_SOURCE_TYPE))
   val edIntentDetected = json.getBoolean(JSON_KEY_ED_INTENT_DETECTED)
-  val edIntent = json.getTrimmedString(JSON_KEY_ED_INTENT)
+  val edIntentType = json.getTrimmedString(JSON_KEY_ED_INTENT)
   val edFormattedQuestion = json.getTrimmedString(JSON_KEY_ED_FORMATTED_QUESTION)
   val edFormattedTitle = json.getTrimmedString(JSON_KEY_ED_FORMATTED_TITLE)
-  return BotReply(
-      replyText, url, sourceType, edIntentDetected, edIntent, edFormattedQuestion, edFormattedTitle)
+  val edIntent =
+      com.android.sample.llm.EdIntent(
+          detected = edIntentDetected,
+          intent = edIntentType,
+          formattedQuestion = edFormattedQuestion,
+          formattedTitle = edFormattedTitle)
+  return BotReply(replyText, url, sourceType, edIntent)
 }
 
 private fun JsonObject.getTrimmedString(key: String): String? {

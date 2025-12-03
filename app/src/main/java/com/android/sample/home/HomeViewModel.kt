@@ -12,6 +12,7 @@ import com.android.sample.conversations.AuthNotReadyException
 import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.ConversationTitleFormatter
 import com.android.sample.conversations.MessageDTO
+import com.android.sample.llm.BotReply
 import com.android.sample.llm.FirebaseFunctionsLlmClient
 import com.android.sample.llm.LlmClient
 import com.android.sample.network.NetworkConnectivityMonitor
@@ -684,21 +685,10 @@ class HomeViewModel(
                 }
             Log.d(
                 TAG,
-                "startStreaming: received reply, length=${reply.reply.length}, edIntentDetected=${reply.edIntentDetected}, edIntent=${reply.edIntent}")
+                "startStreaming: received reply, length=${reply.reply.length}, edIntentDetected=${reply.edIntent.detected}, edIntent=${reply.edIntent.intent}")
 
             // Handle ED intent detection - create PostOnEd pending action
-            if (reply.edIntentDetected && reply.edIntent == ED_INTENT_POST_QUESTION) {
-              Log.d(TAG, "ED intent detected: ${reply.edIntent} - creating PostOnEd pending action")
-              val formattedQuestion = reply.edFormattedQuestion ?: question
-              val formattedTitle = reply.edFormattedTitle ?: ""
-
-              _uiState.update { state ->
-                state.copy(
-                    pendingAction =
-                        PendingAction.PostOnEd(
-                            draftTitle = formattedTitle, draftBody = formattedQuestion))
-              }
-            }
+            handleEdIntent(reply, question)
 
             // simulate stream into the placeholder AI message
             simulateStreamingFromText(messageId, reply.reply)
@@ -1129,5 +1119,26 @@ class HomeViewModel(
         }
     val txt = lines.joinToString("\n")
     return if (txt.isBlank()) null else txt.take(600)
+  }
+
+  /**
+   * Handles ED intent detection from the LLM reply. If a post_question intent is detected, creates
+   * a PostOnEd pending action.
+   *
+   * @param reply The BotReply from the LLM
+   * @param originalQuestion The original user question (used as fallback for formatted question)
+   */
+  private fun handleEdIntent(reply: BotReply, originalQuestion: String) {
+    if (reply.edIntent.detected && reply.edIntent.intent == ED_INTENT_POST_QUESTION) {
+      Log.d(TAG, "ED intent detected: ${reply.edIntent.intent} - creating PostOnEd pending action")
+      val formattedQuestion = reply.edIntent.formattedQuestion ?: originalQuestion
+      val formattedTitle = reply.edIntent.formattedTitle ?: ""
+
+      _uiState.update { state ->
+        state.copy(
+            pendingAction =
+                PendingAction.PostOnEd(draftTitle = formattedTitle, draftBody = formattedQuestion))
+      }
+    }
   }
 }

@@ -6,30 +6,19 @@ class FakeLlmClient : LlmClient {
   var nextReply: String = "test-reply"
   var nextUrl: String? = null
   var nextSourceType: SourceType = SourceType.NONE
-  var nextEdIntentDetected: Boolean = false
-  var nextEdIntent: String? = null
-  var nextEdFormattedQuestion: String? = null
-  var nextEdFormattedTitle: String? = null
+  var nextEdIntent: EdIntent = EdIntent()
   var failure: Throwable? = null
 
   override suspend fun generateReply(prompt: String): BotReply {
     prompts += prompt
     failure?.let { throw it }
-    return BotReply(
-        nextReply,
-        nextUrl,
-        nextSourceType,
-        nextEdIntentDetected,
-        nextEdIntent,
-        nextEdFormattedQuestion,
-        nextEdFormattedTitle)
+    return BotReply(nextReply, nextUrl, nextSourceType, nextEdIntent)
   }
 
   /** Configure the fake to return an ED intent response */
   fun setEdIntentResponse(reply: String, intent: String) {
     nextReply = reply
-    nextEdIntentDetected = true
-    nextEdIntent = intent
+    nextEdIntent = EdIntent(detected = true, intent = intent)
   }
 
   /** Configure the fake to return an ED intent response with formatted question and title */
@@ -40,10 +29,12 @@ class FakeLlmClient : LlmClient {
       formattedTitle: String
   ) {
     nextReply = reply
-    nextEdIntentDetected = true
-    nextEdIntent = intent
-    nextEdFormattedQuestion = formattedQuestion
-    nextEdFormattedTitle = formattedTitle
+    nextEdIntent =
+        EdIntent(
+            detected = true,
+            intent = intent,
+            formattedQuestion = formattedQuestion,
+            formattedTitle = formattedTitle)
   }
 
   /** Reset to default non-ED response */
@@ -51,10 +42,7 @@ class FakeLlmClient : LlmClient {
     nextReply = "test-reply"
     nextUrl = null
     nextSourceType = SourceType.NONE
-    nextEdIntentDetected = false
-    nextEdIntent = null
-    nextEdFormattedQuestion = null
-    nextEdFormattedTitle = null
+    nextEdIntent = EdIntent()
     failure = null
   }
 }

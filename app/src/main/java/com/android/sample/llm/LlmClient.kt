@@ -31,25 +31,51 @@ enum class SourceType {
 }
 
 /**
+ * ED Discussion intent information.
+ *
+ * @param detected Whether an ED Discussion posting intent was detected
+ * @param intent The type of ED intent detected (e.g., "post_question")
+ * @param formattedQuestion The formatted question for ED post (when detected is true)
+ * @param formattedTitle The formatted title for ED post (when detected is true)
+ */
+data class EdIntent(
+    val detected: Boolean = false,
+    val intent: String? = null,
+    val formattedQuestion: String? = null,
+    val formattedTitle: String? = null
+)
+
+/**
  * Response from the LLM backend.
  *
  * @param reply The text response from the LLM
  * @param url Optional URL source reference
  * @param sourceType The type of source used for the answer
- * @param edIntentDetected Whether an ED Discussion posting intent was detected
- * @param edIntent The type of ED intent detected (e.g., "post_question")
- * @param edFormattedQuestion The formatted question for ED post (when edIntentDetected is true)
- * @param edFormattedTitle The formatted title for ED post (when edIntentDetected is true)
+ * @param edIntent ED Discussion intent information
  */
 data class BotReply(
     val reply: String,
     val url: String?,
     val sourceType: SourceType = SourceType.NONE,
-    val edIntentDetected: Boolean = false,
-    val edIntent: String? = null,
-    val edFormattedQuestion: String? = null,
-    val edFormattedTitle: String? = null
-)
+    val edIntent: EdIntent = EdIntent()
+) {
+  // Backward compatibility properties
+  @Deprecated("Use edIntent.detected instead", ReplaceWith("edIntent.detected"))
+  val edIntentDetected: Boolean
+    get() = edIntent.detected
+
+  @Deprecated("Use edIntent.intent instead", ReplaceWith("edIntent.intent"))
+  val edIntentType: String?
+    get() = edIntent.intent
+
+  @Deprecated("Use edIntent.formattedQuestion instead", ReplaceWith("edIntent.formattedQuestion"))
+  val edFormattedQuestion: String?
+    get() = edIntent.formattedQuestion
+
+  @Deprecated("Use edIntent.formattedTitle instead", ReplaceWith("edIntent.formattedTitle"))
+  val edFormattedTitle: String?
+    get() = edIntent.formattedTitle
+}
 
 /**
  * Abstraction over the Large Language Model backend.
@@ -204,22 +230,21 @@ class FirebaseFunctionsLlmClient(
     val url = parsePrimaryUrl(map)
     val sourceType = parseSourceType(map)
     val edIntentDetected = parseEdIntentDetected(map)
-    val edIntent = parseEdIntentType(map)
+    val edIntentType = parseEdIntentType(map)
 
     if (edIntentDetected) {
-      Log.d(TAG, "ED intent detected: $edIntent")
+      Log.d(TAG, "ED intent detected: $edIntentType")
     }
 
     val edFormattedQuestion = parseEdFormattedQuestion(map)
     val edFormattedTitle = parseEdFormattedTitle(map)
-    return BotReply(
-        replyText,
-        url,
-        sourceType,
-        edIntentDetected,
-        edIntent,
-        edFormattedQuestion,
-        edFormattedTitle)
+    val edIntent =
+        EdIntent(
+            detected = edIntentDetected,
+            intent = edIntentType,
+            formattedQuestion = edFormattedQuestion,
+            formattedTitle = edFormattedTitle)
+    return BotReply(replyText, url, sourceType, edIntent)
   }
 
   companion object {

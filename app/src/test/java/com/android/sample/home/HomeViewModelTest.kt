@@ -8,6 +8,7 @@ import com.android.sample.conversations.Conversation
 import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.MessageDTO
 import com.android.sample.llm.BotReply
+import com.android.sample.llm.EdIntent
 import com.android.sample.llm.FakeLlmClient
 import com.android.sample.llm.LlmClient
 import com.android.sample.llm.SourceType
@@ -418,8 +419,7 @@ class HomeViewModelTest {
                   "Voici un lien utile.",
                   "https://www.epfl.ch/education/projects",
                   SourceType.RAG,
-                  false,
-                  null)
+                  EdIntent())
         })
 
     viewModel.updateMessageDraft("Où trouver des projets ?")
@@ -447,8 +447,7 @@ class HomeViewModelTest {
                       "You have a lecture at 10:00 in CM1.",
                       null, // No URL for schedule sources
                       SourceType.SCHEDULE,
-                      false,
-                      null)
+                      EdIntent())
             })
 
         viewModel.updateMessageDraft("What's my schedule today?")
@@ -1595,8 +1594,7 @@ class HomeViewModelTest {
   fun sendMessage_without_ed_intent_works_normally() = runBlocking {
     val fakeLlm = FakeLlmClient()
     fakeLlm.nextReply = "Normal response about EPFL"
-    fakeLlm.nextEdIntentDetected = false
-    fakeLlm.nextEdIntent = null
+    fakeLlm.nextEdIntent = EdIntent()
 
     val viewModel = HomeViewModel()
     viewModel.setPrivateField("llmClient", fakeLlm)
@@ -1617,11 +1615,10 @@ class HomeViewModelTest {
         BotReply(
             reply = "ED intent response",
             url = null,
-            edIntentDetected = true,
-            edIntent = "post_question")
+            edIntent = EdIntent(detected = true, intent = "post_question"))
 
-    assertTrue(reply.edIntentDetected)
-    assertEquals("post_question", reply.edIntent)
+    assertTrue(reply.edIntent.detected)
+    assertEquals("post_question", reply.edIntent.intent)
     assertEquals("ED intent response", reply.reply)
     assertNull(reply.url)
   }
@@ -1630,8 +1627,8 @@ class HomeViewModelTest {
   fun botReply_without_ed_intent_has_default_values() {
     val reply = BotReply(reply = "Normal response", url = "https://epfl.ch")
 
-    assertFalse(reply.edIntentDetected)
-    assertNull(reply.edIntent)
+    assertFalse(reply.edIntent.detected)
+    assertNull(reply.edIntent.intent)
     assertEquals("Normal response", reply.reply)
     assertEquals("https://epfl.ch", reply.url)
   }
@@ -1642,16 +1639,20 @@ class HomeViewModelTest {
         BotReply(
             reply = "ED intent response",
             url = null,
-            edIntentDetected = true,
-            edIntent = "post_question",
-            edFormattedQuestion = "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
-            edFormattedTitle = "Question 5 Modstoch")
+            edIntent =
+                EdIntent(
+                    detected = true,
+                    intent = "post_question",
+                    formattedQuestion =
+                        "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
+                    formattedTitle = "Question 5 Modstoch"))
 
-    assertTrue(reply.edIntentDetected)
-    assertEquals("post_question", reply.edIntent)
+    assertTrue(reply.edIntent.detected)
+    assertEquals("post_question", reply.edIntent.intent)
     assertEquals(
-        "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !", reply.edFormattedQuestion)
-    assertEquals("Question 5 Modstoch", reply.edFormattedTitle)
+        "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
+        reply.edIntent.formattedQuestion)
+    assertEquals("Question 5 Modstoch", reply.edIntent.formattedTitle)
   }
 
   @Test

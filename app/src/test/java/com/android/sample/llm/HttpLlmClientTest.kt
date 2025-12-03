@@ -465,8 +465,9 @@ class HttpLlmClientTest {
     val reply = client.generateReply("Test")
 
     assertEquals(
-        "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !", reply.edFormattedQuestion)
-    assertNull(reply.edFormattedTitle)
+        "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
+        reply.edIntent.formattedQuestion)
+    assertNull(reply.edIntent.formattedTitle)
   }
 
   @Test
@@ -482,8 +483,8 @@ class HttpLlmClientTest {
 
     val reply = client.generateReply("Test")
 
-    assertEquals("Question 5 Modstoch", reply.edFormattedTitle)
-    assertNull(reply.edFormattedQuestion)
+    assertEquals("Question 5 Modstoch", reply.edIntent.formattedTitle)
+    assertNull(reply.edIntent.formattedQuestion)
   }
 
   @Test
@@ -500,8 +501,9 @@ class HttpLlmClientTest {
     val reply = client.generateReply("Test")
 
     assertEquals(
-        "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !", reply.edFormattedQuestion)
-    assertEquals("Question 5 Modstoch", reply.edFormattedTitle)
+        "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
+        reply.edIntent.formattedQuestion)
+    assertEquals("Question 5 Modstoch", reply.edIntent.formattedTitle)
   }
 
   @Test
@@ -517,8 +519,8 @@ class HttpLlmClientTest {
 
     val reply = client.generateReply("Test")
 
-    assertNull(reply.edFormattedQuestion)
-    assertNull(reply.edFormattedTitle)
+    assertNull(reply.edIntent.formattedQuestion)
+    assertNull(reply.edIntent.formattedTitle)
   }
 
   @Test
@@ -536,10 +538,11 @@ class HttpLlmClientTest {
 
     assertEquals("Response", reply.reply)
     assertEquals("https://epfl.ch", reply.url)
-    assertTrue(reply.edIntentDetected)
-    assertEquals("post_question", reply.edIntent)
+    assertTrue(reply.edIntent.detected)
+    assertEquals("post_question", reply.edIntent.intent)
     assertEquals(
-        "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !", reply.edFormattedQuestion)
-    assertEquals("Question 5 Modstoch", reply.edFormattedTitle)
+        "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
+        reply.edIntent.formattedQuestion)
+    assertEquals("Question 5 Modstoch", reply.edIntent.formattedTitle)
   }
 }
