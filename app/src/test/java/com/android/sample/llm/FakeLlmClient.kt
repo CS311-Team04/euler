@@ -5,6 +5,7 @@ class FakeLlmClient : LlmClient {
   val prompts = mutableListOf<String>()
   var nextReply: String = "test-reply"
   var nextUrl: String? = null
+  var nextSourceType: SourceType = SourceType.NONE
   var nextEdIntentDetected: Boolean = false
   var nextEdIntent: String? = null
   var failure: Throwable? = null
@@ -12,7 +13,7 @@ class FakeLlmClient : LlmClient {
   override suspend fun generateReply(prompt: String): BotReply {
     prompts += prompt
     failure?.let { throw it }
-    return BotReply(nextReply, nextUrl, nextEdIntentDetected, nextEdIntent)
+    return BotReply(nextReply, nextUrl, nextSourceType, nextEdIntentDetected, nextEdIntent)
   }
 
   /** Configure the fake to return an ED intent response */
@@ -26,6 +27,7 @@ class FakeLlmClient : LlmClient {
   fun resetToDefault() {
     nextReply = "test-reply"
     nextUrl = null
+    nextSourceType = SourceType.NONE
     nextEdIntentDetected = false
     nextEdIntent = null
     failure = null

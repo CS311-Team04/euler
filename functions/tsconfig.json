@@ -6,11 +6,12 @@
     "esModuleInterop": true,
     "strict": true,
     "skipLibCheck": true,
-    "outDir": "lib",
     "rootDir": "src",
+    "outDir": "lib",
     "sourceMap": true,
     "noImplicitReturns": true,
     "noUnusedLocals": true
   },
-  "include": ["src"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["test/**/*.ts"]
 }
