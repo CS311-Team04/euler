@@ -2,8 +2,6 @@
 
 import {
   detectPostToEdIntentCore,
-  generateEdIntentResponse,
-  detectAndRespondToEdIntent,
   buildEdIntentPromptForApertus,
   EdIntentType,
 } from "../edIntent";
@@ -169,48 +167,18 @@ describe("detectPostToEdIntentCore", () => {
   });
 });
 
-describe("generateEdIntentResponse", () => {
-  it("should generate response for post_question intent", () => {
-    const response = generateEdIntentResponse("post_question", "test question");
-    expect(response).toContain("poster une question sur ED Discussion");
-    expect(response).toContain("connecteur ED");
-  });
-
-  // ===== PLACEHOLDER TESTS: Décommenter quand implémenté =====
-  // it("should generate response for fetch_posts intent", () => {
-  //   const response = generateEdIntentResponse("fetch_posts", "test");
-  //   expect(response).toContain("consulter des posts");
-  // });
-});
-
-describe("detectAndRespondToEdIntent", () => {
-  it("should return full result with reply when intent detected", () => {
-    const result = detectAndRespondToEdIntent("poste sur ed");
-    expect(result.ed_intent_detected).toBe(true);
-    expect(result.ed_intent).toBe("post_question");
-    expect(result.reply).toBeDefined();
-    expect(result.reply).toContain("ED Discussion");
-  });
-
-  it("should return detection-only result when no intent", () => {
-    const result = detectAndRespondToEdIntent("c'est quoi ED?");
-    expect(result.ed_intent_detected).toBe(false);
-    expect(result.ed_intent).toBeNull();
-    expect(result.reply).toBeUndefined();
-  });
-});
-
 describe("buildEdIntentPromptForApertus", () => {
   it("should build prompt with user question", () => {
     const prompt = buildEdIntentPromptForApertus("poste ma question sur ed");
-    expect(prompt).toContain("L'utilisateur souhaite poster sur ED Discussion");
+    expect(prompt).toContain("L'utilisateur souhaite poster une question sur ED Discussion");
     expect(prompt).toContain("poste ma question sur ed");
-    expect(prompt).toContain("fonctionnalité est en cours de développement");
+    expect(prompt).toContain("NE DIS PAS que la fonctionnalité n'est pas disponible");
   });
 
-  it("should include encouragement", () => {
+  it("should include formatting instructions", () => {
     const prompt = buildEdIntentPromptForApertus("test");
-    expect(prompt).toContain("encourageant");
-    expect(prompt).toContain("bientôt");
+    expect(prompt).toContain("FORMATTED_QUESTION");
+    expect(prompt).toContain("FORMATTED_TITLE");
+    expect(prompt).toContain("formules de politesse");
   });
 });

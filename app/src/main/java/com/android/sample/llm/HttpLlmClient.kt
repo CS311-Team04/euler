@@ -136,9 +136,19 @@ internal fun parseBotReply(body: String, gson: Gson): BotReply {
   val replyText =
       json.getTrimmedString(JSON_KEY_REPLY) ?: throw IllegalStateException("Empty LLM reply")
   val url = json.getTrimmedString(JSON_KEY_PRIMARY_URL)
+  val sourceType =
+      com.android.sample.llm.SourceType.fromString(json.getTrimmedString(JSON_KEY_SOURCE_TYPE))
   val edIntentDetected = json.getBoolean(JSON_KEY_ED_INTENT_DETECTED)
-  val edIntent = json.getTrimmedString(JSON_KEY_ED_INTENT)
-  return BotReply(replyText, url, edIntentDetected, edIntent)
+  val edIntentType = json.getTrimmedString(JSON_KEY_ED_INTENT)
+  val edFormattedQuestion = json.getTrimmedString(JSON_KEY_ED_FORMATTED_QUESTION)
+  val edFormattedTitle = json.getTrimmedString(JSON_KEY_ED_FORMATTED_TITLE)
+  val edIntent =
+      com.android.sample.llm.EdIntent(
+          detected = edIntentDetected,
+          intent = edIntentType,
+          formattedQuestion = edFormattedQuestion,
+          formattedTitle = edFormattedTitle)
+  return BotReply(replyText, url, sourceType, edIntent)
 }
 
 private fun JsonObject.getTrimmedString(key: String): String? {
@@ -164,7 +174,10 @@ private const val CONTENT_TYPE_JSON = "application/json; charset=utf-8"
 private const val JSON_KEY_QUESTION = "question"
 private const val JSON_KEY_REPLY = "reply"
 private const val JSON_KEY_PRIMARY_URL = "primary_url"
+private const val JSON_KEY_SOURCE_TYPE = "source_type"
 private const val JSON_KEY_ED_INTENT_DETECTED = "ed_intent_detected"
 private const val JSON_KEY_ED_INTENT = "ed_intent"
+private const val JSON_KEY_ED_FORMATTED_QUESTION = "ed_formatted_question"
+private const val JSON_KEY_ED_FORMATTED_TITLE = "ed_formatted_title"
 // Standard localhost identifier - safe loopback address (RFC 5735)
 private const val LOCALHOST = "localhost"

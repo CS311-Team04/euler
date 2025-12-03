@@ -10,7 +10,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModelProvider
@@ -22,10 +21,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navigation
+import com.android.sample.VoiceChat.Backend.VoiceChatViewModel
 import com.android.sample.VoiceChat.UI.VoiceScreen
 import com.android.sample.auth.MicrosoftAuth
 import com.android.sample.authentification.AuthUIScreen
 import com.android.sample.authentification.AuthUiState
+import com.android.sample.conversations.ConversationRepository
 import com.android.sample.home.HomeScreen
 import com.android.sample.home.HomeViewModel
 import com.android.sample.network.AndroidNetworkConnectivityMonitor
@@ -40,7 +41,8 @@ import com.android.sample.sign_in.AuthViewModel
 import com.android.sample.speech.SpeechPlayback
 import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.splash.OpeningScreen
-import kotlinx.coroutines.launch
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 object Routes {
   const val Opening = "opening"
@@ -204,6 +206,125 @@ private suspend fun navigateToOnboardingOrHome(nav: NavHostController) {
   }
 }
 
+/**
+ * Creates a ConversationRepository or returns null if in guest mode. This function handles
+ * exceptions gracefully to allow guest mode operation.
+ */
+@VisibleForTesting
+internal fun createConversationRepositoryOrNull(): ConversationRepository? {
+  return try {
+    ConversationRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance())
+  } catch (e: Exception) {
+    null // Guest mode - no repository
+  }
+}
+
+/**
+ * Creates a lambda that reads the current conversation ID from HomeViewModel's UI state. The lambda
+ * reads the state each time it's called, ensuring it always returns the current value.
+ */
+@VisibleForTesting
+internal fun createGetCurrentConversationIdLambda(homeViewModel: HomeViewModel): () -> String? {
+  return { homeViewModel.uiState.value.currentConversationId }
+}
+
+/**
+ * Creates a callback that selects a newly created conversation in HomeViewModel. This callback is
+ * invoked when a new conversation is created during voice chat.
+ */
+@VisibleForTesting
+internal fun createOnConversationCreatedCallback(homeViewModel: HomeViewModel): (String) -> Unit {
+  return { conversationId ->
+    // Select the newly created conversation in HomeViewModel
+    homeViewModel.selectConversation(conversationId)
+  }
+}
+
+/**
+ * Factory function to create a VoiceChatViewModel with conversation management. This function is
+ * testable and can be used in both the composable and unit tests.
+ *
+ * @param homeViewModel The HomeViewModel instance to read current conversation state
+ * @param createConversationRepositoryOrNull Lambda to create or retrieve ConversationRepository
+ * @param createGetCurrentConversationIdLambda Lambda factory to create getCurrentConversationId
+ *   lambda
+ * @param createOnConversationCreatedCallback Lambda factory to create onConversationCreated
+ *   callback
+ * @return A configured VoiceChatViewModel instance
+ */
+@VisibleForTesting
+internal fun createVoiceChatViewModel(
+    homeViewModel: HomeViewModel,
+    createConversationRepositoryOrNull: () -> ConversationRepository?,
+    createGetCurrentConversationIdLambda: (HomeViewModel) -> () -> String?,
+    createOnConversationCreatedCallback: (HomeViewModel) -> (String) -> Unit
+): VoiceChatViewModel {
+  val conversationRepo = createConversationRepositoryOrNull()
+  return VoiceChatViewModel(
+      conversationRepository = conversationRepo,
+      getCurrentConversationId = createGetCurrentConversationIdLambda(homeViewModel),
+      onConversationCreated = createOnConversationCreatedCallback(homeViewModel))
+}
+
+/**
+ * Helper function that creates VoiceChatViewModel using the exact same pattern as in the
+ * composable. This function is testable and ensures code coverage of the composable logic. The
+ * composable calls this function to ensure the exact same code paths are executed.
+ */
+@VisibleForTesting
+internal fun createVoiceChatViewModelForComposable(
+    homeViewModel: HomeViewModel
+): VoiceChatViewModel {
+  // This reproduces EXACTLY the code from lines 610-618 of the composable
+  return createVoiceChatViewModel(
+      homeViewModel = homeViewModel,
+      createConversationRepositoryOrNull = { createConversationRepositoryOrNull() },
+      createGetCurrentConversationIdLambda = { createGetCurrentConversationIdLambda(it) },
+      createOnConversationCreatedCallback = { createOnConversationCreatedCallback(it) })
+}
+
+/**
+ * Composable content for the VoiceChat screen. This function is extracted to be testable and
+ * ensures code coverage of the VoiceChat composable content.
+ *
+ * @param homeViewModel The HomeViewModel instance
+ * @param speechHelper The SpeechToTextHelper for voice input
+ * @param onClose Callback when the voice screen should be closed
+ */
+@VisibleForTesting
+@Composable
+internal fun VoiceChatContent(
+    homeViewModel: HomeViewModel,
+    speechHelper: SpeechToTextHelper,
+    onClose: () -> Unit
+) {
+  val voiceChatViewModel =
+      remember(homeViewModel) { createVoiceChatViewModelForComposable(homeViewModel) }
+
+  VoiceScreen(
+      onClose = onClose,
+      modifier = Modifier.fillMaxSize(),
+      speechHelper = speechHelper,
+      voiceChatViewModel = voiceChatViewModel)
+}
+
+/**
+ * Complete VoiceChat composable content that includes getting the HomeViewModel from the parent
+ * entry. This function encapsulates the entire VoiceChat composable logic for testability.
+ *
+ * @param nav The NavHostController
+ * @param speechHelper The SpeechToTextHelper for voice input
+ */
+@VisibleForTesting
+@Composable
+internal fun VoiceChatComposableContent(nav: NavHostController, speechHelper: SpeechToTextHelper) {
+  @Suppress("UnrememberedGetBackStackEntry") val parentEntry = nav.getBackStackEntry("home_root")
+  val homeViewModel: HomeViewModel = viewModel(parentEntry)
+
+  VoiceChatContent(
+      homeViewModel = homeViewModel, speechHelper = speechHelper, onClose = { nav.popBackStack() })
+}
+
 @SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
 fun AppNav(
@@ -229,13 +350,12 @@ fun AppNav(
   // Get current back stack entry
   val navBackStackEntry by nav.currentBackStackEntryAsState()
   val currentDestination = navBackStackEntry?.destination?.route
-  val coroutineScope = rememberCoroutineScope()
 
   // Check for onboarding after sign-in
   LaunchedEffect(authState, currentDestination) {
     when {
       authState is AuthUiState.SignedIn && currentDestination == Routes.SignIn -> {
-        coroutineScope.launch { navigateToOnboardingOrHome(nav) }
+        navigateToOnboardingOrHome(nav)
       }
       authState is AuthUiState.Guest && currentDestination == Routes.SignIn -> {
         // Navigate directly to Home for guest users (skip onboarding)
@@ -538,12 +658,8 @@ fun AppNav(
           }
 
           // Voice Chat Screen
-          composable(Routes.VoiceChat) {
-            VoiceScreen(
-                onClose = { nav.popBackStack() },
-                modifier = Modifier.fillMaxSize(),
-                speechHelper = speechHelper)
-          }
+          // Uses VoiceChatComposableContent which is tested in NavGraphTest
+          composable(Routes.VoiceChat) { VoiceChatComposableContent(nav, speechHelper) }
         }
       }
 }

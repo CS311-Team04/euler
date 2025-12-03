@@ -192,7 +192,7 @@ class ParseBotReplyTest {
 
     assertEquals("ED response", result.reply)
     assertTrue(result.edIntentDetected)
-    assertEquals("post_question", result.edIntent)
+    assertEquals("post_question", result.edIntentType)
   }
 
   @Test
@@ -202,7 +202,7 @@ class ParseBotReplyTest {
 
     assertEquals("Normal response", result.reply)
     assertFalse(result.edIntentDetected)
-    assertNull(result.edIntent)
+    assertNull(result.edIntentType)
   }
 
   @Test
@@ -212,7 +212,7 @@ class ParseBotReplyTest {
 
     assertEquals("Response without ED fields", result.reply)
     assertFalse(result.edIntentDetected)
-    assertNull(result.edIntent)
+    assertNull(result.edIntentType)
   }
 
   @Test
@@ -223,7 +223,7 @@ class ParseBotReplyTest {
       val result = parseBotReply(body, gson)
 
       assertTrue("Should detect ED intent for type: $intentType", result.edIntentDetected)
-      assertEquals(intentType, result.edIntent)
+      assertEquals(intentType, result.edIntentType)
     }
   }
 
@@ -243,7 +243,7 @@ class ParseBotReplyTest {
     val result = parseBotReply(body, gson)
 
     assertTrue(result.edIntentDetected)
-    assertNull("Non-string ed_intent should be null", result.edIntent)
+    assertNull("Non-string ed_intent should be null", result.edIntentType)
   }
 
   @Test
@@ -255,6 +255,139 @@ class ParseBotReplyTest {
     assertEquals("Full response", result.reply)
     assertEquals("https://epfl.ch", result.url)
     assertTrue(result.edIntentDetected)
-    assertEquals("post_question", result.edIntent)
+    assertEquals("post_question", result.edIntentType)
+  }
+
+  // ==================== ED FORMATTED QUESTION/TITLE TESTS ====================
+
+  @Test
+  fun parseBotReply_parses_ed_formatted_question() {
+    val body =
+        """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question","ed_formatted_question":"Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !"}"""
+    val result = parseBotReply(body, gson)
+
+    assertEquals(
+        "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
+        result.edFormattedQuestion)
+    assertNull(result.edFormattedTitle)
+  }
+
+  @Test
+  fun parseBotReply_parses_ed_formatted_title() {
+    val body =
+        """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question","ed_formatted_title":"Question 5 Modstoch"}"""
+    val result = parseBotReply(body, gson)
+
+    assertEquals("Question 5 Modstoch", result.edFormattedTitle)
+    assertNull(result.edFormattedQuestion)
+  }
+
+  @Test
+  fun parseBotReply_parses_both_formatted_fields() {
+    val body =
+        """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question","ed_formatted_question":"Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !","ed_formatted_title":"Question 5 Modstoch"}"""
+    val result = parseBotReply(body, gson)
+
+    assertEquals(
+        "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
+        result.edFormattedQuestion)
+    assertEquals("Question 5 Modstoch", result.edFormattedTitle)
+  }
+
+  @Test
+  fun parseBotReply_defaults_formatted_fields_when_missing() {
+    val body = """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question"}"""
+    val result = parseBotReply(body, gson)
+
+    assertNull(result.edFormattedQuestion)
+    assertNull(result.edFormattedTitle)
+  }
+
+  @Test
+  fun parseBotReply_handles_empty_formatted_question() {
+    val body =
+        """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question","ed_formatted_question":""}"""
+    val result = parseBotReply(body, gson)
+
+    assertNull("Empty string should be treated as null", result.edFormattedQuestion)
+  }
+
+  @Test
+  fun parseBotReply_handles_empty_formatted_title() {
+    val body =
+        """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question","ed_formatted_title":""}"""
+    val result = parseBotReply(body, gson)
+
+    assertNull("Empty string should be treated as null", result.edFormattedTitle)
+  }
+
+  @Test
+  fun parseBotReply_trims_formatted_question() {
+    val body =
+        """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question","ed_formatted_question":"  Trimmed question  "}"""
+    val result = parseBotReply(body, gson)
+
+    assertEquals("Trimmed question", result.edFormattedQuestion)
+  }
+
+  @Test
+  fun parseBotReply_trims_formatted_title() {
+    val body =
+        """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question","ed_formatted_title":"  Trimmed title  "}"""
+    val result = parseBotReply(body, gson)
+
+    assertEquals("Trimmed title", result.edFormattedTitle)
+  }
+
+  @Test
+  fun parseBotReply_handles_whitespace_formatted_question() {
+    val body =
+        """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question","ed_formatted_question":"   "}"""
+    val result = parseBotReply(body, gson)
+
+    assertNull("Whitespace-only should be treated as null", result.edFormattedQuestion)
+  }
+
+  @Test
+  fun parseBotReply_handles_whitespace_formatted_title() {
+    val body =
+        """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question","ed_formatted_title":"   "}"""
+    val result = parseBotReply(body, gson)
+
+    assertNull("Whitespace-only should be treated as null", result.edFormattedTitle)
+  }
+
+  @Test
+  fun parseBotReply_handles_null_formatted_question() {
+    val body =
+        """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question","ed_formatted_question":null}"""
+    val result = parseBotReply(body, gson)
+
+    assertNull(result.edFormattedQuestion)
+  }
+
+  @Test
+  fun parseBotReply_handles_null_formatted_title() {
+    val body =
+        """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question","ed_formatted_title":null}"""
+    val result = parseBotReply(body, gson)
+
+    assertNull(result.edFormattedTitle)
+  }
+
+  @Test
+  fun parseBotReply_complete_ed_response() {
+    val body =
+        """{"reply":"Response","primary_url":"https://epfl.ch","ed_intent_detected":true,"ed_intent":"post_question","ed_formatted_question":"Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !","ed_formatted_title":"Question 5 Modstoch"}"""
+    val result = parseBotReply(body, gson)
+
+    assertEquals("Response", result.reply)
+    assertEquals("https://epfl.ch", result.url)
+    assertTrue(result.edIntentDetected)
+    assertEquals("post_question", result.edIntentType)
+    assertEquals(
+        "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
+        result.edFormattedQuestion)
+    assertEquals("Question 5 Modstoch", result.edFormattedTitle)
   }
 }

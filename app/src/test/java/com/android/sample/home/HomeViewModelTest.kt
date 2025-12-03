@@ -8,8 +8,10 @@ import com.android.sample.conversations.Conversation
 import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.MessageDTO
 import com.android.sample.llm.BotReply
+import com.android.sample.llm.EdIntent
 import com.android.sample.llm.FakeLlmClient
 import com.android.sample.llm.LlmClient
+import com.android.sample.llm.SourceType
 import com.android.sample.profile.UserProfile
 import com.android.sample.util.MainDispatcherRule
 import com.google.android.gms.tasks.Tasks
@@ -414,7 +416,10 @@ class HomeViewModelTest {
         object : LlmClient {
           override suspend fun generateReply(prompt: String): BotReply =
               BotReply(
-                  "Voici un lien utile.", "https://www.epfl.ch/education/projects", false, null)
+                  "Voici un lien utile.",
+                  "https://www.epfl.ch/education/projects",
+                  SourceType.RAG,
+                  EdIntent())
         })
 
     viewModel.updateMessageDraft("Où trouver des projets ?")
@@ -429,6 +434,35 @@ class HomeViewModelTest {
     assertEquals("https://www.epfl.ch/education/projects", sourceCard!!.source?.url)
     assertEquals("EPFL.ch Website", sourceCard.source?.siteLabel)
   }
+
+  @Test
+  fun sendMessage_guest_appends_schedule_source_card_when_llm_returns_schedule_type() =
+      runBlocking {
+        val viewModel = HomeViewModel()
+        viewModel.setPrivateField(
+            "llmClient",
+            object : LlmClient {
+              override suspend fun generateReply(prompt: String): BotReply =
+                  BotReply(
+                      "You have a lecture at 10:00 in CM1.",
+                      null, // No URL for schedule sources
+                      SourceType.SCHEDULE,
+                      EdIntent())
+            })
+
+        viewModel.updateMessageDraft("What's my schedule today?")
+        viewModel.sendMessage()
+        dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.awaitStreamingCompletion()
+
+        val messages = viewModel.uiState.value.messages
+        val sourceCard = messages.lastOrNull { it.source != null }
+        assertNotNull("Expected a schedule source card message", sourceCard)
+        assertNull(sourceCard!!.source?.url) // Schedule sources have no URL
+        assertEquals("Your EPFL Schedule", sourceCard.source?.siteLabel)
+        assertTrue(sourceCard.source?.isScheduleSource == true)
+      }
 
   @Test
   fun sendMessage_failure_surfaces_error_message() = runBlocking {
@@ -1560,8 +1594,7 @@ class HomeViewModelTest {
   fun sendMessage_without_ed_intent_works_normally() = runBlocking {
     val fakeLlm = FakeLlmClient()
     fakeLlm.nextReply = "Normal response about EPFL"
-    fakeLlm.nextEdIntentDetected = false
-    fakeLlm.nextEdIntent = null
+    fakeLlm.nextEdIntent = EdIntent()
 
     val viewModel = HomeViewModel()
     viewModel.setPrivateField("llmClient", fakeLlm)
@@ -1582,11 +1615,10 @@ class HomeViewModelTest {
         BotReply(
             reply = "ED intent response",
             url = null,
-            edIntentDetected = true,
-            edIntent = "post_question")
+            edIntent = EdIntent(detected = true, intent = "post_question"))
 
-    assertTrue(reply.edIntentDetected)
-    assertEquals("post_question", reply.edIntent)
+    assertTrue(reply.edIntent.detected)
+    assertEquals("post_question", reply.edIntent.intent)
     assertEquals("ED intent response", reply.reply)
     assertNull(reply.url)
   }
@@ -1595,9 +1627,100 @@ class HomeViewModelTest {
   fun botReply_without_ed_intent_has_default_values() {
     val reply = BotReply(reply = "Normal response", url = "https://epfl.ch")
 
-    assertFalse(reply.edIntentDetected)
-    assertNull(reply.edIntent)
+    assertFalse(reply.edIntent.detected)
+    assertNull(reply.edIntent.intent)
     assertEquals("Normal response", reply.reply)
     assertEquals("https://epfl.ch", reply.url)
+  }
+
+  @Test
+  fun botReply_with_ed_intent_includes_formatted_fields() {
+    val reply =
+        BotReply(
+            reply = "ED intent response",
+            url = null,
+            edIntent =
+                EdIntent(
+                    detected = true,
+                    intent = "post_question",
+                    formattedQuestion =
+                        "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
+                    formattedTitle = "Question 5 Modstoch"))
+
+    assertTrue(reply.edIntent.detected)
+    assertEquals("post_question", reply.edIntent.intent)
+    assertEquals(
+        "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
+        reply.edIntent.formattedQuestion)
+    assertEquals("Question 5 Modstoch", reply.edIntent.formattedTitle)
+  }
+
+  @Test
+  fun homeViewModel_creates_PostOnEd_when_ed_intent_detected() = runTest {
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.setEdIntentResponseWithFormatted(
+        reply = "Voici votre question formatée pour ED.",
+        intent = "post_question",
+        formattedQuestion =
+            "Bonjour,\n\nComment résoudre la question 5 de Modstoch S9 ?\n\nMerci d'avance !",
+        formattedTitle = "Question 5 Modstoch S9")
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val repo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel = HomeViewModel(fakeLlm, auth, repo)
+
+    viewModel.updateMessageDraft("Poste sur ed comment résoudre la question 5 modstoch")
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    val state = viewModel.uiState.value
+    assertNotNull("pendingAction should be set", state.pendingAction)
+    assertTrue("pendingAction should be PostOnEd", state.pendingAction is PendingAction.PostOnEd)
+    val postOnEd = state.pendingAction as PendingAction.PostOnEd
+    assertEquals("Question 5 Modstoch S9", postOnEd.draftTitle)
+    assertEquals(
+        "Bonjour,\n\nComment résoudre la question 5 de Modstoch S9 ?\n\nMerci d'avance !",
+        postOnEd.draftBody)
+  }
+
+  @Test
+  fun homeViewModel_creates_PostOnEd_with_fallback_when_formatted_fields_missing() = runTest {
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.setEdIntentResponse(
+        reply = "Je vais vous aider à poster sur ED.", intent = "post_question")
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val repo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel = HomeViewModel(fakeLlm, auth, repo)
+
+    val question = "Poste sur ed ma question"
+    viewModel.updateMessageDraft(question)
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    val state = viewModel.uiState.value
+    assertNotNull("pendingAction should be set", state.pendingAction)
+    assertTrue("pendingAction should be PostOnEd", state.pendingAction is PendingAction.PostOnEd)
+    val postOnEd = state.pendingAction as PendingAction.PostOnEd
+    assertEquals("", postOnEd.draftTitle) // Falls back to empty string
+    assertEquals(question, postOnEd.draftBody) // Falls back to original question
   }
 }
