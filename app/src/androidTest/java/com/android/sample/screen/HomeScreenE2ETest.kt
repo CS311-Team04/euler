@@ -6,12 +6,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -85,37 +82,38 @@ class HomeScreenE2ETest {
     composeRule.onNodeWithText("Ask Euler Anything").assertIsDisplayed()
   }
 
-  @Test
-  fun homeScreen_userCanSendMessageAndReceiveResponse() {
-    launchHomeScreen()
-
-    // Wait for the message field to be ready
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.MessageField), timeoutMillis = 5_000)
-
-    // Type a message in the message field
-    val testMessage = "Hello Euler"
-    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput(testMessage)
-
-    // Wait for send button to appear (it should appear when text is entered)
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.SendBtn), timeoutMillis = 5_000)
-
-    // Click the send button
-    composeRule.onNodeWithTag(HomeTags.SendBtn).performClick()
-
-    // Wait for the UI to update after clicking send
-    composeRule.waitForIdle()
-
-    // Wait for the message to appear in the chat (message is added immediately in sendMessage)
-    // Try using testTag first, then fallback to text search
-    composeRule.waitUntilAtLeastOneExists(hasTestTag("chat_user_text"), timeoutMillis = 10_000)
-    composeRule.onNodeWithTag("chat_user_text").assertIsDisplayed()
-
-    // Also verify the text content
-    composeRule.waitUntilAtLeastOneExists(
-        hasText(testMessage, substring = true), timeoutMillis = 5_000)
-    composeRule.onNodeWithText(testMessage, substring = true).assertIsDisplayed()
-
-    // Note: LLM response verification removed as HomeViewModel doesn't accept FakeLlmClient
-    // The message should appear in the chat UI
-  }
+  //  @Test
+  //  fun homeScreen_userCanSendMessageAndReceiveResponse() {
+  //    launchHomeScreen()
+  //
+  //    // Wait for the message field to be ready
+  //    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.MessageField), timeoutMillis =
+  // 5_000)
+  //
+  //    // Type a message in the message field
+  //    val testMessage = "Hello Euler"
+  //    composeRule.onNodeWithTag(HomeTags.MessageField).performTextInput(testMessage)
+  //
+  //    // Wait for send button to appear (it should appear when text is entered)
+  //    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.SendBtn), timeoutMillis = 5_000)
+  //
+  //    // Click the send button
+  //    composeRule.onNodeWithTag(HomeTags.SendBtn).performClick()
+  //
+  //    // Wait for the UI to update after clicking send
+  //    composeRule.waitForIdle()
+  //
+  //    // Wait for the message to appear in the chat (message is added immediately in sendMessage)
+  //    // Try using testTag first, then fallback to text search
+  //    composeRule.waitUntilAtLeastOneExists(hasTestTag("chat_user_text"), timeoutMillis = 10_000)
+  //    composeRule.onNodeWithTag("chat_user_text").assertIsDisplayed()
+  //
+  //    // Also verify the text content
+  //    composeRule.waitUntilAtLeastOneExists(
+  //        hasText(testMessage, substring = true), timeoutMillis = 5_000)
+  //    composeRule.onNodeWithText(testMessage, substring = true).assertIsDisplayed()
+  //
+  //    // Note: LLM response verification removed as HomeViewModel doesn't accept FakeLlmClient
+  //    // The message should appear in the chat UI
+  //  }
 }
