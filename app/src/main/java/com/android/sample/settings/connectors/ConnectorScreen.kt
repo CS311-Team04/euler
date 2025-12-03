@@ -269,8 +269,7 @@ fun ConnectorsScreen(
 private fun MoodleRedirectingOverlay() {
   Box(
       modifier =
-          Modifier.fillMaxSize()
-              .background(com.android.sample.ui.theme.MoodleLoginBackground),
+          Modifier.fillMaxSize().background(com.android.sample.ui.theme.MoodleLoginBackground),
       contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
           // Moodle logo
@@ -478,8 +477,8 @@ internal fun EdConnectDialog(
 }
 
 /**
- * Moodle-styled login dialog that mimics the official Moodle login page.
- * Features a white card on gray background with Moodle branding.
+ * Moodle-styled login dialog that mimics the official Moodle login page. Features a white card on
+ * gray background with Moodle branding.
  */
 @Composable
 internal fun MoodleConnectDialog(
@@ -602,7 +601,8 @@ internal fun MoodleConnectDialog(
 @Composable
 private fun MoodleLogoHeader() {
   coil.compose.AsyncImage(
-      model = "https://res.cloudinary.com/dw5ba0va3/image/upload/v1759937020/Moodle_Logo_zwznns.png",
+      model =
+          "https://res.cloudinary.com/dw5ba0va3/image/upload/v1759937020/Moodle_Logo_zwznns.png",
       contentDescription = "Moodle Logo",
       modifier = Modifier.height(100.dp).widthIn(max = 320.dp),
       contentScale = androidx.compose.ui.layout.ContentScale.Fit)
@@ -642,9 +642,7 @@ private fun MoodleStyledTextField(
               focusedTextColor = com.android.sample.ui.theme.MoodleLoginText,
               unfocusedTextColor = com.android.sample.ui.theme.MoodleLoginText),
       shape = RoundedCornerShape(10.dp),
-      modifier =
-          Modifier.fillMaxWidth()
-              .height(64.dp))
+      modifier = Modifier.fillMaxWidth().height(64.dp))
 }
 
 /** Moodle-styled password field with clean borders and generous padding. */
@@ -670,7 +668,9 @@ private fun MoodleStyledPasswordField(
       visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
       keyboardOptions =
           KeyboardOptions(
-              autoCorrect = false, keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+              autoCorrect = false,
+              keyboardType = KeyboardType.Password,
+              imeAction = ImeAction.Done),
       colors =
           OutlinedTextFieldDefaults.colors(
               focusedBorderColor = com.android.sample.ui.theme.MoodleLoginInputBorderFocused,

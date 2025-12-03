@@ -759,7 +759,8 @@ object Localization {
           edTranslationsPt() +
           mapOf(
               "moodle_connect_generic_error" to "Falha ao conectar ao Moodle. Tente novamente.",
-              "moodle_connect_invalid_credentials" to "Credenciais inválidas. Verifique seu nome de usuário e senha.",
+              "moodle_connect_invalid_credentials" to
+                  "Credenciais inválidas. Verifique seu nome de usuário e senha.",
               "moodle_connect_api_unreachable" to
                   "A API Moodle não está acessível. Verifique sua conexão.",
               "settings_connectors_moodle_title" to "Conectar ao Moodle",
