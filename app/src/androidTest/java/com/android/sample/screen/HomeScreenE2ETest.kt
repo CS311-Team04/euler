@@ -44,11 +44,11 @@ class HomeScreenE2ETest {
     val context = ApplicationProvider.getApplicationContext<Context>()
     if (FirebaseApp.getApps(context).isEmpty()) {
       val options =
-        FirebaseOptions.Builder()
-          .setApplicationId("1:1234567890:android:integration-test")
-          .setProjectId("integration-test")
-          .setApiKey("fake-api-key")
-          .build()
+          FirebaseOptions.Builder()
+              .setApplicationId("1:1234567890:android:integration-test")
+              .setProjectId("integration-test")
+              .setApiKey("fake-api-key")
+              .build()
       FirebaseApp.initializeApp(context, options)
     }
   }
@@ -107,7 +107,7 @@ class HomeScreenE2ETest {
 
     // Wait for the message to appear in the chat (message is added immediately in sendMessage)
     composeRule.waitUntilAtLeastOneExists(
-      hasText(testMessage, substring = true), timeoutMillis = 10_000)
+        hasText(testMessage, substring = true), timeoutMillis = 10_000)
     composeRule.onNodeWithText(testMessage, substring = true).assertIsDisplayed()
 
     // Note: LLM response verification removed as HomeViewModel doesn't accept FakeLlmClient
