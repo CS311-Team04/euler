@@ -185,14 +185,6 @@ class FirebaseFunctionsLlmClientTest {
   }
 
   @Test
-  fun `SourceType fromString returns FOOD for food`() {
-    assertEquals(SourceType.FOOD, SourceType.fromString("food"))
-    assertEquals(SourceType.FOOD, SourceType.fromString("FOOD"))
-    assertEquals(SourceType.FOOD, SourceType.fromString("Food"))
-    assertEquals(SourceType.FOOD, SourceType.fromString("FoOd"))
-  }
-
-  @Test
   fun `SourceType fromString handles null and empty`() {
     assertEquals(SourceType.NONE, SourceType.fromString(null))
     assertEquals(SourceType.NONE, SourceType.fromString(""))
@@ -210,30 +202,11 @@ class FirebaseFunctionsLlmClientTest {
   }
 
   @Test
-  fun `SourceType fromString returns NONE for unknown`() {
-    assertEquals(SourceType.NONE, SourceType.fromString("unknown"))
-    assertEquals(SourceType.NONE, SourceType.fromString(null))
-    assertEquals(SourceType.NONE, SourceType.fromString(""))
-  }
-
-  @Test
   fun `SourceType enum contains all expected values`() {
     val values = SourceType.values()
-    assertEquals(4, values.size)
+    assertEquals(3, values.size)
     assertTrue(values.contains(SourceType.SCHEDULE))
     assertTrue(values.contains(SourceType.RAG))
-    assertTrue(values.contains(SourceType.FOOD))
     assertTrue(values.contains(SourceType.NONE))
-  }
-
-  @Test
-  fun generateReply_parses_source_type_food() = runTest {
-    val reply = "Here are today's menus"
-    val client = clientWithResult(mapOf("reply" to reply, "source_type" to "food"))
-
-    val result = client.generateReply("what's for lunch?")
-
-    assertEquals(reply, result.reply)
-    assertEquals(SourceType.FOOD, result.sourceType)
   }
 }

@@ -972,54 +972,6 @@ class HomeScreenComposeInteractionsTest {
   }
 
   @Test
-  fun homeScreen_displays_schedule_source_indicator() {
-    val viewModel = createViewModel()
-    val messageWithSchedule =
-        ChatUIModel(
-            id = "msg-1",
-            text = "You have a lecture at 10:00",
-            timestamp = System.currentTimeMillis(),
-            type = ChatType.AI,
-            source =
-                SourceMeta(
-                    siteLabel = "Your EPFL Schedule",
-                    title = "Schedule",
-                    url = null,
-                    compactType = CompactSourceType.SCHEDULE))
-    viewModel.editState { it.copy(messages = listOf(messageWithSchedule)) }
-
-    composeRule.setContent { HomeScreen(viewModel = viewModel) }
-    composeRule.waitForIdle()
-
-    // Should display schedule indicator with emoji
-    composeRule.onNodeWithText("📅 Your EPFL Schedule", substring = true).assertExists()
-  }
-
-  @Test
-  fun homeScreen_displays_food_source_indicator() {
-    val viewModel = createViewModel()
-    val messageWithFood =
-        ChatUIModel(
-            id = "msg-2",
-            text = "Today's menu: Pasta 8.50 CHF",
-            timestamp = System.currentTimeMillis(),
-            type = ChatType.AI,
-            source =
-                SourceMeta(
-                    siteLabel = "EPFL Restaurants",
-                    title = "Menu",
-                    url = "https://epfl.ch/food",
-                    compactType = CompactSourceType.FOOD))
-    viewModel.editState { it.copy(messages = listOf(messageWithFood)) }
-
-    composeRule.setContent { HomeScreen(viewModel = viewModel) }
-    composeRule.waitForIdle()
-
-    // Should display food indicator with emoji
-    composeRule.onNodeWithText("🍴 EPFL Restaurants", substring = true).assertExists()
-  }
-
-  @Test
   fun homeScreen_displays_full_rag_source_card_with_visit_button() {
     val viewModel = createViewModel()
     val messageWithRag =
@@ -1032,8 +984,7 @@ class HomeScreenComposeInteractionsTest {
                 SourceMeta(
                     siteLabel = "EPFL.ch Website",
                     title = "Projects",
-                    url = "https://www.epfl.ch/education/projects",
-                    compactType = CompactSourceType.NONE))
+                    url = "https://www.epfl.ch/education/projects"))
     viewModel.editState { it.copy(messages = listOf(messageWithRag)) }
 
     composeRule.setContent { HomeScreen(viewModel = viewModel) }
@@ -1058,8 +1009,7 @@ class HomeScreenComposeInteractionsTest {
                 SourceMeta(
                     siteLabel = "Test Site",
                     title = "Test",
-                    url = null,
-                    compactType = CompactSourceType.NONE))
+                    url = null))
     viewModel.editState { it.copy(messages = listOf(messageWithNullUrl)) }
 
     composeRule.setContent { HomeScreen(viewModel = viewModel) }
@@ -1069,70 +1019,6 @@ class HomeScreenComposeInteractionsTest {
     composeRule.onNodeWithText("Visit", substring = true).assertDoesNotExist()
   }
 
-  // CompactSourceType tests
-  @Test
-  fun CompactSourceType_enum_contains_all_expected_values() {
-    val values = CompactSourceType.values()
-    assertEquals(3, values.size)
-    assertTrue(values.contains(CompactSourceType.NONE))
-    assertTrue(values.contains(CompactSourceType.SCHEDULE))
-    assertTrue(values.contains(CompactSourceType.FOOD))
-  }
-
-  @Test
-  fun CompactSourceType_NONE_is_first_value() {
-    assertEquals(0, CompactSourceType.NONE.ordinal)
-  }
-
-  @Test
-  fun CompactSourceType_SCHEDULE_is_second_value() {
-    assertEquals(1, CompactSourceType.SCHEDULE.ordinal)
-  }
-
-  @Test
-  fun CompactSourceType_FOOD_is_third_value() {
-    assertEquals(2, CompactSourceType.FOOD.ordinal)
-  }
-
-  @Test
-  fun CompactSourceType_valueOf_returns_correct_values() {
-    assertEquals(CompactSourceType.NONE, CompactSourceType.valueOf("NONE"))
-    assertEquals(CompactSourceType.SCHEDULE, CompactSourceType.valueOf("SCHEDULE"))
-    assertEquals(CompactSourceType.FOOD, CompactSourceType.valueOf("FOOD"))
-  }
-
-  @Test
-  fun SourceMeta_default_compactType_is_NONE() {
-    val meta = SourceMeta(siteLabel = "Test", title = "Test Title", url = "https://example.com")
-    assertEquals(CompactSourceType.NONE, meta.compactType)
-  }
-
-  @Test
-  fun SourceMeta_with_FOOD_compactType() {
-    val meta =
-        SourceMeta(
-            siteLabel = "EPFL Restaurants",
-            title = "Daily Menu",
-            url = "https://epfl.ch/food",
-            compactType = CompactSourceType.FOOD)
-    assertEquals(CompactSourceType.FOOD, meta.compactType)
-    assertEquals("EPFL Restaurants", meta.siteLabel)
-  }
-
-  @Test
-  fun SourceMeta_with_SCHEDULE_compactType() {
-    val meta =
-        SourceMeta(
-            siteLabel = "Your EPFL Schedule",
-            title = "Calendar",
-            url = null,
-            isScheduleSource = true,
-            compactType = CompactSourceType.SCHEDULE)
-    assertEquals(CompactSourceType.SCHEDULE, meta.compactType)
-    assertTrue(meta.isScheduleSource)
-    assertNull(meta.url)
-  }
-
   @Test
   fun SourceMeta_retrievedAt_has_default_value() {
     val before = System.currentTimeMillis()
@@ -1140,64 +1026,5 @@ class HomeScreenComposeInteractionsTest {
     val after = System.currentTimeMillis()
     assertTrue(meta.retrievedAt >= before)
     assertTrue(meta.retrievedAt <= after)
-  }
-
-  @Test
-  fun SourceMeta_copy_preserves_compactType() {
-    val original =
-        SourceMeta(
-            siteLabel = "Test",
-            title = "Title",
-            url = "https://example.com",
-            compactType = CompactSourceType.FOOD)
-    val copy = original.copy(siteLabel = "New Label")
-    assertEquals(CompactSourceType.FOOD, copy.compactType)
-    assertEquals("New Label", copy.siteLabel)
-  }
-
-  @Test
-  fun SourceMeta_equality_differs_for_different_compactType() {
-    val meta1 =
-        SourceMeta(
-            siteLabel = "Test",
-            title = "Title",
-            url = null,
-            compactType = CompactSourceType.SCHEDULE)
-    val meta2 =
-        SourceMeta(
-            siteLabel = "Test", title = "Title", url = null, compactType = CompactSourceType.FOOD)
-    assertNotEquals(meta1, meta2)
-  }
-
-  @Test
-  fun SourceMeta_equality_same_compactType() {
-    val meta1 =
-        SourceMeta(
-            siteLabel = "EPFL Restaurants",
-            title = "Menu",
-            url = "https://epfl.ch/food",
-            compactType = CompactSourceType.FOOD)
-    val meta2 =
-        SourceMeta(
-            siteLabel = "EPFL Restaurants",
-            title = "Menu",
-            url = "https://epfl.ch/food",
-            compactType = CompactSourceType.FOOD)
-    assertEquals(meta1, meta2)
-  }
-
-  @Test
-  fun SourceMeta_toString_contains_compactType() {
-    val meta =
-        SourceMeta(
-            siteLabel = "Test", title = "Title", url = null, compactType = CompactSourceType.FOOD)
-    assertTrue(meta.toString().contains("FOOD"))
-  }
-
-  @Test
-  fun CompactSourceType_name_returns_correct_string() {
-    assertEquals("NONE", CompactSourceType.NONE.name)
-    assertEquals("SCHEDULE", CompactSourceType.SCHEDULE.name)
-    assertEquals("FOOD", CompactSourceType.FOOD.name)
   }
 }
