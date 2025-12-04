@@ -1792,18 +1792,32 @@ export async function answerFoodQuestionCore(question: string): Promise<{
       };
     }
     
-    const mealsList = meals.map(m => {
-      const tags: string[] = [];
-      if (m.isVegan) tags.push("🌱 vegan");
-      else if (m.isVegetarian) tags.push("🥬 végétarien");
-      const price = m.studentPrice ? ` — ${m.studentPrice.toFixed(2)} CHF` : "";
-      const tagStr = tags.length > 0 ? ` [${tags.join(", ")}]` : "";
-      return `• ${m.name}${tagStr}${price}`;
-    }).join("\n");
-    
+    // Short restaurant name for cleaner display
+    const shortName = restaurantMatch.replace("-Restauration végétale - Bar à café", "").trim();
     const priceNote = maxPrice !== null ? ` (< ${maxPrice} CHF)` : "";
+    
+    const lines: string[] = [
+      `## 🍽️ ${shortName}`,
+      `*${formattedDayLabel}${priceNote}*`,
+      "",
+      "---",
+      "",
+    ];
+    
+    for (const meal of meals) {
+      const tags: string[] = [];
+      if (meal.isVegan) tags.push("🌱");
+      else if (meal.isVegetarian) tags.push("🥬");
+      const tagStr = tags.length > 0 ? ` ${tags.join("")}` : "";
+      const price = meal.studentPrice ? `*${meal.studentPrice.toFixed(2)} CHF*` : "";
+      
+      lines.push(`**${meal.name}**${tagStr}`);
+      if (price) lines.push(price);
+      lines.push("");
+    }
+    
     return {
-      reply: `${formattedDayLabel} à ${restaurantMatch}${priceNote}:\n${mealsList}`,
+      reply: lines.join("\n").trim(),
       source_type: "food",
       meals,
     };
@@ -1829,15 +1843,40 @@ export async function answerFoodQuestionCore(question: string): Promise<{
     }
     
     const type = isVeganQuery ? "vegan" : "végétarien";
-    const mealsList = veggieMeals.map(m => {
-      const tag = m.isVegan ? "🌱" : "🥬";
-      const price = m.studentPrice ? ` — ${m.studentPrice.toFixed(2)} CHF` : "";
-      return `• ${tag} ${m.name} (${m.restaurant})${price}`;
-    }).join("\n");
-    
+    const emoji = isVeganQuery ? "🌱" : "🥬";
     const priceNote = maxPrice !== null ? ` (< ${maxPrice} CHF)` : "";
+    
+    // Group by restaurant for cleaner output
+    const byRestaurant = new Map<string, typeof veggieMeals>();
+    for (const meal of veggieMeals) {
+      if (!byRestaurant.has(meal.restaurant)) byRestaurant.set(meal.restaurant, []);
+      byRestaurant.get(meal.restaurant)!.push(meal);
+    }
+    
+    const lines: string[] = [
+      `## ${emoji} Plats ${type}s`,
+      `*${formattedDayLabel}${priceNote}*`,
+      "",
+    ];
+    
+    for (const [restaurant, meals] of byRestaurant) {
+      // Short restaurant name for cleaner display
+      const shortName = restaurant.replace("-Restauration végétale - Bar à café", "").trim();
+      lines.push("---");
+      lines.push("");
+      lines.push(`### ${shortName}`);
+      lines.push("");
+      
+      for (const meal of meals) {
+        const price = meal.studentPrice ? `*${meal.studentPrice.toFixed(2)} CHF*` : "";
+        lines.push(`- **${meal.name}**`);
+        if (price) lines.push(`  ${price}`);
+      }
+      lines.push("");
+    }
+    
     return {
-      reply: `Plats ${type}s ${dayLabel}${priceNote}:\n${mealsList}`,
+      reply: lines.join("\n").trim(),
       source_type: "food",
       meals: veggieMeals,
     };
@@ -1857,16 +1896,39 @@ export async function answerFoodQuestionCore(question: string): Promise<{
     // Sort by price
     affordableMeals.sort((a, b) => (a.studentPrice ?? 999) - (b.studentPrice ?? 999));
     
-    const mealsList = affordableMeals.map(m => {
-      const tags: string[] = [];
-      if (m.isVegan) tags.push("🌱");
-      else if (m.isVegetarian) tags.push("🥬");
-      const tagStr = tags.length > 0 ? ` ${tags.join(" ")}` : "";
-      return `• ${m.name}${tagStr} (${m.restaurant}) — ${m.studentPrice?.toFixed(2)} CHF`;
-    }).join("\n");
+    // Group by restaurant
+    const byRestaurant = new Map<string, typeof affordableMeals>();
+    for (const meal of affordableMeals) {
+      if (!byRestaurant.has(meal.restaurant)) byRestaurant.set(meal.restaurant, []);
+      byRestaurant.get(meal.restaurant)!.push(meal);
+    }
+    
+    const lines: string[] = [
+      `## 💰 Plats < ${maxPrice} CHF`,
+      `*${formattedDayLabel}*`,
+      "",
+    ];
+    
+    for (const [restaurant, meals] of byRestaurant) {
+      const shortName = restaurant.replace("-Restauration végétale - Bar à café", "").trim();
+      lines.push("---");
+      lines.push("");
+      lines.push(`### ${shortName}`);
+      lines.push("");
+      
+      for (const meal of meals) {
+        const tags: string[] = [];
+        if (meal.isVegan) tags.push("🌱");
+        else if (meal.isVegetarian) tags.push("🥬");
+        const tagStr = tags.length > 0 ? ` ${tags.join("")}` : "";
+        lines.push(`- **${meal.name}**${tagStr}`);
+        lines.push(`  *${meal.studentPrice?.toFixed(2)} CHF*`);
+      }
+      lines.push("");
+    }
     
     return {
-      reply: `Plats à moins de ${maxPrice} CHF ${dayLabel}:\n${mealsList}`,
+      reply: lines.join("\n").trim(),
       source_type: "food",
       meals: affordableMeals,
     };
@@ -1885,10 +1947,26 @@ export async function answerFoodQuestionCore(question: string): Promise<{
     const tags: string[] = [];
     if (cheapest.isVegan) tags.push("🌱 vegan");
     else if (cheapest.isVegetarian) tags.push("🥬 végétarien");
-    const tagStr = tags.length > 0 ? ` [${tags.join(", ")}]` : "";
+    const tagStr = tags.length > 0 ? ` ${tags.join(", ")}` : "";
+    const shortName = cheapest.restaurant.replace("-Restauration végétale - Bar à café", "").trim();
+    
+    const lines: string[] = [
+      `## 💰 Le moins cher`,
+      `*${formattedDayLabel}*`,
+      "",
+      "---",
+      "",
+      `### ${shortName}`,
+      "",
+      `**${cheapest.name}**${tagStr}`,
+      "",
+      `# ${cheapest.studentPrice?.toFixed(2)} CHF`,
+      "",
+      "*Prix étudiant*",
+    ];
     
     return {
-      reply: `Le plat le moins cher ${dayLabel} est "${cheapest.name}"${tagStr} à ${cheapest.restaurant} pour ${cheapest.studentPrice?.toFixed(2)} CHF (prix étudiant).`,
+      reply: lines.join("\n").trim(),
       source_type: "food",
       meals: [cheapest],
     };
@@ -1901,21 +1979,34 @@ export async function answerFoodQuestionCore(question: string): Promise<{
     byRestaurant.get(meal.restaurant)!.push(meal);
   }
   
-  const lines: string[] = [`${formattedDayLabel} (${dailyMenu.date}):`];
+  const lines: string[] = [
+    `## 🍽️ Menus ${formattedDayLabel}`,
+    "",
+  ];
+  
   for (const [restaurant, meals] of byRestaurant) {
-    lines.push(`\n🏪 ${restaurant}:`);
+    // Short restaurant name for cleaner display
+    const shortName = restaurant.replace("-Restauration végétale - Bar à café", "").trim();
+    lines.push("---");
+    lines.push("");
+    lines.push(`### ${shortName}`);
+    lines.push("");
+    
     for (const meal of meals) {
       const tags: string[] = [];
       if (meal.isVegan) tags.push("🌱");
       else if (meal.isVegetarian) tags.push("🥬");
-      const price = meal.studentPrice ? ` — ${meal.studentPrice.toFixed(2)} CHF` : "";
-      const tagStr = tags.length > 0 ? ` ${tags.join(" ")}` : "";
-      lines.push(`  • ${meal.name}${tagStr}${price}`);
+      const tagStr = tags.length > 0 ? ` ${tags.join("")}` : "";
+      const price = meal.studentPrice ? `*${meal.studentPrice.toFixed(2)} CHF*` : "";
+      
+      lines.push(`- **${meal.name}**${tagStr}`);
+      if (price) lines.push(`  ${price}`);
     }
+    lines.push("");
   }
   
   return {
-    reply: lines.join("\n"),
+    reply: lines.join("\n").trim(),
     source_type: "food",
     meals: dailyMenu.meals,
   };
