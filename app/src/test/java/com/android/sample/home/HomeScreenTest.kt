@@ -1043,4 +1043,63 @@ class HomeScreenComposeInteractionsTest {
     assertTrue(meta.retrievedAt >= before)
     assertTrue(meta.retrievedAt <= after)
   }
+
+  @Test
+  fun SourceMeta_copy_preserves_compactType() {
+    val original =
+        SourceMeta(
+            siteLabel = "Test",
+            title = "Title",
+            url = "https://example.com",
+            compactType = CompactSourceType.FOOD)
+    val copy = original.copy(siteLabel = "New Label")
+    assertEquals(CompactSourceType.FOOD, copy.compactType)
+    assertEquals("New Label", copy.siteLabel)
+  }
+
+  @Test
+  fun SourceMeta_equality_differs_for_different_compactType() {
+    val meta1 =
+        SourceMeta(
+            siteLabel = "Test",
+            title = "Title",
+            url = null,
+            compactType = CompactSourceType.SCHEDULE)
+    val meta2 =
+        SourceMeta(
+            siteLabel = "Test", title = "Title", url = null, compactType = CompactSourceType.FOOD)
+    assertNotEquals(meta1, meta2)
+  }
+
+  @Test
+  fun SourceMeta_equality_same_compactType() {
+    val meta1 =
+        SourceMeta(
+            siteLabel = "EPFL Restaurants",
+            title = "Menu",
+            url = "https://epfl.ch/food",
+            compactType = CompactSourceType.FOOD)
+    val meta2 =
+        SourceMeta(
+            siteLabel = "EPFL Restaurants",
+            title = "Menu",
+            url = "https://epfl.ch/food",
+            compactType = CompactSourceType.FOOD)
+    assertEquals(meta1, meta2)
+  }
+
+  @Test
+  fun SourceMeta_toString_contains_compactType() {
+    val meta =
+        SourceMeta(
+            siteLabel = "Test", title = "Title", url = null, compactType = CompactSourceType.FOOD)
+    assertTrue(meta.toString().contains("FOOD"))
+  }
+
+  @Test
+  fun CompactSourceType_name_returns_correct_string() {
+    assertEquals("NONE", CompactSourceType.NONE.name)
+    assertEquals("SCHEDULE", CompactSourceType.SCHEDULE.name)
+    assertEquals("FOOD", CompactSourceType.FOOD.name)
+  }
 }
