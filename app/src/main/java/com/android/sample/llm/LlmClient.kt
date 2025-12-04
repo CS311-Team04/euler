@@ -231,7 +231,8 @@ class FirebaseFunctionsLlmClient(
   companion object {
     private const val TAG = "FirebaseFunctionsLlmClient"
     private const val FUNCTION_NAME = "answerWithRagFn"
-    private const val DEFAULT_TIMEOUT_MS = 33_000L
+    // Increased timeout: LLM + embedding + vector search can take 30-45s on cold starts
+    private const val DEFAULT_TIMEOUT_MS = 60_000L
 
     // Request payload keys
     private const val KEY_QUESTION = "question"
