@@ -16,12 +16,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.android.sample.settings.AppSettings
 import com.android.sample.settings.AppearanceMode
 import com.android.sample.settings.Localization
@@ -273,18 +275,18 @@ private fun MoodleRedirectingOverlay() {
       contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
           // Moodle logo
-          coil.compose.AsyncImage(
+          AsyncImage(
               model =
                   "https://res.cloudinary.com/dw5ba0va3/image/upload/v1759937020/Moodle_Logo_zwznns.png",
               contentDescription = "Moodle Logo",
               modifier = Modifier.height(80.dp).widthIn(max = 260.dp),
               contentScale = androidx.compose.ui.layout.ContentScale.Fit)
 
-          Spacer(modifier = Modifier.height(32.dp))
+          Spacer(modifier = Modifier.height(Dimens.MoodleDialogLargeSpacing))
 
           // Loading indicator
           CircularProgressIndicator(
-              modifier = Modifier.size(32.dp),
+              modifier = Modifier.size(Dimens.MoodleLoadingIndicatorSize),
               strokeWidth = 3.dp,
               color = com.android.sample.ui.theme.MoodleLoginButtonBlue)
 
@@ -505,7 +507,7 @@ internal fun MoodleConnectDialog(
             modifier =
                 Modifier.fillMaxSize()
                     .background(com.android.sample.ui.theme.MoodleLoginBackground)
-                    .padding(horizontal = 20.dp, vertical = 40.dp),
+                    .padding(horizontal = Dimens.MoodleDialogHorizontalPadding, vertical = 40.dp),
             contentAlignment = Alignment.Center) {
               // White card container with shadow
               Column(
@@ -519,7 +521,7 @@ internal fun MoodleConnectDialog(
                     // Moodle Logo - Large and prominent
                     MoodleLogoHeader()
 
-                    Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(Dimens.MoodleDialogLargeSpacing))
 
                     // "Connexion" title - Moodle's serif-style typography
                     Text(
@@ -541,7 +543,7 @@ internal fun MoodleConnectDialog(
                         keyboardType = KeyboardType.Text,
                         imeAction = ImeAction.Next)
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(Dimens.MoodleDialogFieldSpacing))
 
                     // Password field - Taller with more padding
                     MoodleStyledPasswordField(
@@ -560,7 +562,7 @@ internal fun MoodleConnectDialog(
                         textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
                         modifier = Modifier.align(Alignment.End).padding(vertical = 4.dp))
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(Dimens.MoodleDialogFieldSpacing))
 
                     // Error message
                     if (!error.isNullOrBlank()) {
@@ -580,7 +582,7 @@ internal fun MoodleConnectDialog(
                         enabled = isFormValid && !isLoading,
                         onClick = { onConfirm(baseUrl.trim(), username.trim(), password.trim()) })
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(Dimens.MoodleDialogFieldSpacing))
 
                     // Cancel button
                     TextButton(
@@ -600,7 +602,7 @@ internal fun MoodleConnectDialog(
 /** Moodle logo header - Large and prominent like the official Moodle login page. */
 @Composable
 private fun MoodleLogoHeader() {
-  coil.compose.AsyncImage(
+  AsyncImage(
       model =
           "https://res.cloudinary.com/dw5ba0va3/image/upload/v1759937020/Moodle_Logo_zwznns.png",
       contentDescription = "Moodle Logo",
@@ -643,7 +645,11 @@ private fun MoodleStyledTextField(
       enabled = enabled,
       textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp),
       keyboardOptions =
-          KeyboardOptions(autoCorrect = false, keyboardType = keyboardType, imeAction = imeAction),
+          KeyboardOptions(
+              capitalization = KeyboardCapitalization.Unspecified,
+              autoCorrectEnabled = false,
+              keyboardType = keyboardType,
+              imeAction = imeAction),
       colors = moodleTextFieldColors(),
       shape = RoundedCornerShape(10.dp),
       modifier = Modifier.fillMaxWidth().height(64.dp))
@@ -706,7 +712,7 @@ private fun MoodleLoginButton(
         } else {
           Text(
               text = text,
-              color = androidx.compose.ui.graphics.Color.White,
+              color = ConnectorsLightSurface,
               fontSize = 18.sp,
               fontWeight = FontWeight.Medium)
         }
