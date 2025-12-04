@@ -12,6 +12,7 @@ import com.android.sample.conversations.AuthNotReadyException
 import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.ConversationTitleFormatter
 import com.android.sample.conversations.MessageDTO
+import com.android.sample.llm.BotReply
 import com.android.sample.llm.FirebaseFunctionsLlmClient
 import com.android.sample.llm.LlmClient
 import com.android.sample.network.NetworkConnectivityMonitor
@@ -44,10 +45,11 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
 data class SourceMeta(
-    val siteLabel: String, // e.g. "EPFL.ch Website"
+    val siteLabel: String, // e.g. "EPFL.ch Website" or "Your Schedule"
     val title: String, // e.g. "Projet de Semestre – Bachelor"
-    val url: String,
-    val retrievedAt: Long = System.currentTimeMillis()
+    val url: String?, // null for schedule sources
+    val retrievedAt: Long = System.currentTimeMillis(),
+    val isScheduleSource: Boolean = false // true if from user's EPFL schedule
 )
 /**
  * HomeViewModel
@@ -76,6 +78,7 @@ class HomeViewModel(
   companion object {
     private const val TAG = "HomeViewModel"
     private const val DEFAULT_USER_NAME = "Student"
+    private const val ED_INTENT_POST_QUESTION = "post_question"
 
     // Global exception handler for uncaught coroutine exceptions
     private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -718,30 +721,39 @@ class HomeViewModel(
                 }
             Log.d(
                 TAG,
-                "startStreaming: received reply, length=${reply.reply.length}, edIntentDetected=${reply.edIntentDetected}, edIntent=${reply.edIntent}")
+                "startStreaming: received reply, length=${reply.reply.length}, edIntentDetected=${reply.edIntent.detected}, edIntent=${reply.edIntent.intent}")
 
             // Handle ED intent detection - create PostOnEd pending action
-            if (reply.edIntentDetected && reply.edIntent == "post_question") {
-              Log.d(TAG, "ED intent detected: ${reply.edIntent} - creating PostOnEd pending action")
-              val formattedQuestion = reply.edFormattedQuestion ?: question
-              val formattedTitle = reply.edFormattedTitle ?: ""
-
-              _uiState.update { state ->
-                state.copy(
-                    pendingAction =
-                        PendingAction.PostOnEd(
-                            draftTitle = formattedTitle, draftBody = formattedQuestion))
-              }
-            }
+            handleEdIntent(reply, question)
 
             // simulate stream into the placeholder AI message
             simulateStreamingFromText(messageId, reply.reply)
 
-            // add optional source card
-            reply.url?.let { url ->
-              val meta =
-                  SourceMeta(
-                      siteLabel = buildSiteLabel(url), title = buildFallbackTitle(url), url = url)
+            // add optional source card based on source type
+            val meta: SourceMeta? =
+                when (reply.sourceType) {
+                  com.android.sample.llm.SourceType.SCHEDULE -> {
+                    // Schedule source - show a small indicator
+                    SourceMeta(
+                        siteLabel = "Your EPFL Schedule",
+                        title = "Retrieved from your connected calendar",
+                        url = null,
+                        isScheduleSource = true)
+                  }
+                  com.android.sample.llm.SourceType.RAG -> {
+                    // RAG source - show the web source card if URL exists
+                    reply.url?.let { url ->
+                      SourceMeta(
+                          siteLabel = buildSiteLabel(url),
+                          title = buildFallbackTitle(url),
+                          url = url,
+                          isScheduleSource = false)
+                    }
+                  }
+                  com.android.sample.llm.SourceType.NONE -> null
+                }
+
+            meta?.let { sourceMeta ->
               _uiState.update { s ->
                 s.copy(
                     messages =
@@ -751,7 +763,7 @@ class HomeViewModel(
                                 text = "",
                                 timestamp = System.currentTimeMillis(),
                                 type = ChatType.AI,
-                                source = meta),
+                                source = sourceMeta),
                     streamingSequence = s.streamingSequence + 1)
               }
             }
@@ -1197,5 +1209,26 @@ class HomeViewModel(
         }
     val txt = lines.joinToString("\n")
     return if (txt.isBlank()) null else txt.take(600)
+  }
+
+  /**
+   * Handles ED intent detection from the LLM reply. If a post_question intent is detected, creates
+   * a PostOnEd pending action.
+   *
+   * @param reply The BotReply from the LLM
+   * @param originalQuestion The original user question (used as fallback for formatted question)
+   */
+  private fun handleEdIntent(reply: BotReply, originalQuestion: String) {
+    if (reply.edIntent.detected && reply.edIntent.intent == ED_INTENT_POST_QUESTION) {
+      Log.d(TAG, "ED intent detected: ${reply.edIntent.intent} - creating PostOnEd pending action")
+      val formattedQuestion = reply.edIntent.formattedQuestion ?: originalQuestion
+      val formattedTitle = reply.edIntent.formattedTitle ?: ""
+
+      _uiState.update { state ->
+        state.copy(
+            pendingAction =
+                PendingAction.PostOnEd(draftTitle = formattedTitle, draftBody = formattedQuestion))
+      }
+    }
   }
 }

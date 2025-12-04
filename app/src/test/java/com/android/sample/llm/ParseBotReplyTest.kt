@@ -192,7 +192,7 @@ class ParseBotReplyTest {
 
     assertEquals("ED response", result.reply)
     assertTrue(result.edIntentDetected)
-    assertEquals("post_question", result.edIntent)
+    assertEquals("post_question", result.edIntentType)
   }
 
   @Test
@@ -202,7 +202,7 @@ class ParseBotReplyTest {
 
     assertEquals("Normal response", result.reply)
     assertFalse(result.edIntentDetected)
-    assertNull(result.edIntent)
+    assertNull(result.edIntentType)
   }
 
   @Test
@@ -212,7 +212,7 @@ class ParseBotReplyTest {
 
     assertEquals("Response without ED fields", result.reply)
     assertFalse(result.edIntentDetected)
-    assertNull(result.edIntent)
+    assertNull(result.edIntentType)
   }
 
   @Test
@@ -223,7 +223,7 @@ class ParseBotReplyTest {
       val result = parseBotReply(body, gson)
 
       assertTrue("Should detect ED intent for type: $intentType", result.edIntentDetected)
-      assertEquals(intentType, result.edIntent)
+      assertEquals(intentType, result.edIntentType)
     }
   }
 
@@ -243,7 +243,7 @@ class ParseBotReplyTest {
     val result = parseBotReply(body, gson)
 
     assertTrue(result.edIntentDetected)
-    assertNull("Non-string ed_intent should be null", result.edIntent)
+    assertNull("Non-string ed_intent should be null", result.edIntentType)
   }
 
   @Test
@@ -255,7 +255,7 @@ class ParseBotReplyTest {
     assertEquals("Full response", result.reply)
     assertEquals("https://epfl.ch", result.url)
     assertTrue(result.edIntentDetected)
-    assertEquals("post_question", result.edIntent)
+    assertEquals("post_question", result.edIntentType)
   }
 
   // ==================== ED FORMATTED QUESTION/TITLE TESTS ====================
@@ -384,7 +384,7 @@ class ParseBotReplyTest {
     assertEquals("Response", result.reply)
     assertEquals("https://epfl.ch", result.url)
     assertTrue(result.edIntentDetected)
-    assertEquals("post_question", result.edIntent)
+    assertEquals("post_question", result.edIntentType)
     assertEquals(
         "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
         result.edFormattedQuestion)

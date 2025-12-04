@@ -21,13 +21,8 @@ tools/epfl_scraper/data/
 
 # macOS
 .DS_Store
-/build
 /.gradle
 /.idea
-# Allow workflow configs to live in repo
-!/.github
-!/.github/workflows
-!/.github/workflows/*.yml
 /build
 local.properties
 
@@ -37,5 +32,4 @@ firebase-debug.log
 firebase-debug.*.log
 
 # Node lockfiles (managed locally, not tracked)
-# Dependencies are pinned to exact versions in package.json
 package-lock.json

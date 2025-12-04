@@ -103,8 +103,8 @@ fun VoiceScreen(
     if (logInitialPermissionState(alreadyGranted)) {
       requestPermission(Manifest.permission.RECORD_AUDIO)
     }
-    // Initialize conversation when voice mode is activated
-    voiceChatViewModel.initializeConversation()
+    // Note: Conversation is now managed automatically in handleUserUtterance
+    // It will reuse existing conversation or create new one as needed
   }
 
   // Ensure the back button tears down the websocket/audio before leaving the screen.

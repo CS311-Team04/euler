@@ -95,7 +95,7 @@ class FirebaseFunctionsLlmClientTest {
 
     assertEquals(reply, result.reply)
     assertTrue(result.edIntentDetected)
-    assertEquals("post_question", result.edIntent)
+    assertEquals("post_question", result.edIntentType)
   }
 
   @Test
@@ -109,7 +109,7 @@ class FirebaseFunctionsLlmClientTest {
 
     assertEquals(reply, result.reply)
     assertFalse(result.edIntentDetected)
-    assertNull(result.edIntent)
+    assertNull(result.edIntentType)
   }
 
   @Test
@@ -121,7 +121,7 @@ class FirebaseFunctionsLlmClientTest {
 
     assertEquals(reply, result.reply)
     assertFalse(result.edIntentDetected)
-    assertNull(result.edIntent)
+    assertNull(result.edIntentType)
   }
 
   @Test
@@ -135,7 +135,7 @@ class FirebaseFunctionsLlmClientTest {
 
     assertEquals(reply, result.reply)
     assertFalse(result.edIntentDetected) // Should default to false
-    assertNull(result.edIntent) // Should default to null
+    assertNull(result.edIntentType) // Should default to null
   }
 
   private fun clientWithResult(
@@ -167,7 +167,27 @@ class FirebaseFunctionsLlmClientTest {
 
     override suspend fun generateReply(prompt: String): BotReply {
       prompts += prompt
-      return BotReply(reply, null, false, null)
+      return BotReply(reply, null, SourceType.NONE, EdIntent())
     }
+  }
+
+  // SourceType tests
+  @Test
+  fun `SourceType fromString returns SCHEDULE for schedule`() {
+    assertEquals(SourceType.SCHEDULE, SourceType.fromString("schedule"))
+    assertEquals(SourceType.SCHEDULE, SourceType.fromString("SCHEDULE"))
+  }
+
+  @Test
+  fun `SourceType fromString returns RAG for rag`() {
+    assertEquals(SourceType.RAG, SourceType.fromString("rag"))
+    assertEquals(SourceType.RAG, SourceType.fromString("RAG"))
+  }
+
+  @Test
+  fun `SourceType fromString returns NONE for unknown`() {
+    assertEquals(SourceType.NONE, SourceType.fromString("unknown"))
+    assertEquals(SourceType.NONE, SourceType.fromString(null))
+    assertEquals(SourceType.NONE, SourceType.fromString(""))
   }
 }

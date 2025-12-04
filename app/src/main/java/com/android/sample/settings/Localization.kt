@@ -200,7 +200,42 @@ object Localization {
           "recent_cs220_exam" to "CS220 Final Exam retrieval",
           "recent_linear_algebra" to "Linear Algebra help",
           "recent_deadline" to "Project deadline query",
-          "recent_registration" to "Course registration info") + edTranslationsEn()
+          "recent_registration" to "Course registration info",
+
+          // EPFL Campus Connector
+          "epfl_campus_title" to "EPFL Campus",
+          "epfl_campus_subtitle" to "Connect your schedule",
+          "epfl_instructions_title" to "How to connect",
+          "epfl_step_1" to "Open EPFL Campus app → My Schedule",
+          "epfl_step_2" to "Tap 📤 → 'Copy .ics link to clipboard' ",
+          "epfl_step_3" to "Come back here and paste it below",
+          "epfl_open_campus" to "Open EPFL Campus",
+          "epfl_paste_url" to "Paste your ICS URL",
+          "epfl_connect" to "Connect Schedule",
+          "epfl_syncing" to "Syncing...",
+          "epfl_connected" to "Connected",
+          "epfl_weekly_classes" to "weekly classes",
+          "epfl_exams" to "exams",
+          "epfl_last_sync" to "Last sync",
+          "epfl_disconnect" to "Disconnect",
+          "epfl_connected_info" to "Your schedule is now connected to the AI assistant.",
+          "epfl_clipboard_detected" to "ICS URL detected!",
+          "not_now" to "Not now",
+          "use_this_url" to "Use this URL") +
+          edTranslationsEn() +
+          mapOf(
+              "moodle_connect_generic_error" to "Failed to connect to Moodle. Please try again.",
+              "moodle_connect_api_unreachable" to
+                  "Moodle API is unreachable. Please check your connection.",
+              "settings_connectors_moodle_title" to "Connect to Moodle",
+              "settings_connectors_moodle_base_url_label" to "Moodle URL",
+              "settings_connectors_moodle_username_label" to "Username",
+              "settings_connectors_moodle_password_label" to "Password",
+              "settings_connectors_moodle_login_instructions" to
+                  "Enter your Moodle credentials to connect. Your password will be securely sent to your Moodle server.",
+              "settings_connectors_moodle_load_error" to "Failed to load Moodle connector status",
+              "settings_connectors_moodle_status_error" to
+                  "Unable to load Moodle connector status. Please try again later.")
 
   private fun french() =
       mapOf(
@@ -280,7 +315,45 @@ object Localization {
           "recent_cs220_exam" to "Récupération examen final CS220",
           "recent_linear_algebra" to "Aide en algèbre linéaire",
           "recent_deadline" to "Requête date limite projet",
-          "recent_registration" to "Info inscription aux cours") + edTranslationsFr()
+          "recent_registration" to "Info inscription aux cours",
+
+          // EPFL Campus Connector
+          "epfl_campus_title" to "EPFL Campus",
+          "epfl_campus_subtitle" to "Connectez votre emploi du temps",
+          "epfl_instructions_title" to "Comment se connecter",
+          "epfl_step_1" to "Ouvrez EPFL Campus → Horaire",
+          "epfl_step_2" to "Tapez ⚙️ → Copier le lien .ics",
+          "epfl_step_3" to "Revenez et collez le ici.",
+          "epfl_open_campus" to "Ouvrir EPFL Campus",
+          "epfl_paste_url" to "Collez votre URL ICS",
+          "epfl_connect" to "Connecter l'emploi du temps",
+          "epfl_syncing" to "Synchronisation...",
+          "epfl_connected" to "Connecté",
+          "epfl_weekly_classes" to "cours/semaine",
+          "epfl_exams" to "examens",
+          "epfl_last_sync" to "Dernière sync",
+          "epfl_disconnect" to "Déconnecter",
+          "epfl_connected_info" to
+              "Votre emploi du temps est maintenant connecté à l'assistant IA.",
+          "epfl_clipboard_detected" to "URL ICS détectée !",
+          "not_now" to "Plus tard",
+          "use_this_url" to "Utiliser cette URL") +
+          edTranslationsFr() +
+          mapOf(
+              "moodle_connect_generic_error" to
+                  "La connexion à Moodle a échoué. Veuillez réessayer.",
+              "moodle_connect_api_unreachable" to
+                  "L'API Moodle est inaccessible. Veuillez vérifier votre connexion.",
+              "settings_connectors_moodle_title" to "Se connecter à Moodle",
+              "settings_connectors_moodle_base_url_label" to "URL Moodle",
+              "settings_connectors_moodle_username_label" to "Nom d'utilisateur",
+              "settings_connectors_moodle_password_label" to "Mot de passe",
+              "settings_connectors_moodle_login_instructions" to
+                  "Entrez vos identifiants Moodle pour vous connecter. Votre mot de passe sera envoyé de manière sécurisée à votre serveur Moodle.",
+              "settings_connectors_moodle_load_error" to
+                  "Échec du chargement du statut du connecteur Moodle",
+              "settings_connectors_moodle_status_error" to
+                  "Impossible de charger le statut du connecteur Moodle. Veuillez réessayer plus tard.")
 
   private fun german() =
       mapOf(
@@ -372,7 +445,23 @@ object Localization {
           "recent_cs220_exam" to "CS220 Abschlussprüfung Abruf",
           "recent_linear_algebra" to "Lineare Algebra Hilfe",
           "recent_deadline" to "Projekt-Frist Anfrage",
-          "recent_registration" to "Kursanmeldung Info") + edTranslationsDe()
+          "recent_registration" to "Kursanmeldung Info") +
+          edTranslationsDe() +
+          mapOf(
+              "moodle_connect_generic_error" to
+                  "Verbindung zu Moodle fehlgeschlagen. Bitte versuchen Sie es erneut.",
+              "moodle_connect_api_unreachable" to
+                  "Moodle-API ist nicht erreichbar. Bitte überprüfen Sie Ihre Verbindung.",
+              "settings_connectors_moodle_title" to "Mit Moodle verbinden",
+              "settings_connectors_moodle_base_url_label" to "Moodle-URL",
+              "settings_connectors_moodle_username_label" to "Benutzername",
+              "settings_connectors_moodle_password_label" to "Passwort",
+              "settings_connectors_moodle_login_instructions" to
+                  "Geben Sie Ihre Moodle-Anmeldedaten ein, um sich zu verbinden. Ihr Passwort wird sicher an Ihren Moodle-Server gesendet.",
+              "settings_connectors_moodle_load_error" to
+                  "Fehler beim Laden des Moodle-Connector-Status",
+              "settings_connectors_moodle_status_error" to
+                  "Moodle-Connector-Status konnte nicht geladen werden. Bitte versuchen Sie es später erneut.")
 
   private fun spanish() =
       mapOf(
@@ -452,7 +541,23 @@ object Localization {
           "recent_cs220_exam" to "Recuperación examen final CS220",
           "recent_linear_algebra" to "Ayuda con álgebra lineal",
           "recent_deadline" to "Consulta fecha límite proyecto",
-          "recent_registration" to "Info inscripción cursos") + edTranslationsEs()
+          "recent_registration" to "Info inscripción cursos") +
+          edTranslationsEs() +
+          mapOf(
+              "moodle_connect_generic_error" to
+                  "Error al conectar con Moodle. Por favor, inténtelo de nuevo.",
+              "moodle_connect_api_unreachable" to
+                  "La API de Moodle no es accesible. Por favor, verifique su conexión.",
+              "settings_connectors_moodle_title" to "Conectar a Moodle",
+              "settings_connectors_moodle_base_url_label" to "URL de Moodle",
+              "settings_connectors_moodle_username_label" to "Nombre de usuario",
+              "settings_connectors_moodle_password_label" to "Contraseña",
+              "settings_connectors_moodle_login_instructions" to
+                  "Ingrese sus credenciales de Moodle para conectarse. Su contraseña se enviará de forma segura a su servidor Moodle.",
+              "settings_connectors_moodle_load_error" to
+                  "Error al cargar el estado del conector Moodle",
+              "settings_connectors_moodle_status_error" to
+                  "No se pudo cargar el estado del conector Moodle. Por favor, inténtelo más tarde.")
 
   private fun italian() =
       mapOf(
@@ -532,7 +637,22 @@ object Localization {
           "recent_cs220_exam" to "Recupero esame finale CS220",
           "recent_linear_algebra" to "Aiuto con algebra lineare",
           "recent_deadline" to "Richiesta scadenza progetto",
-          "recent_registration" to "Info iscrizione corsi") + edTranslationsIt()
+          "recent_registration" to "Info iscrizione corsi") +
+          edTranslationsIt() +
+          mapOf(
+              "moodle_connect_generic_error" to "Connessione a Moodle fallita. Riprova.",
+              "moodle_connect_api_unreachable" to
+                  "L'API Moodle non è raggiungibile. Controlla la tua connessione.",
+              "settings_connectors_moodle_title" to "Connetti a Moodle",
+              "settings_connectors_moodle_base_url_label" to "URL Moodle",
+              "settings_connectors_moodle_username_label" to "Nome utente",
+              "settings_connectors_moodle_password_label" to "Password",
+              "settings_connectors_moodle_login_instructions" to
+                  "Inserisci le tue credenziali Moodle per connetterti. La tua password verrà inviata in modo sicuro al tuo server Moodle.",
+              "settings_connectors_moodle_load_error" to
+                  "Errore nel caricamento dello stato del connettore Moodle",
+              "settings_connectors_moodle_status_error" to
+                  "Impossibile caricare lo stato del connettore Moodle. Riprova più tardi.")
 
   private fun portuguese() =
       mapOf(
@@ -612,7 +732,22 @@ object Localization {
           "recent_cs220_exam" to "Recuperação exame final CS220",
           "recent_linear_algebra" to "Ajuda com álgebra linear",
           "recent_deadline" to "Consulta prazo projeto",
-          "recent_registration" to "Info inscrição cursos") + edTranslationsPt()
+          "recent_registration" to "Info inscrição cursos") +
+          edTranslationsPt() +
+          mapOf(
+              "moodle_connect_generic_error" to "Falha ao conectar ao Moodle. Tente novamente.",
+              "moodle_connect_api_unreachable" to
+                  "A API Moodle não está acessível. Verifique sua conexão.",
+              "settings_connectors_moodle_title" to "Conectar ao Moodle",
+              "settings_connectors_moodle_base_url_label" to "URL do Moodle",
+              "settings_connectors_moodle_username_label" to "Nome de usuário",
+              "settings_connectors_moodle_password_label" to "Senha",
+              "settings_connectors_moodle_login_instructions" to
+                  "Digite suas credenciais do Moodle para conectar. Sua senha será enviada com segurança para o servidor Moodle.",
+              "settings_connectors_moodle_load_error" to
+                  "Falha ao carregar o status do conector Moodle",
+              "settings_connectors_moodle_status_error" to
+                  "Não foi possível carregar o status do conector Moodle. Tente novamente mais tarde.")
 
   private fun chinese() =
       mapOf(
@@ -691,5 +826,17 @@ object Localization {
           "recent_cs220_exam" to "CS220 期末考试检索",
           "recent_linear_algebra" to "线性代数帮助",
           "recent_deadline" to "项目截止日期查询",
-          "recent_registration" to "课程注册信息") + edTranslationsZh()
+          "recent_registration" to "课程注册信息") +
+          edTranslationsZh() +
+          mapOf(
+              "moodle_connect_generic_error" to "连接到 Moodle 失败。请重试。",
+              "moodle_connect_api_unreachable" to "Moodle API 无法访问。请检查您的连接。",
+              "settings_connectors_moodle_title" to "连接到 Moodle",
+              "settings_connectors_moodle_base_url_label" to "Moodle URL",
+              "settings_connectors_moodle_username_label" to "用户名",
+              "settings_connectors_moodle_password_label" to "密码",
+              "settings_connectors_moodle_login_instructions" to
+                  "输入您的 Moodle 凭据以连接。您的密码将安全地发送到您的 Moodle 服务器。",
+              "settings_connectors_moodle_load_error" to "加载 Moodle 连接器状态失败",
+              "settings_connectors_moodle_status_error" to "无法加载 Moodle 连接器状态。请稍后再试。")
 }

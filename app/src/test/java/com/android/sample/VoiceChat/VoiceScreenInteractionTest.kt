@@ -57,8 +57,7 @@ class VoiceScreenInteractionTest {
     FirebaseAuth.getInstance().signOut()
   }
 
-  private fun createVoiceViewModel(): VoiceChatViewModel =
-      VoiceChatViewModel(FakeLlmClient(), dispatcherRule.dispatcher)
+  private fun createVoiceViewModel(): VoiceChatViewModel = VoiceChatViewModel(FakeLlmClient())
 
   @Test
   fun voiceScreen_withGrantedPermission_renders() {

@@ -4,17 +4,14 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.sample.BuildConfig
+import com.android.sample.conversations.AuthNotReadyException
 import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.ConversationTitleFormatter
 import com.android.sample.llm.FirebaseFunctionsLlmClient
 import com.android.sample.llm.LlmClient
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -35,18 +32,15 @@ import kotlinx.coroutines.launch
  * - Call the LLM asynchronously when the user finishes speaking.
  * - Emit `SpeechRequest` events that the UI layer can render via any `SpeechPlayback`.
  * - Provide synthesized audio level samples so the visualizer stays animated while TTS runs.
- * - Create and manage conversations in Firestore (same as text mode).
+ * - Manage conversations: reuse existing conversation if available, or create new one if needed.
  * - Persist voice interactions to maintain context and memory.
  */
 class VoiceChatViewModel(
     private val llmClient: LlmClient = FirebaseFunctionsLlmClient(),
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
-    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
+    private val conversationRepository: ConversationRepository? = null,
+    private val getCurrentConversationId: () -> String? = { null },
+    private val onConversationCreated: ((String) -> Unit)? = null,
 ) : ViewModel() {
-
-  private val repo = ConversationRepository(auth, db)
-  private var currentConversationId: String? = null
 
   /**
    * Firebase Functions handle for title generation. Uses local emulator when configured via
@@ -74,32 +68,6 @@ class VoiceChatViewModel(
   private var levelAnimationJob: Job? = null
   private var lastEmittedLevel: Float = 0f
 
-  /**
-   * Returns true when the user is **not** authenticated. Guest mode disables Firestore persistence
-   * and keeps all messages in memory only.
-   */
-  private fun isGuest(): Boolean = auth.currentUser == null
-
-  /**
-   * Prepares for voice mode activation. Resets the current conversation so that a new one will be
-   * created automatically on the first message (same pattern as text mode).
-   *
-   * This ensures that each voice mode session starts with a fresh conversation, maintaining context
-   * and memory within that session.
-   *
-   * This method is called when the voice screen is opened. In guest mode, this is a no-op.
-   */
-  fun initializeConversation() {
-    // Reset conversation ID so a new conversation is created on first message
-    // This ensures each voice mode activation starts a fresh conversation
-    currentConversationId = null
-    if (isGuest()) {
-      Log.d(TAG, "Guest mode: conversation will not be persisted")
-    } else {
-      Log.d(TAG, "Ready to create new conversation on first voice message")
-    }
-  }
-
   /** Receives live partial transcripts from the STT layer so the UI can reflect them instantly. */
   fun onUserTranscript(transcript: String) {
     _uiState.update { it.copy(lastTranscript = transcript, lastError = null) }
@@ -109,8 +77,9 @@ class VoiceChatViewModel(
    * Handles the final transcript of a user utterance by launching an LLM request and, once
    * completed, emitting a [SpeechRequest] for playback.
    *
-   * Creates a conversation on the first message (if signed in) and persists all messages to
-   * Firestore to maintain context and memory, just like text mode.
+   * If a conversation repository is available and user is signed in:
+   * - Uses existing conversation if available, or creates a new one
+   * - Saves user message and AI reply to Firestore
    */
   fun handleUserUtterance(transcript: String) {
     val cleaned = transcript.trim()
@@ -151,44 +120,59 @@ class VoiceChatViewModel(
    * Ensures a conversation exists for the current session. Returns conversation ID if signed in,
    * null if guest mode.
    *
-   * Creates a conversation with a quick title, then upgrades it in the background using
-   * generateTitleFn (same pattern as text mode).
+   * Reuses existing conversation if available, or creates a new one with a quick title, then
+   * upgrades it in the background using generateTitleFn (same pattern as text mode).
    */
   private suspend fun ensureConversationExists(cleaned: String): String? {
-    if (isGuest()) {
+    if (conversationRepository == null) {
       return null // Guest mode: no Firestore persistence
     }
-    return currentConversationId
-        ?: run {
-          // Create new conversation on first message (same pattern as text mode)
-          val quickTitle = ConversationTitleFormatter.localTitleFrom(cleaned)
-          val newId = repo.startNewConversation(quickTitle)
-          currentConversationId = newId
-          Log.d(TAG, "Created new voice conversation: $newId with title: $quickTitle")
 
-          // Upgrade title in background (once)
-          viewModelScope.launch {
-            try {
-              val good = ConversationTitleFormatter.fetchTitle(functions, cleaned, TAG)
-              if (good.isNotBlank() && good != quickTitle) {
-                repo.updateConversationTitle(newId, good)
-                Log.d(TAG, "Upgraded conversation title: $newId -> $good")
-              }
-            } catch (e: Exception) {
-              // Keep provisional title on error
-              Log.d(TAG, "Failed to upgrade title, keeping provisional: ${e.message}")
+    try {
+      // Try to get existing conversation ID
+      var conversationId = getCurrentConversationId()
+
+      if (conversationId == null) {
+        // Create new conversation on first message
+        val quickTitle = ConversationTitleFormatter.localTitleFrom(cleaned)
+        conversationId = conversationRepository.startNewConversation(quickTitle)
+        Log.d(TAG, "Created new voice conversation: $conversationId with title: $quickTitle")
+
+        // Notify that a new conversation was created so it can be selected
+        onConversationCreated?.invoke(conversationId)
+
+        // Upgrade title in background (once)
+        viewModelScope.launch {
+          try {
+            val good = ConversationTitleFormatter.fetchTitle(functions, cleaned, TAG)
+            if (good.isNotBlank() && good != quickTitle) {
+              conversationRepository.updateConversationTitle(conversationId, good)
+              Log.d(TAG, "Upgraded conversation title: $conversationId -> $good")
             }
+          } catch (e: Exception) {
+            // Keep provisional title on error
+            Log.d(TAG, "Failed to upgrade title, keeping provisional: ${e.message}")
           }
-
-          newId
         }
+      } else {
+        Log.d(TAG, "Using existing conversation: $conversationId")
+      }
+
+      return conversationId
+    } catch (e: AuthNotReadyException) {
+      Log.d(TAG, "User not signed in, skipping Firestore save")
+      return null // Guest mode
+    } catch (e: Exception) {
+      Log.e(TAG, "Error managing conversation", e)
+      return null // Continue without persistence
+    }
   }
 
   /** Persists user message to Firestore if conversation ID exists. */
   private suspend fun persistUserMessage(cid: String?, message: String) {
-    if (cid == null) return
+    if (cid == null || conversationRepository == null) return
     try {
-      repo.appendMessage(cid, "user", message)
+      conversationRepository.appendMessage(cid, "user", message)
       Log.d(TAG, "Persisted user message to conversation: $cid")
     } catch (e: Exception) {
       Log.w(TAG, "Failed to persist user message: ${e.message}")
@@ -205,9 +189,9 @@ class VoiceChatViewModel(
 
   /** Persists AI message to Firestore if conversation ID exists. */
   private suspend fun persistAiMessage(cid: String?, reply: String) {
-    if (cid == null) return
+    if (cid == null || conversationRepository == null) return
     try {
-      repo.appendMessage(cid, "assistant", reply)
+      conversationRepository.appendMessage(cid, "assistant", reply)
       Log.d(TAG, "Persisted assistant message to conversation: $cid")
     } catch (e: Exception) {
       Log.w(TAG, "Failed to persist assistant message: ${e.message}")
@@ -269,9 +253,6 @@ class VoiceChatViewModel(
     currentGenerationJob = null
     stopLevelAnimation()
     _uiState.update { it.copy(isGenerating = false, isSpeaking = false) }
-    // Note: We keep currentConversationId so that if the user returns to voice mode,
-    // they can continue the same conversation. To start a new conversation, the user
-    // should use the text mode or we could add a "new conversation" action.
   }
 
   override fun onCleared() {

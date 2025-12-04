@@ -2,4 +2,13 @@
     <string name="app_name">SampleApp</string>
     <string name="title_activity_main">MainActivity</string>
     <string name="title_activity_second">SecondActivity</string>
+    
+    <!-- EPFL Campus Connector -->
+    <string name="error_invalid_url">Invalid URL</string>
+    <string name="error_failed_to_disconnect">Failed to disconnect</string>
+    <string name="error_could_not_open_epfl_campus">Could not open EPFL Campus</string>
+    
+    <!-- Source Labels -->
+    <string name="source_label_epfl_schedule">Your EPFL Schedule</string>
+    <string name="source_label_schedule_description">Retrieved from your connected calendar</string>
 </resources>
