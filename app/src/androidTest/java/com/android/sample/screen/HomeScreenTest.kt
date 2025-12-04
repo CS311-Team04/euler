@@ -114,7 +114,7 @@ class HomeScreenTest {
     launchHomeScreen()
 
     composeRule.onNodeWithText(TestConstants.ButtonTexts.WHAT_IS_EPFL).assertIsDisplayed()
-    composeRule.onNodeWithText(TestConstants.ButtonTexts.CHECK_ED_DISCUSSION).assertIsDisplayed()
+    composeRule.onNodeWithText(TestConstants.ButtonTexts.WHERE_IS_EPFL).assertIsDisplayed()
     composeRule.onNodeWithText(TestConstants.PlaceholderTexts.MESSAGE_EULER).assertIsDisplayed()
   }
 }
