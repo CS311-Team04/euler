@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material3.*
@@ -68,6 +69,7 @@ object HomeTags {
   const val Action2Btn = "home_action2_btn"
   const val MessageField = "home_message_field"
   const val SendBtn = "home_send_btn"
+  const val StopBtn = "home_stop_btn"
   const val MicBtn = "home_mic_btn"
   const val VoiceBtn = "home_voice_btn"
   const val Drawer = "home_drawer"
@@ -354,6 +356,7 @@ fun HomeScreen(
                         placeholder = Localization.t("message_euler"),
                         enabled = !ui.isSending && !ui.isOffline,
                         isSending = ui.isSending,
+                        isGenerating = ui.streamingMessageId != null,
                         canSend = ui.messageDraft.isNotBlank() && !ui.isSending && !ui.isOffline,
                         onSendClick = {
                           if (ui.messageDraft.isNotBlank() && !ui.isSending && !ui.isOffline) {
@@ -361,6 +364,7 @@ fun HomeScreen(
                             viewModel.sendMessage()
                           }
                         },
+                        onStopClick = { viewModel.stopGeneration() },
                         onMicClick = {
                           if (!ui.isOffline) {
                             speechHelper?.startListening(
@@ -417,11 +421,16 @@ fun HomeScreen(
                           state = listState,
                           modifier = Modifier.fillMaxSize().padding(16.dp),
                           verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            // Find the last AI message index for retry button
+                            val lastAiIndex = ui.messages.indexOfLast { it.type == ChatType.AI }
+
                             items(items = ui.messages, key = { it.id }) { item ->
                               val showLeadingDot =
                                   item.id == ui.streamingMessageId && item.text.isEmpty()
                               val audioState =
                                   audioController.audioStateFor(item, ui.streamingMessageId)
+                              val itemIndex = ui.messages.indexOf(item)
+                              val isLastAi = itemIndex == lastAiIndex && item.type == ChatType.AI
 
                               // If this message carries a source, draw the card first
                               if (item.source != null && !item.isThinking) {
@@ -451,6 +460,11 @@ fun HomeScreen(
                                   modifier = Modifier.fillMaxWidth(),
                                   isStreaming = showLeadingDot,
                                   audioState = audioState,
+                                  onRetry =
+                                      if (isLastAi && ui.streamingMessageId == null) {
+                                        { viewModel.retryLastMessage() }
+                                      } else null,
+                                  isLastAiMessage = isLastAi,
                                   aiText = textPrimary)
                             }
 
@@ -551,6 +565,7 @@ private fun DeleteMenuItem(onClick: () -> Unit) {
  * - Vertically centered placeholder text
  * - Properly aligned microphone and voice/send buttons
  * - Smooth transition from voice mode to send button
+ * - Stop button during AI generation
  */
 @Composable
 private fun ChatInputBar(
@@ -559,8 +574,10 @@ private fun ChatInputBar(
     placeholder: String,
     enabled: Boolean,
     isSending: Boolean,
+    isGenerating: Boolean,
     canSend: Boolean,
     onSendClick: () -> Unit,
+    onStopClick: () -> Unit,
     onMicClick: () -> Unit,
     onVoiceModeClick: () -> Unit,
     speechHelperAvailable: Boolean,
@@ -602,64 +619,95 @@ private fun ChatInputBar(
                         modifier = Modifier.size(22.dp))
                   }
 
-              // Voice mode / Send button - sized to match chatbox height with tiny margin (52dp -
+              // Voice mode / Send / Stop button - sized to match chatbox height with tiny margin
+              // (52dp -
               // 9dp margin = 43dp)
               Box(
                   modifier = Modifier.size(43.dp).offset(y = (-1).dp),
                   contentAlignment = Alignment.Center) {
-                    Crossfade(targetState = canSend, label = "voice-to-send-transition") {
-                        readyToSend ->
-                      if (!readyToSend) {
-                        // Voice mode button - circular with waveform icon
-                        Surface(
-                            onClick = onVoiceModeClick,
-                            modifier = Modifier.fillMaxSize().testTag(HomeTags.VoiceBtn),
-                            shape = CircleShape,
-                            color = textSecondary.copy(alpha = 0.2f),
-                            tonalElevation = 0.dp,
-                            shadowElevation = 0.dp) {
-                              Box(
-                                  modifier = Modifier.fillMaxSize(),
-                                  contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        Icons.Default.GraphicEq,
-                                        contentDescription = "Voice mode",
-                                        tint = textSecondary,
-                                        modifier = Modifier.size(18.dp))
-                                  }
-                            }
-                      } else {
-                        // Red send button - transitions from voice mode, matches chatbox height
-                        Surface(
-                            onClick = onSendClick,
-                            modifier = Modifier.fillMaxSize().testTag(HomeTags.SendBtn),
-                            shape = CircleShape,
-                            color = EulerRed,
-                            tonalElevation = 0.dp,
-                            shadowElevation = 0.dp) {
-                              Box(
-                                  modifier = Modifier.fillMaxSize(),
-                                  contentAlignment = Alignment.Center) {
-                                    if (isSending) {
-                                      CircularProgressIndicator(
-                                          strokeWidth = 2.dp,
-                                          modifier = Modifier.size(18.dp),
-                                          color = Color.White)
-                                    } else {
-                                      val icon =
-                                          try {
-                                            androidx.compose.material.icons.Icons.Rounded.Send
-                                          } catch (_: Throwable) {
-                                            androidx.compose.material.icons.Icons.Default.Send
-                                          }
+                    // Determine button state: generating -> stop, canSend -> send, else -> voice
+                    val buttonState =
+                        when {
+                          isGenerating -> "stop"
+                          canSend -> "send"
+                          else -> "voice"
+                        }
+                    Crossfade(targetState = buttonState, label = "voice-send-stop-transition") {
+                        state ->
+                      when (state) {
+                        "stop" -> {
+                          // Stop button - appears during generation
+                          Surface(
+                              onClick = onStopClick,
+                              modifier = Modifier.fillMaxSize().testTag(HomeTags.StopBtn),
+                              shape = CircleShape,
+                              color = MaterialTheme.colorScheme.error,
+                              tonalElevation = 0.dp,
+                              shadowElevation = 0.dp) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center) {
                                       Icon(
-                                          imageVector = icon,
-                                          contentDescription = Localization.t("send"),
+                                          imageVector = Icons.Default.Stop,
+                                          contentDescription = Localization.t("stop_generating"),
                                           tint = Color.White,
+                                          modifier = Modifier.size(20.dp))
+                                    }
+                              }
+                        }
+                        "send" -> {
+                          // Red send button - transitions from voice mode, matches chatbox height
+                          Surface(
+                              onClick = onSendClick,
+                              modifier = Modifier.fillMaxSize().testTag(HomeTags.SendBtn),
+                              shape = CircleShape,
+                              color = EulerRed,
+                              tonalElevation = 0.dp,
+                              shadowElevation = 0.dp) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center) {
+                                      if (isSending) {
+                                        CircularProgressIndicator(
+                                            strokeWidth = 2.dp,
+                                            modifier = Modifier.size(18.dp),
+                                            color = Color.White)
+                                      } else {
+                                        val icon =
+                                            try {
+                                              androidx.compose.material.icons.Icons.Rounded.Send
+                                            } catch (_: Throwable) {
+                                              androidx.compose.material.icons.Icons.Default.Send
+                                            }
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = Localization.t("send"),
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp))
+                                      }
+                                    }
+                              }
+                        }
+                        else -> {
+                          // Voice mode button - circular with waveform icon
+                          Surface(
+                              onClick = onVoiceModeClick,
+                              modifier = Modifier.fillMaxSize().testTag(HomeTags.VoiceBtn),
+                              shape = CircleShape,
+                              color = textSecondary.copy(alpha = 0.2f),
+                              tonalElevation = 0.dp,
+                              shadowElevation = 0.dp) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center) {
+                                      Icon(
+                                          Icons.Default.GraphicEq,
+                                          contentDescription = "Voice mode",
+                                          tint = textSecondary,
                                           modifier = Modifier.size(18.dp))
                                     }
-                                  }
-                            }
+                              }
+                        }
                       }
                     }
                   }

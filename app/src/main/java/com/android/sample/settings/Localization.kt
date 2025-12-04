@@ -159,6 +159,8 @@ object Localization {
           "message_euler" to "Message EULER",
           "euler_thinking" to "Euler is thinking",
           "ask_euler_anything" to "Ask Euler Anything",
+          "stop_generating" to "Stop generating",
+          "retry" to "Retry",
 
           // Home Screen - Suggestions
           "suggestion_what_is_epfl" to "What is EPFL",
@@ -273,6 +275,8 @@ object Localization {
           "message_euler" to "Message EULER",
           "euler_thinking" to "Euler réfléchit",
           "ask_euler_anything" to "Demandez n'importe quoi à Euler",
+          "stop_generating" to "Arrêter la génération",
+          "retry" to "Réessayer",
 
           // Home Screen - Suggestions
           "suggestion_what_is_epfl" to "Qu'est-ce que l'EPFL",
@@ -403,6 +407,8 @@ object Localization {
           "message_euler" to "Nachricht an EULER",
           "euler_thinking" to "Euler denkt nach",
           "ask_euler_anything" to "Fragen Sie Euler alles",
+          "stop_generating" to "Generierung stoppen",
+          "retry" to "Wiederholen",
 
           // Home Screen - Suggestions
           "suggestion_what_is_epfl" to "Was ist EPFL",
@@ -499,6 +505,8 @@ object Localization {
           "message_euler" to "Mensaje a EULER",
           "euler_thinking" to "Euler está pensando",
           "ask_euler_anything" to "Pregunta a Euler cualquier cosa",
+          "stop_generating" to "Detener generación",
+          "retry" to "Reintentar",
 
           // Home Screen - Suggestions
           "suggestion_what_is_epfl" to "Qué es EPFL",
@@ -595,6 +603,8 @@ object Localization {
           "message_euler" to "Messaggio a EULER",
           "euler_thinking" to "Euler sta pensando",
           "ask_euler_anything" to "Chiedi qualsiasi cosa a Euler",
+          "stop_generating" to "Interrompi generazione",
+          "retry" to "Riprova",
 
           // Home Screen - Suggestions
           "suggestion_what_is_epfl" to "Cos'è EPFL",
@@ -690,6 +700,8 @@ object Localization {
           "message_euler" to "Mensagem para EULER",
           "euler_thinking" to "Euler está pensando",
           "ask_euler_anything" to "Pergunte qualquer coisa ao Euler",
+          "stop_generating" to "Parar geração",
+          "retry" to "Tentar novamente",
 
           // Home Screen - Suggestions
           "suggestion_what_is_epfl" to "O que é EPFL",
@@ -785,6 +797,8 @@ object Localization {
           "message_euler" to "发送消息给 EULER",
           "euler_thinking" to "Euler 正在思考",
           "ask_euler_anything" to "向 Euler 提问任何问题",
+          "stop_generating" to "停止生成",
+          "retry" to "重试",
 
           // Home Screen - Suggestions
           "suggestion_what_is_epfl" to "什么是 EPFL",

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
@@ -38,9 +39,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.android.sample.ui.theme.EulerAudioButtonLoadingColor
-import com.android.sample.ui.theme.EulerAudioButtonTint
-import com.android.sample.ui.theme.EulerAudioButtonTintSemiTransparent
 
 /**
  * Renders a single chat message as either:
@@ -69,6 +67,8 @@ fun ChatMessage(
     modifier: Modifier = Modifier,
     isStreaming: Boolean = false,
     audioState: MessageAudioState? = null,
+    onRetry: (() -> Unit)? = null,
+    isLastAiMessage: Boolean = false,
     userBubbleBg: Color = Color(0xFF2B2B2B),
     userBubbleText: Color = Color.White,
     aiText: Color = Color(0xFFEDEDED),
@@ -115,14 +115,24 @@ fun ChatMessage(
               color = aiText,
               modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
 
-          if (audioState != null) {
+          // Show action buttons row (retry + audio)
+          val showRetry = isLastAiMessage && onRetry != null && !isStreaming
+          if (audioState != null || showRetry) {
             Spacer(modifier = Modifier.height(4.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically) {
-                  AudioPlaybackButton(
-                      state = audioState, tint = EulerAudioButtonTintSemiTransparent)
+                  // Retry button - only show for the last AI message
+                  if (showRetry) {
+                    RetryButton(onClick = onRetry!!)
+                    if (audioState != null) {
+                      Spacer(modifier = Modifier.size(4.dp))
+                    }
+                  }
+                  if (audioState != null) {
+                    AudioPlaybackButton(state = audioState)
+                  }
                 }
           }
         }
@@ -163,22 +173,26 @@ data class MessageAudioState(
 @Composable
 private fun AudioPlaybackButton(
     state: MessageAudioState,
-    modifier: Modifier = Modifier.size(24.dp),
-    tint: Color = EulerAudioButtonTint
+    modifier: Modifier = Modifier.size(24.dp)
 ) {
+  val colorScheme = MaterialTheme.colorScheme
+  // Use onSurfaceVariant which adapts to light/dark mode
+  val buttonTint = colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+  val loadingColor = colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+
   when {
     state.isLoading -> {
       CircularProgressIndicator(
           modifier = Modifier.size(14.dp).testTag("chat_audio_btn_loading"),
           strokeWidth = 2.dp,
-          color = EulerAudioButtonLoadingColor)
+          color = loadingColor)
     }
     state.isPlaying -> {
       IconButton(modifier = modifier.testTag("chat_audio_btn_stop"), onClick = state.onStop) {
         Icon(
             imageVector = Icons.Filled.Stop,
             contentDescription = "Stop audio",
-            tint = tint,
+            tint = buttonTint,
             modifier = Modifier.size(14.dp))
       }
     }
@@ -187,9 +201,24 @@ private fun AudioPlaybackButton(
         Icon(
             imageVector = Icons.Filled.VolumeUp,
             contentDescription = "Play audio",
-            tint = tint,
+            tint = buttonTint,
             modifier = Modifier.size(16.dp))
       }
     }
+  }
+}
+
+@Composable
+private fun RetryButton(onClick: () -> Unit, modifier: Modifier = Modifier.size(24.dp)) {
+  val colorScheme = MaterialTheme.colorScheme
+  // Use onSurfaceVariant which adapts to light/dark mode
+  val buttonTint = colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+
+  IconButton(modifier = modifier.testTag("chat_retry_btn"), onClick = onClick) {
+    Icon(
+        imageVector = Icons.Filled.Refresh,
+        contentDescription = "Retry",
+        tint = buttonTint,
+        modifier = Modifier.size(16.dp))
   }
 }

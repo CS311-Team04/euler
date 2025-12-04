@@ -128,6 +128,7 @@ class HomeViewModel(
 
   private var activeStreamJob: Job? = null
   @Volatile private var userCancelledStream: Boolean = false
+  private var lastUserPrompt: String? = null
 
   // ---------------------------
   // UI mutations / state helpers
@@ -518,6 +519,9 @@ class HomeViewModel(
     val msg = current.messageDraft.trim()
     if (msg.isEmpty()) return
 
+    // Store for retry functionality
+    lastUserPrompt = msg
+
     val now = System.currentTimeMillis()
     val userMsg =
         ChatUIModel(
@@ -904,6 +908,102 @@ class HomeViewModel(
           streamingSequence = state.streamingSequence + 1)
     }
     userCancelledStream = false
+  }
+
+  /** Stop the current AI response generation. */
+  fun stopGeneration() {
+    val streamingId = _uiState.value.streamingMessageId ?: return
+    userCancelledStream = true
+    activeStreamJob?.cancel()
+    activeStreamJob = null
+
+    // Mark the message as finished with whatever content it has
+    _uiState.update { state ->
+      val updated =
+          state.messages.map { msg ->
+            if (msg.id == streamingId) {
+              val text = if (msg.text.isBlank()) "Generation stopped" else msg.text
+              msg.copy(text = text, isThinking = false, wasStopped = true)
+            } else {
+              msg
+            }
+          }
+      state.copy(
+          messages = updated,
+          streamingMessageId = null,
+          isSending = false,
+          streamingSequence = state.streamingSequence + 1)
+    }
+    userCancelledStream = false
+  }
+
+  /** Retry the last user message. Removes the last AI response and re-sends. */
+  fun retryLastMessage() {
+    val prompt = lastUserPrompt ?: return
+    val current = _uiState.value
+    if (current.isSending || current.streamingMessageId != null) return
+
+    // Find and remove the last AI message
+    val messages = current.messages.toMutableList()
+    val lastAiIndex = messages.indexOfLast { it.type == ChatType.AI }
+    if (lastAiIndex >= 0) {
+      messages.removeAt(lastAiIndex)
+    }
+
+    val aiMessageId = UUID.randomUUID().toString()
+    val placeholder =
+        ChatUIModel(
+            id = aiMessageId,
+            text = "",
+            timestamp = System.currentTimeMillis(),
+            type = ChatType.AI,
+            isThinking = true)
+
+    _uiState.update { st ->
+      st.copy(
+          messages = messages + placeholder,
+          isSending = true,
+          streamingMessageId = aiMessageId,
+          streamingSequence = st.streamingSequence + 1)
+    }
+
+    viewModelScope.launch(exceptionHandler) {
+      try {
+        if (isGuest()) {
+          startStreaming(
+              question = prompt,
+              messageId = aiMessageId,
+              conversationId = null,
+              summary = null,
+              transcript = null)
+          return@launch
+        }
+
+        val cid = _uiState.value.currentConversationId
+        val uid = auth.currentUser?.uid
+        val summary: String? =
+            if (uid != null && cid != null) {
+              fetchPriorSummary(uid, cid, aiMessageId)
+            } else null
+
+        val recentTranscript: String? =
+            if (uid != null && cid != null) {
+              buildRecentTranscript(uid, cid, aiMessageId)
+            } else null
+
+        startStreaming(
+            question = prompt,
+            messageId = aiMessageId,
+            conversationId = cid,
+            summary = summary,
+            transcript = recentTranscript)
+      } catch (e: Exception) {
+        Log.e(TAG, "Error retrying message", e)
+        handleSendMessageError(e, aiMessageId)
+      } finally {
+        _uiState.update { it.copy(isSending = false) }
+      }
+    }
   }
 
   /** Show the delete confirmation modal. */
