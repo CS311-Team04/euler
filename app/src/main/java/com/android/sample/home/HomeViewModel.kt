@@ -154,7 +154,8 @@ class HomeViewModel(
               // SIGN-IN
               startLocalNewChat() // local placeholder until the first send
               startData() // attach Firestore
-              refreshProfile() // load user profile
+              // Preload profile for better performance
+              viewModelScope.launch { resolveProfile() }
             }
             lastUid = uid
           }
@@ -187,7 +188,8 @@ class HomeViewModel(
       // already signed in
       startLocalNewChat()
       startData()
-      refreshProfile() // load user profile
+      // Preload profile for better performance
+      viewModelScope.launch { resolveProfile() }
     } else {
       // guest at startup
       onSignedOutInternal()
@@ -366,29 +368,48 @@ class HomeViewModel(
     }
   }
 
+  /**
+   * Resolves the current user profile, loading from repository if not already in state. Returns the
+   * profile or null if unavailable. Updates UI state if profile is loaded.
+   */
+  private suspend fun resolveProfile(): UserProfile? {
+    // Check if profile is already in state
+    val existingProfile = _uiState.value.profile
+    if (existingProfile != null) {
+      Log.d(TAG, "resolveProfile: profile already in state")
+      return existingProfile
+    }
+
+    // Load from repository if not in state
+    Log.d(TAG, "resolveProfile: loading profile from repository")
+    return try {
+      val profile = profileRepository.loadProfile()
+      if (profile != null) {
+        Log.d(
+            TAG,
+            "resolveProfile: profile loaded successfully, hasSection=${profile.section.isNotBlank()}, hasName=${profile.fullName.isNotBlank() || profile.preferredName.isNotBlank()}")
+        _uiState.update {
+          it.copy(
+              profile = profile,
+              userName =
+                  profile.preferredName.ifBlank { profile.fullName }.ifBlank { DEFAULT_USER_NAME },
+              isGuest = false)
+        }
+        profile
+      } else {
+        Log.d(TAG, "resolveProfile: profile load returned null - profile may not exist yet")
+        null
+      }
+    } catch (e: Exception) {
+      Log.e(TAG, "resolveProfile: failed to load profile", e)
+      null
+    }
+  }
+
   fun refreshProfile() {
     viewModelScope.launch {
-      try {
-        val profile = profileRepository.loadProfile()
-        _uiState.value =
-            if (profile != null) {
-              _uiState.value.copy(
-                  profile = profile,
-                  userName =
-                      profile.preferredName
-                          .ifBlank { profile.fullName }
-                          .ifBlank { DEFAULT_USER_NAME },
-                  isGuest = false)
-            } else {
-              _uiState.value.copy(
-                  profile = null,
-                  userName =
-                      _uiState.value.userName.takeIf { it.isNotBlank() } ?: DEFAULT_USER_NAME,
-                  isGuest = false)
-            }
-      } catch (t: Throwable) {
-        Log.e("HomeViewModel", "Failed to load profile", t)
-      }
+      resolveProfile()
+      // refreshProfile also updates userName, which resolveProfile already handles
     }
   }
 
@@ -549,15 +570,11 @@ class HomeViewModel(
         // GUEST: no Firestore, just streaming UI
         if (isGuest()) {
           Log.d(TAG, "sendMessage: guest mode, starting streaming")
-          val currentProfile = _uiState.value.profile
-          Log.d(
-              TAG,
-              "sendMessage: Guest mode - Building context with profile: ${currentProfile?.let { "section=${it.section}, name=${it.preferredName.ifBlank { it.fullName }}" } ?: "null"}")
+          val currentProfile = resolveProfile()
           val profileContext = buildProfileContext(currentProfile)
-          val finalContextString = profileContext ?: "null"
           Log.d(
               TAG,
-              "sendMessage: Guest mode Final Context String (length=${finalContextString.length}): $finalContextString")
+              "sendMessage: Guest mode - profileContext built, hasContext=${profileContext != null}, contextLength=${profileContext?.length ?: 0}")
           startStreaming(
               question = msg,
               messageId = aiMessageId,
@@ -622,34 +639,14 @@ class HomeViewModel(
               buildRecentTranscript(uid, conversationId, userMsg.id)
             } else null
 
-        // Ensure profile is loaded if it's null (safety check - load synchronously)
-        var currentProfile = _uiState.value.profile
-        if (currentProfile == null && !isGuest()) {
-          Log.d(TAG, "sendMessage: profile is null, attempting to load it immediately")
-          try {
-            currentProfile = profileRepository.loadProfile()
-            if (currentProfile != null) {
-              Log.d(
-                  TAG,
-                  "sendMessage: successfully loaded profile with section='${currentProfile.section}', name='${currentProfile.preferredName.ifBlank { currentProfile.fullName }}'")
-              _uiState.update { it.copy(profile = currentProfile) }
-            } else {
-              Log.w(TAG, "sendMessage: profile load returned null - profile may not exist yet")
-            }
-          } catch (e: Exception) {
-            Log.e(TAG, "sendMessage: failed to load profile", e)
-          }
-        }
+        // Resolve profile (loads if not already in state)
+        val currentProfile = resolveProfile()
 
         // Construire le contexte du profil utilisateur
-        Log.d(
-            TAG,
-            "sendMessage: Building context with profile: ${currentProfile?.let { "section=${it.section}, name=${it.preferredName.ifBlank { it.fullName }}" } ?: "null"}")
         val profileContext = buildProfileContext(currentProfile)
-        val finalContextString = profileContext ?: "null"
         Log.d(
             TAG,
-            "sendMessage: Final Context String (length=${finalContextString.length}): $finalContextString")
+            "sendMessage: profileContext built, hasProfile=${currentProfile != null}, hasContext=${profileContext != null}, contextLength=${profileContext?.length ?: 0}")
 
         // Appel RAG
         startStreaming(
@@ -1176,9 +1173,7 @@ class HomeViewModel(
 
     // Return null if no useful information
     if (parts.isEmpty()) {
-      Log.d(
-          TAG,
-          "buildProfileContext: profile exists but all fields are empty - fullName='${profile.fullName}', preferredName='${profile.preferredName}', section='${profile.section}', faculty='${profile.faculty}'")
+      Log.d(TAG, "buildProfileContext: profile exists but all fields are empty")
       return null
     }
 
