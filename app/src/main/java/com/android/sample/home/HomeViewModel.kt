@@ -550,10 +550,14 @@ class HomeViewModel(
         if (isGuest()) {
           Log.d(TAG, "sendMessage: guest mode, starting streaming")
           val currentProfile = _uiState.value.profile
-          Log.d(TAG, "sendMessage: Guest mode - Building context with profile: ${currentProfile?.let { "section=${it.section}, name=${it.preferredName.ifBlank { it.fullName }}" } ?: "null"}")
+          Log.d(
+              TAG,
+              "sendMessage: Guest mode - Building context with profile: ${currentProfile?.let { "section=${it.section}, name=${it.preferredName.ifBlank { it.fullName }}" } ?: "null"}")
           val profileContext = buildProfileContext(currentProfile)
           val finalContextString = profileContext ?: "null"
-          Log.d(TAG, "sendMessage: Guest mode Final Context String (length=${finalContextString.length}): $finalContextString")
+          Log.d(
+              TAG,
+              "sendMessage: Guest mode Final Context String (length=${finalContextString.length}): $finalContextString")
           startStreaming(
               question = msg,
               messageId = aiMessageId,
@@ -625,7 +629,9 @@ class HomeViewModel(
           try {
             currentProfile = profileRepository.loadProfile()
             if (currentProfile != null) {
-              Log.d(TAG, "sendMessage: successfully loaded profile with section='${currentProfile.section}', name='${currentProfile.preferredName.ifBlank { currentProfile.fullName }}'")
+              Log.d(
+                  TAG,
+                  "sendMessage: successfully loaded profile with section='${currentProfile.section}', name='${currentProfile.preferredName.ifBlank { currentProfile.fullName }}'")
               _uiState.update { it.copy(profile = currentProfile) }
             } else {
               Log.w(TAG, "sendMessage: profile load returned null - profile may not exist yet")
@@ -636,10 +642,14 @@ class HomeViewModel(
         }
 
         // Construire le contexte du profil utilisateur
-        Log.d(TAG, "sendMessage: Building context with profile: ${currentProfile?.let { "section=${it.section}, name=${it.preferredName.ifBlank { it.fullName }}" } ?: "null"}")
+        Log.d(
+            TAG,
+            "sendMessage: Building context with profile: ${currentProfile?.let { "section=${it.section}, name=${it.preferredName.ifBlank { it.fullName }}" } ?: "null"}")
         val profileContext = buildProfileContext(currentProfile)
         val finalContextString = profileContext ?: "null"
-        Log.d(TAG, "sendMessage: Final Context String (length=${finalContextString.length}): $finalContextString")
+        Log.d(
+            TAG,
+            "sendMessage: Final Context String (length=${finalContextString.length}): $finalContextString")
 
         // Appel RAG
         startStreaming(
@@ -1127,8 +1137,8 @@ class HomeViewModel(
   }
 
   /**
-   * Builds a readable profile context string from UserProfile data.
-   * Returns null if profile is null or contains no useful information.
+   * Builds a readable profile context string from UserProfile data. Returns null if profile is null
+   * or contains no useful information.
    */
   private fun buildProfileContext(profile: UserProfile?): String? {
     if (profile == null) {
@@ -1171,12 +1181,16 @@ class HomeViewModel(
       return null
     }
 
-    val context = buildString {
-      appendLine("User Profile Information:")
-      parts.forEach { part -> appendLine("- $part") }
-    }.trim()
+    val context =
+        buildString {
+              appendLine("User Profile Information:")
+              parts.forEach { part -> appendLine("- $part") }
+            }
+            .trim()
 
-    Log.d(TAG, "buildProfileContext: built context with ${parts.size} fields, length=${context.length}")
+    Log.d(
+        TAG,
+        "buildProfileContext: built context with ${parts.size} fields, length=${context.length}")
     return context
   }
 

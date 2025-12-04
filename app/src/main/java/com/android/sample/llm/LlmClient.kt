@@ -155,12 +155,14 @@ class FirebaseFunctionsLlmClient(
 
         val map =
             parseResponseMap(result)
-                ?: return@withContext fallback?.generateReply(prompt, summary, transcript, profileContext)
+                ?: return@withContext fallback?.generateReply(
+                    prompt, summary, transcript, profileContext)
                     ?: throw IllegalStateException("Invalid LLM response payload: null data")
 
         val replyText =
             parseReplyText(map)
-                ?: return@withContext fallback?.generateReply(prompt, summary, transcript, profileContext)
+                ?: return@withContext fallback?.generateReply(
+                    prompt, summary, transcript, profileContext)
                     ?: throw IllegalStateException("Empty LLM reply")
 
         buildBotReply(map, replyText)
@@ -177,7 +179,9 @@ class FirebaseFunctionsLlmClient(
           summary?.let { put(KEY_SUMMARY, it) }
           transcript?.let { put(KEY_TRANSCRIPT, it) }
           profileContext?.let {
-            Log.d(TAG, "buildRequestPayload: including profileContext, length=${it.length}, preview=${it.take(100)}...")
+            Log.d(
+                TAG,
+                "buildRequestPayload: including profileContext, length=${it.length}, preview=${it.take(100)}...")
             put(KEY_PROFILE_CONTEXT, it)
           } ?: Log.d(TAG, "buildRequestPayload: profileContext is null, not including in request")
         }
