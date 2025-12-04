@@ -9,7 +9,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.sample.ui.theme.SampleAppTheme
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -154,27 +153,21 @@ class MarkdownTextTest {
 
   @Test
   fun markdownText_renders_plain_text() {
-    composeRule.setContent {
-      SampleAppTheme { MarkdownText(markdown = "Hello World") }
-    }
+    composeRule.setContent { SampleAppTheme { MarkdownText(markdown = "Hello World") } }
 
     composeRule.onNode(hasText("Hello World", substring = true)).assertIsDisplayed()
   }
 
   @Test
   fun markdownText_renders_bold_text() {
-    composeRule.setContent {
-      SampleAppTheme { MarkdownText(markdown = "This is **bold** text") }
-    }
+    composeRule.setContent { SampleAppTheme { MarkdownText(markdown = "This is **bold** text") } }
 
     composeRule.onNode(hasText("bold", substring = true)).assertIsDisplayed()
   }
 
   @Test
   fun markdownText_renders_italic_text() {
-    composeRule.setContent {
-      SampleAppTheme { MarkdownText(markdown = "This is *italic* text") }
-    }
+    composeRule.setContent { SampleAppTheme { MarkdownText(markdown = "This is *italic* text") } }
 
     composeRule.onNode(hasText("italic", substring = true)).assertIsDisplayed()
   }
@@ -394,7 +387,8 @@ class MarkdownTextTest {
   @Test
   fun chatMessage_aiMessage_streaming_showsCursor() {
     val aiMessage =
-        ChatUIModel(id = "ai-4", text = "", timestamp = System.currentTimeMillis(), type = ChatType.AI)
+        ChatUIModel(
+            id = "ai-4", text = "", timestamp = System.currentTimeMillis(), type = ChatType.AI)
 
     composeRule.setContent {
       SampleAppTheme { ChatMessage(message = aiMessage, isStreaming = true) }
@@ -418,8 +412,7 @@ class MarkdownTextTest {
 
     composeRule.onNode(hasText("Streaming content", substring = true)).assertIsDisplayed()
     // Cursor should not show when there's text
-    assertTrue(
-        composeRule.onAllNodesWithTag("chat_ai_cursor").fetchSemanticsNodes().isEmpty())
+    assertTrue(composeRule.onAllNodesWithTag("chat_ai_cursor").fetchSemanticsNodes().isEmpty())
   }
 
   @Test
@@ -504,4 +497,3 @@ class MarkdownTextTest {
   private fun androidx.compose.ui.test.junit4.ComposeTestRule.onAllNodesWithTag(tag: String) =
       onAllNodes(androidx.compose.ui.test.hasTestTag(tag))
 }
-

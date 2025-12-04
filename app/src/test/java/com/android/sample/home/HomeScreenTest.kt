@@ -1005,11 +1005,7 @@ class HomeScreenComposeInteractionsTest {
             text = "Some response",
             timestamp = System.currentTimeMillis(),
             type = ChatType.AI,
-            source =
-                SourceMeta(
-                    siteLabel = "Test Site",
-                    title = "Test",
-                    url = null))
+            source = SourceMeta(siteLabel = "Test Site", title = "Test", url = null))
     viewModel.editState { it.copy(messages = listOf(messageWithNullUrl)) }
 
     composeRule.setContent { HomeScreen(viewModel = viewModel) }
