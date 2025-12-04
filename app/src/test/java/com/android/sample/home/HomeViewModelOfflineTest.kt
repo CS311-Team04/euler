@@ -109,7 +109,7 @@ class HomeViewModelOfflineTest {
   }
 
   @Test
-  fun `sendMessage does nothing when offline`() = runTest {
+  fun `sendMessage attempts to send when offline and checks cache`() = runTest {
     networkMonitor.setOnline(false)
     kotlinx.coroutines.delay(100)
     val initialState = viewModel.uiState.first()
@@ -118,10 +118,11 @@ class HomeViewModelOfflineTest {
     viewModel.updateMessageDraft("Test message")
     viewModel.sendMessage()
 
-    kotlinx.coroutines.delay(100)
+    kotlinx.coroutines.delay(200)
     val finalState = viewModel.uiState.first()
-    // Message should not be sent when offline
-    assertEquals(initialMessageCount, finalState.messages.size)
+    // Message should be added (user message) even when offline, as we now allow sending
+    // to check cache. If no cache, error message will be shown.
+    assertTrue("User message should be added", finalState.messages.size > initialMessageCount)
   }
 
   @Test
@@ -159,10 +160,13 @@ class HomeViewModelOfflineTest {
 
     viewModel.sendMessage()
 
-    kotlinx.coroutines.delay(100)
+    kotlinx.coroutines.delay(200)
     val stateAfterSend = viewModel.uiState.first()
-    // sendMessage should not send the message when offline
-    assertEquals(stateBeforeSend.messages.size, stateAfterSend.messages.size)
+    // sendMessage now allows sending when offline to check cache
+    // User message should be added, and if no cache, error will be shown
+    assertTrue(
+        "User message should be added",
+        stateAfterSend.messages.size > stateBeforeSend.messages.size)
     // If user is signed in and showOfflineMessage was false, it should be set to true
     // (This depends on auth.currentUser != null which may not be true in test)
     assertTrue("Should be offline", stateAfterSend.isOffline)
@@ -184,12 +188,12 @@ class HomeViewModelOfflineTest {
 
         viewModel.sendMessage()
 
-        kotlinx.coroutines.delay(100)
+        kotlinx.coroutines.delay(200)
         val stateAfterSend = viewModel.uiState.first()
         // sendMessage should check isCurrentlyOnline() and detect offline
         assertTrue("Should detect offline via isCurrentlyOnline", stateAfterSend.isOffline)
-        assertEquals(
-            "Message should not be sent", initialMessageCount, stateAfterSend.messages.size)
+        // Message will be sent (to check cache), but will show error if no cache
+        assertTrue("Message should be added", stateAfterSend.messages.size > initialMessageCount)
       }
 
   @Test
@@ -262,10 +266,10 @@ class HomeViewModelOfflineTest {
 
     viewModel.sendMessage()
 
-    kotlinx.coroutines.delay(100)
+    kotlinx.coroutines.delay(200)
     val stateAfterSend = viewModel.uiState.first()
-    // Message should not be sent
-    assertEquals("Message should not be sent", initialMessageCount, stateAfterSend.messages.size)
+    // Message will be sent (to check cache), but will show error if no cache
+    assertTrue("Message should be added", stateAfterSend.messages.size > initialMessageCount)
     // showOfflineMessage should remain true (not changed if already true)
     assertTrue("Message should remain shown", stateAfterSend.showOfflineMessage)
   }

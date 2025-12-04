@@ -21,8 +21,8 @@ object TestConstants {
   object ButtonTexts {
     const val MICROSOFT_LOGIN = "Continue with Microsoft Entra ID"
     const val SWITCH_LOGIN = "Continue as a guest"
-    const val WHAT_IS_EPFL = "What is EPFL"
-    const val CHECK_ED_DISCUSSION = "Check Ed Discussion"
+    const val WHAT_IS_EPFL = "What is EPFL?"
+    const val WHERE_IS_EPFL = "Where is EPFL located?"
   }
 
   // Screen texts
