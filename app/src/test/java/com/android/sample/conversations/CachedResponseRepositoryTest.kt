@@ -158,6 +158,20 @@ class CachedResponseRepositoryTest {
   }
 
   @Test
+  fun `getCachedResponse without preferCache also uses Source CACHE`() = runTest {
+    val question = "What is EPFL"
+
+    whenever(globalCacheCollection.document(any())).thenReturn(cacheDocument)
+    whenever(cacheDocument.get(Source.CACHE)).thenReturn(Tasks.forResult(cacheSnapshot))
+    whenever(cacheSnapshot.exists()).thenReturn(false)
+
+    val result = repository.getCachedResponse(question, preferCache = false)
+
+    verify(cacheDocument).get(Source.CACHE)
+    assertNull("Should return null when cache doesn't exist", result)
+  }
+
+  @Test
   fun `getCachedResponse handles exceptions gracefully`() = runTest {
     val question = "What is EPFL"
 
@@ -186,11 +200,55 @@ class CachedResponseRepositoryTest {
     repository.saveCachedResponse(question, response)
 
     verify(cacheDocument).set(any<Map<String, Any>>())
+    verify(cacheDocument).get() // Verify the verification read
     val savedData = setCaptor.firstValue
     assertEquals("Question should be saved", question.trim(), savedData["question"])
     assertEquals("Response should be saved", response, savedData["response"])
     assertNotNull("createdAt should be set", savedData["createdAt"])
     assertNotNull("updatedAt should be set", savedData["updatedAt"])
+  }
+
+  @Test
+  fun `saveCachedResponse verifies document exists after save`() = runTest {
+    val question = "What is EPFL"
+    val response = "EPFL is a university"
+
+    whenever(globalCacheCollection.document(any())).thenReturn(cacheDocument)
+    whenever(cacheDocument.set(any<Map<String, Any>>())).thenReturn(Tasks.forResult(null))
+    whenever(cacheDocument.get()).thenReturn(Tasks.forResult(cacheSnapshot))
+    whenever(cacheSnapshot.exists()).thenReturn(true)
+    whenever(cacheSnapshot.id).thenReturn("test-hash-123")
+    whenever(cacheSnapshot.getString("question")).thenReturn(question.take(50))
+
+    repository.saveCachedResponse(question, response)
+
+    // Verify that verification read was performed
+    verify(cacheDocument).get()
+    verify(cacheSnapshot).exists()
+    verify(cacheSnapshot).id
+    verify(cacheSnapshot).getString("question")
+  }
+
+  @Test
+  fun `saveCachedResponse handles verification when document does not exist`() = runTest {
+    val question = "What is EPFL"
+    val response = "EPFL is a university"
+
+    whenever(globalCacheCollection.document(any())).thenReturn(cacheDocument)
+    whenever(cacheDocument.set(any<Map<String, Any>>())).thenReturn(Tasks.forResult(null))
+
+    // Verification read shows document doesn't exist
+    val verifySnapshot = mock<DocumentSnapshot>()
+    whenever(cacheDocument.get()).thenReturn(Tasks.forResult(verifySnapshot))
+    whenever(verifySnapshot.exists()).thenReturn(false)
+
+    repository.saveCachedResponse(question, response)
+
+    // Verify that verification read was performed
+    verify(cacheDocument).set(any<Map<String, Any>>())
+    verify(cacheDocument).get()
+    verify(verifySnapshot).exists()
+    // Should handle the case where verification shows doc doesn't exist
   }
 
   @Test
