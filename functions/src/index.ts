@@ -460,6 +460,44 @@ export async function answerWithRagCore({
   const trimmedTranscript =
     (recentTranscript ?? "").toString().trim().slice(0, 1500);
 
+  // ===== HARD OVERRIDE: Detect personal questions and force profile usage =====
+  // 1. Detect if question is about profile/personal information
+  const personalQuestionRegex = /\b(mon|ma|mes)\s+(nom|pseudo|section|email|role|faculté|filière)\b|qui\s+(suis-je|je\s+suis)|c'?est\s+quoi\s+(ma|mon)\s+(section|nom|pseudo)/i;
+  const isPersonalQuestion = personalQuestionRegex.test(question);
+  
+  // Additional detection for questions like "quelle est ma section", "quel est mon nom"
+  const alternativePersonalRegex = /(quelle|quel|quelle)\s+est\s+(ma|mon|mes)\s+(section|nom|pseudo|email|faculté|filière)/i;
+  const isPersonalQuestionAlt = alternativePersonalRegex.test(question);
+  
+  const isPersonal = isPersonalQuestion || isPersonalQuestionAlt;
+  
+  // 2. Hard Override: If personal question + profile exists, NUKE the RAG context
+  let finalRagsContext = context;
+  let finalProfileInstruction = "";
+  
+  if (profileContext && isPersonal) {
+    logger.info("answerWithRagCore.override", { 
+      reason: "Personal question detected, ignoring RAG context",
+      questionPreview: question.slice(0, 100),
+      hasProfileContext: Boolean(profileContext),
+      profileContextLen: profileContext.length,
+      originalContextLen: context.length,
+      willUseEmptyContext: true,
+      isPersonalQuestion: isPersonalQuestion,
+      isPersonalQuestionAlt: isPersonalQuestionAlt,
+    });
+    finalRagsContext = ""; // Hide RAG so AI *must* use profile
+    finalProfileInstruction = `\n[[ DONNÉES OFFICIELLES DU PROFIL (PRIORITÉ ABSOLUE) ]]\n${profileContext}\n\nINSTRUCTION CRITIQUE: La question porte sur l'utilisateur. Réponds UNIQUEMENT en utilisant les données du profil ci-dessus. Ignore tout savoir général ou contexte web.\n`;
+  } else {
+    // Log when override is NOT triggered for debugging
+    if (isPersonal && !profileContext) {
+      logger.info("answerWithRagCore.override.skipped", {
+        reason: "Personal question detected but no profile context",
+        questionPreview: question.slice(0, 100),
+      });
+    }
+  }
+
   const prompt = [
     "Consigne: réponds brièvement et directement, sans introduction, sans méta‑commentaires et sans phrases de conclusion.",
     "Format:",
@@ -467,13 +505,27 @@ export async function answerWithRagCore({
     "- Sinon, réponds en 2–4 phrases courtes, chacune sur sa propre ligne.",
     "- Utilise des retours à la ligne pour aérer; pas de titres ni de clôture.",
     "- Rédige toujours au vouvoiement (« vous »). Pour tout fait sur l'utilisateur, écris « Vous … ».",
-    "- Si la question concerne l'utilisateur (section, identité, langue/préférences), réponds UNIQUEMENT à partir du résumé/ fenêtre récente et ignore le contexte RAG.",
-    "- Si le résumé contient des faits pertinents (ex.: section IC, langue, préférences), utilise‑les et ne redemande pas ces informations.",
-    trimmedSummary ? `\nRésumé conversationnel (à utiliser, ne pas afficher tel quel):\n${trimmedSummary}\n` : "",
+    "",
+    "IMPORTANT - Questions personnelles sur l'utilisateur:",
+    "- Si la question concerne le nom, pseudo, section, faculté ou rôle de l'utilisateur (ex: \"c'est quoi ma section\", \"quel est mon nom\", \"quel est mon pseudo\"),",
+    "  tu DOIS utiliser UNIQUEMENT les informations du profil utilisateur fourni dans le contexte système (section PRIORITY USER CONTEXT).",
+    "- IGNORE complètement le contexte RAG pour ces questions personnelles.",
+    "- Réponds directement avec les informations du profil (ex: \"Votre section est Computer Science\").",
+    "- Si la question concerne l'utilisateur (section, identité, langue/préférences), réponds UNIQUEMENT à partir du profil/résumé/fenêtre récente et ignore le contexte RAG.",
+    "",
+    trimmedSummary ? `Résumé conversationnel (à utiliser, ne pas afficher tel quel):\n${trimmedSummary}\n` : "",
     trimmedTranscript ? `Fenêtre récente (ne pas afficher):\n${trimmedTranscript}\n` : "",
-    context ? `Contexte RAG (ignorer pour infos personnelles):\n${context}\n` : "",
+    
+    // Insert the profile instruction HERE in the user message (hard override)
+    finalProfileInstruction,
+    
+    // Use the (potentially empty) RAG context
+    finalRagsContext ? `Contexte RAG (ignorer pour infos personnelles sur l'utilisateur):\n${finalRagsContext}\n` : "",
+    
     `Question: ${question}`,
-    "Si l'information n'est pas dans le résumé ni le contexte, dis que tu ne sais pas.",
+    isPersonal && profileContext 
+      ? "INSTRUCTION: Cette question concerne l'utilisateur. Utilise UNIQUEMENT les données du profil fournies ci-dessus. Ne cherche pas ailleurs."
+      : "Si la question concerne l'utilisateur et que l'information n'est pas dans le profil, dis que tu ne sais pas.",
   ].join("\n");
 
   logger.info("answerWithRagCore.context", {
@@ -489,33 +541,43 @@ export async function answerWithRagCore({
     profileContextHead: profileContext ? profileContext.slice(0, 120) : null,
   });
 
-  // Strong, explicit rules for leveraging the rolling summary
+  // Strong, explicit rules for leveraging the rolling summary and profile
   const summaryUsageRules =
     [
-      "Règles d'usage du résumé conversationnel:",
-      "- Considère les faits présents dans le résumé comme fiables et actuels.",
-      "- Si la question fait référence à « je », « mon/ma », « dans ce cas », etc., utilise le résumé pour résoudre ces références.",
-      "- Pour toute information personnelle (section, identité, langue préférée, contraintes/préférences, disponibilités, objectifs), UTILISE UNIQUEMENT le résumé et/ou la fenêtre récente, et IGNORE le contexte RAG.",
-      "- En cas de conflit entre résumé/ fenêtre récente et contexte RAG, le résumé/ fenêtre récente l'emporte toujours.",
+      "Règles d'usage du résumé conversationnel et du profil utilisateur:",
+      "- ORDRE DE PRIORITÉ pour informations personnelles: 1) Profil utilisateur (PRIORITY USER CONTEXT), 2) Résumé, 3) Fenêtre récente. IGNORE le contexte RAG.",
+      "- Considère les faits présents dans le profil utilisateur comme les plus fiables et actuels.",
+      "- Si la question fait référence à « je », « mon/ma », « ma section », « mon nom », « mon pseudo », utilise d'abord le profil utilisateur.",
+      "- Pour toute information personnelle (section, nom, pseudo, faculté, identité, langue préférée), UTILISE UNIQUEMENT le profil utilisateur si disponible, sinon le résumé/fenêtre récente. IGNORE le contexte RAG.",
+      "- En cas de conflit: profil > résumé/fenêtre récente > contexte RAG.",
       "- Formule ces faits au vouvoiement: « Vous … ». N'utilise jamais « je … » ni « tu … » pour parler de l'utilisateur.",
-      "- Ne redemande pas d'informations déjà présentes dans le résumé (ex.: section IC, préférences, langue).",
+      "- Ne redemande pas d'informations déjà présentes dans le profil (ex.: section, nom, pseudo).",
       "- S'il manque une info essentielle, explique brièvement ce qui manque et propose une question ciblée (une seule).",
-      "- N'affiche pas le résumé tel quel et ne parle pas de « résumé » au destinataire.",
+      "- N'affiche pas le profil ni le résumé tel quel et ne parle pas de « profil » ou « résumé » au destinataire.",
     ].join("\n");
 
-  // Build profile context section if available
+  // Build priority profile context section if available - placed at END for maximum attention
   const profileContextSection = profileContext
     ? [
-        "IMPORTANT: Utilise les informations du profil utilisateur ci-dessous pour répondre aux questions sur le nom, la section, la faculté ou le rôle de l'utilisateur. Adresse-toi toujours à l'utilisateur de manière formelle (« vous »).",
-        "Profil utilisateur (à utiliser, ne pas afficher tel quel):",
+        "",
+        "=== PRIORITY USER CONTEXT ===",
+        "The following is the authenticated user's active profile:",
+        "",
         profileContext,
-      ].join("\n\n")
+        "",
+        "CRITICAL INSTRUCTIONS:",
+        "1. If the user asks about their name, pseudo, section, faculty, or role, you MUST use the info above.",
+        "2. Do NOT use the \"Context\" or web search results to answer questions about the user's identity.",
+        "3. If the profile field is available, state it directly (e.g., \"Votre section est Computer Science\").",
+        "4. For questions like \"c'est quoi ma section\" or \"quel est mon nom\", use ONLY the profile data above.",
+        "5. Ignore RAG context when answering personal information questions - use profile ONLY.",
+        "=============================",
+      ].join("\n")
     : "";
 
-  // Merge persona, rules, profile, summary into a SINGLE system message (some models only allow one)
+  // Merge persona, rules, summary first, then profile at END for priority
   const systemContent = [
     EPFL_SYSTEM_PROMPT,
-    profileContextSection,
     summaryUsageRules,
     trimmedSummary
       ? "Résumé conversationnel à prendre en compte (ne pas afficher tel quel):\n" + trimmedSummary
@@ -523,9 +585,17 @@ export async function answerWithRagCore({
     trimmedTranscript
       ? "Fenêtre récente (ne pas afficher; utile pour les références immédiates):\n" + trimmedTranscript
       : "",
+    profileContextSection, // Profile context at END for maximum attention
   ]
     .filter(Boolean)
     .join("\n\n");
+
+  // Log system content to verify profile context is included (structured logging only)
+  logger.info("answerWithRagCore.systemContent", {
+    systemContentLen: systemContent.length,
+    containsPriorityContext: systemContent.includes("PRIORITY USER CONTEXT"),
+    containsProfileData: profileContext ? systemContent.includes(profileContext.slice(0, 50)) : false,
+  });
 
   const activeClient = client ?? getChatClient();
   const chat = await activeClient.chat.completions.create({
@@ -748,6 +818,14 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
 
     const profileContext =
       typeof (data as any)?.profileContext === "string" ? (data as any).profileContext : undefined;
+
+    // Log received profile context (structured logging only)
+    logger.info("answerWithRagFn.profileContext", {
+      received: Boolean(profileContext),
+      length: profileContext ? profileContext.length : 0,
+      preview: profileContext ? profileContext.slice(0, 200) : null,
+      fullContent: profileContext || null, // Log full content for debugging
+    });
 
     logger.info("answerWithRagFn.input", {
       questionLen: question.length,

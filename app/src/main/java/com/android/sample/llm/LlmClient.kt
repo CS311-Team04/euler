@@ -96,7 +96,7 @@ class FirebaseFunctionsLlmClient(
 
         if (result == null) {
           Log.w(TAG, "Function call returned null (timeout or cancelled)")
-          return@withContext fallback?.generateReply(prompt)
+          return@withContext fallback?.generateReply(prompt, summary, transcript, profileContext)
               ?: throw IllegalStateException("LLM service unavailable: timeout or cancelled")
         }
 
@@ -106,12 +106,12 @@ class FirebaseFunctionsLlmClient(
 
         val map =
             parseResponseMap(result)
-                ?: return@withContext fallback?.generateReply(prompt)
+                ?: return@withContext fallback?.generateReply(prompt, summary, transcript, profileContext)
                     ?: throw IllegalStateException("Invalid LLM response payload: null data")
 
         val replyText =
             parseReplyText(map)
-                ?: return@withContext fallback?.generateReply(prompt)
+                ?: return@withContext fallback?.generateReply(prompt, summary, transcript, profileContext)
                     ?: throw IllegalStateException("Empty LLM reply")
 
         buildBotReply(map, replyText)
@@ -122,12 +122,23 @@ class FirebaseFunctionsLlmClient(
       summary: String?,
       transcript: String?,
       profileContext: String?
-  ): HashMap<String, Any> =
-      hashMapOf<String, Any>(KEY_QUESTION to prompt).apply {
-        summary?.let { put(KEY_SUMMARY, it) }
-        transcript?.let { put(KEY_TRANSCRIPT, it) }
-        profileContext?.let { put(KEY_PROFILE_CONTEXT, it) }
-      }
+  ): HashMap<String, Any> {
+    val payload =
+        hashMapOf<String, Any>(KEY_QUESTION to prompt).apply {
+          summary?.let { put(KEY_SUMMARY, it) }
+          transcript?.let { put(KEY_TRANSCRIPT, it) }
+          profileContext?.let {
+            Log.d(TAG, "buildRequestPayload: including profileContext, length=${it.length}, preview=${it.take(100)}...")
+            put(KEY_PROFILE_CONTEXT, it)
+          } ?: Log.d(TAG, "buildRequestPayload: profileContext is null, not including in request")
+        }
+    // DEBUG: Log full payload structure (without full content to avoid spam)
+    Log.d(
+        TAG,
+        "buildRequestPayload: Payload structure - hasQuestion=${payload.containsKey(KEY_QUESTION)}, hasSummary=${payload.containsKey(KEY_SUMMARY)}, hasTranscript=${payload.containsKey(KEY_TRANSCRIPT)}, hasProfileContext=${payload.containsKey(KEY_PROFILE_CONTEXT)}")
+    Log.d(TAG, "buildRequestPayload: Payload keys: ${payload.keys.joinToString()}")
+    return payload
+  }
 
   private suspend fun callFirebaseFunction(
       data: HashMap<String, Any>

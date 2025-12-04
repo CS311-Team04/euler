@@ -151,6 +151,7 @@ class HomeViewModel(
               // SIGN-IN
               startLocalNewChat() // local placeholder until the first send
               startData() // attach Firestore
+              refreshProfile() // load user profile
             }
             lastUid = uid
           }
@@ -183,6 +184,7 @@ class HomeViewModel(
       // already signed in
       startLocalNewChat()
       startData()
+      refreshProfile() // load user profile
     } else {
       // guest at startup
       onSignedOutInternal()
@@ -544,7 +546,11 @@ class HomeViewModel(
         // GUEST: no Firestore, just streaming UI
         if (isGuest()) {
           Log.d(TAG, "sendMessage: guest mode, starting streaming")
-          val profileContext = buildProfileContext(_uiState.value.profile)
+          val currentProfile = _uiState.value.profile
+          Log.d(TAG, "sendMessage: Guest mode - Building context with profile: ${currentProfile?.let { "section=${it.section}, name=${it.preferredName.ifBlank { it.fullName }}" } ?: "null"}")
+          val profileContext = buildProfileContext(currentProfile)
+          val finalContextString = profileContext ?: "null"
+          Log.d(TAG, "sendMessage: Guest mode Final Context String (length=${finalContextString.length}): $finalContextString")
           startStreaming(
               question = msg,
               messageId = aiMessageId,
@@ -609,8 +615,28 @@ class HomeViewModel(
               buildRecentTranscript(uid, conversationId, userMsg.id)
             } else null
 
+        // Ensure profile is loaded if it's null (safety check - load synchronously)
+        var currentProfile = _uiState.value.profile
+        if (currentProfile == null && !isGuest()) {
+          Log.d(TAG, "sendMessage: profile is null, attempting to load it immediately")
+          try {
+            currentProfile = profileRepository.loadProfile()
+            if (currentProfile != null) {
+              Log.d(TAG, "sendMessage: successfully loaded profile with section='${currentProfile.section}', name='${currentProfile.preferredName.ifBlank { currentProfile.fullName }}'")
+              _uiState.update { it.copy(profile = currentProfile) }
+            } else {
+              Log.w(TAG, "sendMessage: profile load returned null - profile may not exist yet")
+            }
+          } catch (e: Exception) {
+            Log.e(TAG, "sendMessage: failed to load profile", e)
+          }
+        }
+
         // Construire le contexte du profil utilisateur
-        val profileContext = buildProfileContext(_uiState.value.profile)
+        Log.d(TAG, "sendMessage: Building context with profile: ${currentProfile?.let { "section=${it.section}, name=${it.preferredName.ifBlank { it.fullName }}" } ?: "null"}")
+        val profileContext = buildProfileContext(currentProfile)
+        val finalContextString = profileContext ?: "null"
+        Log.d(TAG, "sendMessage: Final Context String (length=${finalContextString.length}): $finalContextString")
 
         // Appel RAG
         startStreaming(
@@ -1093,17 +1119,22 @@ class HomeViewModel(
    * Returns null if profile is null or contains no useful information.
    */
   private fun buildProfileContext(profile: UserProfile?): String? {
-    if (profile == null) return null
+    if (profile == null) {
+      Log.d(TAG, "buildProfileContext: profile is null")
+      return null
+    }
 
     val parts = mutableListOf<String>()
 
-    // Build name (preferred name or full name)
-    val name = when {
-      profile.preferredName.isNotBlank() -> profile.preferredName
-      profile.fullName.isNotBlank() -> profile.fullName
-      else -> null
+    // Add full name if available (legal/complete name)
+    if (profile.fullName.isNotBlank()) {
+      parts.add("Full Name: ${profile.fullName}")
     }
-    name?.let { parts.add("Full Name: $it") }
+
+    // Add preferred name/username if available (pseudo/username)
+    if (profile.preferredName.isNotBlank()) {
+      parts.add("Username: ${profile.preferredName}")
+    }
 
     // Add role if available
     if (profile.roleDescription.isNotBlank()) {
@@ -1121,12 +1152,20 @@ class HomeViewModel(
     }
 
     // Return null if no useful information
-    if (parts.isEmpty()) return null
+    if (parts.isEmpty()) {
+      Log.d(
+          TAG,
+          "buildProfileContext: profile exists but all fields are empty - fullName='${profile.fullName}', preferredName='${profile.preferredName}', section='${profile.section}', faculty='${profile.faculty}'")
+      return null
+    }
 
-    return buildString {
+    val context = buildString {
       appendLine("User Profile Information:")
       parts.forEach { part -> appendLine("- $part") }
     }.trim()
+
+    Log.d(TAG, "buildProfileContext: built context with ${parts.size} fields, length=${context.length}")
+    return context
   }
 
   /**
