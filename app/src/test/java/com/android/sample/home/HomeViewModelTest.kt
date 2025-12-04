@@ -753,6 +753,75 @@ class HomeViewModelTest {
         assertEquals("example.com", title)
       }
 
+  @Test
+  fun buildSiteLabel_handles_www_prefix() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel()
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildSiteLabel", String::class.java)
+        method.isAccessible = true
+
+        val label1 = method.invoke(viewModel, "https://www.epfl.ch/test") as String
+        val label2 = method.invoke(viewModel, "https://epfl.ch/test") as String
+
+        assertEquals("EPFL.ch Website", label1)
+        assertEquals("EPFL.ch Website", label2)
+      }
+
+  @Test
+  fun buildSiteLabel_handles_invalid_url() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel()
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildSiteLabel", String::class.java)
+        method.isAccessible = true
+
+        val label = method.invoke(viewModel, "not-a-url") as String
+
+        assertEquals(" Website", label) // Empty host results in empty string
+      }
+
+  @Test
+  fun buildFallbackTitle_handles_path_with_underscores() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel()
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildFallbackTitle", String::class.java)
+        method.isAccessible = true
+
+        val title =
+            method.invoke(viewModel, "https://example.com/some_path_segment") as String
+
+        assertEquals("Some path segment", title)
+      }
+
+  @Test
+  fun buildFallbackTitle_handles_path_with_dashes() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel()
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildFallbackTitle", String::class.java)
+        method.isAccessible = true
+
+        val title =
+            method.invoke(viewModel, "https://example.com/some-path-segment") as String
+
+        assertEquals("Some path segment", title)
+      }
+
+  @Test
+  fun buildFallbackTitle_handles_invalid_url() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel()
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildFallbackTitle", String::class.java)
+        method.isAccessible = true
+
+        val title = method.invoke(viewModel, "not-a-url") as String
+
+        assertEquals("not-a-url", title) // Falls back to original string
+      }
+
   // ============ Tests for handleSendMessageError (via sendMessage with auth) ============
 
   @Test
