@@ -970,4 +970,57 @@ class HomeScreenComposeInteractionsTest {
 
     composeRule.onNodeWithTag(HomeTags.MicBtn, useUnmergedTree = true).assertIsDisplayed()
   }
+
+  @Test
+  fun homeScreen_displays_full_rag_source_card_with_visit_button() {
+    val viewModel = createViewModel()
+    val messageWithRag =
+        ChatUIModel(
+            id = "msg-3",
+            text = "Here's information about projects",
+            timestamp = System.currentTimeMillis(),
+            type = ChatType.AI,
+            source =
+                SourceMeta(
+                    siteLabel = "EPFL.ch Website",
+                    title = "Projects",
+                    url = "https://www.epfl.ch/education/projects"))
+    viewModel.editState { it.copy(messages = listOf(messageWithRag)) }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    // Should display full RAG card with "Retrieved from" text
+    composeRule.onNodeWithText("Retrieved from", substring = true).assertExists()
+    // Should have Visit button
+    composeRule.onNodeWithText("Visit", substring = true).assertExists()
+  }
+
+  @Test
+  fun homeScreen_no_visit_button_when_url_is_null() {
+    val viewModel = createViewModel()
+    val messageWithNullUrl =
+        ChatUIModel(
+            id = "msg-4",
+            text = "Some response",
+            timestamp = System.currentTimeMillis(),
+            type = ChatType.AI,
+            source = SourceMeta(siteLabel = "Test Site", title = "Test", url = null))
+    viewModel.editState { it.copy(messages = listOf(messageWithNullUrl)) }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    // Should not have Visit button when URL is null
+    composeRule.onNodeWithText("Visit", substring = true).assertDoesNotExist()
+  }
+
+  @Test
+  fun SourceMeta_retrievedAt_has_default_value() {
+    val before = System.currentTimeMillis()
+    val meta = SourceMeta(siteLabel = "Test", title = "Test Title", url = null)
+    val after = System.currentTimeMillis()
+    assertTrue(meta.retrievedAt >= before)
+    assertTrue(meta.retrievedAt <= after)
+  }
 }

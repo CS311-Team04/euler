@@ -185,9 +185,28 @@ class FirebaseFunctionsLlmClientTest {
   }
 
   @Test
-  fun `SourceType fromString returns NONE for unknown`() {
-    assertEquals(SourceType.NONE, SourceType.fromString("unknown"))
+  fun `SourceType fromString handles null and empty`() {
     assertEquals(SourceType.NONE, SourceType.fromString(null))
     assertEquals(SourceType.NONE, SourceType.fromString(""))
+    assertEquals(SourceType.NONE, SourceType.fromString("   "))
+  }
+
+  @Test
+  fun `SourceType fromString is case insensitive`() {
+    assertEquals(SourceType.SCHEDULE, SourceType.fromString("SCHEDULE"))
+    assertEquals(SourceType.SCHEDULE, SourceType.fromString("schedule"))
+    assertEquals(SourceType.SCHEDULE, SourceType.fromString("Schedule"))
+    assertEquals(SourceType.RAG, SourceType.fromString("RAG"))
+    assertEquals(SourceType.RAG, SourceType.fromString("rag"))
+    assertEquals(SourceType.RAG, SourceType.fromString("Rag"))
+  }
+
+  @Test
+  fun `SourceType enum contains all expected values`() {
+    val values = SourceType.values()
+    assertEquals(3, values.size)
+    assertTrue(values.contains(SourceType.SCHEDULE))
+    assertTrue(values.contains(SourceType.RAG))
+    assertTrue(values.contains(SourceType.NONE))
   }
 }

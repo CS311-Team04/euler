@@ -104,17 +104,15 @@ fun ChatMessage(
       }
     }
   } else {
-    // AI: full-width plain text
+    // AI: full-width Markdown-rendered text
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
       if (isStreaming && message.text.isEmpty()) {
         LeadingThinkingDot(color = aiText)
       } else {
         Column(modifier = Modifier.fillMaxWidth()) {
-          Text(
-              text = message.text,
+          MarkdownText(
+              markdown = message.text,
               color = aiText,
-              style = MaterialTheme.typography.bodyMedium,
-              lineHeight = 20.sp,
               modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
 
           if (audioState != null) {
