@@ -544,12 +544,14 @@ class HomeViewModel(
         // GUEST: no Firestore, just streaming UI
         if (isGuest()) {
           Log.d(TAG, "sendMessage: guest mode, starting streaming")
+          val profileContext = buildProfileContext(_uiState.value.profile)
           startStreaming(
               question = msg,
               messageId = aiMessageId,
               conversationId = null,
               summary = null,
-              transcript = null)
+              transcript = null,
+              profileContext = profileContext)
           return@launch
         }
 
@@ -607,13 +609,17 @@ class HomeViewModel(
               buildRecentTranscript(uid, conversationId, userMsg.id)
             } else null
 
+        // Construire le contexte du profil utilisateur
+        val profileContext = buildProfileContext(_uiState.value.profile)
+
         // Appel RAG
         startStreaming(
             question = msg,
             messageId = aiMessageId,
             conversationId = conversationId,
             summary = summary,
-            transcript = recentTranscript)
+            transcript = recentTranscript,
+            profileContext = profileContext)
       } catch (_: AuthNotReadyException) {
         // L'auth n'est pas prête : côté UI, on signale une erreur de streaming / envoi
         try {
@@ -641,13 +647,14 @@ class HomeViewModel(
       }
     }
   }
-  /** Streaming helper using [LlmClient] and optional summary/transcript. */
+  /** Streaming helper using [LlmClient] and optional summary/transcript/profile context. */
   private fun startStreaming(
       question: String,
       messageId: String,
       conversationId: String?,
       summary: String?,
-      transcript: String?
+      transcript: String?,
+      profileContext: String?
   ) {
     activeStreamJob?.cancel()
     userCancelledStream = false
@@ -662,7 +669,10 @@ class HomeViewModel(
                 try {
                   withContext(Dispatchers.IO) {
                     llmClient.generateReply(
-                        prompt = question, summary = summary, transcript = transcript)
+                        prompt = question,
+                        summary = summary,
+                        transcript = transcript,
+                        profileContext = profileContext)
                   }
                 } catch (e: FirebaseFunctionsException) {
                   Log.e(
@@ -1076,6 +1086,47 @@ class HomeViewModel(
       Log.w(TAG, "fetchPriorSummary: error fetching summary", e)
       null
     }
+  }
+
+  /**
+   * Builds a readable profile context string from UserProfile data.
+   * Returns null if profile is null or contains no useful information.
+   */
+  private fun buildProfileContext(profile: UserProfile?): String? {
+    if (profile == null) return null
+
+    val parts = mutableListOf<String>()
+
+    // Build name (preferred name or full name)
+    val name = when {
+      profile.preferredName.isNotBlank() -> profile.preferredName
+      profile.fullName.isNotBlank() -> profile.fullName
+      else -> null
+    }
+    name?.let { parts.add("Full Name: $it") }
+
+    // Add role if available
+    if (profile.roleDescription.isNotBlank()) {
+      parts.add("Role: ${profile.roleDescription}")
+    }
+
+    // Add faculty if available
+    if (profile.faculty.isNotBlank()) {
+      parts.add("Faculty: ${profile.faculty}")
+    }
+
+    // Add section if available
+    if (profile.section.isNotBlank()) {
+      parts.add("Section: ${profile.section}")
+    }
+
+    // Return null if no useful information
+    if (parts.isEmpty()) return null
+
+    return buildString {
+      appendLine("User Profile Information:")
+      parts.forEach { part -> appendLine("- $part") }
+    }.trim()
   }
 
   /**

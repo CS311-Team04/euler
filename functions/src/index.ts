@@ -392,10 +392,11 @@ type AnswerWithRagInput = {
   model?: string;
   summary?: string;
   recentTranscript?: string;
+  profileContext?: string;
 };
 
 export async function answerWithRagCore({
-  question, topK, model, summary, recentTranscript, client,
+  question, topK, model, summary, recentTranscript, profileContext, client,
 }: AnswerWithRagInput & { client?: OpenAI }) {
   const q = question.trim();
 
@@ -481,8 +482,11 @@ export async function answerWithRagCore({
     trimmedSummaryLen: trimmedSummary.length,
     hasTranscript: Boolean(trimmedTranscript),
     transcriptLen: trimmedTranscript.length,
+    hasProfileContext: Boolean(profileContext),
+    profileContextLen: profileContext ? profileContext.length : 0,
     titles: chosen.map(c => c.title).filter(Boolean).slice(0, 5),
     summaryHead: trimmedSummary.slice(0, 120),
+    profileContextHead: profileContext ? profileContext.slice(0, 120) : null,
   });
 
   // Strong, explicit rules for leveraging the rolling summary
@@ -499,9 +503,19 @@ export async function answerWithRagCore({
       "- N'affiche pas le résumé tel quel et ne parle pas de « résumé » au destinataire.",
     ].join("\n");
 
-  // Merge persona, rules and summary into a SINGLE system message (some models only allow one)
+  // Build profile context section if available
+  const profileContextSection = profileContext
+    ? [
+        "IMPORTANT: Utilise les informations du profil utilisateur ci-dessous pour répondre aux questions sur le nom, la section, la faculté ou le rôle de l'utilisateur. Adresse-toi toujours à l'utilisateur de manière formelle (« vous »).",
+        "Profil utilisateur (à utiliser, ne pas afficher tel quel):",
+        profileContext,
+      ].join("\n\n")
+    : "";
+
+  // Merge persona, rules, profile, summary into a SINGLE system message (some models only allow one)
   const systemContent = [
     EPFL_SYSTEM_PROMPT,
+    profileContextSection,
     summaryUsageRules,
     trimmedSummary
       ? "Résumé conversationnel à prendre en compte (ne pas afficher tel quel):\n" + trimmedSummary
@@ -732,16 +746,28 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
     }
     // === End ED Intent Detection ===
 
+    const profileContext =
+      typeof (data as any)?.profileContext === "string" ? (data as any).profileContext : undefined;
+
     logger.info("answerWithRagFn.input", {
       questionLen: question.length,
       hasSummary: Boolean(summary),
       summaryLen: summary ? summary.length : 0,
       hasTranscript: Boolean(recentTranscript),
       transcriptLen: recentTranscript ? recentTranscript.length : 0,
+      hasProfileContext: Boolean(profileContext),
+      profileContextLen: profileContext ? profileContext.length : 0,
       topK,
       model: model ?? process.env.APERTUS_MODEL_ID!,
     });
-    const ragResult = await answerWithRagCore({ question, topK, model, summary, recentTranscript });
+    const ragResult = await answerWithRagCore({
+      question,
+      topK,
+      model,
+      summary,
+      recentTranscript,
+      profileContext,
+    });
     return {
       ...ragResult,
       ed_intent_detected: false,

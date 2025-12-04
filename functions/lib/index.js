@@ -16,32 +16,18 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateTitleFn = exports.answerWithRagHttp = exports.indexChunksHttp = exports.answerWithRagFn = exports.indexChunksFn = exports.ping = exports.onMessageCreate = void 0;
-exports.apertusChatFnCore = apertusChatFnCore;
-exports.generateTitleCore = generateTitleCore;
-exports.indexChunksCore = indexChunksCore;
-exports.answerWithRagCore = answerWithRagCore;
+exports.connectorsMoodleTestFn = exports.connectorsMoodleDisconnectFn = exports.connectorsMoodleConnectFn = exports.connectorsMoodleStatusFn = exports.edConnectorTestFn = exports.edConnectorDisconnectFn = exports.edConnectorConnectFn = exports.edConnectorStatusFn = exports.generateTitleFn = exports.answerWithRagHttp = exports.indexChunksHttp = exports.answerWithRagFn = exports.indexChunksFn = exports.ping = exports.onMessageCreate = exports.answerWithRagCore = exports.indexChunksCore = exports.generateTitleCore = exports.apertusChatFnCore = exports.setChatClient = void 0;
 const node_path_1 = __importDefault(require("node:path"));
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config({ path: node_path_1.default.join(__dirname, "..", ".env") });
@@ -50,6 +36,11 @@ const openai_1 = __importDefault(require("openai"));
 const node_crypto_1 = require("node:crypto");
 const functions = __importStar(require("firebase-functions/v1"));
 const firebase_admin_1 = __importDefault(require("firebase-admin"));
+const EdConnectorRepository_1 = require("./connectors/ed/EdConnectorRepository");
+const EdConnectorService_1 = require("./connectors/ed/EdConnectorService");
+const secretCrypto_1 = require("./security/secretCrypto");
+const edIntent_1 = require("./edIntent");
+const edIntentParser_1 = require("./edIntentParser");
 const europeFunctions = functions.region("europe-west6");
 /* ---------- helpers ---------- */
 function withV1(url) {
@@ -76,16 +67,30 @@ function normalizePointId(id) {
 }
 /* ---------- clients ---------- */
 // Chat = PublicAI (Apertus)
-const chatClient = new openai_1.default({
-    apiKey: process.env.OPENAI_API_KEY,
-    baseURL: withV1(process.env.OPENAI_BASE_URL),
-    defaultHeaders: { "User-Agent": "euler-mvp/1.0 (genkit-functions)" },
-});
+let chatClient = null;
+function getChatClient() {
+    if (!chatClient) {
+        chatClient = new openai_1.default({
+            apiKey: process.env.OPENAI_API_KEY,
+            baseURL: withV1(process.env.OPENAI_BASE_URL),
+            defaultHeaders: { "User-Agent": "euler-mvp/1.0 (genkit-functions)" },
+        });
+    }
+    return chatClient;
+}
+// For testing: allow overriding the client
+function setChatClient(client) {
+    chatClient = client;
+}
+exports.setChatClient = setChatClient;
 // Firebase Admin (Firestore)
 if (!firebase_admin_1.default.apps.length) {
     firebase_admin_1.default.initializeApp();
 }
 const db = firebase_admin_1.default.firestore();
+// ED Discussion connector (stored in Firestore under connectors_ed/{userId})
+const edConnectorRepository = new EdConnectorRepository_1.EdConnectorRepository(db);
+const edConnectorService = new EdConnectorService_1.EdConnectorService(edConnectorRepository, secretCrypto_1.encryptSecret, secretCrypto_1.decryptSecret, "https://eu.edstem.org/api");
 // Embeddings = Jina
 const EMBED_URL = withV1(process.env.EMBED_BASE_URL) + "/embeddings";
 const EMBED_KEY = process.env.EMBED_API_KEY;
@@ -110,12 +115,13 @@ const EPFL_SYSTEM_PROMPT = [
 /* =========================================================
  *                         CHAT (optional)
  * ======================================================= */
-async function apertusChatFnCore({ messages, model, temperature, }) {
+async function apertusChatFnCore({ messages, model, temperature, client, }) {
     const finalMessages = [
         { role: "system", content: EPFL_SYSTEM_PROMPT },
         ...messages,
     ];
-    const resp = await chatClient.chat.completions.create({
+    const activeClient = client ?? getChatClient();
+    const resp = await activeClient.chat.completions.create({
         model: model ?? process.env.APERTUS_MODEL_ID,
         messages: finalMessages,
         temperature: temperature ?? 0.2,
@@ -124,7 +130,8 @@ async function apertusChatFnCore({ messages, model, temperature, }) {
     logger.info("apertusChat success", { length: reply.length });
     return { reply };
 }
-async function generateTitleCore({ question, model }) {
+exports.apertusChatFnCore = apertusChatFnCore;
+async function generateTitleCore({ question, model, client }) {
     const prompt = [
         "Generate a concise conversation title (4-5 words max, no trailing punctuation).",
         `User's first question: "${question.trim()}"`,
@@ -135,14 +142,17 @@ async function generateTitleCore({ question, model }) {
         messages: [{ role: "user", content: prompt }],
         model,
         temperature: 0.2,
+        client,
     });
     const title = (reply || "")
         .replace(/\s+/g, " ")
-        .replace(/^["'“”]+|["'“”]+$/g, "")
+        .replace(/^["'""«»]+|["'""«»]+$/g, "") // Strip quotes from start/end
+        .replace(/^["'""«»\s]+|["'""«»\s]+$/g, "") // Second pass for nested quotes
         .trim()
         .slice(0, 60);
     return { title: title || "New conversation" };
 }
+exports.generateTitleCore = generateTitleCore;
 // collection already created with hybrid schema; only verify existence
 async function qdrantEnsureCollection(_) {
     const base = process.env.QDRANT_URL;
@@ -330,7 +340,8 @@ async function indexChunksCore({ chunks }) {
     logger.info("indexChunks", { count: chunks.length, dim });
     return { count: chunks.length, dim };
 }
-async function answerWithRagCore({ question, topK, model, summary, recentTranscript, }) {
+exports.indexChunksCore = indexChunksCore;
+async function answerWithRagCore({ question, topK, model, summary, recentTranscript, client, }) {
     const q = question.trim();
     // Gate 1: skip retrieval on small talk
     const isSmallTalk = SMALL_TALK.test(q) && q.length <= 30;
@@ -432,7 +443,8 @@ async function answerWithRagCore({ question, topK, model, summary, recentTranscr
     ]
         .filter(Boolean)
         .join("\n\n");
-    const chat = await chatClient.chat.completions.create({
+    const activeClient = client ?? getChatClient();
+    const chat = await activeClient.chat.completions.create({
         model: model ?? process.env.APERTUS_MODEL_ID,
         messages: [
             { role: "system", content: systemContent },
@@ -446,7 +458,7 @@ async function answerWithRagCore({ question, topK, model, summary, recentTranscr
     const usedContextByModel = marker ? marker[1].toUpperCase() === "YES" : false;
     const reply = rawReply.replace(/\s*USED_CONTEXT=(YES|NO)\s*$/i, "").trim();
     // Only expose a URL when BOTH gates pass: we have chosen context and the model says it used it
-    const primary_url = (chosen.length > 0 && usedContextByModel) ? (chosen[0]?.url ?? null) : null;
+    const primary_url = (chosen.length > 0 || usedContextByModel) ? (chosen[0]?.url ?? null) : null;
     return {
         reply,
         primary_url,
@@ -454,13 +466,14 @@ async function answerWithRagCore({ question, topK, model, summary, recentTranscr
         sources: chosen.map((c, i) => ({ idx: i + 1, title: c.title, url: c.url, score: c.score })),
     };
 }
+exports.answerWithRagCore = answerWithRagCore;
 function clampText(s, max = 1200) {
     const t = (s ?? "").toString();
     if (t.length <= max)
         return t;
     return t.slice(0, max);
 }
-async function buildRollingSummary({ priorSummary, recentTurns, }) {
+async function buildRollingSummary({ priorSummary, recentTurns, client, }) {
     // Keep inputs short and deterministic
     const sys = [
         "Tu maintiens un résumé cumulatif et exploitable d'une conversation (utilisateur ↔ assistant).",
@@ -498,7 +511,8 @@ async function buildRollingSummary({ priorSummary, recentTurns, }) {
         ].join("\n"),
     });
     const modelId = process.env.APERTUS_SUMMARY_MODEL_ID || process.env.APERTUS_MODEL_ID;
-    const resp = await chatClient.chat.completions.create({
+    const activeClient = client ?? getChatClient();
+    const resp = await activeClient.chat.completions.create({
         model: modelId,
         messages: parts,
         temperature: 0.1,
@@ -579,12 +593,38 @@ exports.indexChunksFn = europeFunctions.https.onCall(async (data) => {
 exports.answerWithRagFn = europeFunctions.https.onCall(async (data) => {
     try {
         const question = String(data?.question || "").trim();
-        const topK = Number(data?.topK ?? 5);
+        const topK = Number(data?.topK ?? 2);
         const model = data?.model;
         const summary = typeof data?.summary === "string" ? data.summary : undefined;
         const recentTranscript = typeof data?.recentTranscript === "string" ? data.recentTranscript : undefined;
         if (!question)
             throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
+        // === ED Intent Detection (fast, regex-based) ===
+        const edIntentResult = (0, edIntent_1.detectPostToEdIntentCore)(question);
+        if (edIntentResult.ed_intent_detected && edIntentResult.ed_intent) {
+            logger.info("answerWithRagFn.edIntentDetected", {
+                intent: edIntentResult.ed_intent,
+                questionLen: question.length,
+            });
+            // Hybrid approach: REGEX detects, Apertus responds naturally and formats the question
+            const { reply: rawReply } = await apertusChatFnCore({
+                messages: [{ role: "user", content: (0, edIntent_1.buildEdIntentPromptForApertus)(question) }],
+                temperature: 0.3,
+            });
+            // Parse the response to extract formatted question and title
+            const { reply, formattedQuestion, formattedTitle } = (0, edIntentParser_1.parseEdPostResponse)(rawReply);
+            return {
+                reply,
+                primary_url: null,
+                best_score: 0,
+                sources: [],
+                ed_intent_detected: true,
+                ed_intent: edIntentResult.ed_intent,
+                ed_formatted_question: formattedQuestion,
+                ed_formatted_title: formattedTitle,
+            };
+        }
+        // === End ED Intent Detection ===
         logger.info("answerWithRagFn.input", {
             questionLen: question.length,
             hasSummary: Boolean(summary),
@@ -594,7 +634,12 @@ exports.answerWithRagFn = europeFunctions.https.onCall(async (data) => {
             topK,
             model: model ?? process.env.APERTUS_MODEL_ID,
         });
-        return await answerWithRagCore({ question, topK, model, summary, recentTranscript });
+        const ragResult = await answerWithRagCore({ question, topK, model, summary, recentTranscript });
+        return {
+            ...ragResult,
+            ed_intent_detected: false,
+            ed_intent: null,
+        };
     }
     catch (e) {
         logger.error("answerWithRagFn.failed", { error: String(e) });
@@ -611,6 +656,13 @@ function checkKey(req) {
         e.code = 401;
         throw e;
     }
+}
+function requireAuth(context) {
+    const uid = context.auth?.uid;
+    if (!uid) {
+        throw new functions.https.HttpsError("unauthenticated", "Authentication is required");
+    }
+    return uid;
 }
 exports.indexChunksHttp = europeFunctions.https.onRequest(async (req, res) => {
     try {
@@ -633,8 +685,41 @@ exports.answerWithRagHttp = europeFunctions.https.onRequest(async (req, res) => 
             return;
         }
         checkKey(req);
-        const out = await answerWithRagCore(req.body);
-        res.status(200).json(out);
+        const body = req.body;
+        const question = String(body?.question || "").trim();
+        // === ED Intent Detection (fast, regex-based) ===
+        const edIntentResult = (0, edIntent_1.detectPostToEdIntentCore)(question);
+        if (edIntentResult.ed_intent_detected && edIntentResult.ed_intent) {
+            logger.info("answerWithRagHttp.edIntentDetected", {
+                intent: edIntentResult.ed_intent,
+                questionLen: question.length,
+            });
+            // Hybrid approach: REGEX detects, Apertus responds naturally and formats the question
+            const { reply: rawReply } = await apertusChatFnCore({
+                messages: [{ role: "user", content: (0, edIntent_1.buildEdIntentPromptForApertus)(question) }],
+                temperature: 0.3,
+            });
+            // Parse the response to extract formatted question and title
+            const { reply, formattedQuestion, formattedTitle } = (0, edIntentParser_1.parseEdPostResponse)(rawReply);
+            res.status(200).json({
+                reply,
+                primary_url: null,
+                best_score: 0,
+                sources: [],
+                ed_intent_detected: true,
+                ed_intent: edIntentResult.ed_intent,
+                ed_formatted_question: formattedQuestion,
+                ed_formatted_title: formattedTitle,
+            });
+            return;
+        }
+        // === End ED Intent Detection ===
+        const ragResult = await answerWithRagCore(body);
+        res.status(200).json({
+            ...ragResult,
+            ed_intent_detected: false,
+            ed_intent: null,
+        });
     }
     catch (e) {
         res.status(e.code === 401 ? 401 : 400).json({ error: String(e) });
@@ -646,5 +731,129 @@ exports.generateTitleFn = europeFunctions.https.onCall(async (data) => {
     if (!q)
         throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
     return await generateTitleCore({ question: q, model });
+});
+exports.edConnectorStatusFn = europeFunctions.https.onCall(async (_data, context) => {
+    const uid = requireAuth(context);
+    try {
+        const config = await edConnectorService.getStatus(uid);
+        return config;
+    }
+    catch (e) {
+        logger.error("edConnectorStatusFn.failed", {
+            uid,
+            error: String(e),
+        });
+        throw new functions.https.HttpsError("internal", "Failed to get ED connector status", String(e?.message || e));
+    }
+});
+exports.edConnectorConnectFn = europeFunctions.https.onCall(async (data, context) => {
+    const uid = requireAuth(context);
+    const apiToken = String(data?.apiToken || "").trim();
+    const baseUrl = typeof data?.baseUrl === "string" ? data.baseUrl : undefined;
+    if (!apiToken) {
+        throw new functions.https.HttpsError("invalid-argument", "Missing 'apiToken'");
+    }
+    try {
+        const config = await edConnectorService.connect(uid, {
+            apiToken,
+            baseUrl,
+        });
+        return config;
+    }
+    catch (e) {
+        logger.error("edConnectorConnectFn.failed", {
+            uid,
+            error: String(e),
+        });
+        throw new functions.https.HttpsError("internal", "Failed to connect ED connector", String(e?.message || e));
+    }
+});
+exports.edConnectorDisconnectFn = europeFunctions.https.onCall(async (_data, context) => {
+    const uid = requireAuth(context);
+    try {
+        await edConnectorService.disconnect(uid);
+        // For convenience, return a simple status the UI can use.
+        return { status: "not_connected" };
+    }
+    catch (e) {
+        logger.error("edConnectorDisconnectFn.failed", {
+            uid,
+            error: String(e),
+        });
+        throw new functions.https.HttpsError("internal", "Failed to disconnect ED connector", String(e?.message || e));
+    }
+});
+exports.edConnectorTestFn = europeFunctions.https.onCall(async (_data, context) => {
+    const uid = requireAuth(context);
+    try {
+        const config = await edConnectorService.test(uid);
+        return config;
+    }
+    catch (e) {
+        logger.error("edConnectorTestFn.failed", {
+            uid,
+            error: String(e),
+        });
+        throw new functions.https.HttpsError("internal", "Failed to test ED connector", String(e?.message || e));
+    }
+});
+/* =========================================================
+ *                MOODLE CONNECTOR
+ * ======================================================= */
+const MoodleConnectorRepository_1 = require("./connectors/moodle/MoodleConnectorRepository");
+const MoodleConnectorService_1 = require("./connectors/moodle/MoodleConnectorService");
+// simple placeholder encryption for dev.
+const encrypt = (plain) => plain; // todo
+const decrypt = (cipher) => cipher; // to do
+const moodleRepo = new MoodleConnectorRepository_1.MoodleConnectorRepository(db);
+const moodleService = new MoodleConnectorService_1.MoodleConnectorService(moodleRepo, encrypt, decrypt);
+// callable functions
+exports.connectorsMoodleStatusFn = europeFunctions.https.onCall(async (data, context) => {
+    if (!context.auth?.uid) {
+        throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
+    }
+    const config = await moodleService.getStatus(context.auth.uid);
+    return {
+        status: config.status,
+        lastTestAt: config.lastTestAt ?? null,
+        lastError: config.lastError ?? null,
+    };
+});
+// attempts to connect to Moodle with provided baseUrl and token
+exports.connectorsMoodleConnectFn = europeFunctions.https.onCall(async (data, context) => {
+    if (!context.auth?.uid) {
+        throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
+    }
+    const baseUrl = String(data?.baseUrl || "").trim();
+    const token = String(data?.token || "").trim();
+    if (!baseUrl || !token) {
+        throw new functions.https.HttpsError("invalid-argument", "baseUrl and token are required");
+    }
+    const config = await moodleService.connect(context.auth.uid, { baseUrl, token });
+    return {
+        status: config.status,
+        lastTestAt: config.lastTestAt ?? null,
+        lastError: config.lastError ?? null,
+    };
+});
+// disconnects Moodle for the user
+exports.connectorsMoodleDisconnectFn = europeFunctions.https.onCall(async (data, context) => {
+    if (!context.auth?.uid) {
+        throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
+    }
+    await moodleService.disconnect(context.auth.uid);
+    return { status: "not_connected" };
+});
+// tests the Moodle connection for the user
+exports.connectorsMoodleTestFn = europeFunctions.https.onCall(async (data, context) => {
+    if (!context.auth?.uid) {
+        throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
+    }
+    const config = await moodleService.test(context.auth.uid);
+    return {
+        status: config.status,
+        lastTestAt: config.lastTestAt ?? null,
+        lastError: config.lastError ?? null,
+    };
 });
 //# sourceMappingURL=index.js.map
