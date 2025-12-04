@@ -113,8 +113,11 @@ class HomeScreenTest {
   fun displays_expected_button_and_placeholder_texts() {
     launchHomeScreen()
 
-    composeRule.onNodeWithText(TestConstants.ButtonTexts.WHAT_IS_EPFL).assertIsDisplayed()
-    composeRule.onNodeWithText(TestConstants.ButtonTexts.WHERE_IS_EPFL).assertIsDisplayed()
+    // Use tag-based selectors for suggestion buttons to avoid text matching ambiguity
+    // (same text may appear in animated intro and suggestion chips)
+    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.Action1Btn), timeoutMillis = 5_000)
+    composeRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed()
+    composeRule.onNodeWithTag(HomeTags.Action2Btn).assertIsDisplayed()
     composeRule.onNodeWithText(TestConstants.PlaceholderTexts.MESSAGE_EULER).assertIsDisplayed()
   }
 }
