@@ -177,12 +177,13 @@ class ConnectorsViewModelTest {
 
     viewModel.connectConnector("moodle")
     viewModel.connectConnector("ed")
-    // Both Moodle and ED open dialogs, not connect directly
     val uiState = viewModel.uiState.first()
 
-    // Both should open dialogs
+    // Moodle opens dialog, ED navigation is handled in UI (no dialog state)
+    // ED connector uses dedicated EdConnectScreen instead of a dialog,
+    // so isEdConnectDialogOpen remains false
     assertTrue(uiState.isMoodleConnectDialogOpen)
-    assertTrue(uiState.isEdConnectDialogOpen)
+    assertFalse(uiState.isEdConnectDialogOpen)
 
     // Neither should be connected yet
     val moodle = uiState.connectors.find { it.id == "moodle" }
