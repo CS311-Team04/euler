@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.android.sample.BuildConfig
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
+import com.android.sample.Chat.FileAttachment
 import com.android.sample.conversations.AuthNotReadyException
 import com.android.sample.conversations.CachedResponseRepository
 import com.android.sample.conversations.ConversationRepository
@@ -358,12 +359,27 @@ class HomeViewModel(
                 _uiState.update { currentState ->
                   val firestoreMessages = msgs.map { it.toUi() }
 
+                  // Preserve file attachments from existing UI messages
+                  // (fileAttachment is UI-only, not stored in Firestore)
+                  val existingAttachments =
+                      currentState.messages
+                          .filter { it.fileAttachment != null }
+                          .associateBy { it.text to it.type }
+
                   val existingSourceCards =
                       currentState.messages.filter { it.source != null && it.text.isBlank() }
 
                   val finalMessages = mutableListOf<ChatUIModel>()
 
-                  finalMessages.addAll(firestoreMessages)
+                  // Merge Firestore messages with preserved file attachments
+                  firestoreMessages.forEach { fsMsg ->
+                    val attachment = existingAttachments[fsMsg.text to fsMsg.type]?.fileAttachment
+                    if (attachment != null) {
+                      finalMessages.add(fsMsg.copy(fileAttachment = attachment))
+                    } else {
+                      finalMessages.add(fsMsg)
+                    }
+                  }
 
                   existingSourceCards.forEach { sourceCard ->
                     val originalIndex =
@@ -830,13 +846,32 @@ class HomeViewModel(
                 }
             Log.d(
                 TAG,
-                "startStreaming: received reply, length=${reply.reply.length}, edIntentDetected=${reply.edIntent.detected}, edIntent=${reply.edIntent.intent}")
+                "startStreaming: received reply, length=${reply.reply.length}, edIntentDetected=${reply.edIntent.detected}, edIntent=${reply.edIntent.intent}, moodleIntentDetected=${reply.moodleIntent.detected}")
 
             // Handle ED intent detection - create PostOnEd pending action
             handleEdIntent(reply, question)
 
-            // simulate stream into the placeholder AI message
-            simulateStreamingFromText(messageId, reply.reply)
+            // Handle Moodle intent - convert file to FileAttachment
+            val fileAttachment: FileAttachment? =
+                if (reply.moodleIntent.detected && reply.moodleIntent.file != null) {
+                  val mFile = reply.moodleIntent.file
+                  Log.d(TAG, "Moodle file detected: ${mFile.filename}, url=${mFile.downloadUrl}")
+                  FileAttachment(
+                      filename = mFile.filename,
+                      downloadUrl = mFile.downloadUrl,
+                      filesize = mFile.filesize,
+                      mimetype = mFile.mimetype,
+                      courseName = mFile.courseName,
+                      sectionName = mFile.sectionName,
+                      moduleName = mFile.moduleName)
+                } else null
+
+            // simulate stream into the placeholder AI message, including file attachment
+            if (fileAttachment != null) {
+              simulateStreamingWithAttachment(messageId, reply.reply, fileAttachment)
+            } else {
+              simulateStreamingFromText(messageId, reply.reply)
+            }
 
             // add optional source card based on source type
             val meta: SourceMeta? =
@@ -1009,6 +1044,39 @@ class HomeViewModel(
       delay(60)
     }
     markMessageFinished(messageId)
+  }
+
+  /**
+   * Simulates streaming text and then adds a file attachment at the end. Used for Moodle file
+   * retrieval responses.
+   */
+  private suspend fun simulateStreamingWithAttachment(
+      messageId: String,
+      fullText: String,
+      attachment: FileAttachment
+  ) {
+    // Use current dispatcher instead of Dispatchers.Default to allow test control
+    val pattern = Regex("\\S+\\s*")
+    val parts = pattern.findAll(fullText).map { it.value }.toList().ifEmpty { listOf(fullText) }
+    for (chunk in parts) {
+      appendStreamingChunk(messageId, chunk)
+      delay(60)
+    }
+    // Add file attachment to the message
+    withContext(Dispatchers.Main) {
+      _uiState.update { state ->
+        state.copy(
+            messages =
+                state.messages.map { msg ->
+                  if (msg.id == messageId) {
+                    msg.copy(isThinking = false, fileAttachment = attachment)
+                  } else {
+                    msg
+                  }
+                },
+            streamingSequence = state.streamingSequence + 1)
+      }
+    }
   }
 
   private suspend fun clearStreamingState(messageId: String) =

@@ -14,6 +14,8 @@ import { EdConnectorService } from "./connectors/ed/EdConnectorService";
 import { encryptSecret, decryptSecret } from "./security/secretCrypto";
 import { detectPostToEdIntentCore, buildEdIntentPromptForApertus } from "./edIntent";
 import { parseEdPostResponse } from "./edIntentParser";
+import { detectMoodleIntent } from "./connectors/moodle/moodleIntent";
+import { MoodleClient } from "./connectors/moodle/MoodleClient";
 
 
 const europeFunctions = functions.region("europe-west6");
@@ -778,6 +780,125 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
     }
     // === End ED Intent Detection ===
 
+    // === Moodle Intent Detection (file retrieval) ===
+    if (uid) {
+      const moodleIntentResult = detectMoodleIntent(question);
+      if (moodleIntentResult.moodle_intent_detected && moodleIntentResult.moodle_intent === "get_file") {
+        logger.info("answerWithRagFn.moodleIntentDetected", {
+          intent: moodleIntentResult.moodle_intent,
+          courseQuery: moodleIntentResult.course_query,
+          fileQuery: moodleIntentResult.file_query,
+          questionLen: question.length,
+        });
+
+        // Only proceed if we have a course query
+        if (moodleIntentResult.course_query) {
+          const searchResult = await searchMoodleFileCore(
+            uid,
+            moodleIntentResult.course_query,
+            moodleIntentResult.file_query || "lecture"
+          );
+
+          if (searchResult.success && searchResult.file) {
+            // File found! Return a response with the file attachment
+            const fileInfo = searchResult.file;
+            const reply = `📄 Voici le fichier demandé de **${fileInfo.courseName}**:\n\n` +
+              `**${fileInfo.filename}**` +
+              (fileInfo.sectionName ? `\n📁 Section: ${fileInfo.sectionName}` : "") +
+              (fileInfo.moduleName ? `\n📚 ${fileInfo.moduleName}` : "");
+
+            return {
+              reply,
+              primary_url: null,
+              best_score: 0,
+              sources: [],
+              ed_intent_detected: false,
+              ed_intent: null,
+              moodle_intent_detected: true,
+              moodle_intent: moodleIntentResult.moodle_intent,
+              moodle_file: fileInfo,
+            };
+          } else {
+            // File not found - provide helpful error message
+            const errorReply = searchResult.error || `Je n'ai pas trouvé le fichier demandé.`;
+            return {
+              reply: `❌ ${errorReply}\n\nEssayez de préciser le nom exact du cours ou du fichier.`,
+              primary_url: null,
+              best_score: 0,
+              sources: [],
+              ed_intent_detected: false,
+              ed_intent: null,
+              moodle_intent_detected: true,
+              moodle_intent: "get_file",
+              moodle_file: null,
+              moodle_error: errorReply,
+            };
+          }
+        }
+      } else if (moodleIntentResult.moodle_intent_detected && moodleIntentResult.moodle_intent === "list_courses") {
+        // List courses intent
+        logger.info("answerWithRagFn.moodleListCoursesIntent", { uid });
+        
+        const config = await moodleRepo.getConfig(uid);
+        if (!config || config.status !== "connected" || !config.baseUrl || !config.tokenEncrypted) {
+          return {
+            reply: "Moodle n'est pas connecté. Veuillez d'abord connecter votre compte Moodle dans les paramètres.",
+            primary_url: null,
+            best_score: 0,
+            sources: [],
+            ed_intent_detected: false,
+            ed_intent: null,
+            moodle_intent_detected: true,
+            moodle_intent: "list_courses",
+          };
+        }
+
+        try {
+          const token = decryptSecret(config.tokenEncrypted);
+          const client = new MoodleClient(config.baseUrl, token);
+          const courses = await client.getUserCourses();
+
+          if (courses.length === 0) {
+            return {
+              reply: "Vous n'êtes inscrit à aucun cours sur Moodle.",
+              primary_url: null,
+              best_score: 0,
+              sources: [],
+              ed_intent_detected: false,
+              ed_intent: null,
+              moodle_intent_detected: true,
+              moodle_intent: "list_courses",
+            };
+          }
+
+          const courseList = courses.map((c) => `• **${c.fullname}** (${c.shortname})`).join("\n");
+          return {
+            reply: `📚 Voici vos cours Moodle:\n\n${courseList}`,
+            primary_url: null,
+            best_score: 0,
+            sources: [],
+            ed_intent_detected: false,
+            ed_intent: null,
+            moodle_intent_detected: true,
+            moodle_intent: "list_courses",
+          };
+        } catch (e: any) {
+          logger.error("answerWithRagFn.moodleListCoursesFailed", { error: String(e), uid });
+          return {
+            reply: "Erreur lors de la récupération de vos cours Moodle. Veuillez réessayer.",
+            primary_url: null,
+            best_score: 0,
+            sources: [],
+            ed_intent_detected: false,
+            ed_intent: null,
+            moodle_intent_detected: true,
+            moodle_intent: "list_courses",
+          };
+        }
+      }
+    }
+    // === End Moodle Intent Detection ===
+
     logger.info("answerWithRagFn.input", {
       questionLen: question.length,
       hasSummary: Boolean(summary),
@@ -1164,6 +1285,163 @@ export const connectorsMoodleTestFn = europeFunctions.https.onCall(
       lastTestAt: config.lastTestAt ?? null,
       lastError: config.lastError ?? null,
     };
+  }
+);
+
+/* =========================================================
+ *        MOODLE FILE SEARCH
+ * ======================================================= */
+
+/**
+ * File attachment returned when Moodle intent is detected
+ */
+export interface MoodleFileAttachment {
+  type: "moodle_file";
+  filename: string;
+  filesize?: number;
+  mimetype?: string;
+  downloadUrl: string;
+  courseName: string;
+  sectionName?: string;
+  moduleName?: string;
+}
+
+/**
+ * Core function to search for a file in Moodle based on natural language query.
+ * 
+ * @param uid - User ID
+ * @param courseQuery - Natural language course name
+ * @param fileQuery - Natural language file descriptor
+ * @returns Search result with file attachment or error
+ */
+async function searchMoodleFileCore(
+  uid: string,
+  courseQuery: string,
+  fileQuery: string
+): Promise<{ success: boolean; file?: MoodleFileAttachment; error?: string }> {
+  // Get user's Moodle config
+  const config = await moodleRepo.getConfig(uid);
+  if (!config || config.status !== "connected" || !config.baseUrl || !config.tokenEncrypted) {
+    return {
+      success: false,
+      error: "Moodle is not connected. Please connect your Moodle account first.",
+    };
+  }
+
+  // Decrypt token and create client
+  const token = decryptSecret(config.tokenEncrypted);
+  const client = new MoodleClient(config.baseUrl, token);
+
+  // Search for file
+  logger.info("searchMoodleFileCore.searching", { uid, courseQuery, fileQuery });
+  const result = await client.searchFile(courseQuery, fileQuery);
+
+  if (!result.found || !result.file || !result.downloadUrl) {
+    logger.warn("searchMoodleFileCore.notFound", { uid, courseQuery, fileQuery, error: result.error });
+    return {
+      success: false,
+      error: result.error || `File not found for "${fileQuery}" in "${courseQuery}"`,
+    };
+  }
+
+  logger.info("searchMoodleFileCore.found", {
+    uid,
+    filename: result.file.filename,
+    course: result.course?.fullname,
+    section: result.section?.name,
+  });
+
+  return {
+    success: true,
+    file: {
+      type: "moodle_file",
+      filename: result.file.filename,
+      filesize: result.file.filesize,
+      mimetype: result.file.mimetype,
+      downloadUrl: result.downloadUrl,
+      courseName: result.course?.fullname || courseQuery,
+      sectionName: result.section?.name,
+      moduleName: result.module?.name,
+    },
+  };
+}
+
+/**
+ * Callable function to search for a file in Moodle.
+ * 
+ * Input: { courseQuery: string, fileQuery: string }
+ * Output: { success: boolean, file?: MoodleFileAttachment, error?: string }
+ */
+export const moodleSearchFileFn = europeFunctions.https.onCall(
+  async (data: { courseQuery: string; fileQuery: string }, context) => {
+    if (!context.auth?.uid) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "User must be authenticated"
+      );
+    }
+
+    const courseQuery = String(data?.courseQuery || "").trim();
+    const fileQuery = String(data?.fileQuery || "").trim();
+
+    if (!courseQuery) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "courseQuery is required"
+      );
+    }
+
+    try {
+      return await searchMoodleFileCore(
+        context.auth.uid,
+        courseQuery,
+        fileQuery || "lecture"
+      );
+    } catch (e: any) {
+      logger.error("moodleSearchFileFn.failed", { error: String(e), uid: context.auth.uid });
+      throw new functions.https.HttpsError(
+        "internal",
+        e.message || "Failed to search for file"
+      );
+    }
+  }
+);
+
+/**
+ * Lists all courses the user is enrolled in on Moodle.
+ */
+export const moodleListCoursesFn = europeFunctions.https.onCall(
+  async (_data, context) => {
+    if (!context.auth?.uid) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "User must be authenticated"
+      );
+    }
+
+    const uid = context.auth.uid;
+    const config = await moodleRepo.getConfig(uid);
+    if (!config || config.status !== "connected" || !config.baseUrl || !config.tokenEncrypted) {
+      return { success: false, courses: [], error: "Moodle not connected" };
+    }
+
+    try {
+      const token = decryptSecret(config.tokenEncrypted);
+      const client = new MoodleClient(config.baseUrl, token);
+      const courses = await client.getUserCourses();
+
+      return {
+        success: true,
+        courses: courses.map((c) => ({
+          id: c.id,
+          shortname: c.shortname,
+          fullname: c.fullname,
+        })),
+      };
+    } catch (e: any) {
+      logger.error("moodleListCoursesFn.failed", { error: String(e), uid });
+      return { success: false, courses: [], error: e.message || "Failed to list courses" };
+    }
   }
 );
 

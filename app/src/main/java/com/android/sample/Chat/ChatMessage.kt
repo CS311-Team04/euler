@@ -7,7 +7,10 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,12 +19,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -31,11 +40,22 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.sample.ui.theme.EulerAudioButtonLoadingColor
@@ -117,6 +137,13 @@ fun ChatMessage(
               lineHeight = 20.sp,
               modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
 
+          // Render file attachment if present
+          message.fileAttachment?.let { attachment ->
+            Spacer(modifier = Modifier.height(12.dp))
+            FileAttachmentCard(
+                attachment = attachment, modifier = Modifier.testTag("chat_file_attachment"))
+          }
+
           if (audioState != null) {
             Spacer(modifier = Modifier.height(4.dp))
             Row(
@@ -130,6 +157,122 @@ fun ChatMessage(
         }
       }
     }
+  }
+}
+
+/**
+ * File attachment card for displaying downloadable files in chat. Clicking opens the file in an
+ * in-app PDF viewer for a seamless experience.
+ */
+@Composable
+fun FileAttachmentCard(attachment: FileAttachment, modifier: Modifier = Modifier) {
+  var showPdfViewer by remember { mutableStateOf(false) }
+
+  // Colors for the card
+  val cardBg = Color(0xFF1E3A5F) // Deep blue
+  val iconBg = Color(0xFF2E5A8F) // Lighter blue
+  val textColor = Color.White
+  val subtitleColor = Color(0xFFB0C4DE) // Light steel blue
+
+  Card(
+      modifier =
+          modifier
+              .fillMaxWidth()
+              .clip(RoundedCornerShape(12.dp))
+              .clickable {
+                // Open in-app PDF viewer
+                showPdfViewer = true
+              }
+              .testTag("file_card"),
+      colors = CardDefaults.cardColors(containerColor = cardBg),
+      shape = RoundedCornerShape(12.dp)) {
+        Row(
+            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically) {
+              // File icon
+              Box(
+                  modifier =
+                      Modifier.size(48.dp)
+                          .clip(RoundedCornerShape(8.dp))
+                          .background(iconBg)
+                          .testTag("file_icon_container"),
+                  contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = getFileIcon(attachment),
+                        contentDescription = "File",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp))
+                  }
+
+              Spacer(modifier = Modifier.width(12.dp))
+
+              // File info
+              Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = attachment.filename,
+                    color = textColor,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("file_name"))
+
+                attachment.courseName?.let { courseName ->
+                  Text(
+                      text = courseName,
+                      color = subtitleColor,
+                      style = MaterialTheme.typography.bodySmall,
+                      maxLines = 1,
+                      overflow = TextOverflow.Ellipsis,
+                      modifier = Modifier.testTag("file_course"))
+                }
+
+                // Size if available
+                attachment.formattedSize?.let { size ->
+                  Text(
+                      text = size,
+                      color = subtitleColor.copy(alpha = 0.7f),
+                      style = MaterialTheme.typography.labelSmall,
+                      modifier = Modifier.testTag("file_size"))
+                }
+              }
+
+              Spacer(modifier = Modifier.width(8.dp))
+
+              // View icon (indicates tap to open)
+              Icon(
+                  imageVector = Icons.Default.Visibility,
+                  contentDescription = "View file",
+                  tint = subtitleColor,
+                  modifier = Modifier.size(24.dp).testTag("file_view_icon"))
+            }
+      }
+
+  // Full-screen PDF viewer dialog
+  if (showPdfViewer) {
+    Dialog(
+        onDismissRequest = { showPdfViewer = false },
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+      PdfViewerScreen(
+          fileUrl = attachment.downloadUrl,
+          filename = attachment.filename,
+          onDismiss = { showPdfViewer = false }
+      )
+    }
+  }
+}
+
+/** Returns appropriate icon based on file type */
+@Composable
+private fun getFileIcon(attachment: FileAttachment): ImageVector {
+  return when {
+    attachment.isPdf -> Icons.Default.PictureAsPdf
+    else -> Icons.Default.Description
   }
 }
 

@@ -13,16 +13,54 @@ enum class ChatType {
 }
 
 /**
+ * Represents a file attachment in a chat message. Used for Moodle file retrieval and other
+ * file-sharing features.
+ *
+ * @property filename Display name of the file
+ * @property downloadUrl URL to download/open the file (authenticated)
+ * @property filesize Optional file size in bytes
+ * @property mimetype MIME type of the file (e.g., "application/pdf")
+ * @property courseName Name of the course this file belongs to (for Moodle files)
+ * @property sectionName Optional section name within the course
+ * @property moduleName Optional module name (resource title)
+ */
+data class FileAttachment(
+    val filename: String,
+    val downloadUrl: String,
+    val filesize: Long? = null,
+    val mimetype: String? = null,
+    val courseName: String? = null,
+    val sectionName: String? = null,
+    val moduleName: String? = null
+) {
+  /** Returns true if this is a PDF file based on filename or mimetype */
+  val isPdf: Boolean
+    get() = filename.lowercase().endsWith(".pdf") || mimetype == "application/pdf"
+
+  /** Returns a human-readable file size */
+  val formattedSize: String?
+    get() =
+        filesize?.let { bytes ->
+          when {
+            bytes < 1024 -> "$bytes B"
+            bytes < 1024 * 1024 -> "${bytes / 1024} KB"
+            else -> "${bytes / (1024 * 1024)} MB"
+          }
+        }
+}
+
+/**
  * UI model for a single chat message.
  *
  * This is a presentation-layer model for Compose. It encodes who spoke, the display text, when it
- * was produced, and an optional flag for a “still generating” placeholder.
+ * was produced, and an optional flag for a "still generating" placeholder.
  *
  * @property id Stable unique ID (UUID recommended). Use as the LazyColumn `key`.
  * @property text Display text of the message (already formatted for UI if needed).
  * @property timestamp Epoch millis (System.currentTimeMillis) for ordering/labels.
  * @property type Speaker role (USER/AI) to drive alignment and styling.
- * @property isThinking True if this represents a “thinking/placeholder” entry.
+ * @property isThinking True if this represents a "thinking/placeholder" entry.
+ * @property fileAttachment Optional file attachment (e.g., from Moodle)
  */
 data class ChatUIModel(
     val id: String,
@@ -30,5 +68,6 @@ data class ChatUIModel(
     val timestamp: Long,
     val type: ChatType,
     val isThinking: Boolean = false,
-    val source: SourceMeta? = null
+    val source: SourceMeta? = null,
+    val fileAttachment: FileAttachment? = null
 )
