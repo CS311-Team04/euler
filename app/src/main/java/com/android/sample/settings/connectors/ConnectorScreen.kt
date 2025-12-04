@@ -609,6 +609,7 @@ private fun MoodleLogoHeader() {
 }
 
 /** Returns the Moodle-styled colors for OutlinedTextField. */
+@Composable
 private fun moodleTextFieldColors() =
     OutlinedTextFieldDefaults.colors(
         focusedBorderColor = com.android.sample.ui.theme.MoodleLoginInputBorderFocused,
