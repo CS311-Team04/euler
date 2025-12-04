@@ -608,6 +608,17 @@ private fun MoodleLogoHeader() {
       contentScale = androidx.compose.ui.layout.ContentScale.Fit)
 }
 
+/** Returns the Moodle-styled colors for OutlinedTextField. */
+private fun moodleTextFieldColors() =
+    OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = com.android.sample.ui.theme.MoodleLoginInputBorderFocused,
+        unfocusedBorderColor = com.android.sample.ui.theme.MoodleLoginInputBorder,
+        focusedContainerColor = com.android.sample.ui.theme.MoodleLoginCardBackground,
+        unfocusedContainerColor = com.android.sample.ui.theme.MoodleLoginCardBackground,
+        cursorColor = com.android.sample.ui.theme.MoodleLoginButtonBlue,
+        focusedTextColor = com.android.sample.ui.theme.MoodleLoginText,
+        unfocusedTextColor = com.android.sample.ui.theme.MoodleLoginText)
+
 /** Moodle-styled text field with clean borders and generous padding. */
 @Composable
 private fun MoodleStyledTextField(
@@ -632,15 +643,7 @@ private fun MoodleStyledTextField(
       textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp),
       keyboardOptions =
           KeyboardOptions(autoCorrect = false, keyboardType = keyboardType, imeAction = imeAction),
-      colors =
-          OutlinedTextFieldDefaults.colors(
-              focusedBorderColor = com.android.sample.ui.theme.MoodleLoginInputBorderFocused,
-              unfocusedBorderColor = com.android.sample.ui.theme.MoodleLoginInputBorder,
-              focusedContainerColor = com.android.sample.ui.theme.MoodleLoginCardBackground,
-              unfocusedContainerColor = com.android.sample.ui.theme.MoodleLoginCardBackground,
-              cursorColor = com.android.sample.ui.theme.MoodleLoginButtonBlue,
-              focusedTextColor = com.android.sample.ui.theme.MoodleLoginText,
-              unfocusedTextColor = com.android.sample.ui.theme.MoodleLoginText),
+      colors = moodleTextFieldColors(),
       shape = RoundedCornerShape(10.dp),
       modifier = Modifier.fillMaxWidth().height(64.dp))
 }
@@ -671,15 +674,7 @@ private fun MoodleStyledPasswordField(
               autoCorrect = false,
               keyboardType = KeyboardType.Password,
               imeAction = ImeAction.Done),
-      colors =
-          OutlinedTextFieldDefaults.colors(
-              focusedBorderColor = com.android.sample.ui.theme.MoodleLoginInputBorderFocused,
-              unfocusedBorderColor = com.android.sample.ui.theme.MoodleLoginInputBorder,
-              focusedContainerColor = com.android.sample.ui.theme.MoodleLoginCardBackground,
-              unfocusedContainerColor = com.android.sample.ui.theme.MoodleLoginCardBackground,
-              cursorColor = com.android.sample.ui.theme.MoodleLoginButtonBlue,
-              focusedTextColor = com.android.sample.ui.theme.MoodleLoginText,
-              unfocusedTextColor = com.android.sample.ui.theme.MoodleLoginText),
+      colors = moodleTextFieldColors(),
       shape = RoundedCornerShape(10.dp),
       modifier = Modifier.fillMaxWidth().height(64.dp))
 }
