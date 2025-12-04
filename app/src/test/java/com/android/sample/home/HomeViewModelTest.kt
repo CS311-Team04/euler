@@ -462,6 +462,36 @@ class HomeViewModelTest {
         assertNull(sourceCard!!.source?.url) // Schedule sources have no URL
         assertEquals("Your EPFL Schedule", sourceCard.source?.siteLabel)
         assertTrue(sourceCard.source?.isScheduleSource == true)
+        assertEquals(CompactSourceType.SCHEDULE, sourceCard.source?.compactType)
+      }
+
+  @Test
+  fun sendMessage_guest_appends_food_source_card_when_llm_returns_food_type() =
+      runBlocking {
+        val viewModel = HomeViewModel()
+        viewModel.setPrivateField(
+            "llmClient",
+            object : LlmClient {
+              override suspend fun generateReply(prompt: String): BotReply =
+                  BotReply(
+                      "Aujourd'hui au Piano: Pasta 8.50 CHF",
+                      "https://www.epfl.ch/campus/restaurants",
+                      SourceType.FOOD,
+                      EdIntent())
+            })
+
+        viewModel.updateMessageDraft("Qu'est-ce qu'on mange aujourd'hui?")
+        viewModel.sendMessage()
+        dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.awaitStreamingCompletion()
+
+        val messages = viewModel.uiState.value.messages
+        val sourceCard = messages.lastOrNull { it.source != null }
+        assertNotNull("Expected a food source card message", sourceCard)
+        assertEquals("EPFL Restaurants", sourceCard!!.source?.siteLabel)
+        assertEquals("Retrieved from Pocket Campus", sourceCard.source?.title)
+        assertEquals(CompactSourceType.FOOD, sourceCard.source?.compactType)
       }
 
   @Test

@@ -970,4 +970,85 @@ class HomeScreenComposeInteractionsTest {
 
     composeRule.onNodeWithTag(HomeTags.MicBtn, useUnmergedTree = true).assertIsDisplayed()
   }
+
+  // CompactSourceType tests
+  @Test
+  fun CompactSourceType_enum_contains_all_expected_values() {
+    val values = CompactSourceType.values()
+    assertEquals(3, values.size)
+    assertTrue(values.contains(CompactSourceType.NONE))
+    assertTrue(values.contains(CompactSourceType.SCHEDULE))
+    assertTrue(values.contains(CompactSourceType.FOOD))
+  }
+
+  @Test
+  fun CompactSourceType_NONE_is_first_value() {
+    assertEquals(0, CompactSourceType.NONE.ordinal)
+  }
+
+  @Test
+  fun CompactSourceType_SCHEDULE_is_second_value() {
+    assertEquals(1, CompactSourceType.SCHEDULE.ordinal)
+  }
+
+  @Test
+  fun CompactSourceType_FOOD_is_third_value() {
+    assertEquals(2, CompactSourceType.FOOD.ordinal)
+  }
+
+  @Test
+  fun CompactSourceType_valueOf_returns_correct_values() {
+    assertEquals(CompactSourceType.NONE, CompactSourceType.valueOf("NONE"))
+    assertEquals(CompactSourceType.SCHEDULE, CompactSourceType.valueOf("SCHEDULE"))
+    assertEquals(CompactSourceType.FOOD, CompactSourceType.valueOf("FOOD"))
+  }
+
+  @Test
+  fun SourceMeta_default_compactType_is_NONE() {
+    val meta = SourceMeta(
+        siteLabel = "Test",
+        title = "Test Title",
+        url = "https://example.com"
+    )
+    assertEquals(CompactSourceType.NONE, meta.compactType)
+  }
+
+  @Test
+  fun SourceMeta_with_FOOD_compactType() {
+    val meta = SourceMeta(
+        siteLabel = "EPFL Restaurants",
+        title = "Daily Menu",
+        url = "https://epfl.ch/food",
+        compactType = CompactSourceType.FOOD
+    )
+    assertEquals(CompactSourceType.FOOD, meta.compactType)
+    assertEquals("EPFL Restaurants", meta.siteLabel)
+  }
+
+  @Test
+  fun SourceMeta_with_SCHEDULE_compactType() {
+    val meta = SourceMeta(
+        siteLabel = "Your EPFL Schedule",
+        title = "Calendar",
+        url = null,
+        isScheduleSource = true,
+        compactType = CompactSourceType.SCHEDULE
+    )
+    assertEquals(CompactSourceType.SCHEDULE, meta.compactType)
+    assertTrue(meta.isScheduleSource)
+    assertNull(meta.url)
+  }
+
+  @Test
+  fun SourceMeta_retrievedAt_has_default_value() {
+    val before = System.currentTimeMillis()
+    val meta = SourceMeta(
+        siteLabel = "Test",
+        title = "Test Title",
+        url = null
+    )
+    val after = System.currentTimeMillis()
+    assertTrue(meta.retrievedAt >= before)
+    assertTrue(meta.retrievedAt <= after)
+  }
 }
