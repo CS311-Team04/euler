@@ -971,6 +971,104 @@ class HomeScreenComposeInteractionsTest {
     composeRule.onNodeWithTag(HomeTags.MicBtn, useUnmergedTree = true).assertIsDisplayed()
   }
 
+  @Test
+  fun homeScreen_displays_schedule_source_indicator() {
+    val viewModel = createViewModel()
+    val messageWithSchedule =
+        ChatUIModel(
+            id = "msg-1",
+            text = "You have a lecture at 10:00",
+            timestamp = System.currentTimeMillis(),
+            type = ChatType.AI,
+            source =
+                SourceMeta(
+                    siteLabel = "Your EPFL Schedule",
+                    title = "Schedule",
+                    url = null,
+                    compactType = CompactSourceType.SCHEDULE))
+    viewModel.editState { it.copy(messages = listOf(messageWithSchedule)) }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    // Should display schedule indicator with emoji
+    composeRule.onNodeWithText("📅 Your EPFL Schedule", substring = true).assertExists()
+  }
+
+  @Test
+  fun homeScreen_displays_food_source_indicator() {
+    val viewModel = createViewModel()
+    val messageWithFood =
+        ChatUIModel(
+            id = "msg-2",
+            text = "Today's menu: Pasta 8.50 CHF",
+            timestamp = System.currentTimeMillis(),
+            type = ChatType.AI,
+            source =
+                SourceMeta(
+                    siteLabel = "EPFL Restaurants",
+                    title = "Menu",
+                    url = "https://epfl.ch/food",
+                    compactType = CompactSourceType.FOOD))
+    viewModel.editState { it.copy(messages = listOf(messageWithFood)) }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    // Should display food indicator with emoji
+    composeRule.onNodeWithText("🍴 EPFL Restaurants", substring = true).assertExists()
+  }
+
+  @Test
+  fun homeScreen_displays_full_rag_source_card_with_visit_button() {
+    val viewModel = createViewModel()
+    val messageWithRag =
+        ChatUIModel(
+            id = "msg-3",
+            text = "Here's information about projects",
+            timestamp = System.currentTimeMillis(),
+            type = ChatType.AI,
+            source =
+                SourceMeta(
+                    siteLabel = "EPFL.ch Website",
+                    title = "Projects",
+                    url = "https://www.epfl.ch/education/projects",
+                    compactType = CompactSourceType.NONE))
+    viewModel.editState { it.copy(messages = listOf(messageWithRag)) }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    // Should display full RAG card with "Retrieved from" text
+    composeRule.onNodeWithText("Retrieved from", substring = true).assertExists()
+    // Should have Visit button
+    composeRule.onNodeWithText("Visit", substring = true).assertExists()
+  }
+
+  @Test
+  fun homeScreen_no_visit_button_when_url_is_null() {
+    val viewModel = createViewModel()
+    val messageWithNullUrl =
+        ChatUIModel(
+            id = "msg-4",
+            text = "Some response",
+            timestamp = System.currentTimeMillis(),
+            type = ChatType.AI,
+            source =
+                SourceMeta(
+                    siteLabel = "Test Site",
+                    title = "Test",
+                    url = null,
+                    compactType = CompactSourceType.NONE))
+    viewModel.editState { it.copy(messages = listOf(messageWithNullUrl)) }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    // Should not have Visit button when URL is null
+    composeRule.onNodeWithText("Visit", substring = true).assertDoesNotExist()
+  }
+
   // CompactSourceType tests
   @Test
   fun CompactSourceType_enum_contains_all_expected_values() {
