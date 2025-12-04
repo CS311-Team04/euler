@@ -84,6 +84,47 @@ class HomeViewModel(
     private const val DEFAULT_USER_NAME = "Student"
     private const val ED_INTENT_POST_QUESTION = "post_question"
 
+    // Canonical suggestion questions (English) for offline cache
+    // These must match the localization keys exactly for cache hits
+    val OFFLINE_SUGGESTIONS =
+        listOf(
+            "What is EPFL?",
+            "Where is EPFL located?",
+            "When was EPFL founded?",
+            "How many students at EPFL?",
+            "What are EPFL's research areas?",
+            "Tell me about EPFL campus")
+
+    // Mapping of localization keys to canonical English questions for cache lookup
+    private val SUGGESTION_KEY_TO_CANONICAL =
+        mapOf(
+            "suggestion_what_is_epfl" to "What is EPFL?",
+            "suggestion_where_epfl" to "Where is EPFL located?",
+            "suggestion_epfl_founded" to "When was EPFL founded?",
+            "suggestion_epfl_students" to "How many students at EPFL?",
+            "suggestion_epfl_research" to "What are EPFL's research areas?",
+            "suggestion_epfl_campus" to "Tell me about EPFL campus")
+
+    /**
+     * Finds the canonical English question for a given localized suggestion text. Returns the input
+     * text if no match is found (for non-suggestion queries).
+     */
+    fun getCanonicalQuestion(localizedText: String): String {
+      val trimmed = localizedText.trim()
+      // Check if this is a known suggestion by looking at all localized variants
+      for ((key, canonical) in SUGGESTION_KEY_TO_CANONICAL) {
+        val localized = com.android.sample.settings.Localization.t(key)
+        if (localized.equals(trimmed, ignoreCase = true)) {
+          return canonical
+        }
+      }
+      // Also check if it's already the canonical form
+      if (OFFLINE_SUGGESTIONS.any { it.equals(trimmed, ignoreCase = true) }) {
+        return OFFLINE_SUGGESTIONS.first { it.equals(trimmed, ignoreCase = true) }
+      }
+      return trimmed
+    }
+
     // Global exception handler for uncaught coroutine exceptions
     private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
       Log.e(TAG, "Uncaught exception in coroutine", throwable)
@@ -141,6 +182,8 @@ class HomeViewModel(
   private var dataStarted = false
   private var authListener: FirebaseAuth.AuthStateListener? = null
   private var networkMonitorJob: Job? = null
+  private var suggestionsCacheJob: Job? = null
+  @Volatile private var suggestionsCached = false
 
   init {
     val current = auth.currentUser?.uid
@@ -182,6 +225,10 @@ class HomeViewModel(
                   newState
                 }
               }
+              // Pre-cache suggestion responses when online and signed in
+              if (isOnline && !suggestionsCached && auth.currentUser != null) {
+                preCacheSuggestionResponses()
+              }
             }
           }
     }
@@ -202,6 +249,49 @@ class HomeViewModel(
    * and keeps all messages in memory only.
    */
   private fun isGuest(): Boolean = auth.currentUser == null
+
+  /**
+   * Pre-caches responses for suggestion questions so they work offline. Fetches responses from the
+   * LLM and stores them in Firestore's global cache. Only runs once per session when the app is
+   * online.
+   */
+  private fun preCacheSuggestionResponses() {
+    if (suggestionsCached) return
+    suggestionsCached = true // Mark as started to prevent duplicate runs
+
+    suggestionsCacheJob?.cancel()
+    suggestionsCacheJob =
+        viewModelScope.launch(Dispatchers.IO + exceptionHandler) {
+          Log.d(TAG, "Pre-caching suggestion responses for offline use...")
+
+          for (question in OFFLINE_SUGGESTIONS) {
+            try {
+              // Check if already cached
+              val existing = cacheRepo.getCachedResponse(question, preferCache = false)
+              if (existing != null && existing.isNotBlank()) {
+                Log.d(TAG, "Suggestion already cached: ${question.take(30)}...")
+                continue
+              }
+
+              // Fetch fresh response from LLM
+              Log.d(TAG, "Fetching response for: ${question.take(30)}...")
+              val reply =
+                  llmClient.generateReply(prompt = question, summary = null, transcript = null)
+
+              if (reply.reply.isNotBlank()) {
+                // Cache the response
+                cacheRepo.saveCachedResponse(question, reply.reply)
+                Log.d(TAG, "Cached response for: ${question.take(30)}...")
+              }
+            } catch (e: Exception) {
+              Log.w(TAG, "Failed to cache suggestion '$question': ${e.message}")
+              // Continue with other suggestions
+            }
+          }
+
+          Log.d(TAG, "Finished pre-caching suggestion responses")
+        }
+  }
 
   /**
    * Start Firestore listeners (conversations + messages) **only when signed in**. No-op in guest
@@ -558,8 +648,11 @@ class HomeViewModel(
         if (isOffline && !isGuest()) {
           Log.d(TAG, "sendMessage: offline, checking Firestore local cache for question")
           try {
+            // Use canonical English question for cache lookup (handles localized suggestions)
+            val canonicalQuestion = getCanonicalQuestion(msg)
+            Log.d(TAG, "sendMessage: looking up cache for canonical question: $canonicalQuestion")
             // Use preferCache=true to force reading from local Firestore cache
-            val cachedResponse = cacheRepo.getCachedResponse(msg, preferCache = true)
+            val cachedResponse = cacheRepo.getCachedResponse(canonicalQuestion, preferCache = true)
             if (cachedResponse != null && cachedResponse.isNotBlank()) {
               Log.d(TAG, "sendMessage: found cached response in local Firestore cache, using it")
               // Use cached response
@@ -1046,6 +1139,8 @@ class HomeViewModel(
     conversationsJob = null
     messagesJob?.cancel()
     messagesJob = null
+    suggestionsCacheJob?.cancel()
+    suggestionsCacheJob = null
     activeStreamJob?.cancel()
     activeStreamJob = null
     networkMonitorJob?.cancel()

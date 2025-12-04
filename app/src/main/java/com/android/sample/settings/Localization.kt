@@ -160,22 +160,20 @@ object Localization {
           "euler_thinking" to "Euler is thinking",
           "ask_euler_anything" to "Ask Euler Anything",
 
-          // Home Screen - Suggestions
-          "suggestion_what_is_epfl" to "What is EPFL",
-          "suggestion_check_ed" to "Check Ed Discussion",
-          "suggestion_show_schedule" to "Show my schedule",
-          "suggestion_library" to "Find library resources",
-          "suggestion_check_grades" to "Check grades on IS-Academia",
-          "suggestion_search_moodle" to "Search Moodle courses",
-          "suggestion_whats_due" to "What's due this week?",
-          "suggestion_study_help" to "Help me study for CS220",
+          // Home Screen - Suggestions (offline-friendly general EPFL knowledge)
+          "suggestion_what_is_epfl" to "What is EPFL?",
+          "suggestion_where_epfl" to "Where is EPFL located?",
+          "suggestion_epfl_founded" to "When was EPFL founded?",
+          "suggestion_epfl_students" to "How many students at EPFL?",
+          "suggestion_epfl_research" to "What are EPFL's research areas?",
+          "suggestion_epfl_campus" to "Tell me about EPFL campus",
 
           // Home Screen - Animated Intro Suggestions
-          "intro_suggestion_1" to "Find CS220 past exams",
-          "intro_suggestion_2" to "Check my Moodle assignments",
-          "intro_suggestion_3" to "What's on Ed Discussion?",
-          "intro_suggestion_4" to "Show my IS-Academia schedule",
-          "intro_suggestion_5" to "Search EPFL Drive files",
+          "intro_suggestion_1" to "What is EPFL?",
+          "intro_suggestion_2" to "Where is EPFL located?",
+          "intro_suggestion_3" to "When was EPFL founded?",
+          "intro_suggestion_4" to "How many students at EPFL?",
+          "intro_suggestion_5" to "Tell me about EPFL campus",
 
           // Home Screen - Actions
           "share" to "Share",
@@ -274,22 +272,20 @@ object Localization {
           "euler_thinking" to "Euler réfléchit",
           "ask_euler_anything" to "Demandez n'importe quoi à Euler",
 
-          // Home Screen - Suggestions
-          "suggestion_what_is_epfl" to "Qu'est-ce que l'EPFL",
-          "suggestion_check_ed" to "Vérifier Ed Discussion",
-          "suggestion_show_schedule" to "Afficher mon horaire",
-          "suggestion_library" to "Trouver des ressources de bibliothèque",
-          "suggestion_check_grades" to "Vérifier les notes sur IS-Academia",
-          "suggestion_search_moodle" to "Rechercher des cours Moodle",
-          "suggestion_whats_due" to "Qu'est-ce qui est dû cette semaine ?",
-          "suggestion_study_help" to "Aide-moi à étudier pour CS220",
+          // Home Screen - Suggestions (offline-friendly general EPFL knowledge)
+          "suggestion_what_is_epfl" to "Qu'est-ce que l'EPFL ?",
+          "suggestion_where_epfl" to "Où se trouve l'EPFL ?",
+          "suggestion_epfl_founded" to "Quand l'EPFL a-t-elle été fondée ?",
+          "suggestion_epfl_students" to "Combien d'étudiants à l'EPFL ?",
+          "suggestion_epfl_research" to "Quels sont les domaines de recherche de l'EPFL ?",
+          "suggestion_epfl_campus" to "Parle-moi du campus de l'EPFL",
 
           // Home Screen - Animated Intro Suggestions
-          "intro_suggestion_1" to "Trouver les examens passés de CS220",
-          "intro_suggestion_2" to "Vérifier mes devoirs Moodle",
-          "intro_suggestion_3" to "Quoi de neuf sur Ed Discussion ?",
-          "intro_suggestion_4" to "Afficher mon horaire IS-Academia",
-          "intro_suggestion_5" to "Rechercher des fichiers EPFL Drive",
+          "intro_suggestion_1" to "Qu'est-ce que l'EPFL ?",
+          "intro_suggestion_2" to "Où se trouve l'EPFL ?",
+          "intro_suggestion_3" to "Quand l'EPFL a-t-elle été fondée ?",
+          "intro_suggestion_4" to "Combien d'étudiants à l'EPFL ?",
+          "intro_suggestion_5" to "Parle-moi du campus de l'EPFL",
 
           // Home Screen - Actions
           "share" to "Partager",
@@ -404,22 +400,20 @@ object Localization {
           "euler_thinking" to "Euler denkt nach",
           "ask_euler_anything" to "Fragen Sie Euler alles",
 
-          // Home Screen - Suggestions
-          "suggestion_what_is_epfl" to "Was ist EPFL",
-          "suggestion_check_ed" to "Ed Discussion prüfen",
-          "suggestion_show_schedule" to "Meinen Stundenplan anzeigen",
-          "suggestion_library" to "Bibliotheksressourcen finden",
-          "suggestion_check_grades" to "Noten auf IS-Academia prüfen",
-          "suggestion_search_moodle" to "Moodle-Kurse suchen",
-          "suggestion_whats_due" to "Was ist diese Woche fällig?",
-          "suggestion_study_help" to "Hilf mir für CS220 zu lernen",
+          // Home Screen - Suggestions (offline-friendly general EPFL knowledge)
+          "suggestion_what_is_epfl" to "Was ist EPFL?",
+          "suggestion_where_epfl" to "Wo befindet sich die EPFL?",
+          "suggestion_epfl_founded" to "Wann wurde die EPFL gegründet?",
+          "suggestion_epfl_students" to "Wie viele Studenten hat die EPFL?",
+          "suggestion_epfl_research" to "Was sind die Forschungsbereiche der EPFL?",
+          "suggestion_epfl_campus" to "Erzähl mir vom EPFL Campus",
 
           // Home Screen - Animated Intro Suggestions
-          "intro_suggestion_1" to "CS220 frühere Prüfungen finden",
-          "intro_suggestion_2" to "Meine Moodle-Aufgaben prüfen",
-          "intro_suggestion_3" to "Was gibt's Neues auf Ed Discussion?",
-          "intro_suggestion_4" to "Meinen IS-Academia-Stundenplan anzeigen",
-          "intro_suggestion_5" to "EPFL Drive-Dateien durchsuchen",
+          "intro_suggestion_1" to "Was ist EPFL?",
+          "intro_suggestion_2" to "Wo befindet sich die EPFL?",
+          "intro_suggestion_3" to "Wann wurde die EPFL gegründet?",
+          "intro_suggestion_4" to "Wie viele Studenten hat die EPFL?",
+          "intro_suggestion_5" to "Erzähl mir vom EPFL Campus",
 
           // Home Screen - Actions
           "share" to "Teilen",
@@ -500,22 +494,20 @@ object Localization {
           "euler_thinking" to "Euler está pensando",
           "ask_euler_anything" to "Pregunta a Euler cualquier cosa",
 
-          // Home Screen - Suggestions
-          "suggestion_what_is_epfl" to "Qué es EPFL",
-          "suggestion_check_ed" to "Verificar Ed Discussion",
-          "suggestion_show_schedule" to "Mostrar mi horario",
-          "suggestion_library" to "Encontrar recursos de biblioteca",
-          "suggestion_check_grades" to "Verificar calificaciones en IS-Academia",
-          "suggestion_search_moodle" to "Buscar cursos de Moodle",
-          "suggestion_whats_due" to "¿Qué vence esta semana?",
-          "suggestion_study_help" to "Ayúdame a estudiar para CS220",
+          // Home Screen - Suggestions (offline-friendly general EPFL knowledge)
+          "suggestion_what_is_epfl" to "¿Qué es EPFL?",
+          "suggestion_where_epfl" to "¿Dónde está ubicada EPFL?",
+          "suggestion_epfl_founded" to "¿Cuándo se fundó EPFL?",
+          "suggestion_epfl_students" to "¿Cuántos estudiantes tiene EPFL?",
+          "suggestion_epfl_research" to "¿Cuáles son las áreas de investigación de EPFL?",
+          "suggestion_epfl_campus" to "Cuéntame sobre el campus de EPFL",
 
           // Home Screen - Animated Intro Suggestions
-          "intro_suggestion_1" to "Encontrar exámenes pasados de CS220",
-          "intro_suggestion_2" to "Verificar mis tareas de Moodle",
-          "intro_suggestion_3" to "¿Qué hay en Ed Discussion?",
-          "intro_suggestion_4" to "Mostrar mi horario de IS-Academia",
-          "intro_suggestion_5" to "Buscar archivos de EPFL Drive",
+          "intro_suggestion_1" to "¿Qué es EPFL?",
+          "intro_suggestion_2" to "¿Dónde está ubicada EPFL?",
+          "intro_suggestion_3" to "¿Cuándo se fundó EPFL?",
+          "intro_suggestion_4" to "¿Cuántos estudiantes tiene EPFL?",
+          "intro_suggestion_5" to "Cuéntame sobre el campus de EPFL",
 
           // Home Screen - Actions
           "share" to "Compartir",
@@ -596,22 +588,20 @@ object Localization {
           "euler_thinking" to "Euler sta pensando",
           "ask_euler_anything" to "Chiedi qualsiasi cosa a Euler",
 
-          // Home Screen - Suggestions
-          "suggestion_what_is_epfl" to "Cos'è EPFL",
-          "suggestion_check_ed" to "Controlla Ed Discussion",
-          "suggestion_show_schedule" to "Mostra il mio orario",
-          "suggestion_library" to "Trova risorse della biblioteca",
-          "suggestion_check_grades" to "Controlla i voti su IS-Academia",
-          "suggestion_search_moodle" to "Cerca corsi Moodle",
-          "suggestion_whats_due" to "Cosa scade questa settimana?",
-          "suggestion_study_help" to "Aiutami a studiare per CS220",
+          // Home Screen - Suggestions (offline-friendly general EPFL knowledge)
+          "suggestion_what_is_epfl" to "Cos'è l'EPFL?",
+          "suggestion_where_epfl" to "Dove si trova l'EPFL?",
+          "suggestion_epfl_founded" to "Quando è stata fondata l'EPFL?",
+          "suggestion_epfl_students" to "Quanti studenti ha l'EPFL?",
+          "suggestion_epfl_research" to "Quali sono le aree di ricerca dell'EPFL?",
+          "suggestion_epfl_campus" to "Parlami del campus EPFL",
 
           // Home Screen - Animated Intro Suggestions
-          "intro_suggestion_1" to "Trova esami passati di CS220",
-          "intro_suggestion_2" to "Controlla i miei compiti Moodle",
-          "intro_suggestion_3" to "Cosa c'è su Ed Discussion?",
-          "intro_suggestion_4" to "Mostra il mio orario IS-Academia",
-          "intro_suggestion_5" to "Cerca file EPFL Drive",
+          "intro_suggestion_1" to "Cos'è l'EPFL?",
+          "intro_suggestion_2" to "Dove si trova l'EPFL?",
+          "intro_suggestion_3" to "Quando è stata fondata l'EPFL?",
+          "intro_suggestion_4" to "Quanti studenti ha l'EPFL?",
+          "intro_suggestion_5" to "Parlami del campus EPFL",
 
           // Home Screen - Actions
           "share" to "Condividi",
@@ -691,22 +681,20 @@ object Localization {
           "euler_thinking" to "Euler está pensando",
           "ask_euler_anything" to "Pergunte qualquer coisa ao Euler",
 
-          // Home Screen - Suggestions
-          "suggestion_what_is_epfl" to "O que é EPFL",
-          "suggestion_check_ed" to "Verificar Ed Discussion",
-          "suggestion_show_schedule" to "Mostrar minha agenda",
-          "suggestion_library" to "Encontrar recursos da biblioteca",
-          "suggestion_check_grades" to "Verificar notas no IS-Academia",
-          "suggestion_search_moodle" to "Pesquisar cursos Moodle",
-          "suggestion_whats_due" to "O que vence esta semana?",
-          "suggestion_study_help" to "Ajude-me a estudar para CS220",
+          // Home Screen - Suggestions (offline-friendly general EPFL knowledge)
+          "suggestion_what_is_epfl" to "O que é a EPFL?",
+          "suggestion_where_epfl" to "Onde fica a EPFL?",
+          "suggestion_epfl_founded" to "Quando a EPFL foi fundada?",
+          "suggestion_epfl_students" to "Quantos estudantes a EPFL tem?",
+          "suggestion_epfl_research" to "Quais são as áreas de pesquisa da EPFL?",
+          "suggestion_epfl_campus" to "Conte-me sobre o campus da EPFL",
 
           // Home Screen - Animated Intro Suggestions
-          "intro_suggestion_1" to "Encontrar exames anteriores de CS220",
-          "intro_suggestion_2" to "Verificar minhas tarefas do Moodle",
-          "intro_suggestion_3" to "O que há no Ed Discussion?",
-          "intro_suggestion_4" to "Mostrar minha agenda IS-Academia",
-          "intro_suggestion_5" to "Pesquisar arquivos EPFL Drive",
+          "intro_suggestion_1" to "O que é a EPFL?",
+          "intro_suggestion_2" to "Onde fica a EPFL?",
+          "intro_suggestion_3" to "Quando a EPFL foi fundada?",
+          "intro_suggestion_4" to "Quantos estudantes a EPFL tem?",
+          "intro_suggestion_5" to "Conte-me sobre o campus da EPFL",
 
           // Home Screen - Actions
           "share" to "Compartilhar",
@@ -786,22 +774,20 @@ object Localization {
           "euler_thinking" to "Euler 正在思考",
           "ask_euler_anything" to "向 Euler 提问任何问题",
 
-          // Home Screen - Suggestions
-          "suggestion_what_is_epfl" to "什么是 EPFL",
-          "suggestion_check_ed" to "查看 Ed Discussion",
-          "suggestion_show_schedule" to "显示我的日程",
-          "suggestion_library" to "查找图书馆资源",
-          "suggestion_check_grades" to "在 IS-Academia 上查看成绩",
-          "suggestion_search_moodle" to "搜索 Moodle 课程",
-          "suggestion_whats_due" to "本周有什么截止日期？",
-          "suggestion_study_help" to "帮我学习 CS220",
+          // Home Screen - Suggestions (offline-friendly general EPFL knowledge)
+          "suggestion_what_is_epfl" to "什么是 EPFL？",
+          "suggestion_where_epfl" to "EPFL 在哪里？",
+          "suggestion_epfl_founded" to "EPFL 是什么时候成立的？",
+          "suggestion_epfl_students" to "EPFL 有多少学生？",
+          "suggestion_epfl_research" to "EPFL 的研究领域有哪些？",
+          "suggestion_epfl_campus" to "介绍一下 EPFL 校园",
 
           // Home Screen - Animated Intro Suggestions
-          "intro_suggestion_1" to "查找 CS220 往年考试",
-          "intro_suggestion_2" to "查看我的 Moodle 作业",
-          "intro_suggestion_3" to "Ed Discussion 上有什么？",
-          "intro_suggestion_4" to "显示我的 IS-Academia 日程",
-          "intro_suggestion_5" to "搜索 EPFL Drive 文件",
+          "intro_suggestion_1" to "什么是 EPFL？",
+          "intro_suggestion_2" to "EPFL 在哪里？",
+          "intro_suggestion_3" to "EPFL 是什么时候成立的？",
+          "intro_suggestion_4" to "EPFL 有多少学生？",
+          "intro_suggestion_5" to "介绍一下 EPFL 校园",
 
           // Home Screen - Actions
           "share" to "分享",

@@ -278,17 +278,16 @@ fun HomeScreen(
               Column(
                   Modifier.fillMaxWidth().background(backgroundColor).padding(bottom = 16.dp),
                   horizontalAlignment = Alignment.CenterHorizontally) {
-                    // Horizontal scrollable row of suggestion chips
+                    // Horizontal scrollable row of suggestion chips (offline-friendly EPFL
+                    // questions)
                     val suggestions =
                         listOf(
                             Localization.t("suggestion_what_is_epfl"),
-                            Localization.t("suggestion_check_ed"),
-                            Localization.t("suggestion_show_schedule"),
-                            Localization.t("suggestion_library"),
-                            Localization.t("suggestion_check_grades"),
-                            Localization.t("suggestion_search_moodle"),
-                            Localization.t("suggestion_whats_due"),
-                            Localization.t("suggestion_study_help"))
+                            Localization.t("suggestion_where_epfl"),
+                            Localization.t("suggestion_epfl_founded"),
+                            Localization.t("suggestion_epfl_students"),
+                            Localization.t("suggestion_epfl_research"),
+                            Localization.t("suggestion_epfl_campus"))
 
                     val scrollState = rememberScrollState()
 
