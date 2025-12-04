@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 data class SourceMeta(
     val siteLabel: String, // e.g. "EPFL.ch Website" or "Your Schedule"
@@ -1134,8 +1135,9 @@ class HomeViewModel(
   }
 
   /**
-   * Builds a readable profile context string from UserProfile data. Returns null if profile is null
-   * or contains no useful information.
+   * Builds a JSON string from UserProfile data for backend processing. Returns null if profile is
+   * null or contains no useful information. Uses JSONObject to ensure proper escaping and
+   * formatting.
    */
   @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
   internal fun buildProfileContext(profile: UserProfile?): String? {
@@ -1144,49 +1146,43 @@ class HomeViewModel(
       return null
     }
 
-    val parts = mutableListOf<String>()
+    val json = JSONObject()
 
-    // Add full name if available (legal/complete name)
+    // Add fields only if they are not blank
     if (profile.fullName.isNotBlank()) {
-      parts.add("Full Name: ${profile.fullName}")
+      json.put("fullName", profile.fullName)
     }
 
-    // Add preferred name/username if available (pseudo/username)
     if (profile.preferredName.isNotBlank()) {
-      parts.add("Username: ${profile.preferredName}")
+      json.put("preferredName", profile.preferredName)
     }
 
-    // Add role if available
     if (profile.roleDescription.isNotBlank()) {
-      parts.add("Role: ${profile.roleDescription}")
+      json.put("role", profile.roleDescription)
     }
 
-    // Add faculty if available
     if (profile.faculty.isNotBlank()) {
-      parts.add("Faculty: ${profile.faculty}")
+      json.put("faculty", profile.faculty)
     }
 
-    // Add section if available
     if (profile.section.isNotBlank()) {
-      parts.add("Section: ${profile.section}")
+      json.put("section", profile.section)
     }
 
-    // Return null if no useful information
-    if (parts.isEmpty()) {
+    if (profile.email.isNotBlank()) {
+      json.put("email", profile.email)
+    }
+
+    // Return null if JSON is empty (no fields added)
+    if (json.length() == 0) {
       Log.d(TAG, "buildProfileContext: profile exists but all fields are empty")
       return null
     }
 
-    val context =
-        buildString {
-              appendLine("User Profile Information:")
-              parts.forEach { part -> appendLine("- $part") }
-            }
-            .trim()
-
+    val context = json.toString()
     Log.d(
         TAG,
-        "buildProfileContext: built context with ${parts.size} fields, length=${context.length}")
+        "buildProfileContext: built JSON context with ${json.length()} fields, length=${context.length}")
     return context
   }
 

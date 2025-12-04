@@ -1742,7 +1742,7 @@ class HomeViewModelTest {
   }
 
   @Test
-  fun buildProfileContext_builds_context_with_all_fields() = runTest {
+  fun buildProfileContext_builds_json_context_with_all_fields() = runTest {
     val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
     val profile =
         UserProfile(
@@ -1750,34 +1750,36 @@ class HomeViewModelTest {
             preferredName = "jean.d",
             roleDescription = "Student",
             faculty = "IC — School of Computer and Communication Sciences",
-            section = "Computer Science")
+            section = "Computer Science",
+            email = "jean.dupont@epfl.ch")
     val context = viewModel.buildProfileContext(profile)
     assertNotNull("Context should not be null when profile has data", context)
-    assertTrue(
-        "Context should contain 'User Profile Information'",
-        context!!.contains("User Profile Information"))
-    assertTrue("Context should contain full name", context.contains("Full Name: Jean Dupont"))
-    assertTrue("Context should contain username", context.contains("Username: jean.d"))
-    assertTrue("Context should contain role", context.contains("Role: Student"))
-    assertTrue(
-        "Context should contain faculty",
-        context.contains("Faculty: IC — School of Computer and Communication Sciences"))
-    assertTrue("Context should contain section", context.contains("Section: Computer Science"))
+
+    // Parse JSON to verify structure
+    val json = org.json.JSONObject(context!!)
+    assertEquals("Jean Dupont", json.getString("fullName"))
+    assertEquals("jean.d", json.getString("preferredName"))
+    assertEquals("Student", json.getString("role"))
+    assertEquals("IC — School of Computer and Communication Sciences", json.getString("faculty"))
+    assertEquals("Computer Science", json.getString("section"))
+    assertEquals("jean.dupont@epfl.ch", json.getString("email"))
   }
 
   @Test
-  fun buildProfileContext_distinguishes_full_name_and_username() = runTest {
+  fun buildProfileContext_distinguishes_full_name_and_username_in_json() = runTest {
     val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
     val profile =
         UserProfile(
             fullName = "Jean Dupont", preferredName = "jean.d", section = "Computer Science")
     val context = viewModel.buildProfileContext(profile)
     assertNotNull("Context should not be null", context)
-    assertTrue(
-        "Context should label full name correctly", context!!.contains("Full Name: Jean Dupont"))
-    assertTrue("Context should label username correctly", context.contains("Username: jean.d"))
-    assertFalse(
-        "Context should NOT label username as full name", context.contains("Full Name: jean.d"))
+
+    // Parse JSON to verify keys are distinct
+    val json = org.json.JSONObject(context!!)
+    assertEquals("Jean Dupont", json.getString("fullName"))
+    assertEquals("jean.d", json.getString("preferredName"))
+    assertNotEquals(
+        "fullName should be different from preferredName", "jean.d", json.getString("fullName"))
   }
 
   @Test
