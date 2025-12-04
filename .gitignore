@@ -12,7 +12,7 @@ local.properties
 __pycache__/
 *.pyc
 .venv/
-
+functions/index.js
 # Crawler state and data
 .crawler_state/
 tools/epfl_scraper/.crawler_state/
