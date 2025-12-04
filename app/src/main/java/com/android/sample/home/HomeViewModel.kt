@@ -9,6 +9,7 @@ import com.android.sample.BuildConfig
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
 import com.android.sample.conversations.AuthNotReadyException
+import com.android.sample.conversations.CachedResponseRepository
 import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.ConversationTitleFormatter
 import com.android.sample.conversations.MessageDTO
@@ -23,6 +24,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
+import java.io.IOException
 import java.util.UUID
 import kotlin.getValue
 import kotlinx.coroutines.CancellationException
@@ -73,7 +75,9 @@ class HomeViewModel(
         ConversationRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance()),
     private val profileRepository: com.android.sample.profile.ProfileDataSource =
         UserProfileRepository(),
-    private val networkMonitor: NetworkConnectivityMonitor? = null
+    private val networkMonitor: NetworkConnectivityMonitor? = null,
+    private val cacheRepo: CachedResponseRepository =
+        CachedResponseRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance())
 ) : ViewModel() {
   companion object {
     private const val TAG = "HomeViewModel"
@@ -495,28 +499,31 @@ class HomeViewModel(
    * - Call the shared [LlmClient] (Firebase/HTTP) on a background coroutine.
    * - Append an AI message (or an error bubble) on completion.
    */
-  fun sendMessage() {
+  fun sendMessage(message: String? = null) {
     val current = _uiState.value
     if (current.isSending || current.streamingMessageId != null) return
-    // Don't allow sending messages when offline - check both state and actual connectivity
+
+    // Use provided message or fall back to draft
+    val msg = (message?.trim() ?: current.messageDraft.trim())
+    if (msg.isEmpty()) return
+
+    // Note: We allow sending even when offline to support suggestion chips working offline.
+    // Network errors will be caught and displayed to the user.
+    // Still update offline message state if needed, but don't block sending.
     if (current.isOffline) {
       // Update state to show offline message if not already shown
       if (!current.showOfflineMessage && auth.currentUser != null) {
         _uiState.update { it.copy(showOfflineMessage = true) }
       }
-      return
     }
-    // Double-check actual connectivity as a safety measure
+    // Double-check actual connectivity and update state, but don't block sending
     if (networkMonitor?.isCurrentlyOnline() == false) {
       _uiState.update {
         it.copy(
             isOffline = true,
             showOfflineMessage = if (auth.currentUser != null) true else it.showOfflineMessage)
       }
-      return
     }
-    val msg = current.messageDraft.trim()
-    if (msg.isEmpty()) return
 
     val now = System.currentTimeMillis()
     val userMsg =
@@ -544,6 +551,51 @@ class HomeViewModel(
     viewModelScope.launch(exceptionHandler) {
       try {
         Log.d(TAG, "sendMessage: starting, message='${msg.take(50)}...'")
+
+        // Check cache when offline (for signed-in users only)
+        // Use Firestore offline persistence to read from local cache
+        val isOffline = current.isOffline || networkMonitor?.isCurrentlyOnline() == false
+        if (isOffline && !isGuest()) {
+          Log.d(TAG, "sendMessage: offline, checking Firestore local cache for question")
+          try {
+            // Use preferCache=true to force reading from local Firestore cache
+            val cachedResponse = cacheRepo.getCachedResponse(msg, preferCache = true)
+            if (cachedResponse != null && cachedResponse.isNotBlank()) {
+              Log.d(TAG, "sendMessage: found cached response in local Firestore cache, using it")
+              // Use cached response
+              simulateStreamingFromText(aiMessageId, cachedResponse)
+
+              // Persist to conversation if we have one
+              val cid = _uiState.value.currentConversationId
+              if (cid != null) {
+                try {
+                  repo.appendMessage(cid, "assistant", cachedResponse)
+                } catch (e: Exception) {
+                  Log.w(TAG, "Failed to persist cached response to conversation", e)
+                }
+              }
+              return@launch
+            } else {
+              Log.d(
+                  TAG,
+                  "sendMessage: no cached response found in local Firestore cache for offline request")
+              // No cache and offline - show error immediately
+              handleSendMessageError(
+                  IOException(
+                      "No cached response available. Please connect to the internet to get a response."),
+                  aiMessageId)
+              return@launch
+            }
+          } catch (e: Exception) {
+            Log.w(TAG, "Error checking Firestore local cache", e)
+            // If cache check fails and we're offline, show error
+            handleSendMessageError(
+                IOException("Unable to retrieve cached response. Please connect to the internet."),
+                aiMessageId)
+            return@launch
+          }
+        }
+
         // GUEST: no Firestore, just streaming UI
         if (isGuest()) {
           Log.d(TAG, "sendMessage: guest mode, starting streaming")

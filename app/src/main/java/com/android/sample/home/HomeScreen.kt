@@ -328,10 +328,11 @@ fun HomeScreen(
                                           0 -> onAction1Click()
                                           1 -> onAction2Click()
                                         }
-                                        // Update draft and send message
+                                        // Update draft and send message directly
+                                        // Pass message directly to avoid state update timing issues
                                         viewModel.updateMessageDraft(suggestion)
                                         onSendMessage(suggestion)
-                                        viewModel.sendMessage()
+                                        viewModel.sendMessage(suggestion)
                                       })
                                 }
                               }
