@@ -3,6 +3,8 @@ package com.android.sample.settings.connectors
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.android.sample.epfl.EpflScheduleRepository
+import com.android.sample.epfl.ScheduleStatus
 import com.android.sample.settings.Localization
 import com.google.firebase.functions.FirebaseFunctions
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,10 +14,16 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+private const val MOODLE_CONNECTOR_ID = "moodle"
+
 /** Mock data for connectors. In the future, this will come from a repository. */
 private val mockConnectors =
     listOf(
-        Connector(id = "moodle", name = "Moodle", description = "courses", isConnected = false),
+        Connector(
+            id = MOODLE_CONNECTOR_ID,
+            name = "Moodle",
+            description = "courses",
+            isConnected = false),
         Connector(id = "ed", name = "Ed", description = "Q&A platform", isConnected = false),
         Connector(
             id = "epfl_campus",
@@ -40,6 +48,7 @@ class ConnectorsViewModel(
     private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("europe-west6"),
     private val edRemoteDataSource: EdConnectorRemoteDataSource =
         EdConnectorRemoteDataSource(functions),
+    private val epflScheduleRepository: EpflScheduleRepository = EpflScheduleRepository(),
     private val moodleRemoteDataSource: MoodleConnectorRemoteDataSource =
         MoodleConnectorRemoteDataSource(functions),
 ) : ViewModel() {
@@ -51,6 +60,7 @@ class ConnectorsViewModel(
 
   init {
     refreshEdStatus()
+    refreshEpflCampusStatus()
     refreshMoodleStatus()
   }
 
@@ -62,7 +72,7 @@ class ConnectorsViewModel(
       return
     }
 
-    if (connectorId == "moodle") {
+    if (connectorId == MOODLE_CONNECTOR_ID) {
       // For Moodle, simulate a redirect delay before showing the login dialog
       simulateMoodleRedirect()
       return
@@ -109,7 +119,7 @@ class ConnectorsViewModel(
   fun disconnectConnector(connectorId: String) {
     if (connectorId == "ed") {
       disconnectEdConnector()
-    } else if (connectorId == "moodle") {
+    } else if (connectorId == MOODLE_CONNECTOR_ID) {
       disconnectMoodleConnector()
     } else {
       _uiState.update { currentState ->
@@ -181,6 +191,31 @@ class ConnectorsViewModel(
           state.copy(
               isLoadingEd = false, edError = Localization.t("settings_connectors_ed_status_error"))
         }
+      }
+    }
+  }
+
+  /** Refreshes the EPFL Campus connector status from the backend. */
+  private fun refreshEpflCampusStatus() {
+    viewModelScope.launch {
+      try {
+        val status = epflScheduleRepository.getStatus()
+        val isConnected = status is ScheduleStatus.Connected
+
+        _uiState.update { state ->
+          val updatedConnectors =
+              state.connectors.map { connector ->
+                if (connector.id == "epfl_campus") {
+                  connector.copy(isConnected = isConnected)
+                } else {
+                  connector
+                }
+              }
+          state.copy(connectors = updatedConnectors)
+        }
+      } catch (e: Exception) {
+        Log.e("ConnectorsViewModel", "Failed to refresh EPFL Campus connector status", e)
+        // Don't show error to user for EPFL Campus - just leave as disconnected
       }
     }
   }
@@ -262,7 +297,7 @@ class ConnectorsViewModel(
         _uiState.update { state ->
           val updatedConnectors =
               state.connectors.map { connector ->
-                if (connector.id == "moodle") {
+                if (connector.id == MOODLE_CONNECTOR_ID) {
                   connector.copy(
                       isConnected = config.status == MoodleConnectorStatusRemote.CONNECTED)
                 } else {
@@ -292,7 +327,7 @@ class ConnectorsViewModel(
           current.copy(
               connectors =
                   current.connectors.map { connector ->
-                    if (connector.id == "moodle") {
+                    if (connector.id == MOODLE_CONNECTOR_ID) {
                       connector.copy(isConnected = false)
                     } else {
                       connector
@@ -339,7 +374,7 @@ class ConnectorsViewModel(
         return Result.failure(Exception("No token received from Moodle"))
       }
 
-      Log.d("MOODLE_TOKEN", "Successfully fetched token: ${token.take(10)}...")
+      Log.d("MOODLE_TOKEN", "Successfully fetched token")
       Result.success(token)
     } catch (e: Exception) {
       Log.e("MOODLE_TOKEN", "Exception fetching token via Firebase Function", e)
@@ -373,9 +408,6 @@ class ConnectorsViewModel(
         val error = tokenResult.exceptionOrNull() ?: Exception("Unknown error")
         val errorMessage =
             when {
-              error.message?.contains("HTTP 401") == true ||
-                  error.message?.contains("invalid") == true ->
-                  Localization.t("moodle_connect_invalid_credentials")
               error.message?.contains("HTTP") == true ->
                   Localization.t("moodle_connect_api_unreachable")
               else -> Localization.t("moodle_connect_generic_error")
@@ -423,7 +455,7 @@ class ConnectorsViewModel(
           _uiState.update { state ->
             val updatedConnectors =
                 state.connectors.map { connector ->
-                  if (connector.id == "moodle") {
+                  if (connector.id == MOODLE_CONNECTOR_ID) {
                     connector.copy(isConnected = true)
                   } else {
                     connector
@@ -442,7 +474,7 @@ class ConnectorsViewModel(
           _uiState.update { state ->
             val friendlyMessageKey =
                 when (config.lastError) {
-                  "invalid_credentials" -> "moodle_connect_invalid_credentials"
+                  "invalid_credentials" -> "moodle_connect_api_unreachable"
                   "api_unreachable" -> "moodle_connect_api_unreachable"
                   else -> "moodle_connect_generic_error"
                 }

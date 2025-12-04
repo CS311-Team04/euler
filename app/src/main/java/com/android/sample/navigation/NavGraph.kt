@@ -56,6 +56,7 @@ object Routes {
   const val Profile = "profile"
   const val Connectors = "connectors"
   const val VoiceChat = "voice_chat"
+  const val EpflCampus = "epfl_campus"
 }
 
 @VisibleForTesting internal var appNavControllerObserver: ((NavHostController) -> Unit)? = null
@@ -617,7 +618,7 @@ fun AppNav(
                 isProfileEnabled = !homeUiState.isGuest,
                 showProfileWarning = homeUiState.showGuestProfileWarning,
                 onDismissProfileWarning = { homeViewModel.hideGuestProfileWarning() },
-                onConnectorsClick = { nav.navigate(Routes.Settings) })
+                onConnectorsClick = { nav.navigate(Routes.Connectors) })
           }
 
           composable(Routes.Profile) {
@@ -651,13 +652,18 @@ fun AppNav(
             ConnectorsScreen(
                 onBackClick = { nav.popBackStack() },
                 onConnectorClick = { connectorId ->
-                  // For now, just a placeholder. In the future, this will trigger the connection
-                  // flow
-                  android.util.Log.d("NavGraph", "Connector clicked: $connectorId")
+                  when (connectorId) {
+                    "epfl_campus" -> nav.navigate(Routes.EpflCampus)
+                    else -> android.util.Log.d("NavGraph", "Connector clicked: $connectorId")
+                  }
                 })
           }
 
           // Voice Chat Screen
+          // EPFL Campus Connector Screen
+          composable(Routes.EpflCampus) {
+            com.android.sample.epfl.EpflCampusConnectorScreen(onBackClick = { nav.popBackStack() })
+          }
           // Uses VoiceChatComposableContent which is tested in NavGraphTest
           composable(Routes.VoiceChat) { VoiceChatComposableContent(nav, speechHelper) }
         }

@@ -37,11 +37,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateTitleFn = exports.answerWithRagHttp = exports.indexChunksHttp = exports.answerWithRagFn = exports.indexChunksFn = exports.ping = exports.onMessageCreate = void 0;
+exports.getEpflScheduleStatusFn = exports.disconnectEpflScheduleFn = exports.syncEpflScheduleFn = exports.connectorsMoodleTestFn = exports.connectorsMoodleDisconnectFn = exports.connectorsMoodleConnectFn = exports.connectorsMoodleFetchTokenFn = exports.connectorsMoodleStatusFn = exports.edConnectorTestFn = exports.edConnectorDisconnectFn = exports.edConnectorConnectFn = exports.edConnectorStatusFn = exports.generateTitleFn = exports.answerWithRagHttp = exports.indexChunksHttp = exports.answerWithRagFn = exports.indexChunksFn = exports.ping = exports.onMessageCreate = void 0;
+exports.setChatClient = setChatClient;
 exports.apertusChatFnCore = apertusChatFnCore;
 exports.generateTitleCore = generateTitleCore;
 exports.indexChunksCore = indexChunksCore;
 exports.answerWithRagCore = answerWithRagCore;
+exports.syncEpflScheduleCore = syncEpflScheduleCore;
+exports.getScheduleContextCore = getScheduleContextCore;
 const node_path_1 = __importDefault(require("node:path"));
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config({ path: node_path_1.default.join(__dirname, "..", ".env") });
@@ -50,6 +53,11 @@ const openai_1 = __importDefault(require("openai"));
 const node_crypto_1 = require("node:crypto");
 const functions = __importStar(require("firebase-functions/v1"));
 const firebase_admin_1 = __importDefault(require("firebase-admin"));
+const EdConnectorRepository_1 = require("./connectors/ed/EdConnectorRepository");
+const EdConnectorService_1 = require("./connectors/ed/EdConnectorService");
+const secretCrypto_1 = require("./security/secretCrypto");
+const edIntent_1 = require("./edIntent");
+const edIntentParser_1 = require("./edIntentParser");
 const europeFunctions = functions.region("europe-west6");
 /* ---------- helpers ---------- */
 function withV1(url) {
@@ -76,16 +84,29 @@ function normalizePointId(id) {
 }
 /* ---------- clients ---------- */
 // Chat = PublicAI (Apertus)
-const chatClient = new openai_1.default({
-    apiKey: process.env.OPENAI_API_KEY,
-    baseURL: withV1(process.env.OPENAI_BASE_URL),
-    defaultHeaders: { "User-Agent": "euler-mvp/1.0 (genkit-functions)" },
-});
+let chatClient = null;
+function getChatClient() {
+    if (!chatClient) {
+        chatClient = new openai_1.default({
+            apiKey: process.env.OPENAI_API_KEY,
+            baseURL: withV1(process.env.OPENAI_BASE_URL),
+            defaultHeaders: { "User-Agent": "euler-mvp/1.0 (genkit-functions)" },
+        });
+    }
+    return chatClient;
+}
+// For testing: allow overriding the client
+function setChatClient(client) {
+    chatClient = client;
+}
 // Firebase Admin (Firestore)
 if (!firebase_admin_1.default.apps.length) {
     firebase_admin_1.default.initializeApp();
 }
 const db = firebase_admin_1.default.firestore();
+// ED Discussion connector (stored in Firestore under connectors_ed/{userId})
+const edConnectorRepository = new EdConnectorRepository_1.EdConnectorRepository(db);
+const edConnectorService = new EdConnectorService_1.EdConnectorService(edConnectorRepository, secretCrypto_1.encryptSecret, secretCrypto_1.decryptSecret, "https://eu.edstem.org/api");
 // Embeddings = Jina
 const EMBED_URL = withV1(process.env.EMBED_BASE_URL) + "/embeddings";
 const EMBED_KEY = process.env.EMBED_API_KEY;
@@ -110,12 +131,13 @@ const EPFL_SYSTEM_PROMPT = [
 /* =========================================================
  *                         CHAT (optional)
  * ======================================================= */
-async function apertusChatFnCore({ messages, model, temperature, }) {
+async function apertusChatFnCore({ messages, model, temperature, client, }) {
     const finalMessages = [
         { role: "system", content: EPFL_SYSTEM_PROMPT },
         ...messages,
     ];
-    const resp = await chatClient.chat.completions.create({
+    const activeClient = client ?? getChatClient();
+    const resp = await activeClient.chat.completions.create({
         model: model ?? process.env.APERTUS_MODEL_ID,
         messages: finalMessages,
         temperature: temperature ?? 0.2,
@@ -124,7 +146,7 @@ async function apertusChatFnCore({ messages, model, temperature, }) {
     logger.info("apertusChat success", { length: reply.length });
     return { reply };
 }
-async function generateTitleCore({ question, model }) {
+async function generateTitleCore({ question, model, client }) {
     const prompt = [
         "Generate a concise conversation title (4-5 words max, no trailing punctuation).",
         `User's first question: "${question.trim()}"`,
@@ -135,10 +157,12 @@ async function generateTitleCore({ question, model }) {
         messages: [{ role: "user", content: prompt }],
         model,
         temperature: 0.2,
+        client,
     });
     const title = (reply || "")
         .replace(/\s+/g, " ")
-        .replace(/^["'“”]+|["'“”]+$/g, "")
+        .replace(/^["'""«»]+|["'""«»]+$/g, "") // Strip quotes from start/end
+        .replace(/^["'""«»\s]+|["'""«»\s]+$/g, "") // Second pass for nested quotes
         .trim()
         .slice(0, 60);
     return { title: title || "New conversation" };
@@ -330,8 +354,28 @@ async function indexChunksCore({ chunks }) {
     logger.info("indexChunks", { count: chunks.length, dim });
     return { count: chunks.length, dim };
 }
-async function answerWithRagCore({ question, topK, model, summary, recentTranscript, }) {
+// Schedule-related question patterns
+const SCHEDULE_PATTERNS = /\b(horaire|schedule|timetable|cours|class|lecture|planning|agenda|calendrier|calendar|demain|tomorrow|aujourd'hui|today|cette semaine|this week|prochaine|next|quand|when|heure|time|salle|room|où|where|leçon|lesson)\b/i;
+async function answerWithRagCore({ question, topK, model, summary, recentTranscript, uid, client, }) {
     const q = question.trim();
+    // Check if this is a schedule-related question and fetch schedule context
+    let scheduleContext = "";
+    const isScheduleQuestion = SCHEDULE_PATTERNS.test(q);
+    if (isScheduleQuestion && uid) {
+        try {
+            scheduleContext = await getScheduleContextCore(uid);
+            if (scheduleContext) {
+                logger.info("answerWithRagCore.scheduleContext", {
+                    uid,
+                    hasSchedule: true,
+                    contextLen: scheduleContext.length
+                });
+            }
+        }
+        catch (e) {
+            logger.warn("answerWithRagCore.scheduleContextFailed", { error: String(e) });
+        }
+    }
     // Gate 1: skip retrieval on small talk
     const isSmallTalk = SMALL_TALK.test(q) && q.length <= 30;
     let chosen = [];
@@ -383,6 +427,9 @@ async function answerWithRagCore({ question, topK, model, summary, recentTranscr
     // optional rolling summary (kept concise)
     const trimmedSummary = (summary ?? "").toString().trim().slice(0, 2000);
     const trimmedTranscript = (recentTranscript ?? "").toString().trim().slice(0, 1500);
+    // Build schedule-specific instructions if schedule context is present
+    const scheduleInstructions = scheduleContext ?
+        "HORAIRE: Liste uniquement les cours demandés (tirets). Pas de commentaires après." : "";
     const prompt = [
         "Consigne: réponds brièvement et directement, sans introduction, sans méta‑commentaires et sans phrases de conclusion.",
         "Format:",
@@ -390,14 +437,16 @@ async function answerWithRagCore({ question, topK, model, summary, recentTranscr
         "- Sinon, réponds en 2–4 phrases courtes, chacune sur sa propre ligne.",
         "- Utilise des retours à la ligne pour aérer; pas de titres ni de clôture.",
         "- Rédige toujours au vouvoiement (« vous »). Pour tout fait sur l'utilisateur, écris « Vous … ».",
-        "- Si la question concerne l'utilisateur (section, identité, langue/préférences), réponds UNIQUEMENT à partir du résumé/ fenêtre récente et ignore le contexte RAG.",
+        "- Si la question concerne l'utilisateur (section, identité, langue/préférences, horaire personnel), réponds UNIQUEMENT à partir du résumé/ fenêtre récente/ emploi du temps et ignore le contexte RAG.",
         "- Si le résumé contient des faits pertinents (ex.: section IC, langue, préférences), utilise‑les et ne redemande pas ces informations.",
+        scheduleInstructions,
         trimmedSummary ? `\nRésumé conversationnel (à utiliser, ne pas afficher tel quel):\n${trimmedSummary}\n` : "",
         trimmedTranscript ? `Fenêtre récente (ne pas afficher):\n${trimmedTranscript}\n` : "",
-        context ? `Contexte RAG (ignorer pour infos personnelles):\n${context}\n` : "",
+        scheduleContext ? `\nEmploi du temps EPFL de l'utilisateur (UTILISER UNIQUEMENT CECI pour les questions d'horaire):\n${scheduleContext}\n` : "",
+        context && !scheduleContext ? `Contexte RAG:\n${context}\n` : "", // Only include RAG if NOT a schedule question
         `Question: ${question}`,
-        "Si l'information n'est pas dans le résumé ni le contexte, dis que tu ne sais pas.",
-    ].join("\n");
+        !scheduleContext ? "Si l'information n'est pas dans le résumé ni le contexte, dis que tu ne sais pas." : "",
+    ].filter(Boolean).join("\n");
     logger.info("answerWithRagCore.context", {
         chosenCount: chosen.length,
         contextLen: context.length,
@@ -429,10 +478,14 @@ async function answerWithRagCore({ question, topK, model, summary, recentTranscr
         trimmedTranscript
             ? "Fenêtre récente (ne pas afficher; utile pour les références immédiates):\n" + trimmedTranscript
             : "",
+        scheduleContext
+            ? "Emploi du temps EPFL de l'utilisateur (utiliser pour questions d'horaire, cours, salles):\n" + scheduleContext
+            : "",
     ]
         .filter(Boolean)
         .join("\n\n");
-    const chat = await chatClient.chat.completions.create({
+    const activeClient = client ?? getChatClient();
+    const chat = await activeClient.chat.completions.create({
         model: model ?? process.env.APERTUS_MODEL_ID,
         messages: [
             { role: "system", content: systemContent },
@@ -442,16 +495,26 @@ async function answerWithRagCore({ question, topK, model, summary, recentTranscr
         max_tokens: 400,
     });
     const rawReply = chat.choices?.[0]?.message?.content ?? "";
-    const marker = rawReply.match(/USED_CONTEXT=(YES|NO)\s*$/i);
-    const usedContextByModel = marker ? marker[1].toUpperCase() === "YES" : false;
     const reply = rawReply.replace(/\s*USED_CONTEXT=(YES|NO)\s*$/i, "").trim();
-    // Only expose a URL when BOTH gates pass: we have chosen context and the model says it used it
-    const primary_url = (chosen.length > 0 && usedContextByModel) ? (chosen[0]?.url ?? null) : null;
+    // Determine source type: schedule takes priority over RAG for schedule questions
+    const usedSchedule = isScheduleQuestion && scheduleContext.length > 0;
+    const usedRag = chosen.length > 0 && !usedSchedule;
+    // source_type: "schedule" | "rag" | "none"
+    let source_type = "none";
+    if (usedSchedule) {
+        source_type = "schedule";
+    }
+    else if (usedRag) {
+        source_type = "rag";
+    }
+    // Only expose a URL when using RAG (not schedule)
+    const primary_url = usedRag ? (chosen[0]?.url ?? null) : null;
     return {
         reply,
         primary_url,
         best_score: bestScore,
-        sources: chosen.map((c, i) => ({ idx: i + 1, title: c.title, url: c.url, score: c.score })),
+        sources: usedRag ? chosen.map((c, i) => ({ idx: i + 1, title: c.title, url: c.url, score: c.score })) : [],
+        source_type, // "schedule", "rag", or "none"
     };
 }
 function clampText(s, max = 1200) {
@@ -460,7 +523,7 @@ function clampText(s, max = 1200) {
         return t;
     return t.slice(0, max);
 }
-async function buildRollingSummary({ priorSummary, recentTurns, }) {
+async function buildRollingSummary({ priorSummary, recentTurns, client, }) {
     // Keep inputs short and deterministic
     const sys = [
         "Tu maintiens un résumé cumulatif et exploitable d'une conversation (utilisateur ↔ assistant).",
@@ -498,7 +561,8 @@ async function buildRollingSummary({ priorSummary, recentTurns, }) {
         ].join("\n"),
     });
     const modelId = process.env.APERTUS_SUMMARY_MODEL_ID || process.env.APERTUS_MODEL_ID;
-    const resp = await chatClient.chat.completions.create({
+    const activeClient = client ?? getChatClient();
+    const resp = await activeClient.chat.completions.create({
         model: modelId,
         messages: parts,
         temperature: 0.1,
@@ -576,25 +640,59 @@ exports.indexChunksFn = europeFunctions.https.onCall(async (data) => {
         throw new functions.https.HttpsError("internal", "indexChunks failed", String(e?.message || e));
     }
 });
-exports.answerWithRagFn = europeFunctions.https.onCall(async (data) => {
+exports.answerWithRagFn = europeFunctions.https.onCall(async (data, context) => {
     try {
         const question = String(data?.question || "").trim();
-        const topK = Number(data?.topK ?? 5);
+        const topK = Number(data?.topK ?? 2);
         const model = data?.model;
         const summary = typeof data?.summary === "string" ? data.summary : undefined;
         const recentTranscript = typeof data?.recentTranscript === "string" ? data.recentTranscript : undefined;
+        // Get uid from auth context for schedule integration
+        const uid = context.auth?.uid;
         if (!question)
             throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
+        // === ED Intent Detection (fast, regex-based) ===
+        const edIntentResult = (0, edIntent_1.detectPostToEdIntentCore)(question);
+        if (edIntentResult.ed_intent_detected && edIntentResult.ed_intent) {
+            logger.info("answerWithRagFn.edIntentDetected", {
+                intent: edIntentResult.ed_intent,
+                questionLen: question.length,
+            });
+            // Hybrid approach: REGEX detects, Apertus responds naturally and formats the question
+            const { reply: rawReply } = await apertusChatFnCore({
+                messages: [{ role: "user", content: (0, edIntent_1.buildEdIntentPromptForApertus)(question) }],
+                temperature: 0.3,
+            });
+            // Parse the response to extract formatted question and title
+            const { reply, formattedQuestion, formattedTitle } = (0, edIntentParser_1.parseEdPostResponse)(rawReply);
+            return {
+                reply,
+                primary_url: null,
+                best_score: 0,
+                sources: [],
+                ed_intent_detected: true,
+                ed_intent: edIntentResult.ed_intent,
+                ed_formatted_question: formattedQuestion,
+                ed_formatted_title: formattedTitle,
+            };
+        }
+        // === End ED Intent Detection ===
         logger.info("answerWithRagFn.input", {
             questionLen: question.length,
             hasSummary: Boolean(summary),
             summaryLen: summary ? summary.length : 0,
             hasTranscript: Boolean(recentTranscript),
             transcriptLen: recentTranscript ? recentTranscript.length : 0,
+            hasUid: Boolean(uid),
             topK,
             model: model ?? process.env.APERTUS_MODEL_ID,
         });
-        return await answerWithRagCore({ question, topK, model, summary, recentTranscript });
+        const ragResult = await answerWithRagCore({ question, topK, model, summary, recentTranscript, uid });
+        return {
+            ...ragResult,
+            ed_intent_detected: false,
+            ed_intent: null,
+        };
     }
     catch (e) {
         logger.error("answerWithRagFn.failed", { error: String(e) });
@@ -611,6 +709,13 @@ function checkKey(req) {
         e.code = 401;
         throw e;
     }
+}
+function requireAuth(context) {
+    const uid = context.auth?.uid;
+    if (!uid) {
+        throw new functions.https.HttpsError("unauthenticated", "Authentication is required");
+    }
+    return uid;
 }
 exports.indexChunksHttp = europeFunctions.https.onRequest(async (req, res) => {
     try {
@@ -633,8 +738,41 @@ exports.answerWithRagHttp = europeFunctions.https.onRequest(async (req, res) => 
             return;
         }
         checkKey(req);
-        const out = await answerWithRagCore(req.body);
-        res.status(200).json(out);
+        const body = req.body;
+        const question = String(body?.question || "").trim();
+        // === ED Intent Detection (fast, regex-based) ===
+        const edIntentResult = (0, edIntent_1.detectPostToEdIntentCore)(question);
+        if (edIntentResult.ed_intent_detected && edIntentResult.ed_intent) {
+            logger.info("answerWithRagHttp.edIntentDetected", {
+                intent: edIntentResult.ed_intent,
+                questionLen: question.length,
+            });
+            // Hybrid approach: REGEX detects, Apertus responds naturally and formats the question
+            const { reply: rawReply } = await apertusChatFnCore({
+                messages: [{ role: "user", content: (0, edIntent_1.buildEdIntentPromptForApertus)(question) }],
+                temperature: 0.3,
+            });
+            // Parse the response to extract formatted question and title
+            const { reply, formattedQuestion, formattedTitle } = (0, edIntentParser_1.parseEdPostResponse)(rawReply);
+            res.status(200).json({
+                reply,
+                primary_url: null,
+                best_score: 0,
+                sources: [],
+                ed_intent_detected: true,
+                ed_intent: edIntentResult.ed_intent,
+                ed_formatted_question: formattedQuestion,
+                ed_formatted_title: formattedTitle,
+            });
+            return;
+        }
+        // === End ED Intent Detection ===
+        const ragResult = await answerWithRagCore(body);
+        res.status(200).json({
+            ...ragResult,
+            ed_intent_detected: false,
+            ed_intent: null,
+        });
     }
     catch (e) {
         res.status(e.code === 401 ? 401 : 400).json({ error: String(e) });
@@ -646,5 +784,606 @@ exports.generateTitleFn = europeFunctions.https.onCall(async (data) => {
     if (!q)
         throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
     return await generateTitleCore({ question: q, model });
+});
+exports.edConnectorStatusFn = europeFunctions.https.onCall(async (_data, context) => {
+    const uid = requireAuth(context);
+    try {
+        const config = await edConnectorService.getStatus(uid);
+        return config;
+    }
+    catch (e) {
+        logger.error("edConnectorStatusFn.failed", {
+            uid,
+            error: String(e),
+        });
+        throw new functions.https.HttpsError("internal", "Failed to get ED connector status", String(e?.message || e));
+    }
+});
+exports.edConnectorConnectFn = europeFunctions.https.onCall(async (data, context) => {
+    const uid = requireAuth(context);
+    const apiToken = String(data?.apiToken || "").trim();
+    const baseUrl = typeof data?.baseUrl === "string" ? data.baseUrl : undefined;
+    if (!apiToken) {
+        throw new functions.https.HttpsError("invalid-argument", "Missing 'apiToken'");
+    }
+    try {
+        const config = await edConnectorService.connect(uid, {
+            apiToken,
+            baseUrl,
+        });
+        return config;
+    }
+    catch (e) {
+        logger.error("edConnectorConnectFn.failed", {
+            uid,
+            error: String(e),
+        });
+        throw new functions.https.HttpsError("internal", "Failed to connect ED connector", String(e?.message || e));
+    }
+});
+exports.edConnectorDisconnectFn = europeFunctions.https.onCall(async (_data, context) => {
+    const uid = requireAuth(context);
+    try {
+        await edConnectorService.disconnect(uid);
+        // For convenience, return a simple status the UI can use.
+        return { status: "not_connected" };
+    }
+    catch (e) {
+        logger.error("edConnectorDisconnectFn.failed", {
+            uid,
+            error: String(e),
+        });
+        throw new functions.https.HttpsError("internal", "Failed to disconnect ED connector", String(e?.message || e));
+    }
+});
+exports.edConnectorTestFn = europeFunctions.https.onCall(async (_data, context) => {
+    const uid = requireAuth(context);
+    try {
+        const config = await edConnectorService.test(uid);
+        return config;
+    }
+    catch (e) {
+        logger.error("edConnectorTestFn.failed", {
+            uid,
+            error: String(e),
+        });
+        throw new functions.https.HttpsError("internal", "Failed to test ED connector", String(e?.message || e));
+    }
+});
+/* =========================================================
+ *                MOODLE CONNECTOR
+ * ======================================================= */
+const MoodleConnectorRepository_1 = require("./connectors/moodle/MoodleConnectorRepository");
+const MoodleConnectorService_1 = require("./connectors/moodle/MoodleConnectorService");
+// Use the same encryption as ED connector
+const moodleRepo = new MoodleConnectorRepository_1.MoodleConnectorRepository(db);
+const moodleService = new MoodleConnectorService_1.MoodleConnectorService(moodleRepo, secretCrypto_1.encryptSecret, secretCrypto_1.decryptSecret);
+// callable functions
+exports.connectorsMoodleStatusFn = europeFunctions.https.onCall(async (data, context) => {
+    if (!context.auth?.uid) {
+        throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
+    }
+    const config = await moodleService.getStatus(context.auth.uid);
+    return {
+        status: config.status,
+        lastTestAt: config.lastTestAt ?? null,
+        lastError: config.lastError ?? null,
+    };
+});
+// Fetches a Moodle token using username and password (server-side for security)
+exports.connectorsMoodleFetchTokenFn = europeFunctions.https.onCall(async (data, context) => {
+    if (!context.auth?.uid) {
+        throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
+    }
+    const { baseUrl, username, password } = data;
+    // Validate inputs
+    if (!baseUrl || !username || !password) {
+        throw new functions.https.HttpsError("invalid-argument", "baseUrl, username, and password are required");
+    }
+    try {
+        // Normalize baseUrl (remove trailing slash)
+        const normalizedBaseUrl = baseUrl.trim().replace(/\/$/, "");
+        // Build token endpoint URL - credentials sent server-side only
+        const tokenUrl = `${normalizedBaseUrl}/login/token.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&service=moodle_mobile_app`;
+        logger.info("Fetching Moodle token", {
+            baseUrl: normalizedBaseUrl,
+            userId: context.auth.uid,
+        });
+        // Call Moodle API server-side (credentials never exposed to client)
+        const response = await fetch(tokenUrl);
+        const responseBody = await response.json();
+        if (!response.ok || responseBody.error) {
+            const errorMsg = responseBody.error || `HTTP ${response.status}`;
+            logger.error("Failed to fetch Moodle token", {
+                error: errorMsg,
+                userId: context.auth.uid,
+            });
+            throw new functions.https.HttpsError("internal", "Failed to fetch token from Moodle", errorMsg);
+        }
+        if (!responseBody.token) {
+            logger.error("No token in Moodle response", {
+                userId: context.auth.uid,
+            });
+            throw new functions.https.HttpsError("internal", "No token received from Moodle");
+        }
+        // Return only the token (credentials never returned to client)
+        return { token: responseBody.token };
+    }
+    catch (e) {
+        if (e instanceof functions.https.HttpsError) {
+            throw e;
+        }
+        logger.error("Exception fetching Moodle token", {
+            error: String(e),
+            userId: context.auth.uid,
+        });
+        throw new functions.https.HttpsError("internal", "Failed to fetch token from Moodle", String(e?.message || e));
+    }
+});
+// attempts to connect to Moodle with provided baseUrl and token
+exports.connectorsMoodleConnectFn = europeFunctions.https.onCall(async (data, context) => {
+    if (!context.auth?.uid) {
+        throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
+    }
+    const baseUrl = String(data?.baseUrl || "").trim();
+    const token = String(data?.token || "").trim();
+    if (!baseUrl || !token) {
+        throw new functions.https.HttpsError("invalid-argument", "baseUrl and token are required");
+    }
+    const config = await moodleService.connect(context.auth.uid, { baseUrl, token });
+    return {
+        status: config.status,
+        lastTestAt: config.lastTestAt ?? null,
+        lastError: config.lastError ?? null,
+    };
+});
+// disconnects Moodle for the user
+exports.connectorsMoodleDisconnectFn = europeFunctions.https.onCall(async (data, context) => {
+    if (!context.auth?.uid) {
+        throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
+    }
+    await moodleService.disconnect(context.auth.uid);
+    return { status: "not_connected" };
+});
+// tests the Moodle connection for the user
+exports.connectorsMoodleTestFn = europeFunctions.https.onCall(async (data, context) => {
+    if (!context.auth?.uid) {
+        throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
+    }
+    const config = await moodleService.test(context.auth.uid);
+    return {
+        status: config.status,
+        lastTestAt: config.lastTestAt ?? null,
+        lastError: config.lastError ?? null,
+    };
+});
+/** Pattern to detect final exams */
+const EXAM_PATTERN = /\b(written|exam|examen|écrit|final)\b/i;
+/** Extract course code from summary (e.g., "COM-300" from description) */
+function extractCourseCode(description) {
+    if (!description)
+        return undefined;
+    const match = description.match(/Course Code\n([A-Z]+-\d+)/);
+    return match ? match[1] : undefined;
+}
+/** Parse ICS and extract optimized schedule (one week + exams) */
+function parseICSOptimized(icsText) {
+    const allEvents = [];
+    const lines = icsText.replace(/\r\n /g, '').replace(/\r\n\t/g, '').split(/\r?\n/);
+    let currentEvent = null;
+    for (const line of lines) {
+        if (line === 'BEGIN:VEVENT') {
+            currentEvent = {};
+        }
+        else if (line === 'END:VEVENT' && currentEvent) {
+            if (currentEvent.uid && currentEvent.summary && currentEvent.dtstart && currentEvent.dtend) {
+                allEvents.push(currentEvent);
+            }
+            currentEvent = null;
+        }
+        else if (currentEvent) {
+            const colonIdx = line.indexOf(':');
+            if (colonIdx === -1)
+                continue;
+            let key = line.slice(0, colonIdx);
+            const value = line.slice(colonIdx + 1);
+            const semicolonIdx = key.indexOf(';');
+            if (semicolonIdx !== -1) {
+                key = key.slice(0, semicolonIdx);
+            }
+            switch (key) {
+                case 'UID':
+                    currentEvent.uid = value;
+                    break;
+                case 'SUMMARY':
+                    currentEvent.summary = value.replace(/\\,/g, ',').replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
+                    break;
+                case 'LOCATION':
+                    currentEvent.location = value.replace(/\\,/g, ',').replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
+                    break;
+                case 'DESCRIPTION':
+                    currentEvent.description = value.replace(/\\,/g, ',').replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
+                    break;
+                case 'DTSTART':
+                    currentEvent.dtstart = parseICSDate(value);
+                    break;
+                case 'DTEND':
+                    currentEvent.dtend = parseICSDate(value);
+                    break;
+                case 'RRULE':
+                    currentEvent.rrule = value;
+                    break;
+            }
+        }
+    }
+    // Separate regular classes from exams
+    const regularClasses = [];
+    const examEvents = [];
+    for (const event of allEvents) {
+        if (EXAM_PATTERN.test(event.summary)) {
+            examEvents.push(event);
+        }
+        else {
+            regularClasses.push(event);
+        }
+    }
+    // Extract ONE canonical week from regular classes
+    // Use a Map to dedupe by: dayOfWeek + startTime + summary
+    const weeklyMap = new Map();
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    for (const event of regularClasses) {
+        const start = new Date(event.dtstart);
+        const end = new Date(event.dtend);
+        const dayOfWeek = start.getDay();
+        const startTime = `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`;
+        const endTime = `${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`;
+        // Create unique key for deduplication
+        const key = `${dayOfWeek}-${startTime}-${event.summary}`;
+        if (!weeklyMap.has(key)) {
+            // Only include defined fields (Firestore doesn't accept undefined)
+            const slot = {
+                dayOfWeek,
+                dayName: dayNames[dayOfWeek],
+                startTime,
+                endTime,
+                summary: event.summary,
+            };
+            if (event.location)
+                slot.location = event.location;
+            const code = extractCourseCode(event.description);
+            if (code)
+                slot.courseCode = code;
+            weeklyMap.set(key, slot);
+        }
+    }
+    // Convert to sorted array (Monday first, then by time)
+    const weeklySlots = Array.from(weeklyMap.values())
+        .sort((a, b) => {
+        // Monday=1 should come first, Sunday=0 last
+        const dayA = a.dayOfWeek === 0 ? 7 : a.dayOfWeek;
+        const dayB = b.dayOfWeek === 0 ? 7 : b.dayOfWeek;
+        if (dayA !== dayB)
+            return dayA - dayB;
+        return a.startTime.localeCompare(b.startTime);
+    });
+    // Extract final exams (dedupe by course)
+    const examMap = new Map();
+    for (const event of examEvents) {
+        const start = new Date(event.dtstart);
+        const end = new Date(event.dtend);
+        const dateStr = start.toISOString().split('T')[0];
+        const startTime = `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`;
+        const endTime = `${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`;
+        const courseCode = extractCourseCode(event.description);
+        // Dedupe by summary (one exam per course)
+        const key = event.summary;
+        if (!examMap.has(key)) {
+            // Only include defined fields (Firestore doesn't accept undefined)
+            const exam = {
+                date: dateStr,
+                startTime,
+                endTime,
+                summary: event.summary,
+            };
+            if (event.location)
+                exam.location = event.location;
+            if (courseCode)
+                exam.courseCode = courseCode;
+            examMap.set(key, exam);
+        }
+    }
+    const finalExams = Array.from(examMap.values())
+        .sort((a, b) => a.date.localeCompare(b.date));
+    logger.info("parseICSOptimized.result", {
+        totalEvents: allEvents.length,
+        uniqueWeeklySlots: weeklySlots.length,
+        finalExams: finalExams.length,
+    });
+    return { weeklySlots, finalExams };
+}
+/** Convert ICS date format to ISO string */
+function parseICSDate(icsDate) {
+    // Handle formats: 20251127T081500Z or 20251127T081500 or 20251127
+    const clean = icsDate.replace('Z', '');
+    if (clean.length === 8) {
+        // Date only: YYYYMMDD
+        return `${clean.slice(0, 4)}-${clean.slice(4, 6)}-${clean.slice(6, 8)}T00:00:00`;
+    }
+    // DateTime: YYYYMMDDTHHMMSS
+    const datePart = clean.slice(0, 8);
+    const timePart = clean.slice(9, 15);
+    return `${datePart.slice(0, 4)}-${datePart.slice(4, 6)}-${datePart.slice(6, 8)}T${timePart.slice(0, 2)}:${timePart.slice(2, 4)}:${timePart.slice(4, 6)}`;
+}
+/** Format optimized schedule for LLM context */
+function formatOptimizedScheduleForContext(schedule) {
+    const lines = [];
+    // Weekly schedule template
+    if (schedule.weeklySlots.length > 0) {
+        lines.push("📚 EMPLOI DU TEMPS HEBDOMADAIRE (chaque semaine):");
+        let currentDay = '';
+        for (const slot of schedule.weeklySlots) {
+            if (slot.dayName !== currentDay) {
+                currentDay = slot.dayName;
+                lines.push(`\n${slot.dayName}:`);
+            }
+            const loc = slot.location ? ` @ ${slot.location}` : '';
+            const code = slot.courseCode ? ` (${slot.courseCode})` : '';
+            lines.push(`  • ${slot.startTime}–${slot.endTime}: ${slot.summary}${code}${loc}`);
+        }
+    }
+    // Final exams - format with COURSE NAME FIRST for better model matching
+    if (schedule.finalExams.length > 0) {
+        lines.push("\n\n📝 EXAMENS FINAUX (dates des examens écrits):");
+        for (const exam of schedule.finalExams) {
+            const dateObj = new Date(exam.date);
+            const dateStr = dateObj.toLocaleDateString('fr-CH', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+            });
+            const loc = exam.location ? ` en salle ${exam.location}` : '';
+            // Put course name FIRST for better LLM matching
+            lines.push(`  • ${exam.summary}: ${dateStr}, ${exam.startTime}–${exam.endTime}${loc}`);
+        }
+    }
+    if (lines.length === 0) {
+        return "Aucun cours ou examen trouvé.";
+    }
+    return lines.join('\n');
+}
+/** Get current date in Zurich timezone */
+function getZurichDate() {
+    // Create a date string in Zurich timezone and parse it back
+    const zurichStr = new Date().toLocaleString('en-US', { timeZone: 'Europe/Zurich' });
+    return new Date(zurichStr);
+}
+/** Get day of week in Zurich timezone (0=Sunday, 6=Saturday) */
+function getZurichDayOfWeek(date) {
+    const zurichStr = date.toLocaleString('en-US', { timeZone: 'Europe/Zurich', weekday: 'short' });
+    const dayMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+    const dayAbbr = zurichStr.split(',')[0];
+    return dayMap[dayAbbr] ?? date.getDay();
+}
+/** Generate schedule for a specific date range using the weekly template */
+function generateScheduleForDateRange(schedule, startDate, endDate) {
+    const lines = [];
+    // Group weekly slots by day
+    const slotsByDay = new Map();
+    for (const slot of schedule.weeklySlots) {
+        if (!slotsByDay.has(slot.dayOfWeek)) {
+            slotsByDay.set(slot.dayOfWeek, []);
+        }
+        slotsByDay.get(slot.dayOfWeek).push(slot);
+    }
+    // Iterate through each day in range (using Zurich timezone)
+    const current = new Date(startDate);
+    while (current <= endDate) {
+        // Use Zurich timezone for day of week calculation
+        const dayOfWeek = getZurichDayOfWeek(current);
+        const slots = slotsByDay.get(dayOfWeek) || [];
+        // Check for exams on this date (use Zurich date string)
+        const zurichDateParts = current.toLocaleDateString('en-CA', { timeZone: 'Europe/Zurich' }); // YYYY-MM-DD format
+        const examsToday = schedule.finalExams.filter(e => e.date === zurichDateParts);
+        if (slots.length > 0 || examsToday.length > 0) {
+            const dayLabel = current.toLocaleDateString('fr-CH', {
+                timeZone: 'Europe/Zurich',
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long'
+            });
+            lines.push(`\n📅 ${dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1)}`);
+            // Add regular classes
+            for (const slot of slots) {
+                const loc = slot.location ? ` @ ${slot.location}` : '';
+                lines.push(`  • ${slot.startTime}–${slot.endTime}: ${slot.summary}${loc}`);
+            }
+            // Add exams
+            for (const exam of examsToday) {
+                const loc = exam.location ? ` @ ${exam.location}` : '';
+                lines.push(`  • ${exam.startTime}–${exam.endTime}: 📝 ${exam.summary}${loc}`);
+            }
+        }
+        current.setDate(current.getDate() + 1);
+    }
+    return lines.length > 0 ? lines.join('\n') : "Aucun cours prévu sur cette période.";
+}
+// Allowlist of hosts that are permitted for ICS URL fetching (SSRF protection)
+const ALLOWED_ICS_HOSTS = [
+    'campus.epfl.ch',
+    'isa.epfl.ch',
+    'isacademia.epfl.ch',
+    'edu.epfl.ch',
+    'moodle.epfl.ch',
+];
+function isAllowedIcsHost(urlString) {
+    try {
+        const parsed = new URL(urlString);
+        const host = parsed.hostname.toLowerCase();
+        return ALLOWED_ICS_HOSTS.some(allowed => host === allowed || host.endsWith('.' + allowed));
+    }
+    catch {
+        return false;
+    }
+}
+async function syncEpflScheduleCore(uid, { icsUrl }) {
+    // Validate URL
+    if (!icsUrl || typeof icsUrl !== 'string') {
+        throw new Error("Missing or invalid 'icsUrl'");
+    }
+    // Basic URL validation - should look like an EPFL/IS-Academia ICS URL
+    const url = icsUrl.trim();
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        throw new Error("Invalid URL format");
+    }
+    // SSRF protection: Only allow fetching from known EPFL hosts
+    if (!isAllowedIcsHost(url)) {
+        logger.warn("syncEpflSchedule.rejectedHost", { uid, urlPreview: url.slice(0, 60) });
+        throw new Error("URL must be from an EPFL domain (campus.epfl.ch, isa.epfl.ch, etc.)");
+    }
+    // Fetch the ICS file
+    logger.info("syncEpflSchedule.fetching", { uid, urlPreview: url.slice(0, 60) });
+    const response = await fetch(url, {
+        headers: {
+            'User-Agent': 'EULER-App/1.0',
+            'Accept': 'text/calendar, */*',
+        },
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to fetch ICS: ${response.status} ${response.statusText}`);
+    }
+    const icsText = await response.text();
+    if (!icsText.includes('BEGIN:VCALENDAR')) {
+        throw new Error("Invalid ICS format: not a valid calendar file");
+    }
+    // Parse with OPTIMIZED parser (one week + exams only)
+    const schedule = parseICSOptimized(icsText);
+    logger.info("syncEpflSchedule.parsed", {
+        uid,
+        weeklySlots: schedule.weeklySlots.length,
+        finalExams: schedule.finalExams.length,
+    });
+    // Store OPTIMIZED structure in Firestore (much smaller!)
+    const userRef = db.collection('users').doc(uid);
+    await userRef.set({
+        epflSchedule: {
+            icsUrl: url,
+            weeklySlots: schedule.weeklySlots,
+            finalExams: schedule.finalExams,
+            lastSync: firebase_admin_1.default.firestore.FieldValue.serverTimestamp(),
+            slotCount: schedule.weeklySlots.length,
+            examCount: schedule.finalExams.length,
+        }
+    }, { merge: true });
+    logger.info("syncEpflSchedule.stored", {
+        uid,
+        weeklySlots: schedule.weeklySlots.length,
+        finalExams: schedule.finalExams.length,
+    });
+    return {
+        success: true,
+        eventCount: schedule.weeklySlots.length + schedule.finalExams.length,
+        weeklySlots: schedule.weeklySlots.length,
+        finalExams: schedule.finalExams.length,
+        message: `Synced ${schedule.weeklySlots.length} weekly classes and ${schedule.finalExams.length} final exams.`,
+    };
+}
+/** Get user's schedule context for LLM */
+async function getScheduleContextCore(uid) {
+    const userDoc = await db.collection('users').doc(uid).get();
+    const data = userDoc.data();
+    if (!data?.epflSchedule) {
+        return "";
+    }
+    // Check for new optimized format
+    if (data.epflSchedule.weeklySlots) {
+        const schedule = {
+            weeklySlots: data.epflSchedule.weeklySlots || [],
+            finalExams: data.epflSchedule.finalExams || [],
+        };
+        // For context, show the weekly template + upcoming week + exams
+        // Use Zurich timezone for "now"
+        const now = getZurichDate();
+        const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        const lines = [];
+        // Weekly template (always useful)
+        lines.push(formatOptimizedScheduleForContext(schedule));
+        // Also show specific dates for the next 7 days
+        lines.push("\n\n📆 CETTE SEMAINE (dates spécifiques):");
+        lines.push(generateScheduleForDateRange(schedule, now, nextWeek));
+        return lines.join('\n');
+    }
+    // Fallback for old format (legacy)
+    if (data.epflSchedule.events && data.epflSchedule.events.length > 0) {
+        // Old format - just show a message to re-sync
+        return "Emploi du temps disponible. Pour de meilleures performances, reconnectez votre calendrier EPFL Campus.";
+    }
+    return "";
+}
+/** Callable: sync EPFL schedule */
+exports.syncEpflScheduleFn = europeFunctions.https.onCall(async (data, context) => {
+    if (!context.auth?.uid) {
+        throw new functions.https.HttpsError("unauthenticated", "User must be signed in");
+    }
+    try {
+        return await syncEpflScheduleCore(context.auth.uid, data);
+    }
+    catch (e) {
+        logger.error("syncEpflScheduleFn.failed", { error: String(e), uid: context.auth.uid });
+        throw new functions.https.HttpsError("internal", e.message || "Failed to sync schedule");
+    }
+});
+/** Callable: disconnect EPFL schedule */
+exports.disconnectEpflScheduleFn = europeFunctions.https.onCall(async (_data, context) => {
+    if (!context.auth?.uid) {
+        throw new functions.https.HttpsError("unauthenticated", "User must be signed in");
+    }
+    try {
+        const userRef = db.collection('users').doc(context.auth.uid);
+        await userRef.update({
+            epflSchedule: firebase_admin_1.default.firestore.FieldValue.delete(),
+        });
+        logger.info("disconnectEpflSchedule.success", { uid: context.auth.uid });
+        return { success: true, message: "EPFL schedule disconnected" };
+    }
+    catch (e) {
+        logger.error("disconnectEpflScheduleFn.failed", { error: String(e), uid: context.auth.uid });
+        throw new functions.https.HttpsError("internal", e.message || "Failed to disconnect");
+    }
+});
+/** Callable: get schedule status */
+exports.getEpflScheduleStatusFn = europeFunctions.https.onCall(async (_data, context) => {
+    if (!context.auth?.uid) {
+        throw new functions.https.HttpsError("unauthenticated", "User must be signed in");
+    }
+    try {
+        const userDoc = await db.collection('users').doc(context.auth.uid).get();
+        const data = userDoc.data();
+        if (!data?.epflSchedule) {
+            return { connected: false };
+        }
+        // New optimized format
+        if (data.epflSchedule.weeklySlots) {
+            return {
+                connected: true,
+                weeklySlots: data.epflSchedule.slotCount ?? data.epflSchedule.weeklySlots?.length ?? 0,
+                finalExams: data.epflSchedule.examCount ?? data.epflSchedule.finalExams?.length ?? 0,
+                eventCount: (data.epflSchedule.slotCount ?? 0) + (data.epflSchedule.examCount ?? 0),
+                lastSync: data.epflSchedule.lastSync?.toDate?.()?.toISOString() ?? null,
+                optimized: true,
+            };
+        }
+        // Legacy format
+        return {
+            connected: true,
+            eventCount: data.epflSchedule.eventCount ?? data.epflSchedule.events?.length ?? 0,
+            lastSync: data.epflSchedule.lastSync?.toDate?.()?.toISOString() ?? null,
+            optimized: false,
+        };
+    }
+    catch (e) {
+        logger.error("getEpflScheduleStatusFn.failed", { error: String(e), uid: context.auth.uid });
+        throw new functions.https.HttpsError("internal", e.message || "Failed to get status");
+    }
 });
 //# sourceMappingURL=index.js.map

@@ -200,12 +200,31 @@ object Localization {
           "recent_cs220_exam" to "CS220 Final Exam retrieval",
           "recent_linear_algebra" to "Linear Algebra help",
           "recent_deadline" to "Project deadline query",
-          "recent_registration" to "Course registration info") +
+          "recent_registration" to "Course registration info",
+
+          // EPFL Campus Connector
+          "epfl_campus_title" to "EPFL Campus",
+          "epfl_campus_subtitle" to "Connect your schedule",
+          "epfl_instructions_title" to "How to connect",
+          "epfl_step_1" to "Open EPFL Campus app → My Schedule",
+          "epfl_step_2" to "Tap 📤 → 'Copy .ics link to clipboard' ",
+          "epfl_step_3" to "Come back here and paste it below",
+          "epfl_open_campus" to "Open EPFL Campus",
+          "epfl_paste_url" to "Paste your ICS URL",
+          "epfl_connect" to "Connect Schedule",
+          "epfl_syncing" to "Syncing...",
+          "epfl_connected" to "Connected",
+          "epfl_weekly_classes" to "weekly classes",
+          "epfl_exams" to "exams",
+          "epfl_last_sync" to "Last sync",
+          "epfl_disconnect" to "Disconnect",
+          "epfl_connected_info" to "Your schedule is now connected to the AI assistant.",
+          "epfl_clipboard_detected" to "ICS URL detected!",
+          "not_now" to "Not now",
+          "use_this_url" to "Use this URL") +
           edTranslationsEn() +
           mapOf(
               "moodle_connect_generic_error" to "Failed to connect to Moodle. Please try again.",
-              "moodle_connect_invalid_credentials" to
-                  "Invalid credentials. Please check your username and password.",
               "moodle_connect_api_unreachable" to
                   "Moodle API is unreachable. Please check your connection.",
               "settings_connectors_moodle_title" to "Connect to Moodle",
@@ -218,13 +237,6 @@ object Localization {
               "settings_connectors_moodle_redirecting" to "Connecting to Moodle...",
               "settings_connectors_moodle_login_instructions" to
                   "Enter your Moodle credentials to connect. Your password will be securely sent to your Moodle server.",
-              "settings_connectors_moodle_token_label" to "Web service token",
-              "settings_connectors_moodle_token_placeholder" to "Enter your Moodle token",
-              "settings_connectors_moodle_token_instructions" to
-                  "After logging in, go to Site administration > Server > Web services > Manage tokens to generate a token.",
-              "settings_connectors_moodle_webview_instructions" to
-                  "Log in to your Moodle account. After logging in, click the button below to enter your token.",
-              "settings_connectors_moodle_enter_token" to "I've logged in, enter token",
               "settings_connectors_moodle_load_error" to "Failed to load Moodle connector status",
               "settings_connectors_moodle_status_error" to
                   "Unable to load Moodle connector status. Please try again later.")
@@ -307,13 +319,33 @@ object Localization {
           "recent_cs220_exam" to "Récupération examen final CS220",
           "recent_linear_algebra" to "Aide en algèbre linéaire",
           "recent_deadline" to "Requête date limite projet",
-          "recent_registration" to "Info inscription aux cours") +
+          "recent_registration" to "Info inscription aux cours",
+
+          // EPFL Campus Connector
+          "epfl_campus_title" to "EPFL Campus",
+          "epfl_campus_subtitle" to "Connectez votre emploi du temps",
+          "epfl_instructions_title" to "Comment se connecter",
+          "epfl_step_1" to "Ouvrez EPFL Campus → Horaire",
+          "epfl_step_2" to "Tapez ⚙️ → Copier le lien .ics",
+          "epfl_step_3" to "Revenez et collez le ici.",
+          "epfl_open_campus" to "Ouvrir EPFL Campus",
+          "epfl_paste_url" to "Collez votre URL ICS",
+          "epfl_connect" to "Connecter l'emploi du temps",
+          "epfl_syncing" to "Synchronisation...",
+          "epfl_connected" to "Connecté",
+          "epfl_weekly_classes" to "cours/semaine",
+          "epfl_exams" to "examens",
+          "epfl_last_sync" to "Dernière sync",
+          "epfl_disconnect" to "Déconnecter",
+          "epfl_connected_info" to
+              "Votre emploi du temps est maintenant connecté à l'assistant IA.",
+          "epfl_clipboard_detected" to "URL ICS détectée !",
+          "not_now" to "Plus tard",
+          "use_this_url" to "Utiliser cette URL") +
           edTranslationsFr() +
           mapOf(
               "moodle_connect_generic_error" to
                   "La connexion à Moodle a échoué. Veuillez réessayer.",
-              "moodle_connect_invalid_credentials" to
-                  "Identifiants invalides. Veuillez vérifier votre nom d'utilisateur et mot de passe.",
               "moodle_connect_api_unreachable" to
                   "L'API Moodle est inaccessible. Veuillez vérifier votre connexion.",
               "settings_connectors_moodle_title" to "Se connecter à Moodle",
@@ -326,13 +358,6 @@ object Localization {
               "settings_connectors_moodle_redirecting" to "Connexion à Moodle...",
               "settings_connectors_moodle_login_instructions" to
                   "Entrez vos identifiants Moodle pour vous connecter. Votre mot de passe sera envoyé de manière sécurisée à votre serveur Moodle.",
-              "settings_connectors_moodle_token_label" to "Jeton de service web",
-              "settings_connectors_moodle_token_placeholder" to "Entrez votre jeton Moodle",
-              "settings_connectors_moodle_token_instructions" to
-                  "Après vous être connecté, allez dans Administration du site > Serveur > Services web > Gérer les jetons pour générer un jeton.",
-              "settings_connectors_moodle_webview_instructions" to
-                  "Connectez-vous à votre compte Moodle. Après la connexion, cliquez sur le bouton ci-dessous pour entrer votre jeton.",
-              "settings_connectors_moodle_enter_token" to "Je me suis connecté, entrer le jeton",
               "settings_connectors_moodle_load_error" to
                   "Échec du chargement du statut du connecteur Moodle",
               "settings_connectors_moodle_status_error" to
@@ -433,8 +458,6 @@ object Localization {
           mapOf(
               "moodle_connect_generic_error" to
                   "Verbindung zu Moodle fehlgeschlagen. Bitte versuchen Sie es erneut.",
-              "moodle_connect_invalid_credentials" to
-                  "Ungültige Anmeldedaten. Bitte überprüfen Sie Ihren Benutzernamen und Ihr Passwort.",
               "moodle_connect_api_unreachable" to
                   "Moodle-API ist nicht erreichbar. Bitte überprüfen Sie Ihre Verbindung.",
               "settings_connectors_moodle_title" to "Mit Moodle verbinden",
@@ -447,14 +470,6 @@ object Localization {
               "settings_connectors_moodle_redirecting" to "Verbindung zu Moodle...",
               "settings_connectors_moodle_login_instructions" to
                   "Geben Sie Ihre Moodle-Anmeldedaten ein, um sich zu verbinden. Ihr Passwort wird sicher an Ihren Moodle-Server gesendet.",
-              "settings_connectors_moodle_token_label" to "Web-Service-Token",
-              "settings_connectors_moodle_token_placeholder" to "Geben Sie Ihr Moodle-Token ein",
-              "settings_connectors_moodle_token_instructions" to
-                  "Nach der Anmeldung gehen Sie zu Website-Administration > Server > Web-Services > Token verwalten, um ein Token zu generieren.",
-              "settings_connectors_moodle_webview_instructions" to
-                  "Melden Sie sich bei Ihrem Moodle-Konto an. Nach der Anmeldung klicken Sie auf die Schaltfläche unten, um Ihr Token einzugeben.",
-              "settings_connectors_moodle_enter_token" to
-                  "Ich habe mich angemeldet, Token eingeben",
               "settings_connectors_moodle_load_error" to
                   "Fehler beim Laden des Moodle-Connector-Status",
               "settings_connectors_moodle_status_error" to
@@ -543,8 +558,6 @@ object Localization {
           mapOf(
               "moodle_connect_generic_error" to
                   "Error al conectar con Moodle. Por favor, inténtelo de nuevo.",
-              "moodle_connect_invalid_credentials" to
-                  "Credenciales inválidas. Por favor, verifique su nombre de usuario y contraseña.",
               "moodle_connect_api_unreachable" to
                   "La API de Moodle no es accesible. Por favor, verifique su conexión.",
               "settings_connectors_moodle_title" to "Conectar a Moodle",
@@ -557,13 +570,6 @@ object Localization {
               "settings_connectors_moodle_redirecting" to "Conectando a Moodle...",
               "settings_connectors_moodle_login_instructions" to
                   "Ingrese sus credenciales de Moodle para conectarse. Su contraseña se enviará de forma segura a su servidor Moodle.",
-              "settings_connectors_moodle_token_label" to "Token de servicio web",
-              "settings_connectors_moodle_token_placeholder" to "Ingrese su token de Moodle",
-              "settings_connectors_moodle_token_instructions" to
-                  "Después de iniciar sesión, vaya a Administración del sitio > Servidor > Servicios web > Gestionar tokens para generar un token.",
-              "settings_connectors_moodle_webview_instructions" to
-                  "Inicie sesión en su cuenta de Moodle. Después de iniciar sesión, haga clic en el botón a continuación para ingresar su token.",
-              "settings_connectors_moodle_enter_token" to "He iniciado sesión, ingresar token",
               "settings_connectors_moodle_load_error" to
                   "Error al cargar el estado del conector Moodle",
               "settings_connectors_moodle_status_error" to
@@ -651,8 +657,6 @@ object Localization {
           edTranslationsIt() +
           mapOf(
               "moodle_connect_generic_error" to "Connessione a Moodle fallita. Riprova.",
-              "moodle_connect_invalid_credentials" to
-                  "Credenziali non valide. Controlla il tuo nome utente e password.",
               "moodle_connect_api_unreachable" to
                   "L'API Moodle non è raggiungibile. Controlla la tua connessione.",
               "settings_connectors_moodle_title" to "Connetti a Moodle",
@@ -665,13 +669,6 @@ object Localization {
               "settings_connectors_moodle_redirecting" to "Connessione a Moodle...",
               "settings_connectors_moodle_login_instructions" to
                   "Inserisci le tue credenziali Moodle per connetterti. La tua password verrà inviata in modo sicuro al tuo server Moodle.",
-              "settings_connectors_moodle_token_label" to "Token servizio web",
-              "settings_connectors_moodle_token_placeholder" to "Inserisci il tuo token Moodle",
-              "settings_connectors_moodle_token_instructions" to
-                  "Dopo il login, vai a Amministrazione sito > Server > Servizi web > Gestisci token per generare un token.",
-              "settings_connectors_moodle_webview_instructions" to
-                  "Accedi al tuo account Moodle. Dopo il login, clicca sul pulsante qui sotto per inserire il tuo token.",
-              "settings_connectors_moodle_enter_token" to "Ho fatto login, inserisci token",
               "settings_connectors_moodle_load_error" to
                   "Errore nel caricamento dello stato del connettore Moodle",
               "settings_connectors_moodle_status_error" to
@@ -759,8 +756,6 @@ object Localization {
           edTranslationsPt() +
           mapOf(
               "moodle_connect_generic_error" to "Falha ao conectar ao Moodle. Tente novamente.",
-              "moodle_connect_invalid_credentials" to
-                  "Credenciais inválidas. Verifique seu nome de usuário e senha.",
               "moodle_connect_api_unreachable" to
                   "A API Moodle não está acessível. Verifique sua conexão.",
               "settings_connectors_moodle_title" to "Conectar ao Moodle",
@@ -773,13 +768,6 @@ object Localization {
               "settings_connectors_moodle_redirecting" to "Conectando ao Moodle...",
               "settings_connectors_moodle_login_instructions" to
                   "Digite suas credenciais do Moodle para conectar. Sua senha será enviada com segurança para o servidor Moodle.",
-              "settings_connectors_moodle_token_label" to "Token de serviço web",
-              "settings_connectors_moodle_token_placeholder" to "Digite seu token Moodle",
-              "settings_connectors_moodle_token_instructions" to
-                  "Após fazer login, vá para Administração do site > Servidor > Serviços web > Gerenciar tokens para gerar um token.",
-              "settings_connectors_moodle_webview_instructions" to
-                  "Faça login na sua conta Moodle. Após o login, clique no botão abaixo para inserir seu token.",
-              "settings_connectors_moodle_enter_token" to "Fiz login, inserir token",
               "settings_connectors_moodle_load_error" to
                   "Falha ao carregar o status do conector Moodle",
               "settings_connectors_moodle_status_error" to
@@ -866,7 +854,6 @@ object Localization {
           edTranslationsZh() +
           mapOf(
               "moodle_connect_generic_error" to "连接到 Moodle 失败。请重试。",
-              "moodle_connect_invalid_credentials" to "凭据无效。请检查您的用户名和密码。",
               "moodle_connect_api_unreachable" to "Moodle API 无法访问。请检查您的连接。",
               "settings_connectors_moodle_title" to "连接到 Moodle",
               "settings_connectors_moodle_base_url_label" to "Moodle URL",
@@ -878,13 +865,6 @@ object Localization {
               "settings_connectors_moodle_redirecting" to "正在连接 Moodle...",
               "settings_connectors_moodle_login_instructions" to
                   "输入您的 Moodle 凭据以连接。您的密码将安全地发送到您的 Moodle 服务器。",
-              "settings_connectors_moodle_token_label" to "Web 服务令牌",
-              "settings_connectors_moodle_token_placeholder" to "输入您的 Moodle 令牌",
-              "settings_connectors_moodle_token_instructions" to
-                  "登录后，转到站点管理 > 服务器 > Web 服务 > 管理令牌以生成令牌。",
-              "settings_connectors_moodle_webview_instructions" to
-                  "登录您的 Moodle 帐户。登录后，点击下面的按钮输入您的令牌。",
-              "settings_connectors_moodle_enter_token" to "我已登录，输入令牌",
               "settings_connectors_moodle_load_error" to "加载 Moodle 连接器状态失败",
               "settings_connectors_moodle_status_error" to "无法加载 Moodle 连接器状态。请稍后再试。")
 }
