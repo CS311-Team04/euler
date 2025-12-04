@@ -240,7 +240,7 @@ fun EdConnectScreen(onBackClick: () -> Unit = {}, viewModel: ConnectorsViewModel
 }
 
 @Composable
-private fun EdConnectTopBar(onBackClick: () -> Unit, colors: ConnectorsColors) {
+internal fun EdConnectTopBar(onBackClick: () -> Unit, colors: ConnectorsColors) {
   Row(
       modifier =
           Modifier.fillMaxWidth()
@@ -270,7 +270,7 @@ private fun EdConnectTopBar(onBackClick: () -> Unit, colors: ConnectorsColors) {
 }
 
 @Composable
-private fun EdConnectorInfoCard(colors: ConnectorsColors) {
+internal fun EdConnectorInfoCard(colors: ConnectorsColors) {
   Card(
       modifier = Modifier.fillMaxWidth(),
       shape = RoundedCornerShape(22.dp),
@@ -302,7 +302,7 @@ private fun EdConnectorInfoCard(colors: ConnectorsColors) {
 }
 
 @Composable
-private fun HowToConnectCard(colors: ConnectorsColors) {
+internal fun HowToConnectCard(colors: ConnectorsColors) {
   Card(
       modifier = Modifier.fillMaxWidth(),
       shape = RoundedCornerShape(22.dp),
@@ -380,7 +380,7 @@ private fun HowToConnectCard(colors: ConnectorsColors) {
 }
 
 @Composable
-private fun EdClipboardSuggestionBanner(
+internal fun EdClipboardSuggestionBanner(
     detectedToken: String,
     colors: ConnectorsColors,
     onUseToken: () -> Unit,
