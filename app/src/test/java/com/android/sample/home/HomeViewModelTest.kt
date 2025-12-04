@@ -789,8 +789,7 @@ class HomeViewModelTest {
             HomeViewModel::class.java.getDeclaredMethod("buildFallbackTitle", String::class.java)
         method.isAccessible = true
 
-        val title =
-            method.invoke(viewModel, "https://example.com/some_path_segment") as String
+        val title = method.invoke(viewModel, "https://example.com/some_path_segment") as String
 
         assertEquals("Some path segment", title)
       }
@@ -803,8 +802,7 @@ class HomeViewModelTest {
             HomeViewModel::class.java.getDeclaredMethod("buildFallbackTitle", String::class.java)
         method.isAccessible = true
 
-        val title =
-            method.invoke(viewModel, "https://example.com/some-path-segment") as String
+        val title = method.invoke(viewModel, "https://example.com/some-path-segment") as String
 
         assertEquals("Some path segment", title)
       }
