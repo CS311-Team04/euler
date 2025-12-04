@@ -2,9 +2,9 @@ package com.android.sample.settings.connectors
 
 import com.android.sample.epfl.EpflScheduleRepository
 import com.android.sample.epfl.ScheduleStatus
-import com.google.firebase.functions.FirebaseFunctions
 import com.android.sample.util.MainDispatcherRule
 import com.google.android.gms.tasks.Tasks
+import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.HttpsCallableReference
 import com.google.firebase.functions.HttpsCallableResult
 import io.mockk.coEvery
