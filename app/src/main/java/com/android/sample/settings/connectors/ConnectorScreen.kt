@@ -1,5 +1,7 @@
 package com.android.sample.settings.connectors
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -14,6 +16,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -30,6 +34,9 @@ import com.android.sample.ui.theme.ConnectorsLightSurface
 import com.android.sample.ui.theme.DarkSurface
 import com.android.sample.ui.theme.containerColor
 import com.android.sample.ui.theme.previewBgColor
+
+const val ED_CONNECTOR_ID = "ed"
+const val ED_API_TOKENS_URL = "https://eu.edstem.org/settings/api-tokens"
 
 /** Data class representing a connector with its connection status. */
 data class Connector(
@@ -165,6 +172,12 @@ fun ConnectorsScreen(
   val uiState by viewModel.uiState.collectAsState()
   val connectorState = rememberConnectorState()
 
+  // Refresh ED and Moodle status when screen becomes visible
+  LaunchedEffect(Unit) {
+    viewModel.refreshEdStatus()
+    viewModel.refreshMoodleStatus()
+  }
+
   Box(modifier = Modifier.fillMaxSize().background(connectorState.colors.background)) {
     Column(modifier = Modifier.fillMaxSize()) {
       ConnectorsTopBar(onBackClick = onBackClick, colors = connectorState.colors)
@@ -228,21 +241,12 @@ fun ConnectorsScreen(
           isDark = connectorState.isDark,
           onConfirm = {
             viewModel.disconnectConnector(connector.id)
-            onConnectorClick(connector.id)
+            // Don't navigate on disconnect, just stay on connectors screen
           },
           onDismiss = { viewModel.dismissDisconnectConfirmation() })
     }
 
-    if (uiState.isEdConnectDialogOpen) {
-      EdConnectDialog(
-          colors = connectorState.colors,
-          isDark = connectorState.isDark,
-          isLoading = uiState.isEdConnecting,
-          error = uiState.edConnectError,
-          onConfirm = { token, baseUrl -> viewModel.confirmEdConnect(token, baseUrl) },
-          onDismiss = { viewModel.dismissEdConnectDialog() },
-      )
-    }
+    // ED connect dialog removed - now using EdConnectScreen via navigation
 
     if (uiState.isMoodleConnectDialogOpen) {
       MoodleConnectDialog(
@@ -380,44 +384,31 @@ internal fun EdConnectDialog(
 ) {
   var token by remember { mutableStateOf("") }
   var baseUrl by remember { mutableStateOf("") }
+  val clipboardManager = LocalClipboardManager.current
+  val context = LocalContext.current
+
+  // Check clipboard for potential token
+  val clipboardText = remember { clipboardManager.getText()?.text ?: "" }
+  val showPasteButton = clipboardText.isNotBlank() && token.isBlank()
 
   AlertDialog(
       onDismissRequest = { if (!isLoading) onDismiss() },
       title = { DialogTitle(Localization.t("settings_connectors_ed_title"), colors) },
       text = {
-        Column {
-          OutlinedTextField(
-              value = token,
-              onValueChange = { token = it },
-              label = { Text(Localization.t("settings_connectors_ed_api_token_label")) },
-              singleLine = true,
-              enabled = !isLoading,
-              keyboardOptions =
-                  KeyboardOptions(
-                      autoCorrect = false,
-                      keyboardType = KeyboardType.Text,
-                      imeAction = ImeAction.Done),
-          )
-          Spacer(modifier = Modifier.height(12.dp))
-
-          OutlinedTextField(
-              value = baseUrl,
-              onValueChange = { baseUrl = it },
-              label = { Text(Localization.t("settings_connectors_ed_base_url_label")) },
-              singleLine = true,
-              enabled = !isLoading,
-              keyboardOptions =
-                  KeyboardOptions(
-                      autoCorrect = false,
-                      keyboardType = KeyboardType.Uri,
-                      imeAction = ImeAction.Done),
-          )
-
-          if (!error.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            DialogErrorText(error, colors)
-          }
-        }
+        EdDialogContent(
+            token = token,
+            baseUrl = baseUrl,
+            error = error,
+            colors = colors,
+            isLoading = isLoading,
+            showPasteButton = showPasteButton,
+            onTokenChange = { token = it },
+            onBaseUrlChange = { baseUrl = it },
+            onPasteFromClipboard = { token = clipboardText },
+            onGetTokenClick = {
+              val intent = Intent(Intent.ACTION_VIEW, Uri.parse(ED_API_TOKENS_URL))
+              context.startActivity(intent)
+            })
       },
       confirmButton = {
         DialogConfirmButton(
@@ -434,6 +425,85 @@ internal fun EdConnectDialog(
       dismissButton = { DialogDismissButton(colors, isLoading, onDismiss) },
       containerColor = getDialogSurfaceColor(isDark),
       shape = RoundedCornerShape(Dimens.DialogCornerRadius))
+}
+
+@Composable
+private fun EdDialogContent(
+    token: String,
+    baseUrl: String,
+    error: String?,
+    colors: ConnectorsColors,
+    isLoading: Boolean,
+    showPasteButton: Boolean,
+    onTokenChange: (String) -> Unit,
+    onBaseUrlChange: (String) -> Unit,
+    onPasteFromClipboard: () -> Unit,
+    onGetTokenClick: () -> Unit,
+) {
+  Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    // Explanatory text
+    Text(
+        text = Localization.t("settings_connectors_ed_token_instructions"),
+        color = colors.textSecondary,
+        fontSize = 12.sp,
+        modifier = Modifier.padding(bottom = 4.dp))
+
+    // Get Token button
+    OutlinedButton(
+        onClick = onGetTokenClick,
+        enabled = !isLoading,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
+          Text(
+              Localization.t("settings_connectors_ed_get_token_button"),
+              color = colors.textPrimary,
+              fontSize = Dimens.DialogTextFontSize,
+              fontWeight = FontWeight.Medium)
+        }
+
+    // Token field with optional paste button
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+          OutlinedTextField(
+              value = token,
+              onValueChange = onTokenChange,
+              label = { Text(Localization.t("settings_connectors_ed_api_token_label")) },
+              singleLine = true,
+              enabled = !isLoading,
+              keyboardOptions =
+                  KeyboardOptions(
+                      autoCorrect = false,
+                      keyboardType = KeyboardType.Text,
+                      imeAction = ImeAction.Next),
+              modifier = Modifier.weight(1f))
+
+          if (showPasteButton) {
+            TextButton(
+                onClick = onPasteFromClipboard,
+                enabled = !isLoading,
+                modifier = Modifier.padding(start = 4.dp)) {
+                  Text(Localization.t("paste"), color = colors.textPrimary, fontSize = 12.sp)
+                }
+          }
+        }
+
+    // Optional base URL field
+    OutlinedTextField(
+        value = baseUrl,
+        onValueChange = onBaseUrlChange,
+        label = { Text(Localization.t("settings_connectors_ed_base_url_label")) },
+        singleLine = true,
+        enabled = !isLoading,
+        keyboardOptions =
+            KeyboardOptions(
+                autoCorrect = false, keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+        modifier = Modifier.fillMaxWidth())
+
+    // Error message
+    DialogErrorText(error, colors)
+  }
 }
 
 /** Simple dialog for Moodle connection with username/password form. */

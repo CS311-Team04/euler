@@ -12,6 +12,8 @@ data class ConnectorsUiState(
     val isEdConnectDialogOpen: Boolean = false,
     val isEdConnecting: Boolean = false,
     val edConnectError: String? = null,
+    val detectedEdToken: String? = null,
+    val showEdClipboardSuggestion: Boolean = false,
     val isLoadingMoodle: Boolean = false,
     val moodleError: String? = null, // status refresh/errors shown on the main screen
     val isMoodleConnectDialogOpen: Boolean = false,

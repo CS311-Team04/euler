@@ -1,5 +1,7 @@
 package com.android.sample.settings.connectors
 
+import android.content.ClipboardManager
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -22,7 +24,8 @@ private val mockConnectors =
             name = "Moodle",
             description = "courses",
             isConnected = false),
-        Connector(id = "ed", name = "Ed", description = "Q&A platform", isConnected = false),
+        Connector(
+            id = ED_CONNECTOR_ID, name = "Ed", description = "Q&A platform", isConnected = false),
         Connector(
             id = "epfl_campus",
             name = "EPFL Campus",
@@ -62,9 +65,8 @@ class ConnectorsViewModel(
 
   /** Connects a connector (no confirmation needed). */
   fun connectConnector(connectorId: String) {
-    if (connectorId == "ed") {
-      // For ED, open the connection dialog (token)
-      _uiState.update { it.copy(isEdConnectDialogOpen = true, edConnectError = null) }
+    // ED connector navigation is handled in NavGraph via onConnectorClick
+    if (connectorId == ED_CONNECTOR_ID) {
       return
     }
 
@@ -94,7 +96,7 @@ class ConnectorsViewModel(
 
   /** Disconnects a connector after confirmation. */
   fun disconnectConnector(connectorId: String) {
-    if (connectorId == "ed") {
+    if (connectorId == ED_CONNECTOR_ID) {
       disconnectEdConnector()
     } else if (connectorId == MOODLE_CONNECTOR_ID) {
       disconnectMoodleConnector()
@@ -123,13 +125,14 @@ class ConnectorsViewModel(
           current.copy(
               connectors =
                   current.connectors.map { connector ->
-                    if (connector.id == "ed") {
+                    if (connector.id == ED_CONNECTOR_ID) {
                       connector.copy(isConnected = false)
                     } else {
                       connector
                     }
                   })
         }
+        // Note: Status will be refreshed automatically when ConnectorsScreen is displayed
       } catch (_: Exception) {
         // For now, we don't handle user-facing errors here yet.
       }
@@ -142,7 +145,7 @@ class ConnectorsViewModel(
   }
 
   /** Refreshes the ED connector status from the backend. */
-  private fun refreshEdStatus() {
+  fun refreshEdStatus() {
     viewModelScope.launch {
       try {
         // Indicate loading, reset ED error
@@ -153,7 +156,7 @@ class ConnectorsViewModel(
         _uiState.update { state ->
           val updatedConnectors =
               state.connectors.map { connector ->
-                if (connector.id == "ed") {
+                if (connector.id == ED_CONNECTOR_ID) {
                   connector.copy(isConnected = config.status == EdConnectorStatusRemote.CONNECTED)
                 } else {
                   connector
@@ -190,11 +193,11 @@ class ConnectorsViewModel(
             "config after connect: status=${config.status}, lastError=${config.lastError}")
 
         if (config.status == EdConnectorStatusRemote.CONNECTED) {
-          // Success: set ED to "connected" and close the dialog
+          // Success: update state immediately
           _uiState.update { state ->
             val updatedConnectors =
                 state.connectors.map { connector ->
-                  if (connector.id == "ed") {
+                  if (connector.id == ED_CONNECTOR_ID) {
                     connector.copy(isConnected = true)
                   } else {
                     connector
@@ -208,6 +211,7 @@ class ConnectorsViewModel(
                 edConnectError = null,
             )
           }
+          // Note: Status will be refreshed automatically when user returns to ConnectorsScreen
         } else {
           // Backend returned ERROR (e.g.: invalid_credentials)
           _uiState.update { state ->
@@ -237,8 +241,67 @@ class ConnectorsViewModel(
     }
   }
 
+  /**
+   * Checks clipboard for a potential ED token when the screen becomes visible. If a plausible token
+   * is found and the token input is empty, shows the suggestion banner.
+   */
+  fun checkClipboardForEdToken(context: Context, currentTokenInput: String = "") {
+    try {
+      val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+      val clip = clipboard?.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
+
+      val isTokenLike =
+          if (clip.isNotBlank()) {
+            looksLikeEdToken(clip)
+          } else {
+            false
+          }
+
+      if (clip.isNotBlank() && isTokenLike && currentTokenInput.isBlank()) {
+        _uiState.update { it.copy(detectedEdToken = clip, showEdClipboardSuggestion = true) }
+      } else {
+        // Only clear if we're currently showing a suggestion and conditions changed
+        val currentState = _uiState.value
+        if (currentState.showEdClipboardSuggestion &&
+            (currentTokenInput.isNotBlank() || !isTokenLike)) {
+          _uiState.update { it.copy(showEdClipboardSuggestion = false, detectedEdToken = null) }
+        }
+      }
+    } catch (e: Exception) {
+      // Clipboard access might fail on some devices, ignore silently
+    }
+  }
+
+  /**
+   * Simple heuristic to check if text looks like an ED token. ED tokens are typically alphanumeric
+   * strings, at least 10 characters long.
+   */
+  private fun looksLikeEdToken(text: String): Boolean {
+    val trimmed = text.trim()
+    return trimmed.length >= 10 &&
+        !trimmed.contains(' ') &&
+        !trimmed.contains('\n') &&
+        !trimmed.contains('\t') &&
+        trimmed.all { it.isLetterOrDigit() || it == '-' || it == '_' || it == '.' }
+  }
+
+  /**
+   * Accepts the detected clipboard token. This should be called when the user taps "Use this
+   * token". Returns the token string to fill into the text field.
+   */
+  fun acceptEdClipboardToken(): String {
+    val token = _uiState.value.detectedEdToken ?: ""
+    _uiState.update { it.copy(showEdClipboardSuggestion = false, detectedEdToken = null) }
+    return token
+  }
+
+  /** Dismisses the clipboard suggestion banner. */
+  fun dismissEdClipboardSuggestion() {
+    _uiState.update { it.copy(showEdClipboardSuggestion = false, detectedEdToken = null) }
+  }
+
   /** Refreshes the Moodle connector status from the backend. */
-  private fun refreshMoodleStatus() {
+  fun refreshMoodleStatus() {
     viewModelScope.launch {
       try {
         // Indicate loading, reset Moodle error

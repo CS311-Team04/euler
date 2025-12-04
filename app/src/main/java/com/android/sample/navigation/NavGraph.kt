@@ -37,6 +37,7 @@ import com.android.sample.profile.UserProfileRepository
 import com.android.sample.settings.ProfileScreen
 import com.android.sample.settings.SettingsPage
 import com.android.sample.settings.connectors.ConnectorsScreen
+import com.android.sample.settings.connectors.EdConnectScreen
 import com.android.sample.sign_in.AuthViewModel
 import com.android.sample.speech.SpeechPlayback
 import com.android.sample.speech.SpeechToTextHelper
@@ -55,6 +56,7 @@ object Routes {
   const val Settings = "settings"
   const val Profile = "profile"
   const val Connectors = "connectors"
+  const val EdConnect = "ed_connect"
   const val VoiceChat = "voice_chat"
 }
 
@@ -651,11 +653,16 @@ fun AppNav(
             ConnectorsScreen(
                 onBackClick = { nav.popBackStack() },
                 onConnectorClick = { connectorId ->
-                  // For now, just a placeholder. In the future, this will trigger the connection
-                  // flow
-                  android.util.Log.d("NavGraph", "Connector clicked: $connectorId")
+                  if (connectorId == "ed") {
+                    nav.navigate(Routes.EdConnect)
+                  } else {
+                    android.util.Log.d("NavGraph", "Connector clicked: $connectorId")
+                  }
                 })
           }
+
+          // ED Connect Screen
+          composable(Routes.EdConnect) { EdConnectScreen(onBackClick = { nav.popBackStack() }) }
 
           // Voice Chat Screen
           // Uses VoiceChatComposableContent which is tested in NavGraphTest
