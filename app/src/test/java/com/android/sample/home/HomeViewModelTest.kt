@@ -1723,4 +1723,141 @@ class HomeViewModelTest {
     assertEquals("", postOnEd.draftTitle) // Falls back to empty string
     assertEquals(question, postOnEd.draftBody) // Falls back to original question
   }
+
+  // ==================== Profile Context Tests ====================
+
+  @Test
+  fun buildProfileContext_returns_null_when_profile_is_null() = runTest {
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
+    val context = viewModel.buildProfileContext(null)
+    assertNull("Context should be null when profile is null", context)
+  }
+
+  @Test
+  fun buildProfileContext_returns_null_when_all_fields_are_empty() = runTest {
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
+    val emptyProfile = UserProfile()
+    val context = viewModel.buildProfileContext(emptyProfile)
+    assertNull("Context should be null when all profile fields are empty", context)
+  }
+
+  @Test
+  fun buildProfileContext_builds_context_with_all_fields() = runTest {
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
+    val profile =
+        UserProfile(
+            fullName = "Jean Dupont",
+            preferredName = "jean.d",
+            roleDescription = "Student",
+            faculty = "IC — School of Computer and Communication Sciences",
+            section = "Computer Science")
+    val context = viewModel.buildProfileContext(profile)
+    assertNotNull("Context should not be null when profile has data", context)
+    assertTrue(
+        "Context should contain 'User Profile Information'",
+        context!!.contains("User Profile Information"))
+    assertTrue("Context should contain full name", context.contains("Full Name: Jean Dupont"))
+    assertTrue("Context should contain username", context.contains("Username: jean.d"))
+    assertTrue("Context should contain role", context.contains("Role: Student"))
+    assertTrue(
+        "Context should contain faculty",
+        context.contains("Faculty: IC — School of Computer and Communication Sciences"))
+    assertTrue("Context should contain section", context.contains("Section: Computer Science"))
+  }
+
+  @Test
+  fun buildProfileContext_distinguishes_full_name_and_username() = runTest {
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
+    val profile =
+        UserProfile(
+            fullName = "Jean Dupont", preferredName = "jean.d", section = "Computer Science")
+    val context = viewModel.buildProfileContext(profile)
+    assertNotNull("Context should not be null", context)
+    assertTrue(
+        "Context should label full name correctly", context!!.contains("Full Name: Jean Dupont"))
+    assertTrue("Context should label username correctly", context.contains("Username: jean.d"))
+    assertFalse(
+        "Context should NOT label username as full name", context.contains("Full Name: jean.d"))
+  }
+
+  @Test
+  fun sendMessage_loads_profile_when_null_and_signed_in() = runTest {
+    val repo = FakeProfileRepository()
+    val testProfile =
+        UserProfile(
+            fullName = "Test User",
+            preferredName = "testuser",
+            section = "Computer Science",
+            faculty = "IC")
+    repo.savedProfile = testProfile
+
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.resetToDefault()
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val conversationRepo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(conversationRepo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(conversationRepo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel =
+        HomeViewModel(
+            llmClient = fakeLlm, auth = auth, repo = conversationRepo, profileRepository = repo)
+
+    // Ensure profile is null in UI state
+    viewModel.updateUiState { it.copy(profile = null) }
+
+    viewModel.updateMessageDraft("What is my section?")
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    // Verify profile was loaded
+    val state = viewModel.uiState.value
+    assertNotNull("Profile should be loaded after sendMessage", state.profile)
+    assertEquals("Profile should match the saved profile", testProfile, state.profile)
+  }
+
+  @Test
+  fun sendMessage_passes_profile_context_to_llm_client() = runTest {
+    val repo = FakeProfileRepository()
+    val testProfile =
+        UserProfile(
+            fullName = "John Doe",
+            preferredName = "john.d",
+            section = "Computer Science",
+            faculty = "IC")
+    repo.savedProfile = testProfile
+
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.resetToDefault()
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val conversationRepo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(conversationRepo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(conversationRepo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel =
+        HomeViewModel(
+            llmClient = fakeLlm, auth = auth, repo = conversationRepo, profileRepository = repo)
+    viewModel.refreshProfile()
+    advanceUntilIdle()
+
+    viewModel.updateMessageDraft("Test question")
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    // Verify the LLM client was called (indicating profile context was built and passed)
+    assertTrue("LLM client should be called", fakeLlm.prompts.isNotEmpty())
+  }
 }

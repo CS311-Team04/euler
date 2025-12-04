@@ -1140,7 +1140,8 @@ class HomeViewModel(
    * Builds a readable profile context string from UserProfile data. Returns null if profile is null
    * or contains no useful information.
    */
-  private fun buildProfileContext(profile: UserProfile?): String? {
+  @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+  internal fun buildProfileContext(profile: UserProfile?): String? {
     if (profile == null) {
       Log.d(TAG, "buildProfileContext: profile is null")
       return null
