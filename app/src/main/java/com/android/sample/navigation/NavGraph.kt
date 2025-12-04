@@ -58,6 +58,7 @@ object Routes {
   const val Connectors = "connectors"
   const val EdConnect = "ed_connect"
   const val VoiceChat = "voice_chat"
+  const val EpflCampus = "epfl_campus"
 }
 
 @VisibleForTesting internal var appNavControllerObserver: ((NavHostController) -> Unit)? = null
@@ -619,7 +620,7 @@ fun AppNav(
                 isProfileEnabled = !homeUiState.isGuest,
                 showProfileWarning = homeUiState.showGuestProfileWarning,
                 onDismissProfileWarning = { homeViewModel.hideGuestProfileWarning() },
-                onConnectorsClick = { nav.navigate(Routes.Settings) })
+                onConnectorsClick = { nav.navigate(Routes.Connectors) })
           }
 
           composable(Routes.Profile) {
@@ -653,18 +654,23 @@ fun AppNav(
             ConnectorsScreen(
                 onBackClick = { nav.popBackStack() },
                 onConnectorClick = { connectorId ->
-                  if (connectorId == "ed") {
-                    nav.navigate(Routes.EdConnect)
-                  } else {
-                    android.util.Log.d("NavGraph", "Connector clicked: $connectorId")
-                  }
-                })
+                    when (connectorId) {
+                        "ed" -> nav.navigate(Routes.EdConnect)
+                        "epfl_campus" -> nav.navigate(Routes.EpflCampus)
+                        else -> android.util.Log.d("NavGraph", "Connector clicked: $connectorId")
+                    }
+                }
+            )
           }
 
           // ED Connect Screen
           composable(Routes.EdConnect) { EdConnectScreen(onBackClick = { nav.popBackStack() }) }
 
           // Voice Chat Screen
+          // EPFL Campus Connector Screen
+          composable(Routes.EpflCampus) {
+            com.android.sample.epfl.EpflCampusConnectorScreen(onBackClick = { nav.popBackStack() })
+          }
           // Uses VoiceChatComposableContent which is tested in NavGraphTest
           composable(Routes.VoiceChat) { VoiceChatComposableContent(nav, speechHelper) }
         }
