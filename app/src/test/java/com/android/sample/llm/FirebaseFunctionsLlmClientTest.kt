@@ -211,9 +211,7 @@ class FirebaseFunctionsLlmClientTest {
   @Test
   fun generateReply_parses_source_type_food() = runTest {
     val reply = "Here are today's menus"
-    val client =
-        clientWithResult(
-            mapOf("reply" to reply, "source_type" to "food"))
+    val client = clientWithResult(mapOf("reply" to reply, "source_type" to "food"))
 
     val result = client.generateReply("what's for lunch?")
 

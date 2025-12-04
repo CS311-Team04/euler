@@ -1005,35 +1005,31 @@ class HomeScreenComposeInteractionsTest {
 
   @Test
   fun SourceMeta_default_compactType_is_NONE() {
-    val meta = SourceMeta(
-        siteLabel = "Test",
-        title = "Test Title",
-        url = "https://example.com"
-    )
+    val meta = SourceMeta(siteLabel = "Test", title = "Test Title", url = "https://example.com")
     assertEquals(CompactSourceType.NONE, meta.compactType)
   }
 
   @Test
   fun SourceMeta_with_FOOD_compactType() {
-    val meta = SourceMeta(
-        siteLabel = "EPFL Restaurants",
-        title = "Daily Menu",
-        url = "https://epfl.ch/food",
-        compactType = CompactSourceType.FOOD
-    )
+    val meta =
+        SourceMeta(
+            siteLabel = "EPFL Restaurants",
+            title = "Daily Menu",
+            url = "https://epfl.ch/food",
+            compactType = CompactSourceType.FOOD)
     assertEquals(CompactSourceType.FOOD, meta.compactType)
     assertEquals("EPFL Restaurants", meta.siteLabel)
   }
 
   @Test
   fun SourceMeta_with_SCHEDULE_compactType() {
-    val meta = SourceMeta(
-        siteLabel = "Your EPFL Schedule",
-        title = "Calendar",
-        url = null,
-        isScheduleSource = true,
-        compactType = CompactSourceType.SCHEDULE
-    )
+    val meta =
+        SourceMeta(
+            siteLabel = "Your EPFL Schedule",
+            title = "Calendar",
+            url = null,
+            isScheduleSource = true,
+            compactType = CompactSourceType.SCHEDULE)
     assertEquals(CompactSourceType.SCHEDULE, meta.compactType)
     assertTrue(meta.isScheduleSource)
     assertNull(meta.url)
@@ -1042,11 +1038,7 @@ class HomeScreenComposeInteractionsTest {
   @Test
   fun SourceMeta_retrievedAt_has_default_value() {
     val before = System.currentTimeMillis()
-    val meta = SourceMeta(
-        siteLabel = "Test",
-        title = "Test Title",
-        url = null
-    )
+    val meta = SourceMeta(siteLabel = "Test", title = "Test Title", url = null)
     val after = System.currentTimeMillis()
     assertTrue(meta.retrievedAt >= before)
     assertTrue(meta.retrievedAt <= after)
