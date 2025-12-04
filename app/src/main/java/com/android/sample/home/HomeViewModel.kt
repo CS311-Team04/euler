@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 data class SourceMeta(
     val siteLabel: String, // e.g. "EPFL.ch Website" or "Your Schedule"
@@ -201,6 +202,8 @@ class HomeViewModel(
               // SIGN-IN
               startLocalNewChat() // local placeholder until the first send
               startData() // attach Firestore
+              // Preload profile for better performance
+              viewModelScope.launch { resolveProfile() }
             }
             lastUid = uid
           }
@@ -237,6 +240,8 @@ class HomeViewModel(
       // already signed in
       startLocalNewChat()
       startData()
+      // Preload profile for better performance
+      viewModelScope.launch { resolveProfile() }
     } else {
       // guest at startup
       onSignedOutInternal()
@@ -458,29 +463,48 @@ class HomeViewModel(
     }
   }
 
+  /**
+   * Resolves the current user profile, loading from repository if not already in state. Returns the
+   * profile or null if unavailable. Updates UI state if profile is loaded.
+   */
+  private suspend fun resolveProfile(): UserProfile? {
+    // Check if profile is already in state
+    val existingProfile = _uiState.value.profile
+    if (existingProfile != null) {
+      Log.d(TAG, "resolveProfile: profile already in state")
+      return existingProfile
+    }
+
+    // Load from repository if not in state
+    Log.d(TAG, "resolveProfile: loading profile from repository")
+    return try {
+      val profile = profileRepository.loadProfile()
+      if (profile != null) {
+        Log.d(
+            TAG,
+            "resolveProfile: profile loaded successfully, hasSection=${profile.section.isNotBlank()}, hasName=${profile.fullName.isNotBlank() || profile.preferredName.isNotBlank()}")
+        _uiState.update {
+          it.copy(
+              profile = profile,
+              userName =
+                  profile.preferredName.ifBlank { profile.fullName }.ifBlank { DEFAULT_USER_NAME },
+              isGuest = false)
+        }
+        profile
+      } else {
+        Log.d(TAG, "resolveProfile: profile load returned null - profile may not exist yet")
+        null
+      }
+    } catch (e: Exception) {
+      Log.e(TAG, "resolveProfile: failed to load profile", e)
+      null
+    }
+  }
+
   fun refreshProfile() {
     viewModelScope.launch {
-      try {
-        val profile = profileRepository.loadProfile()
-        _uiState.value =
-            if (profile != null) {
-              _uiState.value.copy(
-                  profile = profile,
-                  userName =
-                      profile.preferredName
-                          .ifBlank { profile.fullName }
-                          .ifBlank { DEFAULT_USER_NAME },
-                  isGuest = false)
-            } else {
-              _uiState.value.copy(
-                  profile = null,
-                  userName =
-                      _uiState.value.userName.takeIf { it.isNotBlank() } ?: DEFAULT_USER_NAME,
-                  isGuest = false)
-            }
-      } catch (t: Throwable) {
-        Log.e("HomeViewModel", "Failed to load profile", t)
-      }
+      resolveProfile()
+      // refreshProfile also updates userName, which resolveProfile already handles
     }
   }
 
@@ -692,12 +716,18 @@ class HomeViewModel(
         // GUEST: no Firestore, just streaming UI
         if (isGuest()) {
           Log.d(TAG, "sendMessage: guest mode, starting streaming")
+          val currentProfile = resolveProfile()
+          val profileContext = buildProfileContext(currentProfile)
+          Log.d(
+              TAG,
+              "sendMessage: Guest mode - profileContext built, hasContext=${profileContext != null}, contextLength=${profileContext?.length ?: 0}")
           startStreaming(
               question = msg,
               messageId = aiMessageId,
               conversationId = null,
               summary = null,
-              transcript = null)
+              transcript = null,
+              profileContext = profileContext)
           return@launch
         }
 
@@ -755,13 +785,23 @@ class HomeViewModel(
               buildRecentTranscript(uid, conversationId, userMsg.id)
             } else null
 
+        // Resolve profile (loads if not already in state)
+        val currentProfile = resolveProfile()
+
+        // Construire le contexte du profil utilisateur
+        val profileContext = buildProfileContext(currentProfile)
+        Log.d(
+            TAG,
+            "sendMessage: profileContext built, hasProfile=${currentProfile != null}, hasContext=${profileContext != null}, contextLength=${profileContext?.length ?: 0}")
+
         // Appel RAG
         startStreaming(
             question = msg,
             messageId = aiMessageId,
             conversationId = conversationId,
             summary = summary,
-            transcript = recentTranscript)
+            transcript = recentTranscript,
+            profileContext = profileContext)
       } catch (_: AuthNotReadyException) {
         // L'auth n'est pas prête : côté UI, on signale une erreur de streaming / envoi
         try {
@@ -789,13 +829,14 @@ class HomeViewModel(
       }
     }
   }
-  /** Streaming helper using [LlmClient] and optional summary/transcript. */
+  /** Streaming helper using [LlmClient] and optional summary/transcript/profile context. */
   private fun startStreaming(
       question: String,
       messageId: String,
       conversationId: String?,
       summary: String?,
-      transcript: String?
+      transcript: String?,
+      profileContext: String?
   ) {
     activeStreamJob?.cancel()
     userCancelledStream = false
@@ -810,7 +851,10 @@ class HomeViewModel(
                 try {
                   withContext(Dispatchers.IO) {
                     llmClient.generateReply(
-                        prompt = question, summary = summary, transcript = transcript)
+                        prompt = question,
+                        summary = summary,
+                        transcript = transcript,
+                        profileContext = profileContext)
                   }
                 } catch (e: FirebaseFunctionsException) {
                   Log.e(
@@ -1235,6 +1279,58 @@ class HomeViewModel(
       Log.w(TAG, "fetchPriorSummary: error fetching summary", e)
       null
     }
+  }
+
+  /**
+   * Builds a JSON string from UserProfile data for backend processing. Returns null if profile is
+   * null or contains no useful information. Uses JSONObject to ensure proper escaping and
+   * formatting.
+   */
+  @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+  internal fun buildProfileContext(profile: UserProfile?): String? {
+    if (profile == null) {
+      Log.d(TAG, "buildProfileContext: profile is null")
+      return null
+    }
+
+    val json = JSONObject()
+
+    // Add fields only if they are not blank
+    if (profile.fullName.isNotBlank()) {
+      json.put("fullName", profile.fullName)
+    }
+
+    if (profile.preferredName.isNotBlank()) {
+      json.put("preferredName", profile.preferredName)
+    }
+
+    if (profile.roleDescription.isNotBlank()) {
+      json.put("role", profile.roleDescription)
+    }
+
+    if (profile.faculty.isNotBlank()) {
+      json.put("faculty", profile.faculty)
+    }
+
+    if (profile.section.isNotBlank()) {
+      json.put("section", profile.section)
+    }
+
+    if (profile.email.isNotBlank()) {
+      json.put("email", profile.email)
+    }
+
+    // Return null if JSON is empty (no fields added)
+    if (json.length() == 0) {
+      Log.d(TAG, "buildProfileContext: profile exists but all fields are empty")
+      return null
+    }
+
+    val context = json.toString()
+    Log.d(
+        TAG,
+        "buildProfileContext: built JSON context with ${json.length()} fields, length=${context.length}")
+    return context
   }
 
   /**
