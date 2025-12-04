@@ -21,6 +21,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -34,6 +35,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.android.sample.settings.Localization
 import com.android.sample.settings.connectors.ConnectorsDimensions as Dimens
 import com.android.sample.ui.theme.containerColor
+import com.android.sample.ui.theme.ed1
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -105,7 +107,7 @@ fun EdConnectScreen(onBackClick: () -> Unit = {}, viewModel: ConnectorsViewModel
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Get Token button
+            // Open ED Token Page button
             Button(
                 onClick = {
                   val intent = Intent(Intent.ACTION_VIEW, Uri.parse(ED_API_TOKENS_URL))
@@ -114,9 +116,7 @@ fun EdConnectScreen(onBackClick: () -> Unit = {}, viewModel: ConnectorsViewModel
                 enabled = !uiState.isEdConnecting,
                 modifier = Modifier.fillMaxWidth(),
                 colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor = connectorState.colors.accentRed,
-                        contentColor = connectorState.colors.onPrimaryColor),
+                    ButtonDefaults.buttonColors(containerColor = ed1, contentColor = Color.White),
                 shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
                   Text(
                       Localization.t("settings_connectors_ed_get_token_button"),
@@ -185,14 +185,17 @@ fun EdConnectScreen(onBackClick: () -> Unit = {}, viewModel: ConnectorsViewModel
                 modifier = Modifier.fillMaxWidth(),
                 colors =
                     ButtonDefaults.buttonColors(
-                        containerColor = connectorState.colors.accentRed,
-                        contentColor = connectorState.colors.onPrimaryColor),
+                        containerColor =
+                            if (token.isNotBlank() && !uiState.isEdConnecting) {
+                              ed1
+                            } else {
+                              connectorState.colors.accentRed
+                            },
+                        contentColor = Color.White),
                 shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
                   if (uiState.isEdConnecting) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = connectorState.colors.onPrimaryColor)
+                        modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
                   } else {
                     Text(
                         Localization.t("connect"),

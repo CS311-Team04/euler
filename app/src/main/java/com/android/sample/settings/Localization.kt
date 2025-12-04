@@ -41,11 +41,10 @@ object Localization {
           "settings_connectors_ed_base_url_label" to "Base URL (optional)",
           "settings_connectors_ed_token_instructions" to
               "To connect ED, you need a personal API token. We'll store it securely and you won't have to paste it again.",
-          "settings_connectors_ed_get_token_button" to "Get Token",
+          "settings_connectors_ed_get_token_button" to "Open ED Token Page",
           "settings_connectors_ed_description" to "Connect to the Q&A platform",
           "settings_connectors_ed_how_to_connect_title" to "How to connect",
-          "settings_connectors_ed_step_1" to
-              "Open https://eu.edstem.org/settings/api-tokens in your browser",
+          "settings_connectors_ed_step_1" to "Tap the button below to open your ED API token page",
           "settings_connectors_ed_step_2" to "Copy the token to clipboard",
           "settings_connectors_ed_step_3" to "Come back here and paste it below",
           "settings_connectors_ed_paste_token_label" to "Paste your token",
@@ -71,11 +70,11 @@ object Localization {
           "settings_connectors_ed_base_url_label" to "URL de base (optionnel)",
           "settings_connectors_ed_token_instructions" to
               "Pour vous connecter à ED, vous avez besoin d'un jeton API personnel. Nous le stockerons de manière sécurisée et vous n'aurez plus à le coller.",
-          "settings_connectors_ed_get_token_button" to "Obtenir le jeton",
+          "settings_connectors_ed_get_token_button" to "Ouvrir la page de jeton ED",
           "settings_connectors_ed_description" to "Se connecter à la plateforme Q&A",
           "settings_connectors_ed_how_to_connect_title" to "Comment se connecter",
           "settings_connectors_ed_step_1" to
-              "Ouvrez https://eu.edstem.org/settings/api-tokens dans votre navigateur",
+              "Appuyez sur le bouton ci-dessous pour ouvrir votre page de jeton API ED",
           "settings_connectors_ed_step_2" to "Copiez le jeton dans le presse-papiers",
           "settings_connectors_ed_step_3" to "Revenez ici et collez-le ci-dessous",
           "settings_connectors_ed_paste_token_label" to "Collez votre jeton",

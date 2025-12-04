@@ -654,13 +654,12 @@ fun AppNav(
             ConnectorsScreen(
                 onBackClick = { nav.popBackStack() },
                 onConnectorClick = { connectorId ->
-                    when (connectorId) {
-                        "ed" -> nav.navigate(Routes.EdConnect)
-                        "epfl_campus" -> nav.navigate(Routes.EpflCampus)
-                        else -> android.util.Log.d("NavGraph", "Connector clicked: $connectorId")
-                    }
-                }
-            )
+                  when (connectorId) {
+                    "ed" -> nav.navigate(Routes.EdConnect)
+                    "epfl_campus" -> nav.navigate(Routes.EpflCampus)
+                    else -> android.util.Log.d("NavGraph", "Connector clicked: $connectorId")
+                  }
+                })
           }
 
           // ED Connect Screen
