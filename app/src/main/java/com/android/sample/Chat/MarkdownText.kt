@@ -40,58 +40,45 @@ fun MarkdownText(
     color: Color = MaterialTheme.colorScheme.onSurface,
     style: TextStyle = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp)
 ) {
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val tertiaryColor = MaterialTheme.colorScheme.tertiary
-    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
-    
-    val richTextStyle = RichTextStyle(
-        stringStyle = RichTextStringStyle(
-            linkStyle = SpanStyle(
-                color = primaryColor
-            ),
-            codeStyle = SpanStyle(
-                color = tertiaryColor,
-                background = surfaceVariant
-            ),
-            boldStyle = SpanStyle(
-                fontWeight = FontWeight.Bold
-            ),
-            italicStyle = SpanStyle(
-                fontStyle = FontStyle.Italic
-            )
-        ),
-        paragraphSpacing = 8.sp
-    ).resolveDefaults()
+  val primaryColor = MaterialTheme.colorScheme.primary
+  val tertiaryColor = MaterialTheme.colorScheme.tertiary
+  val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
 
-    RichText(
-        modifier = modifier,
-        style = richTextStyle
-    ) {
-        Markdown(content = markdown)
-    }
+  val richTextStyle =
+      RichTextStyle(
+              stringStyle =
+                  RichTextStringStyle(
+                      linkStyle = SpanStyle(color = primaryColor),
+                      codeStyle = SpanStyle(color = tertiaryColor, background = surfaceVariant),
+                      boldStyle = SpanStyle(fontWeight = FontWeight.Bold),
+                      italicStyle = SpanStyle(fontStyle = FontStyle.Italic)),
+              paragraphSpacing = 8.sp)
+          .resolveDefaults()
+
+  RichText(modifier = modifier, style = richTextStyle) { Markdown(content = markdown) }
 }
 
 /**
- * Sanitizes text for Markdown rendering by escaping special characters
- * that might interfere with Markdown parsing.
+ * Sanitizes text for Markdown rendering by escaping special characters that might interfere with
+ * Markdown parsing.
  *
  * Use this for user-generated content that should be displayed literally.
  */
 fun escapeMarkdown(text: String): String {
-    return text
-        .replace("\\", "\\\\")
-        .replace("`", "\\`")
-        .replace("*", "\\*")
-        .replace("_", "\\_")
-        .replace("{", "\\{")
-        .replace("}", "\\}")
-        .replace("[", "\\[")
-        .replace("]", "\\]")
-        .replace("(", "\\(")
-        .replace(")", "\\)")
-        .replace("#", "\\#")
-        .replace("+", "\\+")
-        .replace("-", "\\-")
-        .replace(".", "\\.")
-        .replace("!", "\\!")
+  return text
+      .replace("\\", "\\\\")
+      .replace("`", "\\`")
+      .replace("*", "\\*")
+      .replace("_", "\\_")
+      .replace("{", "\\{")
+      .replace("}", "\\}")
+      .replace("[", "\\[")
+      .replace("]", "\\]")
+      .replace("(", "\\(")
+      .replace(")", "\\)")
+      .replace("#", "\\#")
+      .replace("+", "\\+")
+      .replace("-", "\\-")
+      .replace(".", "\\.")
+      .replace("!", "\\!")
 }
