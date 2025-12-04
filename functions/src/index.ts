@@ -13,6 +13,7 @@ import { EdConnectorRepository } from "./connectors/ed/EdConnectorRepository";
 import { EdConnectorService } from "./connectors/ed/EdConnectorService";
 import { encryptSecret, decryptSecret } from "./security/secretCrypto";
 import { detectPostToEdIntentCore, buildEdIntentPromptForApertus } from "./edIntent";
+import { parseEdPostResponse } from "./edIntentParser";
 
 
 const europeFunctions = functions.region("europe-west6");
@@ -755,11 +756,14 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
         questionLen: question.length,
       });
       
-      // Hybrid approach: REGEX detects, Apertus responds naturally
-      const { reply } = await apertusChatFnCore({
+      // Hybrid approach: REGEX detects, Apertus responds naturally and formats the question
+      const { reply: rawReply } = await apertusChatFnCore({
         messages: [{ role: "user", content: buildEdIntentPromptForApertus(question) }],
         temperature: 0.3,
       });
+
+      // Parse the response to extract formatted question and title
+      const { reply, formattedQuestion, formattedTitle } = parseEdPostResponse(rawReply);
 
       return {
         reply,
@@ -768,6 +772,8 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
         sources: [],
         ed_intent_detected: true,
         ed_intent: edIntentResult.ed_intent,
+        ed_formatted_question: formattedQuestion,
+        ed_formatted_title: formattedTitle,
       };
     }
     // === End ED Intent Detection ===
@@ -848,11 +854,14 @@ export const answerWithRagHttp = europeFunctions.https.onRequest(async (req: fun
         questionLen: question.length,
       });
       
-      // Hybrid approach: REGEX detects, Apertus responds naturally
-      const { reply } = await apertusChatFnCore({
+      // Hybrid approach: REGEX detects, Apertus responds naturally and formats the question
+      const { reply: rawReply } = await apertusChatFnCore({
         messages: [{ role: "user", content: buildEdIntentPromptForApertus(question) }],
         temperature: 0.3,
       });
+
+      // Parse the response to extract formatted question and title
+      const { reply, formattedQuestion, formattedTitle } = parseEdPostResponse(rawReply);
 
       res.status(200).json({
         reply,
@@ -861,6 +870,8 @@ export const answerWithRagHttp = europeFunctions.https.onRequest(async (req: fun
         sources: [],
         ed_intent_detected: true,
         ed_intent: edIntentResult.ed_intent,
+        ed_formatted_question: formattedQuestion,
+        ed_formatted_title: formattedTitle,
       });
       return;
     }
@@ -994,12 +1005,9 @@ export const edConnectorTestFn = europeFunctions.https.onCall(
 import { MoodleConnectorRepository } from "./connectors/moodle/MoodleConnectorRepository";
 import { MoodleConnectorService } from "./connectors/moodle/MoodleConnectorService";
 
-// simple placeholder encryption for dev.
-const encrypt = (plain: string): string => plain; // todo
-const decrypt = (cipher: string): string => cipher; // to do
-
+// Use the same encryption as ED connector
 const moodleRepo = new MoodleConnectorRepository(db);
-const moodleService = new MoodleConnectorService(moodleRepo, encrypt, decrypt);
+const moodleService = new MoodleConnectorService(moodleRepo, encryptSecret, decryptSecret);
 // callable functions
 export const connectorsMoodleStatusFn = europeFunctions.https.onCall(
   async (data, context) => {
@@ -1016,6 +1024,87 @@ export const connectorsMoodleStatusFn = europeFunctions.https.onCall(
       lastTestAt: config.lastTestAt ?? null,
       lastError: config.lastError ?? null,
     };
+  }
+);
+
+// Fetches a Moodle token using username and password (server-side for security)
+export const connectorsMoodleFetchTokenFn = europeFunctions.https.onCall(
+  async (
+    data: { baseUrl: string; username: string; password: string },
+    context
+  ) => {
+    if (!context.auth?.uid) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "User must be authenticated"
+      );
+    }
+
+    const { baseUrl, username, password } = data;
+
+    // Validate inputs
+    if (!baseUrl || !username || !password) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "baseUrl, username, and password are required"
+      );
+    }
+
+    try {
+      // Normalize baseUrl (remove trailing slash)
+      const normalizedBaseUrl = baseUrl.trim().replace(/\/$/, "");
+
+      // Build token endpoint URL - credentials sent server-side only
+      const tokenUrl = `${normalizedBaseUrl}/login/token.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&service=moodle_mobile_app`;
+
+      logger.info("Fetching Moodle token", {
+        baseUrl: normalizedBaseUrl,
+        userId: context.auth.uid,
+      });
+
+      // Call Moodle API server-side (credentials never exposed to client)
+      const response = await fetch(tokenUrl);
+      const responseBody = await response.json();
+
+      if (!response.ok || responseBody.error) {
+        const errorMsg = responseBody.error || `HTTP ${response.status}`;
+        logger.error("Failed to fetch Moodle token", {
+          error: errorMsg,
+          userId: context.auth.uid,
+        });
+        throw new functions.https.HttpsError(
+          "internal",
+          "Failed to fetch token from Moodle",
+          errorMsg
+        );
+      }
+
+      if (!responseBody.token) {
+        logger.error("No token in Moodle response", {
+          userId: context.auth.uid,
+        });
+        throw new functions.https.HttpsError(
+          "internal",
+          "No token received from Moodle"
+        );
+      }
+
+      // Return only the token (credentials never returned to client)
+      return { token: responseBody.token };
+    } catch (e: any) {
+      if (e instanceof functions.https.HttpsError) {
+        throw e;
+      }
+      logger.error("Exception fetching Moodle token", {
+        error: String(e),
+        userId: context.auth.uid,
+      });
+      throw new functions.https.HttpsError(
+        "internal",
+        "Failed to fetch token from Moodle",
+        String(e?.message || e)
+      );
+    }
   }
 );
 // attempts to connect to Moodle with provided baseUrl and token

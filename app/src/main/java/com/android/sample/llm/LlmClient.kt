@@ -31,21 +31,51 @@ enum class SourceType {
 }
 
 /**
+ * ED Discussion intent information.
+ *
+ * @param detected Whether an ED Discussion posting intent was detected
+ * @param intent The type of ED intent detected (e.g., "post_question")
+ * @param formattedQuestion The formatted question for ED post (when detected is true)
+ * @param formattedTitle The formatted title for ED post (when detected is true)
+ */
+data class EdIntent(
+    val detected: Boolean = false,
+    val intent: String? = null,
+    val formattedQuestion: String? = null,
+    val formattedTitle: String? = null
+)
+
+/**
  * Response from the LLM backend.
  *
  * @param reply The text response from the LLM
  * @param url Optional URL source reference
  * @param sourceType The type of source used for the answer
- * @param edIntentDetected Whether an ED Discussion posting intent was detected
- * @param edIntent The type of ED intent detected (e.g., "post_question")
+ * @param edIntent ED Discussion intent information
  */
 data class BotReply(
     val reply: String,
     val url: String?,
     val sourceType: SourceType = SourceType.NONE,
-    val edIntentDetected: Boolean = false,
-    val edIntent: String? = null
-)
+    val edIntent: EdIntent = EdIntent()
+) {
+  // Backward compatibility properties
+  @Deprecated("Use edIntent.detected instead", ReplaceWith("edIntent.detected"))
+  val edIntentDetected: Boolean
+    get() = edIntent.detected
+
+  @Deprecated("Use edIntent.intent instead", ReplaceWith("edIntent.intent"))
+  val edIntentType: String?
+    get() = edIntent.intent
+
+  @Deprecated("Use edIntent.formattedQuestion instead", ReplaceWith("edIntent.formattedQuestion"))
+  val edFormattedQuestion: String?
+    get() = edIntent.formattedQuestion
+
+  @Deprecated("Use edIntent.formattedTitle instead", ReplaceWith("edIntent.formattedTitle"))
+  val edFormattedTitle: String?
+    get() = edIntent.formattedTitle
+}
 
 /**
  * Abstraction over the Large Language Model backend.
@@ -180,49 +210,41 @@ class FirebaseFunctionsLlmClient(
         null
       }
 
-  private fun parsePrimaryUrl(map: Map<String, Any?>): String? =
-      try {
-        map[KEY_PRIMARY_URL] as? String
-      } catch (e: ClassCastException) {
-        Log.w(TAG, "Failed to cast primary_url to String", e)
-        null
-      }
+  private fun parsePrimaryUrl(map: Map<String, Any?>): String? = map[KEY_PRIMARY_URL] as? String
 
   private fun parseEdIntentDetected(map: Map<String, Any?>): Boolean =
-      try {
-        map[KEY_ED_INTENT_DETECTED] as? Boolean ?: false
-      } catch (e: ClassCastException) {
-        Log.w(TAG, "Failed to cast ed_intent_detected to Boolean", e)
-        false
-      }
+      map[KEY_ED_INTENT_DETECTED] as? Boolean ?: false
 
-  private fun parseEdIntentType(map: Map<String, Any?>): String? =
-      try {
-        map[KEY_ED_INTENT] as? String
-      } catch (e: ClassCastException) {
-        Log.w(TAG, "Failed to cast ed_intent to String", e)
-        null
-      }
+  private fun parseEdIntentType(map: Map<String, Any?>): String? = map[KEY_ED_INTENT] as? String
 
   private fun parseSourceType(map: Map<String, Any?>): SourceType =
-      try {
-        SourceType.fromString(map[KEY_SOURCE_TYPE] as? String)
-      } catch (e: ClassCastException) {
-        Log.w(TAG, "Failed to cast source_type to String", e)
-        SourceType.NONE
-      }
+      SourceType.fromString(map[KEY_SOURCE_TYPE] as? String)
+
+  private fun parseEdFormattedQuestion(map: Map<String, Any?>): String? =
+      map[KEY_ED_FORMATTED_QUESTION] as? String
+
+  private fun parseEdFormattedTitle(map: Map<String, Any?>): String? =
+      map[KEY_ED_FORMATTED_TITLE] as? String
 
   private fun buildBotReply(map: Map<String, Any?>, replyText: String): BotReply {
     val url = parsePrimaryUrl(map)
     val sourceType = parseSourceType(map)
     val edIntentDetected = parseEdIntentDetected(map)
-    val edIntent = parseEdIntentType(map)
+    val edIntentType = parseEdIntentType(map)
 
     if (edIntentDetected) {
-      Log.d(TAG, "ED intent detected: $edIntent")
+      Log.d(TAG, "ED intent detected: $edIntentType")
     }
 
-    return BotReply(replyText, url, sourceType, edIntentDetected, edIntent)
+    val edFormattedQuestion = parseEdFormattedQuestion(map)
+    val edFormattedTitle = parseEdFormattedTitle(map)
+    val edIntent =
+        EdIntent(
+            detected = edIntentDetected,
+            intent = edIntentType,
+            formattedQuestion = edFormattedQuestion,
+            formattedTitle = edFormattedTitle)
+    return BotReply(replyText, url, sourceType, edIntent)
   }
 
   companion object {
@@ -241,6 +263,8 @@ class FirebaseFunctionsLlmClient(
     private const val KEY_SOURCE_TYPE = "source_type"
     private const val KEY_ED_INTENT_DETECTED = "ed_intent_detected"
     private const val KEY_ED_INTENT = "ed_intent"
+    private const val KEY_ED_FORMATTED_QUESTION = "ed_formatted_question"
+    private const val KEY_ED_FORMATTED_TITLE = "ed_formatted_title"
 
     /**
      * Creates a region-scoped [FirebaseFunctions] instance and wires the local emulator when

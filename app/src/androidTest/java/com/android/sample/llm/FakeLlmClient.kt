@@ -6,13 +6,12 @@ class FakeLlmClient : LlmClient {
   var nextReply: String = "test-reply"
   var nextUrl: String? = null
   var nextSourceType: SourceType = SourceType.NONE
-  var nextEdIntentDetected: Boolean = false
-  var nextEdIntent: String? = null
+  var nextEdIntent: EdIntent = EdIntent()
   var failure: Throwable? = null
 
   override suspend fun generateReply(prompt: String): BotReply {
     prompts += prompt
     failure?.let { throw it }
-    return BotReply(nextReply, nextUrl, nextSourceType, nextEdIntentDetected, nextEdIntent)
+    return BotReply(nextReply, nextUrl, nextSourceType, nextEdIntent)
   }
 }

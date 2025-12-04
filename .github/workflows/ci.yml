@@ -108,7 +108,7 @@ jobs:
     name: Instrumented tests (connectedDebugAndroidTest)
     runs-on: ubuntu-latest           # recommandé par l'action
     timeout-minutes: 30
-    needs: [ static-checks, unit-tests ]
+    needs: [ static-checks ]
     env:
       _JAVA_OPTIONS: "-Xmx4g"
 
