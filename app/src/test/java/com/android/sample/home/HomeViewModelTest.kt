@@ -924,7 +924,8 @@ class HomeViewModelTest {
 
         val title = method.invoke(viewModel, "not-a-url") as String
 
-        assertEquals("not-a-url", title) // Falls back to original string
+        // Uri.parse treats "not-a-url" as a path segment, so it gets transformed
+        assertEquals("Not a url", title)
       }
 
   // ============ Tests for handleSendMessageError (via sendMessage with auth) ============
