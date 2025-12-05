@@ -13,11 +13,13 @@ import kotlinx.coroutines.withTimeoutOrNull
  * Source type for the response
  * - "schedule": answer came from user's EPFL schedule
  * - "rag": answer came from RAG/web sources
+ * - "food": answer came from EPFL restaurant menus
  * - "none": no external source used
  */
 enum class SourceType {
   SCHEDULE,
   RAG,
+  FOOD,
   NONE;
 
   companion object {
@@ -25,6 +27,7 @@ enum class SourceType {
         when (s?.lowercase()) {
           "schedule" -> SCHEDULE
           "rag" -> RAG
+          "food" -> FOOD
           else -> NONE
         }
   }
