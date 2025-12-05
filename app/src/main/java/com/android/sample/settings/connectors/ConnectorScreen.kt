@@ -16,12 +16,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.android.sample.settings.AppSettings
 import com.android.sample.settings.AppearanceMode
 import com.android.sample.settings.Localization
@@ -256,7 +258,47 @@ fun ConnectorsScreen(
           onDismiss = { viewModel.dismissMoodleConnectDialog() },
       )
     }
+
+    // Moodle redirect loading overlay
+    if (uiState.isMoodleRedirecting) {
+      MoodleRedirectingOverlay()
+    }
   }
+}
+
+/** Full-screen overlay shown while "redirecting" to Moodle. */
+@Composable
+private fun MoodleRedirectingOverlay() {
+  Box(
+      modifier =
+          Modifier.fillMaxSize().background(com.android.sample.ui.theme.MoodleLoginBackground),
+      contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+          // Moodle logo
+          AsyncImage(
+              model =
+                  "https://res.cloudinary.com/dw5ba0va3/image/upload/v1759937020/Moodle_Logo_zwznns.png",
+              contentDescription = "Moodle Logo",
+              modifier = Modifier.height(80.dp).widthIn(max = 260.dp),
+              contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+
+          Spacer(modifier = Modifier.height(Dimens.MoodleDialogLargeSpacing))
+
+          // Loading indicator
+          CircularProgressIndicator(
+              modifier = Modifier.size(Dimens.MoodleLoadingIndicatorSize),
+              strokeWidth = 3.dp,
+              color = com.android.sample.ui.theme.MoodleLoginButtonBlue)
+
+          Spacer(modifier = Modifier.height(16.dp))
+
+          // "Connecting..." text
+          Text(
+              text = Localization.t("settings_connectors_moodle_redirecting"),
+              color = com.android.sample.ui.theme.MoodleLoginPlaceholder,
+              fontSize = 15.sp)
+        }
+      }
 }
 
 /** Computes dialog surface color based on theme. */
@@ -436,7 +478,10 @@ internal fun EdConnectDialog(
       shape = RoundedCornerShape(Dimens.DialogCornerRadius))
 }
 
-/** Simple dialog for Moodle connection with username/password form. */
+/**
+ * Moodle-styled login dialog that mimics the official Moodle login page. Features a white card on
+ * gray background with Moodle branding.
+ */
 @Composable
 internal fun MoodleConnectDialog(
     colors: ConnectorsColors,
@@ -452,144 +497,226 @@ internal fun MoodleConnectDialog(
 
   val isFormValid = baseUrl.isNotBlank() && username.isNotBlank() && password.isNotBlank()
 
-  AlertDialog(
+  // Full-screen dialog with Moodle-style background
+  androidx.compose.ui.window.Dialog(
       onDismissRequest = { if (!isLoading) onDismiss() },
-      title = { MoodleDialogTitle(colors) },
-      text = {
-        MoodleDialogContent(
-            baseUrl = baseUrl,
-            username = username,
-            password = password,
-            error = error,
-            colors = colors,
-            isLoading = isLoading,
-            onBaseUrlChange = { baseUrl = it },
-            onUsernameChange = { username = it },
-            onPasswordChange = { password = it })
-      },
-      confirmButton = {
-        MoodleDialogConfirmButton(
-            colors = colors,
-            isLoading = isLoading,
-            isFormValid = isFormValid,
-            onConfirm = { onConfirm(baseUrl.trim(), username.trim(), password.trim()) })
-      },
-      dismissButton = {
-        MoodleDialogDismissButton(colors = colors, isLoading = isLoading, onDismiss = onDismiss)
-      },
-      containerColor = getDialogSurfaceColor(isDark),
-      shape = RoundedCornerShape(Dimens.DialogCornerRadius))
+      properties =
+          androidx.compose.ui.window.DialogProperties(
+              usePlatformDefaultWidth = false, dismissOnBackPress = !isLoading)) {
+        Box(
+            modifier =
+                Modifier.fillMaxSize()
+                    .background(com.android.sample.ui.theme.MoodleLoginBackground)
+                    .padding(horizontal = Dimens.MoodleDialogHorizontalPadding, vertical = 40.dp),
+            contentAlignment = Alignment.Center) {
+              // White card container with shadow
+              Column(
+                  modifier =
+                      Modifier.fillMaxWidth()
+                          .background(
+                              com.android.sample.ui.theme.MoodleLoginCardBackground,
+                              RoundedCornerShape(12.dp))
+                          .padding(horizontal = 28.dp, vertical = 40.dp),
+                  horizontalAlignment = Alignment.CenterHorizontally) {
+                    // Moodle Logo - Large and prominent
+                    MoodleLogoHeader()
+
+                    Spacer(modifier = Modifier.height(Dimens.MoodleDialogLargeSpacing))
+
+                    // "Connexion" title - Moodle's serif-style typography
+                    Text(
+                        text = Localization.t("settings_connectors_moodle_login_title"),
+                        color = com.android.sample.ui.theme.MoodleLoginTitleBlue,
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                        modifier = Modifier.align(Alignment.Start))
+
+                    Spacer(modifier = Modifier.height(28.dp))
+
+                    // Username field - Taller with more padding
+                    MoodleStyledTextField(
+                        value = username,
+                        onValueChange = { username = it },
+                        placeholder = Localization.t("settings_connectors_moodle_username_label"),
+                        enabled = !isLoading,
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Next)
+
+                    Spacer(modifier = Modifier.height(Dimens.MoodleDialogFieldSpacing))
+
+                    // Password field - Taller with more padding
+                    MoodleStyledPasswordField(
+                        value = password,
+                        onValueChange = { password = it },
+                        placeholder = Localization.t("settings_connectors_moodle_password_label"),
+                        enabled = !isLoading)
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // "Forgot password?" link - Right aligned
+                    Text(
+                        text = Localization.t("settings_connectors_moodle_forgot_password"),
+                        color = com.android.sample.ui.theme.MoodleLoginLink,
+                        fontSize = 15.sp,
+                        textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
+                        modifier = Modifier.align(Alignment.End).padding(vertical = 4.dp))
+
+                    Spacer(modifier = Modifier.height(Dimens.MoodleDialogFieldSpacing))
+
+                    // Error message
+                    if (!error.isNullOrBlank()) {
+                      Text(
+                          text = error,
+                          color = com.android.sample.ui.theme.MoodleLoginError,
+                          fontSize = 15.sp,
+                          textAlign = TextAlign.Center,
+                          lineHeight = 22.sp,
+                          modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp))
+                    }
+
+                    // Connect button - Full width, Moodle blue
+                    MoodleLoginButton(
+                        text = Localization.t("settings_connectors_moodle_login_button"),
+                        isLoading = isLoading,
+                        enabled = isFormValid && !isLoading,
+                        onClick = { onConfirm(baseUrl.trim(), username.trim(), password.trim()) })
+
+                    Spacer(modifier = Modifier.height(Dimens.MoodleDialogFieldSpacing))
+
+                    // Cancel button
+                    TextButton(
+                        onClick = { if (!isLoading) onDismiss() },
+                        modifier = Modifier.fillMaxWidth()) {
+                          Text(
+                              text = Localization.t("cancel"),
+                              color = com.android.sample.ui.theme.MoodleLoginPlaceholder,
+                              fontSize = 15.sp,
+                              fontWeight = FontWeight.Medium)
+                        }
+                  }
+            }
+      }
 }
 
+/** Moodle logo header - Large and prominent like the official Moodle login page. */
 @Composable
-private fun MoodleDialogTitle(colors: ConnectorsColors) {
-  DialogTitle(Localization.t("settings_connectors_moodle_title"), colors)
+private fun MoodleLogoHeader() {
+  AsyncImage(
+      model =
+          "https://res.cloudinary.com/dw5ba0va3/image/upload/v1759937020/Moodle_Logo_zwznns.png",
+      contentDescription = "Moodle Logo",
+      modifier = Modifier.height(100.dp).widthIn(max = 320.dp),
+      contentScale = androidx.compose.ui.layout.ContentScale.Fit)
 }
 
+/** Returns the Moodle-styled colors for OutlinedTextField. */
 @Composable
-private fun MoodleDialogContent(
-    baseUrl: String,
-    username: String,
-    password: String,
-    error: String?,
-    colors: ConnectorsColors,
-    isLoading: Boolean,
-    onBaseUrlChange: (String) -> Unit,
-    onUsernameChange: (String) -> Unit,
-    onPasswordChange: (String) -> Unit,
-) {
-  Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-    MoodleTextField(
-        value = baseUrl,
-        onValueChange = onBaseUrlChange,
-        label = Localization.t("settings_connectors_moodle_base_url_label"),
-        enabled = !isLoading)
+private fun moodleTextFieldColors() =
+    OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = com.android.sample.ui.theme.MoodleLoginInputBorderFocused,
+        unfocusedBorderColor = com.android.sample.ui.theme.MoodleLoginInputBorder,
+        focusedContainerColor = com.android.sample.ui.theme.MoodleLoginCardBackground,
+        unfocusedContainerColor = com.android.sample.ui.theme.MoodleLoginCardBackground,
+        cursorColor = com.android.sample.ui.theme.MoodleLoginButtonBlue,
+        focusedTextColor = com.android.sample.ui.theme.MoodleLoginText,
+        unfocusedTextColor = com.android.sample.ui.theme.MoodleLoginText)
 
-    MoodleTextField(
-        value = username,
-        onValueChange = onUsernameChange,
-        label = Localization.t("settings_connectors_moodle_username_label"),
-        enabled = !isLoading)
-
-    MoodlePasswordField(
-        value = password,
-        onValueChange = onPasswordChange,
-        label = Localization.t("settings_connectors_moodle_password_label"),
-        enabled = !isLoading)
-
-    Text(
-        text = Localization.t("settings_connectors_moodle_login_instructions"),
-        color = colors.textSecondary,
-        fontSize = 12.sp,
-        modifier = Modifier.padding(vertical = 4.dp))
-
-    DialogErrorText(error, colors)
-  }
-}
-
+/** Moodle-styled text field with clean borders and generous padding. */
 @Composable
-private fun MoodleTextField(
+private fun MoodleStyledTextField(
     value: String,
     onValueChange: (String) -> Unit,
-    label: String,
+    placeholder: String,
     enabled: Boolean,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    imeAction: ImeAction = ImeAction.Next,
 ) {
   OutlinedTextField(
       value = value,
       onValueChange = onValueChange,
-      label = { Text(label) },
+      placeholder = {
+        Text(
+            text = placeholder,
+            color = com.android.sample.ui.theme.MoodleLoginPlaceholder,
+            fontSize = 17.sp)
+      },
       singleLine = true,
       enabled = enabled,
+      textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp),
       keyboardOptions =
           KeyboardOptions(
-              autoCorrect = false, keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
-      modifier = Modifier.fillMaxWidth())
+              capitalization = KeyboardCapitalization.Unspecified,
+              autoCorrectEnabled = false,
+              keyboardType = keyboardType,
+              imeAction = imeAction),
+      colors = moodleTextFieldColors(),
+      shape = RoundedCornerShape(10.dp),
+      modifier = Modifier.fillMaxWidth().height(64.dp))
 }
 
+/** Moodle-styled password field with clean borders and generous padding. */
 @Composable
-private fun MoodlePasswordField(
+private fun MoodleStyledPasswordField(
     value: String,
     onValueChange: (String) -> Unit,
-    label: String,
+    placeholder: String,
     enabled: Boolean,
 ) {
   OutlinedTextField(
       value = value,
       onValueChange = onValueChange,
-      label = { Text(label) },
+      placeholder = {
+        Text(
+            text = placeholder,
+            color = com.android.sample.ui.theme.MoodleLoginPlaceholder,
+            fontSize = 17.sp)
+      },
       singleLine = true,
       enabled = enabled,
+      textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp),
       visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
       keyboardOptions =
           KeyboardOptions(
               autoCorrect = false,
               keyboardType = KeyboardType.Password,
               imeAction = ImeAction.Done),
-      modifier = Modifier.fillMaxWidth())
+      colors = moodleTextFieldColors(),
+      shape = RoundedCornerShape(10.dp),
+      modifier = Modifier.fillMaxWidth().height(64.dp))
 }
 
+/** Moodle-styled blue login button - Full width with proper height. */
 @Composable
-private fun MoodleDialogConfirmButton(
-    colors: ConnectorsColors,
+private fun MoodleLoginButton(
+    text: String,
     isLoading: Boolean,
-    isFormValid: Boolean,
-    onConfirm: () -> Unit,
+    enabled: Boolean,
+    onClick: () -> Unit,
 ) {
-  DialogConfirmButton(
-      colors = colors,
-      isLoading = isLoading,
-      enabled = isFormValid,
-      buttonText = Localization.t("connect"),
-      onConfirm = onConfirm)
-}
-
-@Composable
-private fun MoodleDialogDismissButton(
-    colors: ConnectorsColors,
-    isLoading: Boolean,
-    onDismiss: () -> Unit,
-) {
-  DialogDismissButton(colors, isLoading, onDismiss)
+  Button(
+      onClick = onClick,
+      enabled = enabled,
+      colors =
+          ButtonDefaults.buttonColors(
+              containerColor = com.android.sample.ui.theme.MoodleLoginButtonBlue,
+              disabledContainerColor =
+                  com.android.sample.ui.theme.MoodleLoginButtonBlue.copy(alpha = 0.6f)),
+      shape = RoundedCornerShape(6.dp),
+      modifier = Modifier.fillMaxWidth().height(56.dp)) {
+        if (isLoading) {
+          CircularProgressIndicator(
+              modifier = Modifier.size(22.dp),
+              strokeWidth = 2.dp,
+              color = androidx.compose.ui.graphics.Color.White)
+        } else {
+          Text(
+              text = text,
+              color = ConnectorsLightSurface,
+              fontSize = 18.sp,
+              fontWeight = FontWeight.Medium)
+        }
+      }
 }
 
 @Preview(showBackground = true, backgroundColor = previewBgColor)
