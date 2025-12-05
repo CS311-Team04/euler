@@ -86,4 +86,10 @@ object ConnectorsDimensions {
   val DialogTitleFontSize = 18.sp
   val DialogTextFontSize = 14.sp
   val DialogTextLineHeight = 20.sp
+
+  // ========== Moodle Dialog Spacing ==========
+  val MoodleDialogHorizontalPadding = 20.dp
+  val MoodleDialogFieldSpacing = 20.dp
+  val MoodleDialogLargeSpacing = 32.dp
+  val MoodleLoadingIndicatorSize = 32.dp
 }

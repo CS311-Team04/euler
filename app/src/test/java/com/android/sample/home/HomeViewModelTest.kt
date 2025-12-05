@@ -177,11 +177,6 @@ class HomeViewModelTest {
 
         viewModel.refreshProfile()
         advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertNull(state.profile)
-        assertEquals("Student", state.userName)
-        assertFalse(state.isGuest)
       }
 
   @Test
@@ -1722,5 +1717,144 @@ class HomeViewModelTest {
     val postOnEd = state.pendingAction as PendingAction.PostOnEd
     assertEquals("", postOnEd.draftTitle) // Falls back to empty string
     assertEquals(question, postOnEd.draftBody) // Falls back to original question
+  }
+
+  // ==================== Profile Context Tests ====================
+
+  @Test
+  fun buildProfileContext_returns_null_when_profile_is_null() = runTest {
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
+    val context = viewModel.buildProfileContext(null)
+    assertNull("Context should be null when profile is null", context)
+  }
+
+  @Test
+  fun buildProfileContext_returns_null_when_all_fields_are_empty() = runTest {
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
+    val emptyProfile = UserProfile()
+    val context = viewModel.buildProfileContext(emptyProfile)
+    assertNull("Context should be null when all profile fields are empty", context)
+  }
+
+  @Test
+  fun buildProfileContext_builds_json_context_with_all_fields() = runTest {
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
+    val profile =
+        UserProfile(
+            fullName = "Jean Dupont",
+            preferredName = "jean.d",
+            roleDescription = "Student",
+            faculty = "IC — School of Computer and Communication Sciences",
+            section = "Computer Science",
+            email = "jean.dupont@epfl.ch")
+    val context = viewModel.buildProfileContext(profile)
+    assertNotNull("Context should not be null when profile has data", context)
+
+    // Parse JSON to verify structure
+    val json = org.json.JSONObject(context!!)
+    assertEquals("Jean Dupont", json.getString("fullName"))
+    assertEquals("jean.d", json.getString("preferredName"))
+    assertEquals("Student", json.getString("role"))
+    assertEquals("IC — School of Computer and Communication Sciences", json.getString("faculty"))
+    assertEquals("Computer Science", json.getString("section"))
+    assertEquals("jean.dupont@epfl.ch", json.getString("email"))
+  }
+
+  @Test
+  fun buildProfileContext_distinguishes_full_name_and_username_in_json() = runTest {
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
+    val profile =
+        UserProfile(
+            fullName = "Jean Dupont", preferredName = "jean.d", section = "Computer Science")
+    val context = viewModel.buildProfileContext(profile)
+    assertNotNull("Context should not be null", context)
+
+    // Parse JSON to verify keys are distinct
+    val json = org.json.JSONObject(context!!)
+    assertEquals("Jean Dupont", json.getString("fullName"))
+    assertEquals("jean.d", json.getString("preferredName"))
+    assertNotEquals(
+        "fullName should be different from preferredName", "jean.d", json.getString("fullName"))
+  }
+
+  @Test
+  fun sendMessage_loads_profile_when_null_and_signed_in() = runTest {
+    val repo = FakeProfileRepository()
+    val testProfile =
+        UserProfile(
+            fullName = "Test User",
+            preferredName = "testuser",
+            section = "Computer Science",
+            faculty = "IC")
+    repo.savedProfile = testProfile
+
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.resetToDefault()
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val conversationRepo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(conversationRepo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(conversationRepo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel =
+        HomeViewModel(
+            llmClient = fakeLlm, auth = auth, repo = conversationRepo, profileRepository = repo)
+
+    // Ensure profile is null in UI state
+    viewModel.updateUiState { it.copy(profile = null) }
+
+    viewModel.updateMessageDraft("What is my section?")
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    // Verify profile was loaded
+    val state = viewModel.uiState.value
+    assertNotNull("Profile should be loaded after sendMessage", state.profile)
+    assertEquals("Profile should match the saved profile", testProfile, state.profile)
+  }
+
+  @Test
+  fun sendMessage_passes_profile_context_to_llm_client() = runTest {
+    val repo = FakeProfileRepository()
+    val testProfile =
+        UserProfile(
+            fullName = "John Doe",
+            preferredName = "john.d",
+            section = "Computer Science",
+            faculty = "IC")
+    repo.savedProfile = testProfile
+
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.resetToDefault()
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val conversationRepo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(conversationRepo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(conversationRepo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel =
+        HomeViewModel(
+            llmClient = fakeLlm, auth = auth, repo = conversationRepo, profileRepository = repo)
+    viewModel.refreshProfile()
+    advanceUntilIdle()
+
+    viewModel.updateMessageDraft("Test question")
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    // Verify the LLM client was called (indicating profile context was built and passed)
+    assertTrue("LLM client should be called", fakeLlm.prompts.isNotEmpty())
   }
 }

@@ -16,6 +16,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
@@ -97,6 +98,8 @@ class ConnectorsViewModelTest {
     advanceUntilIdle()
 
     viewModel.connectConnector("moodle")
+    advanceTimeBy(1000)
+    advanceUntilIdle()
     val uiState = viewModel.uiState.first()
 
     // Moodle should open dialog, not connect directly
@@ -181,6 +184,9 @@ class ConnectorsViewModelTest {
 
     viewModel.connectConnector("moodle")
     viewModel.connectConnector("ed")
+    advanceTimeBy(1000)
+    advanceUntilIdle()
+    // Both Moodle and ED open dialogs, not connect directly
     val uiState = viewModel.uiState.first()
 
     // Moodle opens dialog, ED navigation is handled in UI (no dialog state)
@@ -217,6 +223,8 @@ class ConnectorsViewModelTest {
 
     // Connect moodle (opens dialog, then we need to confirm with credentials)
     viewModel.connectConnector("moodle")
+    advanceTimeBy(1000)
+    advanceUntilIdle()
     var uiState = viewModel.uiState.first()
     assertTrue(uiState.isMoodleConnectDialogOpen)
 
@@ -243,6 +251,8 @@ class ConnectorsViewModelTest {
 
     // Connect again (opens dialog)
     viewModel.connectConnector("moodle")
+    advanceTimeBy(1000)
+    advanceUntilIdle()
     assertTrue(viewModel.uiState.first().isMoodleConnectDialogOpen)
   }
 
@@ -482,6 +492,8 @@ class ConnectorsViewModelTest {
             status = MoodleConnectorStatusRemote.CONNECTED, lastTestAt = null, lastError = null)
 
     viewModel.connectConnector("moodle")
+    advanceTimeBy(1000)
+    advanceUntilIdle()
     viewModel.confirmMoodleConnect("https://euler-swent.moodlecloud.com", "test-token")
     advanceUntilIdle()
 
@@ -515,6 +527,8 @@ class ConnectorsViewModelTest {
             lastError = "invalid_credentials")
 
     viewModel.connectConnector("moodle")
+    advanceTimeBy(1000)
+    advanceUntilIdle()
     viewModel.confirmMoodleConnect("https://euler-swent.moodlecloud.com", "invalid-token")
     advanceUntilIdle()
 
@@ -540,6 +554,8 @@ class ConnectorsViewModelTest {
     advanceUntilIdle()
 
     viewModel.connectConnector("moodle")
+    advanceTimeBy(1000)
+    advanceUntilIdle()
     var uiState = viewModel.uiState.first()
     assertTrue(uiState.isMoodleConnectDialogOpen)
 

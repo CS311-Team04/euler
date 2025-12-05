@@ -10,6 +10,8 @@ import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.speech.TextToSpeechHelper
 import com.android.sample.ui.theme.SampleAppTheme
 import com.google.firebase.FirebaseApp
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreSettings
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
@@ -25,6 +27,12 @@ class MainActivity : ComponentActivity() {
     if (FirebaseApp.getApps(this).isEmpty()) {
       FirebaseApp.initializeApp(this)
     }
+
+    // Enable Firestore offline persistence for cached responses
+    val db = FirebaseFirestore.getInstance()
+    val settings = FirebaseFirestoreSettings.Builder().setPersistenceEnabled(true).build()
+    db.firestoreSettings = settings
+
     // Initialize app settings (loads saved preferences)
     AppSettings.initialize(this)
     // Initialize the helper here (lazy initialization happens on first access, but before

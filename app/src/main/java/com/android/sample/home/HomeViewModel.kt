@@ -9,6 +9,7 @@ import com.android.sample.BuildConfig
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
 import com.android.sample.conversations.AuthNotReadyException
+import com.android.sample.conversations.CachedResponseRepository
 import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.ConversationTitleFormatter
 import com.android.sample.conversations.MessageDTO
@@ -23,6 +24,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
+import java.io.IOException
 import java.util.UUID
 import kotlin.getValue
 import kotlinx.coroutines.CancellationException
@@ -43,6 +45,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 data class SourceMeta(
     val siteLabel: String, // e.g. "EPFL.ch Website" or "Your Schedule"
@@ -73,12 +76,55 @@ class HomeViewModel(
         ConversationRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance()),
     private val profileRepository: com.android.sample.profile.ProfileDataSource =
         UserProfileRepository(),
-    private val networkMonitor: NetworkConnectivityMonitor? = null
+    private val networkMonitor: NetworkConnectivityMonitor? = null,
+    private val cacheRepo: CachedResponseRepository =
+        CachedResponseRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance())
 ) : ViewModel() {
   companion object {
     private const val TAG = "HomeViewModel"
     private const val DEFAULT_USER_NAME = "Student"
     private const val ED_INTENT_POST_QUESTION = "post_question"
+
+    // Canonical suggestion questions (English) for offline cache
+    // These must match the localization keys exactly for cache hits
+    val OFFLINE_SUGGESTIONS =
+        listOf(
+            "What is EPFL?",
+            "Where is EPFL located?",
+            "When was EPFL founded?",
+            "How many students at EPFL?",
+            "What are EPFL's research areas?",
+            "Tell me about EPFL campus")
+
+    // Mapping of localization keys to canonical English questions for cache lookup
+    private val SUGGESTION_KEY_TO_CANONICAL =
+        mapOf(
+            "suggestion_what_is_epfl" to "What is EPFL?",
+            "suggestion_where_epfl" to "Where is EPFL located?",
+            "suggestion_epfl_founded" to "When was EPFL founded?",
+            "suggestion_epfl_students" to "How many students at EPFL?",
+            "suggestion_epfl_research" to "What are EPFL's research areas?",
+            "suggestion_epfl_campus" to "Tell me about EPFL campus")
+
+    /**
+     * Finds the canonical English question for a given localized suggestion text. Returns the input
+     * text if no match is found (for non-suggestion queries).
+     */
+    fun getCanonicalQuestion(localizedText: String): String {
+      val trimmed = localizedText.trim()
+      // Check if this is a known suggestion by looking at all localized variants
+      for ((key, canonical) in SUGGESTION_KEY_TO_CANONICAL) {
+        val localized = com.android.sample.settings.Localization.t(key)
+        if (localized.equals(trimmed, ignoreCase = true)) {
+          return canonical
+        }
+      }
+      // Also check if it's already the canonical form
+      if (OFFLINE_SUGGESTIONS.any { it.equals(trimmed, ignoreCase = true) }) {
+        return OFFLINE_SUGGESTIONS.first { it.equals(trimmed, ignoreCase = true) }
+      }
+      return trimmed
+    }
 
     // Global exception handler for uncaught coroutine exceptions
     private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -137,6 +183,8 @@ class HomeViewModel(
   private var dataStarted = false
   private var authListener: FirebaseAuth.AuthStateListener? = null
   private var networkMonitorJob: Job? = null
+  private var suggestionsCacheJob: Job? = null
+  @Volatile private var suggestionsCached = false
 
   init {
     val current = auth.currentUser?.uid
@@ -154,6 +202,8 @@ class HomeViewModel(
               // SIGN-IN
               startLocalNewChat() // local placeholder until the first send
               startData() // attach Firestore
+              // Preload profile for better performance
+              viewModelScope.launch { resolveProfile() }
             }
             lastUid = uid
           }
@@ -178,6 +228,10 @@ class HomeViewModel(
                   newState
                 }
               }
+              // Pre-cache suggestion responses when online and signed in
+              if (isOnline && !suggestionsCached && auth.currentUser != null) {
+                preCacheSuggestionResponses()
+              }
             }
           }
     }
@@ -186,6 +240,8 @@ class HomeViewModel(
       // already signed in
       startLocalNewChat()
       startData()
+      // Preload profile for better performance
+      viewModelScope.launch { resolveProfile() }
     } else {
       // guest at startup
       onSignedOutInternal()
@@ -198,6 +254,49 @@ class HomeViewModel(
    * and keeps all messages in memory only.
    */
   private fun isGuest(): Boolean = auth.currentUser == null
+
+  /**
+   * Pre-caches responses for suggestion questions so they work offline. Fetches responses from the
+   * LLM and stores them in Firestore's global cache. Only runs once per session when the app is
+   * online.
+   */
+  private fun preCacheSuggestionResponses() {
+    if (suggestionsCached) return
+    suggestionsCached = true // Mark as started to prevent duplicate runs
+
+    suggestionsCacheJob?.cancel()
+    suggestionsCacheJob =
+        viewModelScope.launch(Dispatchers.IO + exceptionHandler) {
+          Log.d(TAG, "Pre-caching suggestion responses for offline use...")
+
+          for (question in OFFLINE_SUGGESTIONS) {
+            try {
+              // Check if already cached
+              val existing = cacheRepo.getCachedResponse(question, preferCache = false)
+              if (existing != null && existing.isNotBlank()) {
+                Log.d(TAG, "Suggestion already cached: ${question.take(30)}...")
+                continue
+              }
+
+              // Fetch fresh response from LLM
+              Log.d(TAG, "Fetching response for: ${question.take(30)}...")
+              val reply =
+                  llmClient.generateReply(prompt = question, summary = null, transcript = null)
+
+              if (reply.reply.isNotBlank()) {
+                // Cache the response
+                cacheRepo.saveCachedResponse(question, reply.reply)
+                Log.d(TAG, "Cached response for: ${question.take(30)}...")
+              }
+            } catch (e: Exception) {
+              Log.w(TAG, "Failed to cache suggestion '$question': ${e.message}")
+              // Continue with other suggestions
+            }
+          }
+
+          Log.d(TAG, "Finished pre-caching suggestion responses")
+        }
+  }
 
   /**
    * Start Firestore listeners (conversations + messages) **only when signed in**. No-op in guest
@@ -364,29 +463,48 @@ class HomeViewModel(
     }
   }
 
+  /**
+   * Resolves the current user profile, loading from repository if not already in state. Returns the
+   * profile or null if unavailable. Updates UI state if profile is loaded.
+   */
+  private suspend fun resolveProfile(): UserProfile? {
+    // Check if profile is already in state
+    val existingProfile = _uiState.value.profile
+    if (existingProfile != null) {
+      Log.d(TAG, "resolveProfile: profile already in state")
+      return existingProfile
+    }
+
+    // Load from repository if not in state
+    Log.d(TAG, "resolveProfile: loading profile from repository")
+    return try {
+      val profile = profileRepository.loadProfile()
+      if (profile != null) {
+        Log.d(
+            TAG,
+            "resolveProfile: profile loaded successfully, hasSection=${profile.section.isNotBlank()}, hasName=${profile.fullName.isNotBlank() || profile.preferredName.isNotBlank()}")
+        _uiState.update {
+          it.copy(
+              profile = profile,
+              userName =
+                  profile.preferredName.ifBlank { profile.fullName }.ifBlank { DEFAULT_USER_NAME },
+              isGuest = false)
+        }
+        profile
+      } else {
+        Log.d(TAG, "resolveProfile: profile load returned null - profile may not exist yet")
+        null
+      }
+    } catch (e: Exception) {
+      Log.e(TAG, "resolveProfile: failed to load profile", e)
+      null
+    }
+  }
+
   fun refreshProfile() {
     viewModelScope.launch {
-      try {
-        val profile = profileRepository.loadProfile()
-        _uiState.value =
-            if (profile != null) {
-              _uiState.value.copy(
-                  profile = profile,
-                  userName =
-                      profile.preferredName
-                          .ifBlank { profile.fullName }
-                          .ifBlank { DEFAULT_USER_NAME },
-                  isGuest = false)
-            } else {
-              _uiState.value.copy(
-                  profile = null,
-                  userName =
-                      _uiState.value.userName.takeIf { it.isNotBlank() } ?: DEFAULT_USER_NAME,
-                  isGuest = false)
-            }
-      } catch (t: Throwable) {
-        Log.e("HomeViewModel", "Failed to load profile", t)
-      }
+      resolveProfile()
+      // refreshProfile also updates userName, which resolveProfile already handles
     }
   }
 
@@ -495,28 +613,31 @@ class HomeViewModel(
    * - Call the shared [LlmClient] (Firebase/HTTP) on a background coroutine.
    * - Append an AI message (or an error bubble) on completion.
    */
-  fun sendMessage() {
+  fun sendMessage(message: String? = null) {
     val current = _uiState.value
     if (current.isSending || current.streamingMessageId != null) return
-    // Don't allow sending messages when offline - check both state and actual connectivity
+
+    // Use provided message or fall back to draft
+    val msg = (message?.trim() ?: current.messageDraft.trim())
+    if (msg.isEmpty()) return
+
+    // Note: We allow sending even when offline to support suggestion chips working offline.
+    // Network errors will be caught and displayed to the user.
+    // Still update offline message state if needed, but don't block sending.
     if (current.isOffline) {
       // Update state to show offline message if not already shown
       if (!current.showOfflineMessage && auth.currentUser != null) {
         _uiState.update { it.copy(showOfflineMessage = true) }
       }
-      return
     }
-    // Double-check actual connectivity as a safety measure
+    // Double-check actual connectivity and update state, but don't block sending
     if (networkMonitor?.isCurrentlyOnline() == false) {
       _uiState.update {
         it.copy(
             isOffline = true,
             showOfflineMessage = if (auth.currentUser != null) true else it.showOfflineMessage)
       }
-      return
     }
-    val msg = current.messageDraft.trim()
-    if (msg.isEmpty()) return
 
     val now = System.currentTimeMillis()
     val userMsg =
@@ -544,15 +665,69 @@ class HomeViewModel(
     viewModelScope.launch(exceptionHandler) {
       try {
         Log.d(TAG, "sendMessage: starting, message='${msg.take(50)}...'")
+
+        // Check cache when offline (for signed-in users only)
+        // Use Firestore offline persistence to read from local cache
+        val isOffline = current.isOffline || networkMonitor?.isCurrentlyOnline() == false
+        if (isOffline && !isGuest()) {
+          Log.d(TAG, "sendMessage: offline, checking Firestore local cache for question")
+          try {
+            // Use canonical English question for cache lookup (handles localized suggestions)
+            val canonicalQuestion = getCanonicalQuestion(msg)
+            Log.d(TAG, "sendMessage: looking up cache for canonical question: $canonicalQuestion")
+            // Use preferCache=true to force reading from local Firestore cache
+            val cachedResponse = cacheRepo.getCachedResponse(canonicalQuestion, preferCache = true)
+            if (cachedResponse != null && cachedResponse.isNotBlank()) {
+              Log.d(TAG, "sendMessage: found cached response in local Firestore cache, using it")
+              // Use cached response
+              simulateStreamingFromText(aiMessageId, cachedResponse)
+
+              // Persist to conversation if we have one
+              val cid = _uiState.value.currentConversationId
+              if (cid != null) {
+                try {
+                  repo.appendMessage(cid, "assistant", cachedResponse)
+                } catch (e: Exception) {
+                  Log.w(TAG, "Failed to persist cached response to conversation", e)
+                }
+              }
+              return@launch
+            } else {
+              Log.d(
+                  TAG,
+                  "sendMessage: no cached response found in local Firestore cache for offline request")
+              // No cache and offline - show error immediately
+              handleSendMessageError(
+                  IOException(
+                      "No cached response available. Please connect to the internet to get a response."),
+                  aiMessageId)
+              return@launch
+            }
+          } catch (e: Exception) {
+            Log.w(TAG, "Error checking Firestore local cache", e)
+            // If cache check fails and we're offline, show error
+            handleSendMessageError(
+                IOException("Unable to retrieve cached response. Please connect to the internet."),
+                aiMessageId)
+            return@launch
+          }
+        }
+
         // GUEST: no Firestore, just streaming UI
         if (isGuest()) {
           Log.d(TAG, "sendMessage: guest mode, starting streaming")
+          val currentProfile = resolveProfile()
+          val profileContext = buildProfileContext(currentProfile)
+          Log.d(
+              TAG,
+              "sendMessage: Guest mode - profileContext built, hasContext=${profileContext != null}, contextLength=${profileContext?.length ?: 0}")
           startStreaming(
               question = msg,
               messageId = aiMessageId,
               conversationId = null,
               summary = null,
-              transcript = null)
+              transcript = null,
+              profileContext = profileContext)
           return@launch
         }
 
@@ -610,13 +785,23 @@ class HomeViewModel(
               buildRecentTranscript(uid, conversationId, userMsg.id)
             } else null
 
+        // Resolve profile (loads if not already in state)
+        val currentProfile = resolveProfile()
+
+        // Construire le contexte du profil utilisateur
+        val profileContext = buildProfileContext(currentProfile)
+        Log.d(
+            TAG,
+            "sendMessage: profileContext built, hasProfile=${currentProfile != null}, hasContext=${profileContext != null}, contextLength=${profileContext?.length ?: 0}")
+
         // Appel RAG
         startStreaming(
             question = msg,
             messageId = aiMessageId,
             conversationId = conversationId,
             summary = summary,
-            transcript = recentTranscript)
+            transcript = recentTranscript,
+            profileContext = profileContext)
       } catch (_: AuthNotReadyException) {
         // L'auth n'est pas prête : côté UI, on signale une erreur de streaming / envoi
         try {
@@ -644,13 +829,14 @@ class HomeViewModel(
       }
     }
   }
-  /** Streaming helper using [LlmClient] and optional summary/transcript. */
+  /** Streaming helper using [LlmClient] and optional summary/transcript/profile context. */
   private fun startStreaming(
       question: String,
       messageId: String,
       conversationId: String?,
       summary: String?,
-      transcript: String?
+      transcript: String?,
+      profileContext: String?
   ) {
     activeStreamJob?.cancel()
     userCancelledStream = false
@@ -665,7 +851,10 @@ class HomeViewModel(
                 try {
                   withContext(Dispatchers.IO) {
                     llmClient.generateReply(
-                        prompt = question, summary = summary, transcript = transcript)
+                        prompt = question,
+                        summary = summary,
+                        transcript = transcript,
+                        profileContext = profileContext)
                   }
                 } catch (e: FirebaseFunctionsException) {
                   Log.e(
@@ -994,6 +1183,8 @@ class HomeViewModel(
     conversationsJob = null
     messagesJob?.cancel()
     messagesJob = null
+    suggestionsCacheJob?.cancel()
+    suggestionsCacheJob = null
     activeStreamJob?.cancel()
     activeStreamJob = null
     networkMonitorJob?.cancel()
@@ -1088,6 +1279,58 @@ class HomeViewModel(
       Log.w(TAG, "fetchPriorSummary: error fetching summary", e)
       null
     }
+  }
+
+  /**
+   * Builds a JSON string from UserProfile data for backend processing. Returns null if profile is
+   * null or contains no useful information. Uses JSONObject to ensure proper escaping and
+   * formatting.
+   */
+  @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+  internal fun buildProfileContext(profile: UserProfile?): String? {
+    if (profile == null) {
+      Log.d(TAG, "buildProfileContext: profile is null")
+      return null
+    }
+
+    val json = JSONObject()
+
+    // Add fields only if they are not blank
+    if (profile.fullName.isNotBlank()) {
+      json.put("fullName", profile.fullName)
+    }
+
+    if (profile.preferredName.isNotBlank()) {
+      json.put("preferredName", profile.preferredName)
+    }
+
+    if (profile.roleDescription.isNotBlank()) {
+      json.put("role", profile.roleDescription)
+    }
+
+    if (profile.faculty.isNotBlank()) {
+      json.put("faculty", profile.faculty)
+    }
+
+    if (profile.section.isNotBlank()) {
+      json.put("section", profile.section)
+    }
+
+    if (profile.email.isNotBlank()) {
+      json.put("email", profile.email)
+    }
+
+    // Return null if JSON is empty (no fields added)
+    if (json.length() == 0) {
+      Log.d(TAG, "buildProfileContext: profile exists but all fields are empty")
+      return null
+    }
+
+    val context = json.toString()
+    Log.d(
+        TAG,
+        "buildProfileContext: built JSON context with ${json.length()} fields, length=${context.length}")
+    return context
   }
 
   /**
