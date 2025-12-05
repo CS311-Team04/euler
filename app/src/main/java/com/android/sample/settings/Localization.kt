@@ -5,6 +5,9 @@ package com.android.sample.settings
  * will automatically recompose when language changes.
  */
 object Localization {
+  private const val BASE_URL_OPTIONAL_DE = "Basis-URL (optional)"
+  private const val BASE_URL_OPTIONAL_ES = "URL base (opcional)"
+
   /**
    * Translate a key to the current language string. Falls back to English if the key is not found
    * in the selected language.
@@ -39,9 +42,24 @@ object Localization {
           "settings_connectors_ed_title" to "Connect to ED",
           "settings_connectors_ed_api_token_label" to "ED API token",
           "settings_connectors_ed_base_url_label" to "Base URL (optional)",
+          "settings_connectors_ed_token_instructions" to
+              "To connect ED, you need a personal API token. We'll store it securely and you won't have to paste it again.",
+          "settings_connectors_ed_get_token_button" to "Open ED Token Page",
+          "settings_connectors_ed_description" to "Connect to the Q&A platform",
+          "settings_connectors_ed_how_to_connect_title" to "How to connect",
+          "settings_connectors_ed_step_1" to "Tap the button below to open your ED API token page",
+          "settings_connectors_ed_step_2" to "Copy the token to clipboard",
+          "settings_connectors_ed_step_3" to "Come back here and paste it below",
+          "settings_connectors_ed_paste_token_label" to "Paste your token",
+          "settings_connectors_ed_paste_token_placeholder" to "Paste your token",
+          "settings_connectors_ed_base_url_placeholder" to "Base URL (optional)",
           "settings_connectors_ed_load_error" to "Failed to load ED connector status",
           "settings_connectors_ed_status_error" to
-              "Unable to load ED connector status. Please try again later.")
+              "Unable to load ED connector status. Please try again later.",
+          "settings_connectors_ed_token_detected_title" to "ED token detected!",
+          "settings_connectors_ed_use_token_button" to "Use this token",
+          "settings_connectors_ed_not_now_button" to "Not now",
+          "paste" to "Paste")
 
   private fun edTranslationsFr() =
       mapOf(
@@ -53,9 +71,25 @@ object Localization {
           "settings_connectors_ed_title" to "Se connecter à ED",
           "settings_connectors_ed_api_token_label" to "Jeton API ED",
           "settings_connectors_ed_base_url_label" to "URL de base (optionnel)",
+          "settings_connectors_ed_token_instructions" to
+              "Pour vous connecter à ED, vous avez besoin d'un jeton API personnel. Nous le stockerons de manière sécurisée et vous n'aurez plus à le coller.",
+          "settings_connectors_ed_get_token_button" to "Ouvrir la page de jeton ED",
+          "settings_connectors_ed_description" to "Se connecter à la plateforme Q&A",
+          "settings_connectors_ed_how_to_connect_title" to "Comment se connecter",
+          "settings_connectors_ed_step_1" to
+              "Appuyez sur le bouton ci-dessous pour ouvrir votre page de jeton API ED",
+          "settings_connectors_ed_step_2" to "Copiez le jeton dans le presse-papiers",
+          "settings_connectors_ed_step_3" to "Revenez ici et collez-le ci-dessous",
+          "settings_connectors_ed_paste_token_label" to "Collez votre jeton",
+          "settings_connectors_ed_paste_token_placeholder" to "Collez votre jeton",
+          "settings_connectors_ed_base_url_placeholder" to "URL de base (optionnel)",
           "settings_connectors_ed_load_error" to "Échec du chargement du statut du connecteur ED",
           "settings_connectors_ed_status_error" to
-              "Impossible de charger le statut du connecteur ED. Veuillez réessayer plus tard.")
+              "Impossible de charger le statut du connecteur ED. Veuillez réessayer plus tard.",
+          "settings_connectors_ed_token_detected_title" to "Jeton ED détecté !",
+          "settings_connectors_ed_use_token_button" to "Utiliser ce jeton",
+          "settings_connectors_ed_not_now_button" to "Pas maintenant",
+          "paste" to "Coller")
 
   private fun edTranslationsDe() =
       mapOf(
@@ -67,10 +101,23 @@ object Localization {
               "ED-API ist nicht erreichbar. Bitte überprüfen Sie Ihre Verbindung.",
           "settings_connectors_ed_title" to "Mit ED verbinden",
           "settings_connectors_ed_api_token_label" to "ED API-Token",
-          "settings_connectors_ed_base_url_label" to "Basis-URL (optional)",
+          "settings_connectors_ed_base_url_label" to BASE_URL_OPTIONAL_DE,
+          "settings_connectors_ed_token_instructions" to
+              "Um sich mit ED zu verbinden, benötigen Sie einen persönlichen API-Token. Wir speichern ihn sicher und Sie müssen ihn nicht erneut einfügen.",
+          "settings_connectors_ed_get_token_button" to "Token abrufen",
+          "settings_connectors_ed_description" to "Mit der Q&A-Plattform verbinden",
+          "settings_connectors_ed_how_to_connect_title" to "So verbinden Sie sich",
+          "settings_connectors_ed_step_1" to
+              "Öffnen Sie https://eu.edstem.org/settings/api-tokens in Ihrem Browser",
+          "settings_connectors_ed_step_2" to "Kopieren Sie das Token in die Zwischenablage",
+          "settings_connectors_ed_step_3" to "Kommen Sie hierher zurück und fügen Sie es unten ein",
+          "settings_connectors_ed_paste_token_label" to "Fügen Sie Ihr Token ein",
+          "settings_connectors_ed_paste_token_placeholder" to "Fügen Sie Ihr Token ein",
+          "settings_connectors_ed_base_url_placeholder" to BASE_URL_OPTIONAL_DE,
           "settings_connectors_ed_load_error" to "Fehler beim Laden des ED-Connector-Status",
           "settings_connectors_ed_status_error" to
-              "ED-Connector-Status konnte nicht geladen werden. Bitte versuchen Sie es später erneut.")
+              "ED-Connector-Status konnte nicht geladen werden. Bitte versuchen Sie es später erneut.",
+          "paste" to "Einfügen")
 
   private fun edTranslationsEs() =
       mapOf(
@@ -81,10 +128,23 @@ object Localization {
               "La API de ED no es accesible. Por favor, verifique su conexión.",
           "settings_connectors_ed_title" to "Conectar a ED",
           "settings_connectors_ed_api_token_label" to "Token API de ED",
-          "settings_connectors_ed_base_url_label" to "URL base (opcional)",
+          "settings_connectors_ed_base_url_label" to BASE_URL_OPTIONAL_ES,
+          "settings_connectors_ed_token_instructions" to
+              "Para conectarse a ED, necesita un token API personal. Lo almacenaremos de forma segura y no tendrá que pegarlo de nuevo.",
+          "settings_connectors_ed_get_token_button" to "Obtener token",
+          "settings_connectors_ed_description" to "Conectarse a la plataforma Q&A",
+          "settings_connectors_ed_how_to_connect_title" to "Cómo conectarse",
+          "settings_connectors_ed_step_1" to
+              "Abra https://eu.edstem.org/settings/api-tokens en su navegador",
+          "settings_connectors_ed_step_2" to "Copie el token al portapapeles",
+          "settings_connectors_ed_step_3" to "Vuelva aquí y péguelo a continuación",
+          "settings_connectors_ed_paste_token_label" to "Pegue su token",
+          "settings_connectors_ed_paste_token_placeholder" to "Pegue su token",
+          "settings_connectors_ed_base_url_placeholder" to BASE_URL_OPTIONAL_ES,
           "settings_connectors_ed_load_error" to "Error al cargar el estado del conector ED",
           "settings_connectors_ed_status_error" to
-              "No se pudo cargar el estado del conector ED. Por favor, inténtelo más tarde.")
+              "No se pudo cargar el estado del conector ED. Por favor, inténtelo más tarde.",
+          "paste" to "Pegar")
 
   private fun edTranslationsIt() =
       mapOf(
@@ -95,10 +155,23 @@ object Localization {
           "settings_connectors_ed_title" to "Connetti a ED",
           "settings_connectors_ed_api_token_label" to "Token API ED",
           "settings_connectors_ed_base_url_label" to "URL base (opzionale)",
+          "settings_connectors_ed_token_instructions" to
+              "Per connetterti a ED, hai bisogno di un token API personale. Lo memorizzeremo in modo sicuro e non dovrai più incollarlo.",
+          "settings_connectors_ed_get_token_button" to "Ottieni token",
+          "settings_connectors_ed_description" to "Connettiti alla piattaforma Q&A",
+          "settings_connectors_ed_how_to_connect_title" to "Come connettersi",
+          "settings_connectors_ed_step_1" to
+              "Apri https://eu.edstem.org/settings/api-tokens nel tuo browser",
+          "settings_connectors_ed_step_2" to "Copia il token negli appunti",
+          "settings_connectors_ed_step_3" to "Torna qui e incollalo qui sotto",
+          "settings_connectors_ed_paste_token_label" to "Incolla il tuo token",
+          "settings_connectors_ed_paste_token_placeholder" to "Incolla il tuo token",
+          "settings_connectors_ed_base_url_placeholder" to "URL base (opzionale)",
           "settings_connectors_ed_load_error" to
               "Errore nel caricamento dello stato del connettore ED",
           "settings_connectors_ed_status_error" to
-              "Impossibile caricare lo stato del connettore ED. Riprova più tardi.")
+              "Impossibile caricare lo stato del connettore ED. Riprova più tardi.",
+          "paste" to "Incolla")
 
   private fun edTranslationsPt() =
       mapOf(
@@ -107,10 +180,23 @@ object Localization {
           "ed_connect_api_unreachable" to "A API ED não está acessível. Verifique sua conexão.",
           "settings_connectors_ed_title" to "Conectar ao ED",
           "settings_connectors_ed_api_token_label" to "Token API do ED",
-          "settings_connectors_ed_base_url_label" to "URL base (opcional)",
+          "settings_connectors_ed_base_url_label" to BASE_URL_OPTIONAL_ES,
+          "settings_connectors_ed_token_instructions" to
+              "Para conectar ao ED, você precisa de um token API pessoal. Vamos armazená-lo com segurança e você não precisará colá-lo novamente.",
+          "settings_connectors_ed_get_token_button" to "Obter token",
+          "settings_connectors_ed_description" to "Conectar-se à plataforma Q&A",
+          "settings_connectors_ed_how_to_connect_title" to "Como conectar",
+          "settings_connectors_ed_step_1" to
+              "Abra https://eu.edstem.org/settings/api-tokens no seu navegador",
+          "settings_connectors_ed_step_2" to "Copie o token para a área de transferência",
+          "settings_connectors_ed_step_3" to "Volte aqui e cole abaixo",
+          "settings_connectors_ed_paste_token_label" to "Cole seu token",
+          "settings_connectors_ed_paste_token_placeholder" to "Cole seu token",
+          "settings_connectors_ed_base_url_placeholder" to BASE_URL_OPTIONAL_ES,
           "settings_connectors_ed_load_error" to "Falha ao carregar o status do conector ED",
           "settings_connectors_ed_status_error" to
-              "Não foi possível carregar o status do conector ED. Tente novamente mais tarde.")
+              "Não foi possível carregar o status do conector ED. Tente novamente mais tarde.",
+          "paste" to "Colar")
 
   private fun edTranslationsZh() =
       mapOf(
@@ -120,8 +206,20 @@ object Localization {
           "settings_connectors_ed_title" to "连接到 ED",
           "settings_connectors_ed_api_token_label" to "ED API 令牌",
           "settings_connectors_ed_base_url_label" to "基础 URL（可选）",
+          "settings_connectors_ed_token_instructions" to
+              "要连接到 ED，您需要一个个人 API 令牌。我们将安全地存储它，您无需再次粘贴。",
+          "settings_connectors_ed_get_token_button" to "获取令牌",
+          "settings_connectors_ed_description" to "连接到 Q&A 平台",
+          "settings_connectors_ed_how_to_connect_title" to "如何连接",
+          "settings_connectors_ed_step_1" to "在浏览器中打开 https://eu.edstem.org/settings/api-tokens",
+          "settings_connectors_ed_step_2" to "将令牌复制到剪贴板",
+          "settings_connectors_ed_step_3" to "返回此处并在下方粘贴",
+          "settings_connectors_ed_paste_token_label" to "粘贴您的令牌",
+          "settings_connectors_ed_paste_token_placeholder" to "粘贴您的令牌",
+          "settings_connectors_ed_base_url_placeholder" to "基础 URL（可选）",
           "settings_connectors_ed_load_error" to "加载 ED 连接器状态失败",
-          "settings_connectors_ed_status_error" to "无法加载 ED 连接器状态。请稍后再试。")
+          "settings_connectors_ed_status_error" to "无法加载 ED 连接器状态。请稍后再试。",
+          "paste" to "粘贴")
 
   private fun english() =
       mapOf(
@@ -390,7 +488,7 @@ object Localization {
               "ED-API ist nicht erreichbar. Bitte überprüfen Sie Ihre Verbindung.",
           "settings_connectors_ed_title" to "Mit ED verbinden",
           "settings_connectors_ed_api_token_label" to "ED API-Token",
-          "settings_connectors_ed_base_url_label" to "Basis-URL (optional)",
+          "settings_connectors_ed_base_url_label" to BASE_URL_OPTIONAL_DE,
           "settings_connectors_ed_load_error" to "Fehler beim Laden des ED-Connector-Status",
           "settings_connectors_ed_status_error" to
               "ED-Connector-Status konnte nicht geladen werden. Bitte versuchen Sie es später erneut.",
