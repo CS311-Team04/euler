@@ -85,10 +85,7 @@ fun EdConnectScreen(onBackClick: () -> Unit = {}, viewModel: ConnectorsViewModel
 
   Box(modifier = Modifier.fillMaxSize().background(connectorState.colors.background)) {
     Column(modifier = Modifier.fillMaxSize()) {
-      // Top bar
       EdConnectTopBar(onBackClick = onBackClick, colors = connectorState.colors)
-
-      // Content
       Column(
           modifier =
               Modifier.fillMaxSize()
@@ -96,132 +93,36 @@ fun EdConnectScreen(onBackClick: () -> Unit = {}, viewModel: ConnectorsViewModel
                   .verticalScroll(rememberScrollState()),
           verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Spacer(modifier = Modifier.height(8.dp))
-
-            // Ed connector info card
             EdConnectorInfoCard(colors = connectorState.colors)
-
             Spacer(modifier = Modifier.height(8.dp))
-
-            // How to connect card
             HowToConnectCard(colors = connectorState.colors)
-
             Spacer(modifier = Modifier.height(8.dp))
-
-            // Open ED Token Page button
-            Button(
-                onClick = {
-                  val intent = Intent(Intent.ACTION_VIEW, Uri.parse(ED_API_TOKENS_URL))
-                  context.startActivity(intent)
-                },
+            EdConnectOpenTokenButton(
                 enabled = !uiState.isEdConnecting,
-                modifier = Modifier.fillMaxWidth(),
-                colors =
-                    ButtonDefaults.buttonColors(containerColor = ed1, contentColor = Color.White),
-                shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
-                  Text(
-                      Localization.t("settings_connectors_ed_get_token_button"),
-                      fontSize = Dimens.DialogTextFontSize,
-                      fontWeight = FontWeight.SemiBold)
-                }
-
+                context = context,
+                colors = connectorState.colors)
             Spacer(modifier = Modifier.height(8.dp))
-
-            // Token input field
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-              Text(
-                  text = Localization.t("settings_connectors_ed_paste_token_label"),
-                  color = connectorState.colors.textPrimary,
-                  fontSize = 14.sp,
-                  fontWeight = FontWeight.Medium)
-
-              OutlinedTextField(
-                  value = token,
-                  onValueChange = { token = it },
-                  placeholder = {
-                    Text(
-                        Localization.t("settings_connectors_ed_paste_token_placeholder"),
-                        color = connectorState.colors.textSecondary)
-                  },
-                  leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.ContentCopy,
-                        contentDescription = null,
-                        tint = connectorState.colors.textSecondary)
-                  },
-                  singleLine = true,
-                  enabled = !uiState.isEdConnecting,
-                  keyboardOptions =
-                      KeyboardOptions(
-                          autoCorrect = false,
-                          keyboardType = KeyboardType.Text,
-                          imeAction = ImeAction.Done),
-                  modifier = Modifier.fillMaxWidth(),
-                  colors =
-                      OutlinedTextFieldDefaults.colors(
-                          focusedTextColor = connectorState.colors.textPrimary,
-                          unfocusedTextColor = connectorState.colors.textPrimary,
-                          focusedBorderColor = connectorState.colors.glassBorder,
-                          unfocusedBorderColor = connectorState.colors.glassBorder))
-            }
-
-            // Error message
-            uiState.edConnectError?.let { error ->
-              Text(
-                  text = error,
-                  color = connectorState.colors.accentRed,
-                  fontSize = 12.sp,
-                  modifier = Modifier.padding(top = 8.dp))
-            }
-
+            EdConnectTokenInput(
+                token = token,
+                onTokenChange = { token = it },
+                enabled = !uiState.isEdConnecting,
+                colors = connectorState.colors)
+            EdConnectError(error = uiState.edConnectError, colors = connectorState.colors)
             Spacer(modifier = Modifier.height(16.dp))
-
-            // Connect button
-            Button(
-                onClick = {
-                  val trimmedToken = token.trim()
-                  viewModel.confirmEdConnect(trimmedToken, null)
-                },
-                enabled = token.isNotBlank() && !uiState.isEdConnecting,
-                modifier = Modifier.fillMaxWidth(),
-                colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor =
-                            if (token.isNotBlank() && !uiState.isEdConnecting) {
-                              ed1
-                            } else {
-                              connectorState.colors.accentRed
-                            },
-                        contentColor = Color.White),
-                shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
-                  if (uiState.isEdConnecting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
-                  } else {
-                    Text(
-                        Localization.t("connect"),
-                        fontSize = Dimens.DialogTextFontSize,
-                        fontWeight = FontWeight.SemiBold)
-                  }
-                }
-
+            EdConnectButton(
+                token = token,
+                isConnecting = uiState.isEdConnecting,
+                onClick = { viewModel.confirmEdConnect(token.trim(), null) },
+                colors = connectorState.colors)
             Spacer(modifier = Modifier.height(24.dp))
           }
     }
-
-    // ED clipboard suggestion banner at the bottom
-    if (uiState.showEdClipboardSuggestion && uiState.detectedEdToken != null) {
-      AnimatedVisibility(
-          visible = uiState.showEdClipboardSuggestion,
-          enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-          exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
-          modifier = Modifier.align(Alignment.BottomCenter)) {
-            EdClipboardSuggestionBanner(
-                detectedToken = uiState.detectedEdToken ?: "",
-                colors = connectorState.colors,
-                onUseToken = { token = viewModel.acceptEdClipboardToken() },
-                onDismiss = { viewModel.dismissEdClipboardSuggestion() })
-          }
-    }
+    EdConnectClipboardBanner(
+        uiState = uiState,
+        connectorState = connectorState,
+        viewModel = viewModel,
+        onTokenChange = { token = it },
+        modifier = Modifier.align(Alignment.BottomCenter))
   }
 
   // Handle successful connection - navigate back after state is updated
@@ -236,6 +137,133 @@ fun EdConnectScreen(onBackClick: () -> Unit = {}, viewModel: ConnectorsViewModel
       kotlinx.coroutines.delay(300)
       onBackClick()
     }
+  }
+}
+
+@Composable
+private fun EdConnectOpenTokenButton(
+    enabled: Boolean,
+    context: android.content.Context,
+    colors: ConnectorsColors
+) {
+  Button(
+      onClick = {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(ED_API_TOKENS_URL))
+        context.startActivity(intent)
+      },
+      enabled = enabled,
+      modifier = Modifier.fillMaxWidth(),
+      colors = ButtonDefaults.buttonColors(containerColor = ed1, contentColor = Color.White),
+      shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
+        Text(
+            Localization.t("settings_connectors_ed_get_token_button"),
+            fontSize = Dimens.DialogTextFontSize,
+            fontWeight = FontWeight.SemiBold)
+      }
+}
+
+@Composable
+private fun EdConnectTokenInput(
+    token: String,
+    onTokenChange: (String) -> Unit,
+    enabled: Boolean,
+    colors: ConnectorsColors
+) {
+  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Text(
+        text = Localization.t("settings_connectors_ed_paste_token_label"),
+        color = colors.textPrimary,
+        fontSize = 14.sp,
+        fontWeight = FontWeight.Medium)
+    OutlinedTextField(
+        value = token,
+        onValueChange = onTokenChange,
+        placeholder = {
+          Text(
+              Localization.t("settings_connectors_ed_paste_token_placeholder"),
+              color = colors.textSecondary)
+        },
+        leadingIcon = {
+          Icon(
+              imageVector = Icons.Default.ContentCopy,
+              contentDescription = null,
+              tint = colors.textSecondary)
+        },
+        singleLine = true,
+        enabled = enabled,
+        keyboardOptions =
+            KeyboardOptions(
+                autoCorrect = false, keyboardType = KeyboardType.Text, imeAction = ImeAction.Done),
+        modifier = Modifier.fillMaxWidth(),
+        colors =
+            OutlinedTextFieldDefaults.colors(
+                focusedTextColor = colors.textPrimary,
+                unfocusedTextColor = colors.textPrimary,
+                focusedBorderColor = colors.glassBorder,
+                unfocusedBorderColor = colors.glassBorder))
+  }
+}
+
+@Composable
+private fun EdConnectError(error: String?, colors: ConnectorsColors) {
+  error?.let {
+    Text(
+        text = it,
+        color = colors.accentRed,
+        fontSize = 12.sp,
+        modifier = Modifier.padding(top = 8.dp))
+  }
+}
+
+@Composable
+private fun EdConnectButton(
+    token: String,
+    isConnecting: Boolean,
+    onClick: () -> Unit,
+    colors: ConnectorsColors
+) {
+  val isEnabled = token.isNotBlank() && !isConnecting
+  Button(
+      onClick = onClick,
+      enabled = isEnabled,
+      modifier = Modifier.fillMaxWidth(),
+      colors =
+          ButtonDefaults.buttonColors(
+              containerColor = if (isEnabled) ed1 else colors.accentRed,
+              contentColor = Color.White),
+      shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
+        if (isConnecting) {
+          CircularProgressIndicator(
+              modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+        } else {
+          Text(
+              Localization.t("connect"),
+              fontSize = Dimens.DialogTextFontSize,
+              fontWeight = FontWeight.SemiBold)
+        }
+      }
+}
+
+@Composable
+private fun EdConnectClipboardBanner(
+    uiState: ConnectorsUiState,
+    connectorState: ConnectorState,
+    viewModel: ConnectorsViewModel,
+    onTokenChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+  if (uiState.showEdClipboardSuggestion && uiState.detectedEdToken != null) {
+    AnimatedVisibility(
+        visible = uiState.showEdClipboardSuggestion,
+        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+        modifier = modifier) {
+          EdClipboardSuggestionBanner(
+              detectedToken = uiState.detectedEdToken ?: "",
+              colors = connectorState.colors,
+              onUseToken = { onTokenChange(viewModel.acceptEdClipboardToken()) },
+              onDismiss = { viewModel.dismissEdClipboardSuggestion() })
+        }
   }
 }
 

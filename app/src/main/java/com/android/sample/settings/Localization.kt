@@ -5,6 +5,9 @@ package com.android.sample.settings
  * will automatically recompose when language changes.
  */
 object Localization {
+  private const val BASE_URL_OPTIONAL_DE = "Basis-URL (optional)"
+  private const val BASE_URL_OPTIONAL_ES = "URL base (opcional)"
+
   /**
    * Translate a key to the current language string. Falls back to English if the key is not found
    * in the selected language.
@@ -98,7 +101,7 @@ object Localization {
               "ED-API ist nicht erreichbar. Bitte überprüfen Sie Ihre Verbindung.",
           "settings_connectors_ed_title" to "Mit ED verbinden",
           "settings_connectors_ed_api_token_label" to "ED API-Token",
-          "settings_connectors_ed_base_url_label" to "Basis-URL (optional)",
+          "settings_connectors_ed_base_url_label" to BASE_URL_OPTIONAL_DE,
           "settings_connectors_ed_token_instructions" to
               "Um sich mit ED zu verbinden, benötigen Sie einen persönlichen API-Token. Wir speichern ihn sicher und Sie müssen ihn nicht erneut einfügen.",
           "settings_connectors_ed_get_token_button" to "Token abrufen",
@@ -110,7 +113,7 @@ object Localization {
           "settings_connectors_ed_step_3" to "Kommen Sie hierher zurück und fügen Sie es unten ein",
           "settings_connectors_ed_paste_token_label" to "Fügen Sie Ihr Token ein",
           "settings_connectors_ed_paste_token_placeholder" to "Fügen Sie Ihr Token ein",
-          "settings_connectors_ed_base_url_placeholder" to "Basis-URL (optional)",
+          "settings_connectors_ed_base_url_placeholder" to BASE_URL_OPTIONAL_DE,
           "settings_connectors_ed_load_error" to "Fehler beim Laden des ED-Connector-Status",
           "settings_connectors_ed_status_error" to
               "ED-Connector-Status konnte nicht geladen werden. Bitte versuchen Sie es später erneut.",
@@ -125,7 +128,7 @@ object Localization {
               "La API de ED no es accesible. Por favor, verifique su conexión.",
           "settings_connectors_ed_title" to "Conectar a ED",
           "settings_connectors_ed_api_token_label" to "Token API de ED",
-          "settings_connectors_ed_base_url_label" to "URL base (opcional)",
+          "settings_connectors_ed_base_url_label" to BASE_URL_OPTIONAL_ES,
           "settings_connectors_ed_token_instructions" to
               "Para conectarse a ED, necesita un token API personal. Lo almacenaremos de forma segura y no tendrá que pegarlo de nuevo.",
           "settings_connectors_ed_get_token_button" to "Obtener token",
@@ -137,7 +140,7 @@ object Localization {
           "settings_connectors_ed_step_3" to "Vuelva aquí y péguelo a continuación",
           "settings_connectors_ed_paste_token_label" to "Pegue su token",
           "settings_connectors_ed_paste_token_placeholder" to "Pegue su token",
-          "settings_connectors_ed_base_url_placeholder" to "URL base (opcional)",
+          "settings_connectors_ed_base_url_placeholder" to BASE_URL_OPTIONAL_ES,
           "settings_connectors_ed_load_error" to "Error al cargar el estado del conector ED",
           "settings_connectors_ed_status_error" to
               "No se pudo cargar el estado del conector ED. Por favor, inténtelo más tarde.",
@@ -177,7 +180,7 @@ object Localization {
           "ed_connect_api_unreachable" to "A API ED não está acessível. Verifique sua conexão.",
           "settings_connectors_ed_title" to "Conectar ao ED",
           "settings_connectors_ed_api_token_label" to "Token API do ED",
-          "settings_connectors_ed_base_url_label" to "URL base (opcional)",
+          "settings_connectors_ed_base_url_label" to BASE_URL_OPTIONAL_ES,
           "settings_connectors_ed_token_instructions" to
               "Para conectar ao ED, você precisa de um token API pessoal. Vamos armazená-lo com segurança e você não precisará colá-lo novamente.",
           "settings_connectors_ed_get_token_button" to "Obter token",
@@ -189,7 +192,7 @@ object Localization {
           "settings_connectors_ed_step_3" to "Volte aqui e cole abaixo",
           "settings_connectors_ed_paste_token_label" to "Cole seu token",
           "settings_connectors_ed_paste_token_placeholder" to "Cole seu token",
-          "settings_connectors_ed_base_url_placeholder" to "URL base (opcional)",
+          "settings_connectors_ed_base_url_placeholder" to BASE_URL_OPTIONAL_ES,
           "settings_connectors_ed_load_error" to "Falha ao carregar o status do conector ED",
           "settings_connectors_ed_status_error" to
               "Não foi possível carregar o status do conector ED. Tente novamente mais tarde.",
@@ -485,7 +488,7 @@ object Localization {
               "ED-API ist nicht erreichbar. Bitte überprüfen Sie Ihre Verbindung.",
           "settings_connectors_ed_title" to "Mit ED verbinden",
           "settings_connectors_ed_api_token_label" to "ED API-Token",
-          "settings_connectors_ed_base_url_label" to "Basis-URL (optional)",
+          "settings_connectors_ed_base_url_label" to BASE_URL_OPTIONAL_DE,
           "settings_connectors_ed_load_error" to "Fehler beim Laden des ED-Connector-Status",
           "settings_connectors_ed_status_error" to
               "ED-Connector-Status konnte nicht geladen werden. Bitte versuchen Sie es später erneut.",
