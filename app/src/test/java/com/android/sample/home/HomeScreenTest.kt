@@ -4,11 +4,13 @@ import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
@@ -969,5 +971,105 @@ class HomeScreenComposeInteractionsTest {
     composeRule.waitForIdle()
 
     composeRule.onNodeWithTag(HomeTags.MicBtn, useUnmergedTree = true).assertIsDisplayed()
+  }
+
+  // ===== ED Post Tests =====
+
+  @Test
+  fun HomeScreen_ed_post_flow_publish_and_cancel() {
+    val viewModel = createViewModel()
+
+    // Test modal display and publish
+    viewModel.editState {
+      it.copy(
+          pendingAction =
+              com.android.sample.home.PendingAction.PostOnEd(
+                  draftTitle = "Title", draftBody = "Body"))
+    }
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+    // Find the text field by its text content (same approach as EdPostConfirmationModalTest)
+    composeRule.onNodeWithText("Title").assertIsDisplayed()
+    composeRule.onNodeWithText("Post").performClick()
+    composeRule.waitForIdle()
+    composeRule.runOnIdle {
+      assertNull(viewModel.uiState.value.pendingAction)
+      assertEquals(1, viewModel.uiState.value.edPostCards.size)
+      assertEquals(
+          com.android.sample.home.EdPostStatus.Published,
+          viewModel.uiState.value.edPostCards.first().status)
+    }
+
+    // Test cancel
+    viewModel.editState {
+      it.copy(
+          pendingAction =
+              com.android.sample.home.PendingAction.PostOnEd(
+                  draftTitle = "Title2", draftBody = "Body2"))
+    }
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+    composeRule.onNodeWithText("Cancel").performClick()
+    composeRule.waitForIdle()
+    composeRule.runOnIdle {
+      assertNull(viewModel.uiState.value.pendingAction)
+      assertEquals(2, viewModel.uiState.value.edPostCards.size)
+      assertEquals(
+          com.android.sample.home.EdPostStatus.Cancelled,
+          viewModel.uiState.value.edPostCards.last().status)
+    }
+  }
+
+  @Test
+  fun HomeScreen_displays_ed_post_cards() {
+    val viewModel = createViewModel()
+    val cards =
+        listOf(
+            com.android.sample.home.EdPostCard(
+                id = "1",
+                title = "Published",
+                body = "Body1",
+                status = com.android.sample.home.EdPostStatus.Published,
+                createdAt = 1000L),
+            com.android.sample.home.EdPostCard(
+                id = "2",
+                title = "Cancelled",
+                body = "Body2",
+                status = com.android.sample.home.EdPostStatus.Cancelled,
+                createdAt = 2000L))
+    viewModel.editState { it.copy(edPostCards = cards) }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    // Check for card titles (same approach as EdPostedCardTest)
+    composeRule.onNodeWithText("Published").assertIsDisplayed()
+    composeRule.onNodeWithText("Cancelled").assertIsDisplayed()
+  }
+
+  @Test
+  fun HomeScreen_allows_editing_in_modal() {
+    val viewModel = createViewModel()
+    viewModel.editState {
+      it.copy(
+          pendingAction =
+              com.android.sample.home.PendingAction.PostOnEd(
+                  draftTitle = "Original", draftBody = "Original Body"))
+    }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    // Find text fields and replace text
+    composeRule.onNode(hasText("Original")).performTextReplacement("Edited")
+    composeRule.onNode(hasText("Original Body")).performTextReplacement("Edited Body")
+    composeRule.onNodeWithText("Post").performClick()
+    composeRule.waitForIdle()
+
+    composeRule.runOnIdle {
+      assertEquals(1, viewModel.uiState.value.edPostCards.size)
+      assertEquals("Edited", viewModel.uiState.value.edPostCards.first().title)
+      assertEquals("Edited Body", viewModel.uiState.value.edPostCards.first().body)
+    }
   }
 }
