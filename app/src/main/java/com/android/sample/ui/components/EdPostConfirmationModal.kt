@@ -2,24 +2,25 @@ package com.android.sample.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.android.sample.ui.theme.EdPostBorderSecondary
+import com.android.sample.ui.theme.EdPostDimensions
+import com.android.sample.ui.theme.EdPostIconSecondary
+import com.android.sample.ui.theme.EdPostTextFieldContainer
+import com.android.sample.ui.theme.EdPostTextPrimary
+import com.android.sample.ui.theme.EdPostTransparent
 import com.android.sample.ui.theme.ed1
 import com.android.sample.ui.theme.ed2
 
@@ -46,115 +47,145 @@ fun EdPostConfirmationModal(
   var editedBody by remember(body) { mutableStateOf(body.replace("\\n", "\n")) }
 
   val colorScheme = MaterialTheme.colorScheme
-  val textPrimary = colorScheme.onSurface
   val textSecondary = colorScheme.onSurfaceVariant
   val gradient = Brush.horizontalGradient(listOf(ed1, ed2))
-  val pillBg = Color(0xFF1C1C1E)
 
   Column(
-      modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
-      verticalArrangement = Arrangement.spacedBy(10.dp)) {
+      modifier =
+          modifier
+              .fillMaxWidth()
+              .padding(
+                  horizontal = EdPostDimensions.ContainerHorizontalPadding,
+                  vertical = EdPostDimensions.ContainerVerticalPadding),
+      verticalArrangement = Arrangement.spacedBy(EdPostDimensions.ContainerVerticalSpacing)) {
 
         // Gradient frame
         EdPostGradientFrame(gradient = gradient) {
           Column(
-              modifier = Modifier.fillMaxWidth().padding(16.dp),
-              verticalArrangement = Arrangement.spacedBy(12.dp)) {
+              modifier = Modifier.fillMaxWidth().padding(EdPostDimensions.ContentHorizontalPadding),
+              verticalArrangement = Arrangement.spacedBy(EdPostDimensions.ContentVerticalSpacing)) {
                 // Title capsule row
                 OutlinedTextField(
                     value = editedTitle,
                     onValueChange = { editedTitle = it },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text(text = "Titre", color = textSecondary, fontSize = 15.sp) },
+                    placeholder = {
+                      Text(
+                          text = "Titre",
+                          color = textSecondary,
+                          fontSize = EdPostDimensions.TextFieldPlaceholderFontSize)
+                    },
                     textStyle =
                         MaterialTheme.typography.titleLarge.copy(
-                            fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White),
+                            fontSize = EdPostDimensions.TextFieldTitleFontSize,
+                            fontWeight = FontWeight.Bold,
+                            color = EdPostTextPrimary),
                     colors =
                         OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            cursorColor = Color.White,
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedContainerColor = Color(0xFF16161A),
-                            unfocusedContainerColor = Color(0xFF16161A)),
-                    shape = RoundedCornerShape(12.dp),
+                            focusedTextColor = EdPostTextPrimary,
+                            unfocusedTextColor = EdPostTextPrimary,
+                            cursorColor = EdPostTextPrimary,
+                            focusedBorderColor = EdPostTransparent,
+                            unfocusedBorderColor = EdPostTransparent,
+                            focusedContainerColor = EdPostTextFieldContainer,
+                            unfocusedContainerColor = EdPostTextFieldContainer),
+                    shape = RoundedCornerShape(EdPostDimensions.TextFieldTitleCornerRadius),
                     singleLine = true,
                     trailingIcon = {
                       Icon(
                           imageVector = Icons.Outlined.Edit,
                           contentDescription = "Edit title",
-                          tint = Color.White.copy(alpha = 0.7f),
-                          modifier = Modifier.size(18.dp))
+                          tint = EdPostIconSecondary,
+                          modifier = Modifier.size(EdPostDimensions.IconEditSize))
                     })
 
                 // Body text field (multiline)
                 OutlinedTextField(
                     value = editedBody,
                     onValueChange = { editedBody = it },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 200.dp, max = 360.dp),
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .heightIn(
+                                min = EdPostDimensions.TextFieldBodyMinHeight,
+                                max = EdPostDimensions.TextFieldBodyMaxHeight),
                     placeholder = {
                       Text(
-                          text = "Votre question pour ED…", color = textSecondary, fontSize = 15.sp)
+                          text = "Votre question pour ED…",
+                          color = textSecondary,
+                          fontSize = EdPostDimensions.TextFieldPlaceholderFontSize)
                     },
                     textStyle =
                         MaterialTheme.typography.bodyLarge.copy(
-                            fontSize = 16.sp, color = Color.White, lineHeight = 23.sp),
+                            fontSize = EdPostDimensions.TextFieldBodyFontSize,
+                            color = EdPostTextPrimary,
+                            lineHeight = EdPostDimensions.TextFieldBodyLineHeight),
                     colors =
                         OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            cursorColor = Color.White,
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedContainerColor = Color(0xFF16161A),
-                            unfocusedContainerColor = Color(0xFF16161A)),
-                    shape = RoundedCornerShape(14.dp),
-                    maxLines = 14,
+                            focusedTextColor = EdPostTextPrimary,
+                            unfocusedTextColor = EdPostTextPrimary,
+                            cursorColor = EdPostTextPrimary,
+                            focusedBorderColor = EdPostTransparent,
+                            unfocusedBorderColor = EdPostTransparent,
+                            focusedContainerColor = EdPostTextFieldContainer,
+                            unfocusedContainerColor = EdPostTextFieldContainer),
+                    shape = RoundedCornerShape(EdPostDimensions.TextFieldBodyCornerRadius),
+                    maxLines = EdPostDimensions.TextFieldBodyMaxLines,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default))
 
                 // Action buttons row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    horizontalArrangement = Arrangement.spacedBy(EdPostDimensions.ButtonSpacing)) {
                       // Cancel button (outline)
                       OutlinedButton(
                           onClick = onCancel,
                           modifier = Modifier.weight(1f),
-                          colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                          shape = RoundedCornerShape(10.dp),
-                          border = BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))) {
-                            Text(text = "Cancel", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                          colors =
+                              ButtonDefaults.outlinedButtonColors(contentColor = EdPostTextPrimary),
+                          shape = RoundedCornerShape(EdPostDimensions.ButtonCancelCornerRadius),
+                          border =
+                              BorderStroke(
+                                  EdPostDimensions.ButtonBorderWidth, EdPostBorderSecondary)) {
+                            Text(
+                                text = "Cancel",
+                                fontSize = EdPostDimensions.ButtonTextFontSize,
+                                fontWeight = FontWeight.Medium)
                           }
 
                       // Post button (gradient purple)
                       Button(
                           onClick = { onPublish(editedTitle, editedBody) },
                           modifier = Modifier.weight(1f),
-                          colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                          colors = ButtonDefaults.buttonColors(containerColor = EdPostTransparent),
                           contentPadding = PaddingValues(),
-                          shape = RoundedCornerShape(12.dp)) {
+                          shape = RoundedCornerShape(EdPostDimensions.ButtonPostCornerRadius)) {
                             Box(
                                 modifier =
                                     Modifier.background(
-                                            brush = gradient, shape = RoundedCornerShape(12.dp))
+                                            brush = gradient,
+                                            shape =
+                                                RoundedCornerShape(
+                                                    EdPostDimensions.ButtonGradientCornerRadius))
                                         .fillMaxWidth()
-                                        .padding(vertical = 12.dp),
+                                        .padding(vertical = EdPostDimensions.ButtonVerticalPadding),
                                 contentAlignment = Alignment.Center) {
                                   Row(
                                       horizontalArrangement = Arrangement.Center,
                                       verticalAlignment = Alignment.CenterVertically) {
                                         Text(
                                             text = "Post",
-                                            fontSize = 14.sp,
+                                            fontSize = EdPostDimensions.ButtonTextFontSize,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color.White)
-                                        Spacer(modifier = Modifier.width(10.dp))
+                                            color = EdPostTextPrimary)
+                                        Spacer(
+                                            modifier =
+                                                Modifier.width(
+                                                    EdPostDimensions.ButtonIconSpacerWidth))
                                         Icon(
-                                            imageVector = Icons.Rounded.Send,
+                                            imageVector = Icons.AutoMirrored.Rounded.Send,
                                             contentDescription = null,
-                                            modifier = Modifier.size(18.dp),
-                                            tint = Color.White)
+                                            modifier = Modifier.size(EdPostDimensions.IconSendSize),
+                                            tint = EdPostTextPrimary)
                                       }
                                 }
                           }

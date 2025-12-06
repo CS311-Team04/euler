@@ -12,8 +12,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
+import com.android.sample.ui.theme.EdPostCardBackground
+import com.android.sample.ui.theme.EdPostDimensions
 
 /**
  * Reusable gradient frame wrapper for ED post components. Provides a consistent visual style with
@@ -33,17 +33,25 @@ internal fun EdPostGradientFrame(
       modifier =
           modifier
               .fillMaxWidth()
-              .border(BorderStroke(2.dp, gradient), RoundedCornerShape(18.dp))
-              .background(Color(0xFF0F0F0F), RoundedCornerShape(18.dp))) {
+              .border(
+                  BorderStroke(EdPostDimensions.GradientFrameBorderWidth, gradient),
+                  RoundedCornerShape(EdPostDimensions.GradientFrameOuterCornerRadius))
+              .background(
+                  EdPostCardBackground,
+                  RoundedCornerShape(EdPostDimensions.GradientFrameOuterCornerRadius))) {
         // Main card container
         Card(
             modifier =
                 Modifier.fillMaxWidth()
-                    .padding(2.dp) // keep gradient visible
-                    .background(Color(0xFF0F0F0F), RoundedCornerShape(16.dp)),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F0F0F)),
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
+                    .padding(EdPostDimensions.GradientFrameInnerPadding)
+                    .background(
+                        EdPostCardBackground,
+                        RoundedCornerShape(EdPostDimensions.GradientFrameInnerCornerRadius)),
+            colors = CardDefaults.cardColors(containerColor = EdPostCardBackground),
+            shape = RoundedCornerShape(EdPostDimensions.GradientFrameInnerCornerRadius),
+            elevation =
+                CardDefaults.cardElevation(
+                    defaultElevation = EdPostDimensions.GradientFrameElevation)) {
               content()
             }
       }

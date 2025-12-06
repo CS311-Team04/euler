@@ -12,12 +12,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.android.sample.home.EdPostCard
 import com.android.sample.home.EdPostStatus
+import com.android.sample.ui.theme.EdPostDimensions
+import com.android.sample.ui.theme.EdPostStatusCancelled
+import com.android.sample.ui.theme.EdPostStatusPublished
+import com.android.sample.ui.theme.EdPostTextPrimary
 import com.android.sample.ui.theme.ed1
 import com.android.sample.ui.theme.ed2
 
@@ -25,34 +26,45 @@ import com.android.sample.ui.theme.ed2
 fun EdPostedCard(card: EdPostCard, modifier: Modifier = Modifier) {
   val statusColor =
       when (card.status) {
-        EdPostStatus.Published -> Color(0xFF2ECC71) // green
-        EdPostStatus.Cancelled -> Color(0xFFE74C3C) // red
+        EdPostStatus.Published -> EdPostStatusPublished
+        EdPostStatus.Cancelled -> EdPostStatusCancelled
       }
   val gradient = Brush.horizontalGradient(listOf(ed1, ed2))
 
   Column(
-      modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
-      verticalArrangement = Arrangement.spacedBy(10.dp)) {
+      modifier =
+          modifier
+              .fillMaxWidth()
+              .padding(
+                  horizontal = EdPostDimensions.ContainerHorizontalPadding,
+                  vertical = EdPostDimensions.ContainerVerticalPadding),
+      verticalArrangement = Arrangement.spacedBy(EdPostDimensions.ContainerVerticalSpacing)) {
         // Gradient frame
         EdPostGradientFrame(gradient = gradient) {
           Column(
-              modifier = Modifier.fillMaxWidth().padding(16.dp),
-              verticalArrangement = Arrangement.spacedBy(12.dp)) {
+              modifier = Modifier.fillMaxWidth().padding(EdPostDimensions.ContentHorizontalPadding),
+              verticalArrangement = Arrangement.spacedBy(EdPostDimensions.ContentVerticalSpacing)) {
                 // Title and status row
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    horizontalArrangement =
+                        Arrangement.spacedBy(EdPostDimensions.CardRowHorizontalSpacing)) {
                       Text(
                           text = card.title.ifBlank { "ED post" },
-                          color = Color.White,
+                          color = EdPostTextPrimary,
                           fontWeight = FontWeight.Bold,
-                          style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp))
+                          style =
+                              MaterialTheme.typography.titleLarge.copy(
+                                  fontSize = EdPostDimensions.CardTitleFontSize))
                       Spacer(Modifier.weight(1f))
                       Box(
                           modifier =
                               Modifier.background(
-                                      statusColor.copy(alpha = 0.14f), RoundedCornerShape(10.dp))
-                                  .padding(horizontal = 10.dp, vertical = 6.dp)) {
+                                      statusColor.copy(alpha = EdPostDimensions.StatusBadgeAlpha),
+                                      RoundedCornerShape(EdPostDimensions.StatusBadgeCornerRadius))
+                                  .padding(
+                                      horizontal = EdPostDimensions.StatusBadgeHorizontalPadding,
+                                      vertical = EdPostDimensions.StatusBadgeVerticalPadding)) {
                             Text(
                                 text =
                                     if (card.status == EdPostStatus.Published) "Published"
@@ -66,12 +78,13 @@ fun EdPostedCard(card: EdPostCard, modifier: Modifier = Modifier) {
                 // Ed Discussion footer
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    horizontalArrangement =
+                        Arrangement.spacedBy(EdPostDimensions.CardFooterHorizontalSpacing)) {
                       Icon(
                           imageVector = Icons.Default.CheckCircle,
                           contentDescription = null,
                           tint = statusColor,
-                          modifier = Modifier.size(16.dp))
+                          modifier = Modifier.size(EdPostDimensions.IconStatusSize))
                       Text(
                           text = "Ed Discussion",
                           color = statusColor,
