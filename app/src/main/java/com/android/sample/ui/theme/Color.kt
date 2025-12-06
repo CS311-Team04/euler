@@ -121,6 +121,16 @@ val MoodleLoginError = Color(0xFFDC3545) // Error text color (Bootstrap red)
 val ed1 = Color(0xFF6B46C1)
 val ed2 = Color(0xFFEC4899)
 
+// ED Post component colors
+val EdPostCardBackground = DarkBackground // #0F0F0F - background for gradient frame and card
+val EdPostTextFieldContainer = Color(0xFF16161A) // container color for text fields in modal
+val EdPostStatusPublished = Color(0xFF2ECC71) // green for published status
+val EdPostStatusCancelled = Color(0xFFE74C3C) // red for cancelled status
+val EdPostTextPrimary = Color.White // primary text color
+val EdPostIconSecondary = Color.White.copy(alpha = 0.7f) // secondary icon color (70% opacity)
+val EdPostBorderSecondary = Color.White.copy(alpha = 0.4f) // secondary border color (40% opacity)
+val EdPostTransparent = Color.Transparent // transparent color for borders and buttons
+
 // IS-Academia brand colors
 val isAcademiaR = Color(0xFFC62828)
 

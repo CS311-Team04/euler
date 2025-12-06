@@ -55,6 +55,8 @@ import com.android.sample.R
 import com.android.sample.settings.Localization
 import com.android.sample.speech.SpeechPlayback
 import com.android.sample.speech.SpeechToTextHelper
+import com.android.sample.ui.components.EdPostConfirmationModal
+import com.android.sample.ui.components.EdPostedCard
 import com.android.sample.ui.components.GuestProfileWarningModal
 import com.android.sample.ui.theme.EulerRed
 import kotlinx.coroutines.delay
@@ -72,6 +74,22 @@ object HomeTags {
   const val VoiceBtn = "home_voice_btn"
   const val Drawer = "home_drawer"
   const val TopRightMenu = "home_topright_menu"
+}
+
+private sealed class TimelineItem {
+  abstract val timestamp: Long
+  abstract val key: String
+
+  data class MessageItem(
+      val message: com.android.sample.Chat.ChatUIModel,
+      override val timestamp: Long
+  ) : TimelineItem() {
+    override val key: String = message.id
+  }
+
+  data class CardItem(val card: EdPostCard, override val timestamp: Long) : TimelineItem() {
+    override val key: String = card.id
+  }
 }
 
 /**
@@ -413,45 +431,68 @@ fun HomeScreen(
                         listState.animateScrollToItem(lastIndex)
                       }
 
+                      val edPostAction =
+                          ui.pendingAction as? com.android.sample.home.PendingAction.PostOnEd
+                      val messagesToShow = ui.messages
+
+                      // Merge messages and ED cards into a single timeline sorted by timestamp
+                      val timeline =
+                          remember(messagesToShow, ui.edPostCards) {
+                            val msgItems =
+                                messagesToShow.map { TimelineItem.MessageItem(it, it.timestamp) }
+                            val cardItems =
+                                ui.edPostCards.map { TimelineItem.CardItem(it, it.createdAt) }
+                            (msgItems + cardItems).sortedBy { it.timestamp }
+                          }
+
                       LazyColumn(
                           state = listState,
                           modifier = Modifier.fillMaxSize().padding(16.dp),
                           verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            items(items = ui.messages, key = { it.id }) { item ->
-                              val showLeadingDot =
-                                  item.id == ui.streamingMessageId && item.text.isEmpty()
-                              val audioState =
-                                  audioController.audioStateFor(item, ui.streamingMessageId)
+                            items(items = timeline, key = { it.key }) { item ->
+                              when (item) {
+                                is TimelineItem.MessageItem -> {
+                                  val msg = item.message
+                                  val showLeadingDot =
+                                      msg.id == ui.streamingMessageId && msg.text.isEmpty()
+                                  val audioState =
+                                      audioController.audioStateFor(msg, ui.streamingMessageId)
 
-                              // If this message carries a source, draw the card first
-                              if (item.source != null && !item.isThinking) {
-                                val context = androidx.compose.ui.platform.LocalContext.current
-                                SourceCard(
-                                    siteLabel = item.source.siteLabel,
-                                    title = item.source.title,
-                                    url = item.source.url,
-                                    retrievedAt = item.source.retrievedAt,
-                                    isScheduleSource = item.source.isScheduleSource,
-                                    onVisit =
-                                        if (item.source.url != null &&
-                                            !item.source.isScheduleSource) {
-                                          {
-                                            val intent =
-                                                Intent(
-                                                    Intent.ACTION_VIEW, Uri.parse(item.source.url))
-                                            context.startActivity(intent)
-                                          }
-                                        } else null)
-                                Spacer(Modifier.height(8.dp))
+                                  // If this message carries a source, draw the card first
+                                  if (msg.source != null && !msg.isThinking) {
+                                    val context = androidx.compose.ui.platform.LocalContext.current
+                                    SourceCard(
+                                        siteLabel = msg.source.siteLabel,
+                                        title = msg.source.title,
+                                        url = msg.source.url,
+                                        retrievedAt = msg.source.retrievedAt,
+                                        isScheduleSource = msg.source.isScheduleSource,
+                                        onVisit =
+                                            if (msg.source.url != null &&
+                                                !msg.source.isScheduleSource) {
+                                              {
+                                                val intent =
+                                                    Intent(
+                                                        Intent.ACTION_VIEW,
+                                                        Uri.parse(msg.source.url))
+                                                context.startActivity(intent)
+                                              }
+                                            } else null)
+                                    Spacer(Modifier.height(8.dp))
+                                  }
+
+                                  // Then render the usual chat bubble (for USER/AI text)
+                                  ChatMessage(
+                                      message = msg,
+                                      modifier = Modifier.fillMaxWidth(),
+                                      isStreaming = showLeadingDot,
+                                      audioState = audioState,
+                                      aiText = textPrimary)
+                                }
+                                is TimelineItem.CardItem -> {
+                                  EdPostedCard(item.card, modifier = Modifier.fillMaxWidth())
+                                }
                               }
-
-                              // Then render the usual chat bubble (for USER/AI text)
-                              ChatMessage(
-                                  message = item,
-                                  modifier = Modifier.fillMaxWidth(),
-                                  isStreaming = showLeadingDot,
-                                  audioState = audioState,
-                                  aiText = textPrimary)
                             }
 
                             // Global thinking indicator shown AFTER the last user message.
@@ -463,6 +504,21 @@ fun HomeScreen(
                                         Modifier.fillMaxWidth()
                                             .padding(vertical = 8.dp)
                                             .testTag("home_thinking_indicator"))
+                              }
+                            }
+
+                            // Inline ED post proposal card at the end of the list
+                            if (edPostAction != null) {
+                              item {
+                                EdPostConfirmationModal(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    title = edPostAction.draftTitle,
+                                    body = edPostAction.draftBody,
+                                    onPublish = { title, body ->
+                                      viewModel.publishEdPost(title, body)
+                                    },
+                                    onCancel = { viewModel.cancelEdPost() })
+                                Spacer(Modifier.height(8.dp))
                               }
                             }
                           }
@@ -494,6 +550,8 @@ fun HomeScreen(
               onSignOut()
             })
       }
+
+  // ED post status banner (published / cancelled)
 }
 
 /** Compact, rounded action button used in the bottom actions row. */
