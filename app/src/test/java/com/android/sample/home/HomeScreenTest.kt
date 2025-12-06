@@ -989,8 +989,8 @@ class HomeScreenComposeInteractionsTest {
     composeRule.setContent { HomeScreen(viewModel = viewModel) }
     composeRule.waitForIdle()
     // Find the text field by its text content (same approach as EdPostConfirmationModalTest)
-    composeRule.onNodeWithText("Title").assertIsDisplayed()
-    composeRule.onNodeWithText("Post").performClick()
+    composeRule.onNode(hasText("Title"), useUnmergedTree = true).assertIsDisplayed()
+    composeRule.onNodeWithText("Post", useUnmergedTree = true).performClick()
     composeRule.waitForIdle()
     composeRule.runOnIdle {
       assertNull(viewModel.uiState.value.pendingAction)
@@ -1009,7 +1009,7 @@ class HomeScreenComposeInteractionsTest {
     }
     composeRule.setContent { HomeScreen(viewModel = viewModel) }
     composeRule.waitForIdle()
-    composeRule.onNodeWithText("Cancel").performClick()
+    composeRule.onNodeWithText("Cancel", useUnmergedTree = true).performClick()
     composeRule.waitForIdle()
     composeRule.runOnIdle {
       assertNull(viewModel.uiState.value.pendingAction)
@@ -1043,8 +1043,9 @@ class HomeScreenComposeInteractionsTest {
     composeRule.waitForIdle()
 
     // Check for card titles (same approach as EdPostedCardTest)
-    composeRule.onNodeWithText("Published").assertIsDisplayed()
-    composeRule.onNodeWithText("Cancelled").assertIsDisplayed()
+    // The title "Published" appears in the card, and "Cancelled" is both a title and a status label
+    composeRule.onNodeWithText("Published", useUnmergedTree = true).assertIsDisplayed()
+    composeRule.onNodeWithText("Cancelled", useUnmergedTree = true).assertIsDisplayed()
   }
 
   @Test
@@ -1054,22 +1055,27 @@ class HomeScreenComposeInteractionsTest {
       it.copy(
           pendingAction =
               com.android.sample.home.PendingAction.PostOnEd(
-                  draftTitle = "Original", draftBody = "Original Body"))
+                  draftTitle = "Original Title", draftBody = "Original Body Text"))
     }
 
     composeRule.setContent { HomeScreen(viewModel = viewModel) }
     composeRule.waitForIdle()
 
-    // Find text fields and replace text
-    composeRule.onNode(hasText("Original")).performTextReplacement("Edited")
-    composeRule.onNode(hasText("Original Body")).performTextReplacement("Edited Body")
-    composeRule.onNodeWithText("Post").performClick()
+    // Find text fields and replace text (use useUnmergedTree to find text in OutlinedTextField)
+    // First field is title (single line), second is body (multiline)
+    composeRule
+        .onNode(hasText("Original Title"), useUnmergedTree = true)
+        .performTextReplacement("Edited Title")
+    composeRule
+        .onNode(hasText("Original Body Text"), useUnmergedTree = true)
+        .performTextReplacement("Edited Body Text")
+    composeRule.onNodeWithText("Post", useUnmergedTree = true).performClick()
     composeRule.waitForIdle()
 
     composeRule.runOnIdle {
       assertEquals(1, viewModel.uiState.value.edPostCards.size)
-      assertEquals("Edited", viewModel.uiState.value.edPostCards.first().title)
-      assertEquals("Edited Body", viewModel.uiState.value.edPostCards.first().body)
+      assertEquals("Edited Title", viewModel.uiState.value.edPostCards.first().title)
+      assertEquals("Edited Body Text", viewModel.uiState.value.edPostCards.first().body)
     }
   }
 }
