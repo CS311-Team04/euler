@@ -11,4 +11,10 @@
     <!-- Source Labels -->
     <string name="source_label_epfl_schedule">Your EPFL Schedule</string>
     <string name="source_label_schedule_description">Retrieved from your connected calendar</string>
+    
+    <!-- ED Post Confirmation Modal -->
+    <string name="ed_post_title_placeholder">Titre</string>
+    <string name="ed_post_body_placeholder">Votre question pour ED…</string>
+    <string name="ed_post_cancel_button">Cancel</string>
+    <string name="ed_post_post_button">Post</string>
 </resources>
