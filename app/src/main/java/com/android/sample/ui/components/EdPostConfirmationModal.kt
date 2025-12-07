@@ -13,8 +13,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import com.android.sample.R
 import com.android.sample.ui.theme.EdPostBorderSecondary
 import com.android.sample.ui.theme.EdPostDimensions
 import com.android.sample.ui.theme.EdPostIconSecondary
@@ -71,7 +73,7 @@ fun EdPostConfirmationModal(
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = {
                       Text(
-                          text = "Titre",
+                          text = stringResource(R.string.ed_post_title_placeholder),
                           color = textSecondary,
                           fontSize = EdPostDimensions.TextFieldPlaceholderFontSize)
                     },
@@ -110,7 +112,7 @@ fun EdPostConfirmationModal(
                                 max = EdPostDimensions.TextFieldBodyMaxHeight),
                     placeholder = {
                       Text(
-                          text = "Votre question pour ED…",
+                          text = stringResource(R.string.ed_post_body_placeholder),
                           color = textSecondary,
                           fontSize = EdPostDimensions.TextFieldPlaceholderFontSize)
                     },
@@ -147,7 +149,7 @@ fun EdPostConfirmationModal(
                               BorderStroke(
                                   EdPostDimensions.ButtonBorderWidth, EdPostBorderSecondary)) {
                             Text(
-                                text = "Cancel",
+                                text = stringResource(R.string.ed_post_cancel_button),
                                 fontSize = EdPostDimensions.ButtonTextFontSize,
                                 fontWeight = FontWeight.Medium)
                           }
@@ -173,7 +175,7 @@ fun EdPostConfirmationModal(
                                       horizontalArrangement = Arrangement.Center,
                                       verticalAlignment = Alignment.CenterVertically) {
                                         Text(
-                                            text = "Post",
+                                            text = stringResource(R.string.ed_post_post_button),
                                             fontSize = EdPostDimensions.ButtonTextFontSize,
                                             fontWeight = FontWeight.Bold,
                                             color = EdPostTextPrimary)

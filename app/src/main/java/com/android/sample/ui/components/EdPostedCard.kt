@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -13,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import com.android.sample.home.EdPostCard
 import com.android.sample.home.EdPostStatus
 import com.android.sample.ui.theme.EdPostDimensions
@@ -55,8 +57,10 @@ fun EdPostedCard(card: EdPostCard, modifier: Modifier = Modifier) {
                           fontWeight = FontWeight.Bold,
                           style =
                               MaterialTheme.typography.titleLarge.copy(
-                                  fontSize = EdPostDimensions.CardTitleFontSize))
-                      Spacer(Modifier.weight(1f))
+                                  fontSize = EdPostDimensions.CardTitleFontSize),
+                          maxLines = 1,
+                          overflow = TextOverflow.Ellipsis,
+                          modifier = Modifier.weight(1f))
                       Box(
                           modifier =
                               Modifier.background(
@@ -81,7 +85,9 @@ fun EdPostedCard(card: EdPostCard, modifier: Modifier = Modifier) {
                     horizontalArrangement =
                         Arrangement.spacedBy(EdPostDimensions.CardFooterHorizontalSpacing)) {
                       Icon(
-                          imageVector = Icons.Default.CheckCircle,
+                          imageVector =
+                              if (card.status == EdPostStatus.Published) Icons.Default.CheckCircle
+                              else Icons.Filled.Close,
                           contentDescription = null,
                           tint = statusColor,
                           modifier = Modifier.size(EdPostDimensions.IconStatusSize))
