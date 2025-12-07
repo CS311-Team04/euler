@@ -41,10 +41,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
-import org.mockito.kotlin.doThrow
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
-import org.mockito.kotlin.onBlocking
 import org.mockito.kotlin.timeout
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -285,12 +283,19 @@ class HomeViewModelTest {
   @Test
   fun publishEdPost_adds_published_card_and_clears_pending() =
       runTest(testDispatcher) {
-        val viewModel = createHomeViewModel()
+        val dataSource = mock<EdPostRemoteDataSource>()
+        runBlocking {
+          whenever(dataSource.publish(any(), any())).thenReturn(EdPostPublishResult(1, 1, 1))
+        }
+        val viewModel =
+            HomeViewModel(
+                profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
         viewModel.updateUiState {
           it.copy(pendingAction = PendingAction.PostOnEd(draftTitle = "T", draftBody = "B"))
         }
 
         viewModel.publishEdPost("T", "B")
+        advanceUntilIdle()
 
         val state = viewModel.uiState.value
         assertNull(state.pendingAction)
@@ -346,7 +351,13 @@ class HomeViewModelTest {
   @Test
   fun publishEdPost_accumulates_multiple_cards() =
       runTest(testDispatcher) {
-        val viewModel = createHomeViewModel()
+        val dataSource = mock<EdPostRemoteDataSource>()
+        runBlocking {
+          whenever(dataSource.publish(any(), any())).thenReturn(EdPostPublishResult(2, 1153, 20))
+        }
+        val viewModel =
+            HomeViewModel(
+                profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
         viewModel.updateUiState {
           it.copy(
               edPostCards =
@@ -362,6 +373,7 @@ class HomeViewModelTest {
         }
 
         viewModel.publishEdPost("Second", "Second body")
+        advanceUntilIdle()
 
         val state = viewModel.uiState.value
         assertEquals(2, state.edPostCards.size)
@@ -504,10 +516,10 @@ class HomeViewModelTest {
   @Test
   fun publishEdPost_clears_edPostResult() =
       runTest(testDispatcher) {
-        val dataSource =
-            mock<EdPostRemoteDataSource> {
-              onBlocking { publish(any(), any()) } doReturn EdPostPublishResult(1, 1, 1)
-            }
+        val dataSource = mock<EdPostRemoteDataSource>()
+        runBlocking {
+          whenever(dataSource.publish(any(), any())).thenReturn(EdPostPublishResult(1, 1, 1))
+        }
         val viewModel =
             HomeViewModel(
                 profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
@@ -544,10 +556,10 @@ class HomeViewModelTest {
   @Test
   fun publishEdPost_success_adds_card_and_clears_pending() =
       runTest(testDispatcher) {
-        val dataSource =
-            mock<EdPostRemoteDataSource> {
-              onBlocking { publish(any(), any()) } doReturn EdPostPublishResult(99, 1153, 12)
-            }
+        val dataSource = mock<EdPostRemoteDataSource>()
+        runBlocking {
+          whenever(dataSource.publish(any(), any())).thenReturn(EdPostPublishResult(99, 1153, 12))
+        }
         val viewModel =
             HomeViewModel(
                 profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
@@ -565,10 +577,10 @@ class HomeViewModelTest {
   @Test
   fun publishEdPost_failure_preserves_draft_and_sets_error() =
       runTest(testDispatcher) {
-        val dataSource =
-            mock<EdPostRemoteDataSource> {
-              onBlocking { publish(any(), any()) } doThrow RuntimeException("backend down")
-            }
+        val dataSource = mock<EdPostRemoteDataSource>()
+        runBlocking {
+          whenever(dataSource.publish(any(), any())).thenThrow(RuntimeException("backend down"))
+        }
         val viewModel =
             HomeViewModel(
                 profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)

@@ -8,7 +8,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import org.mockito.ArgumentCaptor
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.doReturn
@@ -22,7 +21,7 @@ class EdPostRemoteDataSourceTest {
   fun publish_parses_camelCase_ids_and_sends_default_course() = runTest {
     val callableResult =
         mock<HttpsCallableResult> {
-          on { data } doReturn
+          on { getData() } doReturn
               mapOf(
                   "threadId" to 10,
                   "courseId" to 1153,
@@ -47,7 +46,7 @@ class EdPostRemoteDataSourceTest {
     assertEquals(7L, result.threadNumber)
 
     // payload contains default courseId
-    val captor: ArgumentCaptor<Map<String, Any>> = argumentCaptor()
+    val captor = argumentCaptor<Map<String, Any>>()
     verify(callableRef).call(captor.capture())
     assertEquals(1153L, captor.firstValue["courseId"])
   }
@@ -56,7 +55,7 @@ class EdPostRemoteDataSourceTest {
   fun publish_parses_snake_case_ids() = runTest {
     val callableResult =
         mock<HttpsCallableResult> {
-          on { data } doReturn
+          on { getData() } doReturn
               mapOf(
                   "thread_id" to 5,
                   "course_id" to 222,
