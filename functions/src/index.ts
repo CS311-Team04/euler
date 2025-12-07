@@ -64,13 +64,18 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
+const ED_DEFAULT_COURSE_ID = Number(
+  process.env.ED_DEFAULT_COURSE_ID || "1153"
+);
+
 // ED Discussion connector (stored in Firestore under connectors_ed/{userId})
 const edConnectorRepository = new EdConnectorRepository(db);
 const edConnectorService = new EdConnectorService(
   edConnectorRepository,
   encryptSecret,
   decryptSecret,
-  "https://eu.edstem.org/api"
+  "https://eu.edstem.org/api",
+  ED_DEFAULT_COURSE_ID
 );
 
 // Embeddings = Jina
@@ -1104,6 +1109,50 @@ export const edConnectorTestFn = europeFunctions.https.onCall(
       throw new functions.https.HttpsError(
         "internal",
         "Failed to test ED connector",
+        String(e?.message || e)
+      );
+    }
+  }
+);
+
+type EdConnectorPostCallableInput = {
+  title?: string;
+  body?: string;
+  courseId?: number;
+};
+
+export const edConnectorPostFn = europeFunctions.https.onCall(
+  async (data: EdConnectorPostCallableInput, context) => {
+    const uid = requireAuth(context);
+
+    const title = String(data?.title || "").trim();
+    const body = String(data?.body || "").trim();
+    const courseId =
+      typeof data?.courseId === "number" ? data.courseId : undefined;
+
+    if (!title && !body) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "title or body is required"
+      );
+    }
+
+    try {
+      const result = await edConnectorService.postThread(uid, {
+        title,
+        body,
+        courseId,
+      });
+      return result;
+    } catch (e: any) {
+      if (e instanceof functions.https.HttpsError) throw e;
+      logger.error("edConnectorPostFn.failed", {
+        uid,
+        error: String(e),
+      });
+      throw new functions.https.HttpsError(
+        "internal",
+        "Failed to post ED thread",
         String(e?.message || e)
       );
     }

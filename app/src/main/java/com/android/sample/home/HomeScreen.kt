@@ -22,8 +22,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
@@ -37,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -514,6 +517,7 @@ fun HomeScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     title = edPostAction.draftTitle,
                                     body = edPostAction.draftBody,
+                                    isLoading = ui.isPostingToEd,
                                     onPublish = { title, body ->
                                       viewModel.publishEdPost(title, body)
                                     },
@@ -551,7 +555,75 @@ fun HomeScreen(
             })
       }
 
-  // ED post status banner (published / cancelled)
+  // ED post status banner (published / cancelled / failed)
+  val edPostResult = ui.edPostResult
+  LaunchedEffect(edPostResult) {
+    if (edPostResult != null) {
+      // Auto-dismiss after a short delay
+      delay(4_000)
+      viewModel.clearEdPostResult()
+    }
+  }
+  AnimatedVisibility(
+      visible = edPostResult != null,
+      enter = fadeIn(tween(150)),
+      exit = fadeOut(tween(150)),
+      modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+          val bg: Color
+          val icon: ImageVector
+          val title: String
+          val subtitle: String
+          when (val result = edPostResult) {
+            is EdPostResult.Published -> {
+              bg = MaterialTheme.colorScheme.surfaceVariant
+              icon = Icons.Default.CheckCircle
+              title = "Posted to Ed"
+              subtitle = "Your question was published."
+            }
+            is EdPostResult.Cancelled -> {
+              bg = MaterialTheme.colorScheme.surfaceVariant
+              icon = Icons.Default.Close
+              title = "Post cancelled"
+              subtitle = "Draft was discarded."
+            }
+            is EdPostResult.Failed -> {
+              bg = MaterialTheme.colorScheme.errorContainer
+              icon = Icons.Default.Error
+              title = "Failed to post on Ed"
+              subtitle = result.message
+            }
+            else -> {
+              bg = MaterialTheme.colorScheme.surface
+              icon = Icons.Default.Check
+              title = ""
+              subtitle = ""
+            }
+          }
+
+          Surface(
+              tonalElevation = 8.dp,
+              shape = RoundedCornerShape(16.dp),
+              color = bg,
+              modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                      Icon(icon, contentDescription = null)
+                      Column(modifier = Modifier.weight(1f)) {
+                        Text(text = title, fontWeight = FontWeight.Bold)
+                        if (subtitle.isNotBlank()) {
+                          Text(text = subtitle, style = MaterialTheme.typography.bodyMedium)
+                        }
+                      }
+                      IconButton(onClick = { viewModel.clearEdPostResult() }) {
+                        Icon(Icons.Default.Close, contentDescription = "Dismiss")
+                      }
+                    }
+              }
+        }
+      }
 }
 
 /** Compact, rounded action button used in the bottom actions row. */

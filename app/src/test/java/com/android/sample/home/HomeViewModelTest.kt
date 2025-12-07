@@ -41,8 +41,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.doThrow
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
+import org.mockito.kotlin.onBlocking
 import org.mockito.kotlin.timeout
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -502,7 +504,13 @@ class HomeViewModelTest {
   @Test
   fun publishEdPost_clears_edPostResult() =
       runTest(testDispatcher) {
-        val viewModel = createHomeViewModel()
+        val dataSource =
+            mock<EdPostRemoteDataSource> {
+              onBlocking { publish(any(), any()) } doReturn EdPostPublishResult(1, 1, 1)
+            }
+        val viewModel =
+            HomeViewModel(
+                profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
         viewModel.updateUiState {
           it.copy(
               pendingAction = PendingAction.PostOnEd(draftTitle = "T", draftBody = "B"),
@@ -510,9 +518,11 @@ class HomeViewModelTest {
         }
 
         viewModel.publishEdPost("T", "B")
+        advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertNull(state.edPostResult)
+        assertTrue(state.edPostResult is EdPostResult.Published)
+        assertTrue(state.edPostCards.isNotEmpty())
       }
 
   @Test
@@ -528,7 +538,49 @@ class HomeViewModelTest {
         viewModel.cancelEdPost()
 
         val state = viewModel.uiState.value
-        assertNull(state.edPostResult)
+        assertTrue(state.edPostResult is EdPostResult.Cancelled)
+      }
+
+  @Test
+  fun publishEdPost_success_adds_card_and_clears_pending() =
+      runTest(testDispatcher) {
+        val dataSource =
+            mock<EdPostRemoteDataSource> {
+              onBlocking { publish(any(), any()) } doReturn EdPostPublishResult(99, 1153, 12)
+            }
+        val viewModel =
+            HomeViewModel(
+                profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
+
+        viewModel.publishEdPost("Title", "Body")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.edPostResult is EdPostResult.Published)
+        assertNull(state.pendingAction)
+        assertEquals(1, state.edPostCards.size)
+        assertFalse(state.isPostingToEd)
+      }
+
+  @Test
+  fun publishEdPost_failure_preserves_draft_and_sets_error() =
+      runTest(testDispatcher) {
+        val dataSource =
+            mock<EdPostRemoteDataSource> {
+              onBlocking { publish(any(), any()) } doThrow RuntimeException("backend down")
+            }
+        val viewModel =
+            HomeViewModel(
+                profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
+
+        viewModel.publishEdPost("Title", "Body")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.pendingAction is PendingAction.PostOnEd)
+        assertTrue(state.edPostResult is EdPostResult.Failed)
+        assertTrue(state.edPostCards.isEmpty())
+        assertFalse(state.isPostingToEd)
       }
 
   @Test
