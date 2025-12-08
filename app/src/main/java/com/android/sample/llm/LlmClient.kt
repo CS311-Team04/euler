@@ -94,13 +94,17 @@ interface LlmClient {
   suspend fun generateReply(prompt: String): BotReply
 
   /**
-   * Advanced API: prompt + optional rolling summary + recent transcript.
+   * Advanced API: prompt + optional rolling summary + recent transcript + profile context.
    *
    * Default implementation simply ignores the extra context and delegates to [generateReply].
    * Implementations that support RAG can override this.
    */
-  suspend fun generateReply(prompt: String, summary: String?, transcript: String?): BotReply =
-      generateReply(prompt)
+  suspend fun generateReply(
+      prompt: String,
+      summary: String? = null,
+      transcript: String? = null,
+      profileContext: String? = null
+  ): BotReply = generateReply(prompt)
 }
 
 /**
@@ -118,7 +122,7 @@ class FirebaseFunctionsLlmClient(
 
   /** Backwards-compatible entry point: no summary / transcript context. */
   override suspend fun generateReply(prompt: String): BotReply =
-      generateReply(prompt = prompt, summary = null, transcript = null)
+      generateReply(prompt = prompt, summary = null, transcript = null, profileContext = null)
 
   /**
    * Calls the Cloud Function `answerWithRagFn` and extracts the `reply` field.
@@ -127,6 +131,7 @@ class FirebaseFunctionsLlmClient(
    * - "question": the user prompt
    * - "summary": optional rolling summary of the conversation
    * - "recentTranscript": optional recent transcript
+   * - "profileContext": optional user profile information
    *
    * When the function fails (timeout, malformed response, empty reply) the optional fallback is
    * invoked before ultimately throwing an [IllegalStateException].
@@ -134,15 +139,16 @@ class FirebaseFunctionsLlmClient(
   override suspend fun generateReply(
       prompt: String,
       summary: String?,
-      transcript: String?
+      transcript: String?,
+      profileContext: String?
   ): BotReply =
       withContext(Dispatchers.IO) {
-        val data = buildRequestPayload(prompt, summary, transcript)
+        val data = buildRequestPayload(prompt, summary, transcript, profileContext)
         val result = callFirebaseFunction(data)
 
         if (result == null) {
           Log.w(TAG, "Function call returned null (timeout or cancelled)")
-          return@withContext fallback?.generateReply(prompt)
+          return@withContext fallback?.generateReply(prompt, summary, transcript, profileContext)
               ?: throw IllegalStateException("LLM service unavailable: timeout or cancelled")
         }
 
@@ -152,12 +158,14 @@ class FirebaseFunctionsLlmClient(
 
         val map =
             parseResponseMap(result)
-                ?: return@withContext fallback?.generateReply(prompt)
+                ?: return@withContext fallback?.generateReply(
+                    prompt, summary, transcript, profileContext)
                     ?: throw IllegalStateException("Invalid LLM response payload: null data")
 
         val replyText =
             parseReplyText(map)
-                ?: return@withContext fallback?.generateReply(prompt)
+                ?: return@withContext fallback?.generateReply(
+                    prompt, summary, transcript, profileContext)
                     ?: throw IllegalStateException("Empty LLM reply")
 
         buildBotReply(map, replyText)
@@ -166,12 +174,27 @@ class FirebaseFunctionsLlmClient(
   private fun buildRequestPayload(
       prompt: String,
       summary: String?,
-      transcript: String?
-  ): HashMap<String, Any> =
-      hashMapOf<String, Any>(KEY_QUESTION to prompt).apply {
-        summary?.let { put(KEY_SUMMARY, it) }
-        transcript?.let { put(KEY_TRANSCRIPT, it) }
-      }
+      transcript: String?,
+      profileContext: String?
+  ): HashMap<String, Any> {
+    val payload =
+        hashMapOf<String, Any>(KEY_QUESTION to prompt).apply {
+          summary?.let { put(KEY_SUMMARY, it) }
+          transcript?.let { put(KEY_TRANSCRIPT, it) }
+          profileContext?.let {
+            Log.d(
+                TAG,
+                "buildRequestPayload: including profileContext, length=${it.length}, preview=${it.take(100)}...")
+            put(KEY_PROFILE_CONTEXT, it)
+          } ?: Log.d(TAG, "buildRequestPayload: profileContext is null, not including in request")
+        }
+    // DEBUG: Log full payload structure (without full content to avoid spam)
+    Log.d(
+        TAG,
+        "buildRequestPayload: Payload structure - hasQuestion=${payload.containsKey(KEY_QUESTION)}, hasSummary=${payload.containsKey(KEY_SUMMARY)}, hasTranscript=${payload.containsKey(KEY_TRANSCRIPT)}, hasProfileContext=${payload.containsKey(KEY_PROFILE_CONTEXT)}")
+    Log.d(TAG, "buildRequestPayload: Payload keys: ${payload.keys.joinToString()}")
+    return payload
+  }
 
   private suspend fun callFirebaseFunction(
       data: HashMap<String, Any>
@@ -179,7 +202,7 @@ class FirebaseFunctionsLlmClient(
       try {
         Log.d(
             TAG,
-            "Calling $FUNCTION_NAME with data: question=${data[KEY_QUESTION]?.toString()?.take(50)}..., hasSummary=${data.containsKey(KEY_SUMMARY)}, hasTranscript=${data.containsKey(KEY_TRANSCRIPT)}")
+            "Calling $FUNCTION_NAME with data: question=${data[KEY_QUESTION]?.toString()?.take(50)}..., hasSummary=${data.containsKey(KEY_SUMMARY)}, hasTranscript=${data.containsKey(KEY_TRANSCRIPT)}, hasProfileContext=${data.containsKey(KEY_PROFILE_CONTEXT)}")
         withTimeoutOrNull(timeoutMillis) {
           functions.getHttpsCallable(FUNCTION_NAME).call(data).await()
         }
@@ -259,6 +282,7 @@ class FirebaseFunctionsLlmClient(
     private const val KEY_QUESTION = "question"
     private const val KEY_SUMMARY = "summary"
     private const val KEY_TRANSCRIPT = "recentTranscript"
+    private const val KEY_PROFILE_CONTEXT = "profileContext"
 
     // Response payload keys
     private const val KEY_REPLY = "reply"

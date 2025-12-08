@@ -1,5 +1,9 @@
 package com.android.sample.settings.connectors
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import androidx.test.platform.app.InstrumentationRegistry
 import com.android.sample.epfl.EpflScheduleRepository
 import com.android.sample.epfl.ScheduleStatus
 import com.android.sample.util.MainDispatcherRule
@@ -12,6 +16,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
@@ -93,6 +98,8 @@ class ConnectorsViewModelTest {
     advanceUntilIdle()
 
     viewModel.connectConnector("moodle")
+    advanceTimeBy(1000)
+    advanceUntilIdle()
     val uiState = viewModel.uiState.first()
 
     // Moodle should open dialog, not connect directly
@@ -177,12 +184,16 @@ class ConnectorsViewModelTest {
 
     viewModel.connectConnector("moodle")
     viewModel.connectConnector("ed")
+    advanceTimeBy(1000)
+    advanceUntilIdle()
     // Both Moodle and ED open dialogs, not connect directly
     val uiState = viewModel.uiState.first()
 
-    // Both should open dialogs
+    // Moodle opens dialog, ED navigation is handled in UI (no dialog state)
+    // ED connector uses dedicated EdConnectScreen instead of a dialog,
+    // so isEdConnectDialogOpen remains false
     assertTrue(uiState.isMoodleConnectDialogOpen)
-    assertTrue(uiState.isEdConnectDialogOpen)
+    assertFalse(uiState.isEdConnectDialogOpen)
 
     // Neither should be connected yet
     val moodle = uiState.connectors.find { it.id == "moodle" }
@@ -212,6 +223,8 @@ class ConnectorsViewModelTest {
 
     // Connect moodle (opens dialog, then we need to confirm with credentials)
     viewModel.connectConnector("moodle")
+    advanceTimeBy(1000)
+    advanceUntilIdle()
     var uiState = viewModel.uiState.first()
     assertTrue(uiState.isMoodleConnectDialogOpen)
 
@@ -238,6 +251,8 @@ class ConnectorsViewModelTest {
 
     // Connect again (opens dialog)
     viewModel.connectConnector("moodle")
+    advanceTimeBy(1000)
+    advanceUntilIdle()
     assertTrue(viewModel.uiState.first().isMoodleConnectDialogOpen)
   }
 
@@ -477,6 +492,8 @@ class ConnectorsViewModelTest {
             status = MoodleConnectorStatusRemote.CONNECTED, lastTestAt = null, lastError = null)
 
     viewModel.connectConnector("moodle")
+    advanceTimeBy(1000)
+    advanceUntilIdle()
     viewModel.confirmMoodleConnect("https://euler-swent.moodlecloud.com", "test-token")
     advanceUntilIdle()
 
@@ -510,6 +527,8 @@ class ConnectorsViewModelTest {
             lastError = "invalid_credentials")
 
     viewModel.connectConnector("moodle")
+    advanceTimeBy(1000)
+    advanceUntilIdle()
     viewModel.confirmMoodleConnect("https://euler-swent.moodlecloud.com", "invalid-token")
     advanceUntilIdle()
 
@@ -535,6 +554,8 @@ class ConnectorsViewModelTest {
     advanceUntilIdle()
 
     viewModel.connectConnector("moodle")
+    advanceTimeBy(1000)
+    advanceUntilIdle()
     var uiState = viewModel.uiState.first()
     assertTrue(uiState.isMoodleConnectDialogOpen)
 
@@ -542,5 +563,88 @@ class ConnectorsViewModelTest {
     uiState = viewModel.uiState.first()
     assertFalse(uiState.isMoodleConnectDialogOpen)
     assertNull(uiState.moodleConnectError)
+  }
+
+  @Test
+  fun `checkClipboardForEdToken handles various clipboard scenarios`() = runTest {
+    val viewModel = createViewModel()
+    advanceUntilIdle()
+    val context = InstrumentationRegistry.getInstrumentation().targetContext
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+
+    // Valid token with empty input -> shows banner
+    clipboard.setPrimaryClip(ClipData.newPlainText("label", "valid_token_12345"))
+    viewModel.checkClipboardForEdToken(context)
+    advanceUntilIdle()
+    var uiState = viewModel.uiState.first()
+    assertEquals("valid_token_12345", uiState.detectedEdToken)
+    assertTrue(uiState.showEdClipboardSuggestion)
+
+    // Token input not blank -> ignores
+    viewModel.checkClipboardForEdToken(context, "existing")
+    advanceUntilIdle()
+    uiState = viewModel.uiState.first()
+    assertFalse(uiState.showEdClipboardSuggestion)
+
+    // Invalid token (too short) -> no banner
+    clipboard.setPrimaryClip(ClipData.newPlainText("label", "short"))
+    viewModel.checkClipboardForEdToken(context)
+    advanceUntilIdle()
+    uiState = viewModel.uiState.first()
+    assertFalse(uiState.showEdClipboardSuggestion)
+
+    // Empty clipboard -> no banner
+    clipboard.setPrimaryClip(ClipData.newPlainText("label", ""))
+    viewModel.checkClipboardForEdToken(context)
+    advanceUntilIdle()
+    uiState = viewModel.uiState.first()
+    assertFalse(uiState.showEdClipboardSuggestion)
+  }
+
+  @Test
+  fun `acceptEdClipboardToken and dismissEdClipboardSuggestion work correctly`() = runTest {
+    val viewModel = createViewModel()
+    advanceUntilIdle()
+    val context = InstrumentationRegistry.getInstrumentation().targetContext
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+
+    // Accept with token detected
+    clipboard.setPrimaryClip(ClipData.newPlainText("label", "test_token_12345"))
+    viewModel.checkClipboardForEdToken(context)
+    advanceUntilIdle()
+    val token = viewModel.acceptEdClipboardToken()
+    advanceUntilIdle()
+    var uiState = viewModel.uiState.first()
+    assertEquals("test_token_12345", token)
+    assertFalse(uiState.showEdClipboardSuggestion)
+    assertNull(uiState.detectedEdToken)
+
+    // Accept without token -> returns empty
+    val emptyToken = viewModel.acceptEdClipboardToken()
+    assertEquals("", emptyToken)
+
+    // Dismiss clears state
+    clipboard.setPrimaryClip(ClipData.newPlainText("label", "another_token_67890"))
+    viewModel.checkClipboardForEdToken(context)
+    advanceUntilIdle()
+    viewModel.dismissEdClipboardSuggestion()
+    advanceUntilIdle()
+    uiState = viewModel.uiState.first()
+    assertFalse(uiState.showEdClipboardSuggestion)
+    assertNull(uiState.detectedEdToken)
+  }
+
+  @Test
+  fun `checkClipboardForEdToken handles clipboard exceptions gracefully`() = runTest {
+    val viewModel = createViewModel()
+    advanceUntilIdle()
+    val mockContext = mockk<Context>(relaxed = true)
+    every { mockContext.getSystemService(any()) } throws Exception("Clipboard error")
+
+    viewModel.checkClipboardForEdToken(mockContext)
+    advanceUntilIdle()
+    val uiState = viewModel.uiState.first()
+
+    assertFalse(uiState.showEdClipboardSuggestion)
   }
 }

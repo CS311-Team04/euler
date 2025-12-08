@@ -419,11 +419,12 @@ class HomeScreenNewFeaturesTest {
   @Test
   fun suggestionsList_containExpectedKeywords() {
     val expectedSuggestions = getExpectedSuggestions()
-    assertTrue(expectedSuggestions[0].contains("CS220"))
-    assertTrue(expectedSuggestions[1].contains("Moodle"))
-    assertTrue(expectedSuggestions[2].contains("Ed Discussion"))
-    assertTrue(expectedSuggestions[3].contains("IS-Academia"))
-    assertTrue(expectedSuggestions[4].contains("EPFL Drive"))
+    // Updated to reflect new offline-friendly EPFL questions
+    assertTrue(expectedSuggestions[0].contains("EPFL"))
+    assertTrue(expectedSuggestions[1].contains("EPFL"))
+    assertTrue(expectedSuggestions[2].contains("EPFL"))
+    assertTrue(expectedSuggestions[3].contains("EPFL"))
+    assertTrue(expectedSuggestions[4].contains("EPFL"))
   }
 
   /** Test that all suggestions are properly formatted. */

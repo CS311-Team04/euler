@@ -180,4 +180,56 @@ class ConnectorScreenTest {
         .onNodeWithText(Localization.t("settings_connectors_ed_title"))
         .assertIsNotDisplayed()
   }
+
+  @Test
+  fun connectorsScreen_showsMoodleRedirectingOverlay_whenRedirecting() {
+    val mockViewModel = mockk<ConnectorsViewModel>(relaxed = true)
+    val uiState =
+        ConnectorsUiState(
+            connectors =
+                listOf(
+                    Connector(
+                        id = "moodle",
+                        name = "Moodle",
+                        description = "courses",
+                        isConnected = false)),
+            isMoodleRedirecting = true)
+    val stateFlow = MutableStateFlow(uiState)
+
+    io.mockk.every { mockViewModel.uiState } returns stateFlow
+
+    composeRule.setContent { MaterialTheme { ConnectorsScreen(viewModel = mockViewModel) } }
+
+    composeRule.waitForIdle()
+    // Verify that the redirecting overlay is displayed by checking for the "Connecting..." text
+    composeRule
+        .onNodeWithText(Localization.t("settings_connectors_moodle_redirecting"))
+        .assertIsDisplayed()
+  }
+
+  @Test
+  fun connectorsScreen_hidesMoodleRedirectingOverlay_whenNotRedirecting() {
+    val mockViewModel = mockk<ConnectorsViewModel>(relaxed = true)
+    val uiState =
+        ConnectorsUiState(
+            connectors =
+                listOf(
+                    Connector(
+                        id = "moodle",
+                        name = "Moodle",
+                        description = "courses",
+                        isConnected = false)),
+            isMoodleRedirecting = false)
+    val stateFlow = MutableStateFlow(uiState)
+
+    io.mockk.every { mockViewModel.uiState } returns stateFlow
+
+    composeRule.setContent { MaterialTheme { ConnectorsScreen(viewModel = mockViewModel) } }
+
+    composeRule.waitForIdle()
+    // Verify that the redirecting overlay is not displayed
+    composeRule
+        .onNodeWithText(Localization.t("settings_connectors_moodle_redirecting"))
+        .assertIsNotDisplayed()
+  }
 }

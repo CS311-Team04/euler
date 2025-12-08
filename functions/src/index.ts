@@ -74,13 +74,18 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
+const ED_DEFAULT_COURSE_ID = Number(
+  process.env.ED_DEFAULT_COURSE_ID || "1153"
+);
+
 // ED Discussion connector (stored in Firestore under connectors_ed/{userId})
 const edConnectorRepository = new EdConnectorRepository(db);
 const edConnectorService = new EdConnectorService(
   edConnectorRepository,
   encryptSecret,
   decryptSecret,
-  "https://eu.edstem.org/api"
+  "https://eu.edstem.org/api",
+  ED_DEFAULT_COURSE_ID
 );
 
 // Embeddings = Jina
@@ -402,6 +407,7 @@ type AnswerWithRagInput = {
   model?: string;
   summary?: string;
   recentTranscript?: string;
+  profileContext?: string;
   uid?: string; // Optional: for schedule context
 };
 
@@ -412,7 +418,7 @@ const SCHEDULE_PATTERNS = /\b(horaire|schedule|timetable|cours|class|lecture|pla
 const FOOD_PATTERNS = /\b(manger|menu|plat|repas|resto|restaurant|nourriture|déjeuner|dîner|lunch|food|meal|cantine|cafétéria|végétarien|végé|veggie|vegan|prix|cheapest|moins cher|alpine|arcadie|esplanade|espla|native|ornithorynque|orni|piano|qu'est-ce qu'on mange|il y a quoi)\b/i;
 
 export async function answerWithRagCore({
-  question, topK, model, summary, recentTranscript, uid, client,
+  question, topK, model, summary, recentTranscript, profileContext, uid, client,
 }: AnswerWithRagInput & { client?: OpenAI }) {
   const q = question.trim();
   
@@ -515,6 +521,43 @@ export async function answerWithRagCore({
   const trimmedTranscript =
     (recentTranscript ?? "").toString().trim().slice(0, 1500);
 
+  // ===== HARD OVERRIDE: Detect personal questions and force profile usage =====
+  // 1. Detect if question is about profile/personal information
+  const personalQuestionRegex = /\b(mon|ma|mes)\s+(nom|pseudo|section|email|role|faculté|filière)\b|qui\s+(suis-je|je\s+suis)|c'?est\s+quoi\s+(ma|mon)\s+(section|nom|pseudo)/i;
+  const isPersonalQuestion = personalQuestionRegex.test(question);
+  
+  // Additional detection for questions like "quelle est ma section", "quel est mon nom"
+  const alternativePersonalRegex = /(quelle|quel|quelle)\s+est\s+(ma|mon|mes)\s+(section|nom|pseudo|email|faculté|filière)/i;
+  const isPersonalQuestionAlt = alternativePersonalRegex.test(question);
+  
+  const isPersonal = isPersonalQuestion || isPersonalQuestionAlt;
+  
+  // 2. Hard Override: If personal question + profile exists, NUKE the RAG context
+  let finalRagsContext = context;
+  let finalProfileInstruction = "";
+  
+  if (profileContext && isPersonal) {
+    logger.info("answerWithRagCore.override", { 
+      reason: "Personal question detected, ignoring RAG context",
+      questionPreview: question.slice(0, 100),
+      hasProfileContext: Boolean(profileContext),
+      profileContextLen: profileContext.length,
+      originalContextLen: context.length,
+      willUseEmptyContext: true,
+      isPersonalQuestion: isPersonalQuestion,
+      isPersonalQuestionAlt: isPersonalQuestionAlt,
+    });
+    finalRagsContext = ""; // Hide RAG so AI *must* use profile
+    finalProfileInstruction = `\n[[ DONNÉES OFFICIELLES DU PROFIL (PRIORITÉ ABSOLUE) ]]\n${profileContext}\n\nINSTRUCTION CRITIQUE: La question porte sur l'utilisateur. Réponds UNIQUEMENT en utilisant les données du profil ci-dessus. Ignore tout savoir général ou contexte web.\n`;
+  } else {
+    // Log when override is NOT triggered for debugging
+    if (isPersonal && !profileContext) {
+      logger.info("answerWithRagCore.override.skipped", {
+        reason: "Personal question detected but no profile context",
+        questionPreview: question.slice(0, 100),
+      });
+    }
+  }
   // Build schedule-specific instructions if schedule context is present
   const scheduleInstructions = scheduleContext ? 
     "HORAIRE: Liste uniquement les cours demandés (tirets). Pas de commentaires après." : "";
@@ -526,15 +569,35 @@ export async function answerWithRagCore({
     "- Sinon, réponds en 2–4 phrases courtes, chacune sur sa propre ligne.",
     "- Utilise des retours à la ligne pour aérer; pas de titres ni de clôture.",
     "- Rédige toujours au vouvoiement (« vous »). Pour tout fait sur l'utilisateur, écris « Vous … ».",
-    "- Si la question concerne l'utilisateur (section, identité, langue/préférences, horaire personnel), réponds UNIQUEMENT à partir du résumé/ fenêtre récente/ emploi du temps et ignore le contexte RAG.",
-    "- Si le résumé contient des faits pertinents (ex.: section IC, langue, préférences), utilise‑les et ne redemande pas ces informations.",
+    "",
+    "IMPORTANT - Questions personnelles sur l'utilisateur:",
+    "- Si la question concerne le nom, pseudo, section, faculté ou rôle de l'utilisateur (ex: \"c'est quoi ma section\", \"quel est mon nom\", \"quel est mon pseudo\"),",
+    "  tu DOIS utiliser UNIQUEMENT les informations du profil utilisateur fourni dans le contexte système (section PRIORITY USER CONTEXT).",
+    "- IGNORE complètement le contexte RAG pour ces questions personnelles.",
+    "- Réponds directement avec les informations du profil (ex: \"Votre section est Computer Science\").",
+    "- Si la question concerne l'utilisateur (section, identité, langue/préférences), réponds UNIQUEMENT à partir du profil/résumé/fenêtre récente et ignore le contexte RAG.",
+    "",
+    "- Si la question concerne l'horaire/cours, réponds UNIQUEMENT à partir de l'emploi du temps fourni.",
     scheduleInstructions,
-    trimmedSummary ? `\nRésumé conversationnel (à utiliser, ne pas afficher tel quel):\n${trimmedSummary}\n` : "",
+    "",
+    trimmedSummary ? `Résumé conversationnel (à utiliser, ne pas afficher tel quel):\n${trimmedSummary}\n` : "",
     trimmedTranscript ? `Fenêtre récente (ne pas afficher):\n${trimmedTranscript}\n` : "",
     scheduleContext ? `\nEmploi du temps EPFL de l'utilisateur (UTILISER UNIQUEMENT CECI pour les questions d'horaire):\n${scheduleContext}\n` : "",
-    context && !scheduleContext ? `Contexte RAG:\n${context}\n` : "", // Only include RAG if NOT a schedule question
+    
+    // Insert the profile instruction HERE in the user message (hard override)
+    finalProfileInstruction,
+    
+    // Use the (potentially empty) RAG context.
+    // ALSO check if it's a schedule question. If we have schedule context, we usually hide RAG to avoid pollution.
+    (finalRagsContext && !scheduleContext) ? `Contexte RAG (ignorer pour infos personnelles sur l'utilisateur):\n${finalRagsContext}\n` : "",
+    
     `Question: ${question}`,
-    !scheduleContext ? "Si l'information n'est pas dans le résumé ni le contexte, dis que tu ne sais pas." : "",
+    
+    // Conditional Footer Instructions
+    isPersonal && profileContext 
+      ? "INSTRUCTION: Cette question concerne l'utilisateur. Utilise UNIQUEMENT les données du profil fournies ci-dessus. Ne cherche pas ailleurs."
+      : "",
+    !scheduleContext && !isPersonal ? "Si l'information n'est pas dans le résumé ni le contexte, dis que tu ne sais pas." : "",
   ].filter(Boolean).join("\n");
 
   logger.info("answerWithRagCore.context", {
@@ -543,25 +606,48 @@ export async function answerWithRagCore({
     trimmedSummaryLen: trimmedSummary.length,
     hasTranscript: Boolean(trimmedTranscript),
     transcriptLen: trimmedTranscript.length,
+    hasProfileContext: Boolean(profileContext),
+    profileContextLen: profileContext ? profileContext.length : 0,
     titles: chosen.map(c => c.title).filter(Boolean).slice(0, 5),
     summaryHead: trimmedSummary.slice(0, 120),
+    profileContextHead: profileContext ? profileContext.slice(0, 120) : null,
   });
 
-  // Strong, explicit rules for leveraging the rolling summary
+  // Strong, explicit rules for leveraging the rolling summary and profile
   const summaryUsageRules =
     [
-      "Règles d'usage du résumé conversationnel:",
-      "- Considère les faits présents dans le résumé comme fiables et actuels.",
-      "- Si la question fait référence à « je », « mon/ma », « dans ce cas », etc., utilise le résumé pour résoudre ces références.",
-      "- Pour toute information personnelle (section, identité, langue préférée, contraintes/préférences, disponibilités, objectifs), UTILISE UNIQUEMENT le résumé et/ou la fenêtre récente, et IGNORE le contexte RAG.",
-      "- En cas de conflit entre résumé/ fenêtre récente et contexte RAG, le résumé/ fenêtre récente l'emporte toujours.",
+      "Règles d'usage du résumé conversationnel et du profil utilisateur:",
+      "- ORDRE DE PRIORITÉ pour informations personnelles: 1) Profil utilisateur (PRIORITY USER CONTEXT), 2) Résumé, 3) Fenêtre récente. IGNORE le contexte RAG.",
+      "- Considère les faits présents dans le profil utilisateur comme les plus fiables et actuels.",
+      "- Si la question fait référence à « je », « mon/ma », « ma section », « mon nom », « mon pseudo », utilise d'abord le profil utilisateur.",
+      "- Pour toute information personnelle (section, nom, pseudo, faculté, identité, langue préférée), UTILISE UNIQUEMENT le profil utilisateur si disponible, sinon le résumé/fenêtre récente. IGNORE le contexte RAG.",
+      "- En cas de conflit: profil > résumé/fenêtre récente > contexte RAG.",
       "- Formule ces faits au vouvoiement: « Vous … ». N'utilise jamais « je … » ni « tu … » pour parler de l'utilisateur.",
-      "- Ne redemande pas d'informations déjà présentes dans le résumé (ex.: section IC, préférences, langue).",
+      "- Ne redemande pas d'informations déjà présentes dans le profil (ex.: section, nom, pseudo).",
       "- S'il manque une info essentielle, explique brièvement ce qui manque et propose une question ciblée (une seule).",
-      "- N'affiche pas le résumé tel quel et ne parle pas de « résumé » au destinataire.",
+      "- N'affiche pas le profil ni le résumé tel quel et ne parle pas de « profil » ou « résumé » au destinataire.",
     ].join("\n");
 
-  // Merge persona, rules and summary into a SINGLE system message (some models only allow one)
+  // Build priority profile context section if available - placed at END for maximum attention
+  const profileContextSection = profileContext
+    ? [
+        "",
+        "=== PRIORITY USER CONTEXT ===",
+        "The following is the authenticated user's active profile:",
+        "",
+        profileContext,
+        "",
+        "CRITICAL INSTRUCTIONS:",
+        "1. If the user asks about their name, pseudo, section, faculty, or role, you MUST use the info above.",
+        "2. Do NOT use the \"Context\" or web search results to answer questions about the user's identity.",
+        "3. If the profile field is available, state it directly (e.g., \"Votre section est Computer Science\").",
+        "4. For questions like \"c'est quoi ma section\" or \"quel est mon nom\", use ONLY the profile data above.",
+        "5. Ignore RAG context when answering personal information questions - use profile ONLY.",
+        "=============================",
+      ].join("\n")
+    : "";
+
+  // Merge persona, rules, summary first, then profile at END for priority
   const systemContent = [
     EPFL_SYSTEM_PROMPT,
     summaryUsageRules,
@@ -574,9 +660,17 @@ export async function answerWithRagCore({
     scheduleContext
       ? "Emploi du temps EPFL de l'utilisateur (utiliser pour questions d'horaire, cours, salles):\n" + scheduleContext
       : "",
+    profileContextSection, // Profile context at END for maximum attention
   ]
     .filter(Boolean)
     .join("\n\n");
+
+  // Log system content to verify profile context is included (structured logging only)
+  logger.info("answerWithRagCore.systemContent", {
+    systemContentLen: systemContent.length,
+    containsPriorityContext: systemContent.includes("PRIORITY USER CONTEXT"),
+    containsProfileData: profileContext ? systemContent.includes(profileContext.slice(0, 50)) : false,
+  });
 
   const activeClient = client ?? getChatClient();
   const chat = await activeClient.chat.completions.create({
@@ -811,17 +905,39 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
     }
     // === End ED Intent Detection ===
 
+    const profileContext =
+      typeof (data as any)?.profileContext === "string" ? (data as any).profileContext : undefined;
+
+    // Log received profile context (structured logging only)
+    logger.info("answerWithRagFn.profileContext", {
+      received: Boolean(profileContext),
+      length: profileContext ? profileContext.length : 0,
+      preview: profileContext ? profileContext.slice(0, 200) : null,
+      fullContent: profileContext || null, // Log full content for debugging
+    });
+
     logger.info("answerWithRagFn.input", {
       questionLen: question.length,
       hasSummary: Boolean(summary),
       summaryLen: summary ? summary.length : 0,
       hasTranscript: Boolean(recentTranscript),
       transcriptLen: recentTranscript ? recentTranscript.length : 0,
+      hasProfileContext: Boolean(profileContext),
+      profileContextLen: profileContext ? profileContext.length : 0,
       hasUid: Boolean(uid),
       topK,
       model: model ?? process.env.APERTUS_MODEL_ID!,
     });
-    const ragResult = await answerWithRagCore({ question, topK, model, summary, recentTranscript, uid });
+    
+    const ragResult = await answerWithRagCore({
+      question,
+      topK,
+      model,
+      summary,
+      recentTranscript,
+      profileContext,
+      uid,
+    });
     return {
       ...ragResult,
       ed_intent_detected: false,
@@ -1026,6 +1142,50 @@ export const edConnectorTestFn = europeFunctions.https.onCall(
       throw new functions.https.HttpsError(
         "internal",
         "Failed to test ED connector",
+        String(e?.message || e)
+      );
+    }
+  }
+);
+
+type EdConnectorPostCallableInput = {
+  title?: string;
+  body?: string;
+  courseId?: number;
+};
+
+export const edConnectorPostFn = europeFunctions.https.onCall(
+  async (data: EdConnectorPostCallableInput, context) => {
+    const uid = requireAuth(context);
+
+    const title = String(data?.title || "").trim();
+    const body = String(data?.body || "").trim();
+    const courseId =
+      typeof data?.courseId === "number" ? data.courseId : undefined;
+
+    if (!title && !body) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "title or body is required"
+      );
+    }
+
+    try {
+      const result = await edConnectorService.postThread(uid, {
+        title,
+        body,
+        courseId,
+      });
+      return result;
+    } catch (e: any) {
+      if (e instanceof functions.https.HttpsError) throw e;
+      logger.error("edConnectorPostFn.failed", {
+        uid,
+        error: String(e),
+      });
+      throw new functions.https.HttpsError(
+        "internal",
+        "Failed to post ED thread",
         String(e?.message || e)
       );
     }

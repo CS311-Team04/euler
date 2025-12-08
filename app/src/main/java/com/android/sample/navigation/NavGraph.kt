@@ -37,6 +37,7 @@ import com.android.sample.profile.UserProfileRepository
 import com.android.sample.settings.ProfileScreen
 import com.android.sample.settings.SettingsPage
 import com.android.sample.settings.connectors.ConnectorsScreen
+import com.android.sample.settings.connectors.EdConnectScreen
 import com.android.sample.sign_in.AuthViewModel
 import com.android.sample.speech.SpeechPlayback
 import com.android.sample.speech.SpeechToTextHelper
@@ -55,6 +56,7 @@ object Routes {
   const val Settings = "settings"
   const val Profile = "profile"
   const val Connectors = "connectors"
+  const val EdConnect = "ed_connect"
   const val VoiceChat = "voice_chat"
   const val EpflCampus = "epfl_campus"
 }
@@ -653,11 +655,15 @@ fun AppNav(
                 onBackClick = { nav.popBackStack() },
                 onConnectorClick = { connectorId ->
                   when (connectorId) {
+                    "ed" -> nav.navigate(Routes.EdConnect)
                     "epfl_campus" -> nav.navigate(Routes.EpflCampus)
                     else -> android.util.Log.d("NavGraph", "Connector clicked: $connectorId")
                   }
                 })
           }
+
+          // ED Connect Screen
+          composable(Routes.EdConnect) { EdConnectScreen(onBackClick = { nav.popBackStack() }) }
 
           // Voice Chat Screen
           // EPFL Campus Connector Screen

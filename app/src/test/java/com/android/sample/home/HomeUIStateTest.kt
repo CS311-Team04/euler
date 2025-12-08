@@ -755,4 +755,79 @@ class HomeUIStateMoreTest {
     assertTrue(toString.contains("Title"))
     assertTrue(toString.contains("Body"))
   }
+
+  // ===== ED Post Result Tests =====
+
+  @Test
+  fun EdPostResult_Published_and_Cancelled() {
+    val published = EdPostResult.Published(title = "Title", body = "Body")
+    assertEquals("Title", published.title)
+    assertEquals("Body", published.body)
+
+    val cancelled = EdPostResult.Cancelled
+    assertSame(cancelled, EdPostResult.Cancelled)
+    assertNotEquals(published, cancelled)
+  }
+
+  @Test
+  fun HomeUiState_with_edPostResult() {
+    val state1 = HomeUiState()
+    assertNull(state1.edPostResult)
+
+    val state2 = HomeUiState(edPostResult = EdPostResult.Published(title = "T", body = "B"))
+    assertTrue(state2.edPostResult is EdPostResult.Published)
+
+    val state3 = HomeUiState(edPostResult = EdPostResult.Cancelled)
+    assertTrue(state3.edPostResult is EdPostResult.Cancelled)
+
+    val state4 = HomeUiState(edPostResult = EdPostResult.Failed("Oops"))
+    assertTrue(state4.edPostResult is EdPostResult.Failed)
+  }
+
+  // ===== ED Post Card Tests =====
+
+  @Test
+  fun EdPostCard_creation_and_equality() {
+    val card1 =
+        EdPostCard(
+            id = "1", title = "T", body = "B", status = EdPostStatus.Published, createdAt = 1000L)
+    val card2 =
+        EdPostCard(
+            id = "1", title = "T", body = "B", status = EdPostStatus.Published, createdAt = 1000L)
+    val card3 =
+        EdPostCard(
+            id = "2", title = "T", body = "B", status = EdPostStatus.Cancelled, createdAt = 1000L)
+
+    assertEquals(card1, card2)
+    assertNotEquals(card1, card3)
+    assertEquals("1", card1.id)
+    assertEquals(EdPostStatus.Published, card1.status)
+  }
+
+  // ===== HomeUIState with ED Post Cards =====
+
+  @Test
+  fun HomeUiState_with_edPostCards() {
+    val state1 = HomeUiState()
+    assertTrue(state1.edPostCards.isEmpty())
+
+    val cards =
+        listOf(
+            EdPostCard(
+                id = "1",
+                title = "T1",
+                body = "B1",
+                status = EdPostStatus.Published,
+                createdAt = 1000L),
+            EdPostCard(
+                id = "2",
+                title = "T2",
+                body = "B2",
+                status = EdPostStatus.Cancelled,
+                createdAt = 2000L))
+    val state2 = HomeUiState(edPostCards = cards)
+    assertEquals(2, state2.edPostCards.size)
+    assertEquals(EdPostStatus.Published, state2.edPostCards[0].status)
+    assertEquals(EdPostStatus.Cancelled, state2.edPostCards[1].status)
+  }
 }

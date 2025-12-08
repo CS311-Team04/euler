@@ -233,7 +233,7 @@ class HomeScreenTestCov {
 
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
-    composeRule.onNodeWithText("What is EPFL").assertIsDisplayed()
+    // Use tag-based selectors for the first two suggestions (they have testTags)
     composeRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed()
     composeRule.onNodeWithTag(HomeTags.Action2Btn).assertIsDisplayed()
   }
@@ -581,10 +581,10 @@ class HomeScreenTestCov {
     composeRule.waitForIdle()
 
     assertTrue(action1Called)
-    assertTrue(sentMessages.contains("What is EPFL"))
+    assertTrue(sentMessages.contains("What is EPFL?"))
     assertTrue(
         viewModel.uiState.value.messages.any {
-          it.type == ChatType.USER && it.text == "What is EPFL"
+          it.type == ChatType.USER && it.text == "What is EPFL?"
         })
   }
 
@@ -613,9 +613,9 @@ class HomeScreenTestCov {
     // Verify that Action1Btn and Action2Btn are visible (suggestions are shown)
     composeRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed()
     composeRule.onNodeWithTag(HomeTags.Action2Btn).assertIsDisplayed()
-    // Verify suggestion texts are displayed
-    composeRule.onNodeWithText("What is EPFL").assertIsDisplayed()
-    composeRule.onNodeWithText("Check Ed Discussion").assertIsDisplayed()
+    // Verify additional suggestion texts are displayed (these are unique to the chips)
+    composeRule.onNodeWithText("When was EPFL founded?").assertIsDisplayed()
+    composeRule.onNodeWithText("How many students at EPFL?").assertIsDisplayed()
   }
 
   @Test
@@ -680,7 +680,7 @@ class HomeScreenTestCov {
         )
       }
     }
-    composeRule.onAllNodesWithText("What is EPFL").assertCountEquals(0)
+    composeRule.onAllNodesWithText("What is EPFL?").assertCountEquals(0)
   }
 
   @Test
@@ -729,7 +729,7 @@ class HomeScreenTestCov {
         // Verify callbacks were called
         assertTrue("onAction1Click should be called", action1Called)
         assertTrue("onSendMessage should be called", sendMessageCalled)
-        assertEquals("What is EPFL", sendMessageText)
+        assertEquals("What is EPFL?", sendMessageText)
 
         // Note: messageDraft will be empty after sendMessage() is called, which is expected
         // The important thing is that updateMessageDraft() was called with the correct text
@@ -766,7 +766,7 @@ class HomeScreenTestCov {
         // Verify callbacks were called
         assertTrue("onAction2Click should be called", action2Called)
         assertTrue("onSendMessage should be called", sendMessageCalled)
-        assertEquals("Check Ed Discussion", sendMessageText)
+        assertEquals("Where is EPFL located?", sendMessageText)
 
         // Note: messageDraft will be empty after sendMessage() is called, which is expected
         // The important thing is that updateMessageDraft() was called with the correct text
@@ -803,7 +803,7 @@ class HomeScreenTestCov {
         advanceUntilIdle()
         assertTrue("User message should be added", viewModel.uiState.value.messages.isNotEmpty())
         val userMessage = viewModel.uiState.value.messages.first()
-        assertEquals("What is EPFL", userMessage.text)
+        assertEquals("What is EPFL?", userMessage.text)
         assertEquals(ChatType.USER, userMessage.type)
       }
 
@@ -812,10 +812,12 @@ class HomeScreenTestCov {
     val viewModel = createHomeViewModel()
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
     composeRule.waitForIdle()
-    composeRule.onNodeWithText("What is EPFL").assertIsDisplayed()
-    composeRule.onNodeWithText("Check Ed Discussion").assertIsDisplayed()
-    composeRule.onNodeWithText("Show my schedule").assertIsDisplayed()
-    composeRule.onNodeWithText("Find library resources").assertIsDisplayed()
+    // First two suggestions have tags
+    composeRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed()
+    composeRule.onNodeWithTag(HomeTags.Action2Btn).assertIsDisplayed()
+    // Additional suggestions are unique to the chip row
+    composeRule.onNodeWithText("When was EPFL founded?").assertIsDisplayed()
+    composeRule.onNodeWithText("How many students at EPFL?").assertIsDisplayed()
   }
 
   @Test
@@ -858,8 +860,8 @@ class HomeScreenTestCov {
 
     // Other suggestions (index > 1) should not have specific testTags
     // They should still be visible via their text content
-    composeRule.onNodeWithText("Show my schedule").assertIsDisplayed()
-    composeRule.onNodeWithText("Find library resources").assertIsDisplayed()
+    composeRule.onNodeWithText("When was EPFL founded?").assertIsDisplayed()
+    composeRule.onNodeWithText("How many students at EPFL?").assertIsDisplayed()
   }
 
   @Test
@@ -887,7 +889,7 @@ class HomeScreenTestCov {
 
         // Verify that onSendMessage was called with the suggestion text
         // This confirms that updateMessageDraft() was called with the correct text
-        assertEquals("What is EPFL", sendMessageText)
+        assertEquals("What is EPFL?", sendMessageText)
         // Note: messageDraft will be empty after sendMessage() is called, which is expected
         // The important thing is that updateMessageDraft() was called with the correct text
       }
@@ -898,9 +900,9 @@ class HomeScreenTestCov {
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
     // Verify suggestions are displayed in a scrollable row
-    // First suggestions should be visible
-    composeRule.onNodeWithText("What is EPFL").assertIsDisplayed()
-    composeRule.onNodeWithText("Check Ed Discussion").assertIsDisplayed()
+    // First suggestions should be visible (use tags since text may appear in multiple places)
+    composeRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed()
+    composeRule.onNodeWithTag(HomeTags.Action2Btn).assertIsDisplayed()
 
     // Verify the row contains multiple suggestions
     // The horizontalScroll modifier should be present (tested via UI behavior)
@@ -911,7 +913,10 @@ class HomeScreenTestCov {
     // They may not all be visible without scrolling, but they should exist
     // Use try-catch to verify existence without requiring visibility
     val additionalSuggestions =
-        listOf("Show my schedule", "Find library resources", "Search Moodle courses")
+        listOf(
+            "When was EPFL founded?",
+            "How many students at EPFL?",
+            "What are EPFL's research areas?")
     additionalSuggestions.forEach { suggestion ->
       try {
         composeRule.onNodeWithText(suggestion).assertIsDisplayed()
@@ -1090,8 +1095,8 @@ class HomeScreenTestCov {
         }
         composeRule.waitForIdle()
 
-        // Click on third suggestion (index 2) - "Show my schedule"
-        composeRule.onNodeWithText("Show my schedule").performClick()
+        // Click on third suggestion (index 2) - "When was EPFL founded?"
+        composeRule.onNodeWithText("When was EPFL founded?").performClick()
         composeRule.waitForIdle()
         advanceUntilIdle()
 
@@ -1100,7 +1105,7 @@ class HomeScreenTestCov {
         assertFalse("onAction2Click should not be called for index > 1", action2Called)
         // But onSendMessage should still be called with the correct text
         assertTrue("onSendMessage should be called for any suggestion", sendMessageCalled)
-        assertEquals("Show my schedule", sendMessageText)
+        assertEquals("When was EPFL founded?", sendMessageText)
         // Note: messageDraft will be empty after sendMessage() is called, which is expected
         // behavior
       }
@@ -1140,7 +1145,7 @@ class HomeScreenTestCov {
 
         assertEquals("Action1 should be called once", 1, action1CallCount)
         assertEquals("SendMessage should be called once", 1, sendMessageCallCount)
-        assertEquals("What is EPFL", firstSendMessageText)
+        assertEquals("What is EPFL?", firstSendMessageText)
         // Note: messageDraft will be empty after sendMessage() is called
 
         // Click on second suggestion - try by testTag first, fallback to text
@@ -1157,7 +1162,7 @@ class HomeScreenTestCov {
             // If still not found, try clicking by text content
             try {
               composeRule
-                  .onNodeWithText("Check Ed Discussion", useUnmergedTree = true)
+                  .onNodeWithText("Where is EPFL located?", useUnmergedTree = true)
                   .performClick()
             } catch (e3: AssertionError) {
               // If Action2Btn is not accessible after first click, we can't test the sequence
@@ -1172,7 +1177,7 @@ class HomeScreenTestCov {
         assertEquals("Action1 should still be called once", 1, action1CallCount)
         assertEquals("Action2 should be called once", 1, action2CallCount)
         assertEquals("SendMessage should be called twice", 2, sendMessageCallCount)
-        assertEquals("Check Ed Discussion", secondSendMessageText)
+        assertEquals("Where is EPFL located?", secondSendMessageText)
       }
 
   @Test

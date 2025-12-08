@@ -5,6 +5,9 @@ package com.android.sample.settings
  * will automatically recompose when language changes.
  */
 object Localization {
+  private const val BASE_URL_OPTIONAL_DE = "Basis-URL (optional)"
+  private const val BASE_URL_OPTIONAL_ES = "URL base (opcional)"
+
   /**
    * Translate a key to the current language string. Falls back to English if the key is not found
    * in the selected language.
@@ -39,9 +42,24 @@ object Localization {
           "settings_connectors_ed_title" to "Connect to ED",
           "settings_connectors_ed_api_token_label" to "ED API token",
           "settings_connectors_ed_base_url_label" to "Base URL (optional)",
+          "settings_connectors_ed_token_instructions" to
+              "To connect ED, you need a personal API token. We'll store it securely and you won't have to paste it again.",
+          "settings_connectors_ed_get_token_button" to "Open ED Token Page",
+          "settings_connectors_ed_description" to "Connect to the Q&A platform",
+          "settings_connectors_ed_how_to_connect_title" to "How to connect",
+          "settings_connectors_ed_step_1" to "Tap the button below to open your ED API token page",
+          "settings_connectors_ed_step_2" to "Copy the token to clipboard",
+          "settings_connectors_ed_step_3" to "Come back here and paste it below",
+          "settings_connectors_ed_paste_token_label" to "Paste your token",
+          "settings_connectors_ed_paste_token_placeholder" to "Paste your token",
+          "settings_connectors_ed_base_url_placeholder" to "Base URL (optional)",
           "settings_connectors_ed_load_error" to "Failed to load ED connector status",
           "settings_connectors_ed_status_error" to
-              "Unable to load ED connector status. Please try again later.")
+              "Unable to load ED connector status. Please try again later.",
+          "settings_connectors_ed_token_detected_title" to "ED token detected!",
+          "settings_connectors_ed_use_token_button" to "Use this token",
+          "settings_connectors_ed_not_now_button" to "Not now",
+          "paste" to "Paste")
 
   private fun edTranslationsFr() =
       mapOf(
@@ -53,9 +71,25 @@ object Localization {
           "settings_connectors_ed_title" to "Se connecter à ED",
           "settings_connectors_ed_api_token_label" to "Jeton API ED",
           "settings_connectors_ed_base_url_label" to "URL de base (optionnel)",
+          "settings_connectors_ed_token_instructions" to
+              "Pour vous connecter à ED, vous avez besoin d'un jeton API personnel. Nous le stockerons de manière sécurisée et vous n'aurez plus à le coller.",
+          "settings_connectors_ed_get_token_button" to "Ouvrir la page de jeton ED",
+          "settings_connectors_ed_description" to "Se connecter à la plateforme Q&A",
+          "settings_connectors_ed_how_to_connect_title" to "Comment se connecter",
+          "settings_connectors_ed_step_1" to
+              "Appuyez sur le bouton ci-dessous pour ouvrir votre page de jeton API ED",
+          "settings_connectors_ed_step_2" to "Copiez le jeton dans le presse-papiers",
+          "settings_connectors_ed_step_3" to "Revenez ici et collez-le ci-dessous",
+          "settings_connectors_ed_paste_token_label" to "Collez votre jeton",
+          "settings_connectors_ed_paste_token_placeholder" to "Collez votre jeton",
+          "settings_connectors_ed_base_url_placeholder" to "URL de base (optionnel)",
           "settings_connectors_ed_load_error" to "Échec du chargement du statut du connecteur ED",
           "settings_connectors_ed_status_error" to
-              "Impossible de charger le statut du connecteur ED. Veuillez réessayer plus tard.")
+              "Impossible de charger le statut du connecteur ED. Veuillez réessayer plus tard.",
+          "settings_connectors_ed_token_detected_title" to "Jeton ED détecté !",
+          "settings_connectors_ed_use_token_button" to "Utiliser ce jeton",
+          "settings_connectors_ed_not_now_button" to "Pas maintenant",
+          "paste" to "Coller")
 
   private fun edTranslationsDe() =
       mapOf(
@@ -67,10 +101,23 @@ object Localization {
               "ED-API ist nicht erreichbar. Bitte überprüfen Sie Ihre Verbindung.",
           "settings_connectors_ed_title" to "Mit ED verbinden",
           "settings_connectors_ed_api_token_label" to "ED API-Token",
-          "settings_connectors_ed_base_url_label" to "Basis-URL (optional)",
+          "settings_connectors_ed_base_url_label" to BASE_URL_OPTIONAL_DE,
+          "settings_connectors_ed_token_instructions" to
+              "Um sich mit ED zu verbinden, benötigen Sie einen persönlichen API-Token. Wir speichern ihn sicher und Sie müssen ihn nicht erneut einfügen.",
+          "settings_connectors_ed_get_token_button" to "Token abrufen",
+          "settings_connectors_ed_description" to "Mit der Q&A-Plattform verbinden",
+          "settings_connectors_ed_how_to_connect_title" to "So verbinden Sie sich",
+          "settings_connectors_ed_step_1" to
+              "Öffnen Sie https://eu.edstem.org/settings/api-tokens in Ihrem Browser",
+          "settings_connectors_ed_step_2" to "Kopieren Sie das Token in die Zwischenablage",
+          "settings_connectors_ed_step_3" to "Kommen Sie hierher zurück und fügen Sie es unten ein",
+          "settings_connectors_ed_paste_token_label" to "Fügen Sie Ihr Token ein",
+          "settings_connectors_ed_paste_token_placeholder" to "Fügen Sie Ihr Token ein",
+          "settings_connectors_ed_base_url_placeholder" to BASE_URL_OPTIONAL_DE,
           "settings_connectors_ed_load_error" to "Fehler beim Laden des ED-Connector-Status",
           "settings_connectors_ed_status_error" to
-              "ED-Connector-Status konnte nicht geladen werden. Bitte versuchen Sie es später erneut.")
+              "ED-Connector-Status konnte nicht geladen werden. Bitte versuchen Sie es später erneut.",
+          "paste" to "Einfügen")
 
   private fun edTranslationsEs() =
       mapOf(
@@ -81,10 +128,23 @@ object Localization {
               "La API de ED no es accesible. Por favor, verifique su conexión.",
           "settings_connectors_ed_title" to "Conectar a ED",
           "settings_connectors_ed_api_token_label" to "Token API de ED",
-          "settings_connectors_ed_base_url_label" to "URL base (opcional)",
+          "settings_connectors_ed_base_url_label" to BASE_URL_OPTIONAL_ES,
+          "settings_connectors_ed_token_instructions" to
+              "Para conectarse a ED, necesita un token API personal. Lo almacenaremos de forma segura y no tendrá que pegarlo de nuevo.",
+          "settings_connectors_ed_get_token_button" to "Obtener token",
+          "settings_connectors_ed_description" to "Conectarse a la plataforma Q&A",
+          "settings_connectors_ed_how_to_connect_title" to "Cómo conectarse",
+          "settings_connectors_ed_step_1" to
+              "Abra https://eu.edstem.org/settings/api-tokens en su navegador",
+          "settings_connectors_ed_step_2" to "Copie el token al portapapeles",
+          "settings_connectors_ed_step_3" to "Vuelva aquí y péguelo a continuación",
+          "settings_connectors_ed_paste_token_label" to "Pegue su token",
+          "settings_connectors_ed_paste_token_placeholder" to "Pegue su token",
+          "settings_connectors_ed_base_url_placeholder" to BASE_URL_OPTIONAL_ES,
           "settings_connectors_ed_load_error" to "Error al cargar el estado del conector ED",
           "settings_connectors_ed_status_error" to
-              "No se pudo cargar el estado del conector ED. Por favor, inténtelo más tarde.")
+              "No se pudo cargar el estado del conector ED. Por favor, inténtelo más tarde.",
+          "paste" to "Pegar")
 
   private fun edTranslationsIt() =
       mapOf(
@@ -95,10 +155,23 @@ object Localization {
           "settings_connectors_ed_title" to "Connetti a ED",
           "settings_connectors_ed_api_token_label" to "Token API ED",
           "settings_connectors_ed_base_url_label" to "URL base (opzionale)",
+          "settings_connectors_ed_token_instructions" to
+              "Per connetterti a ED, hai bisogno di un token API personale. Lo memorizzeremo in modo sicuro e non dovrai più incollarlo.",
+          "settings_connectors_ed_get_token_button" to "Ottieni token",
+          "settings_connectors_ed_description" to "Connettiti alla piattaforma Q&A",
+          "settings_connectors_ed_how_to_connect_title" to "Come connettersi",
+          "settings_connectors_ed_step_1" to
+              "Apri https://eu.edstem.org/settings/api-tokens nel tuo browser",
+          "settings_connectors_ed_step_2" to "Copia il token negli appunti",
+          "settings_connectors_ed_step_3" to "Torna qui e incollalo qui sotto",
+          "settings_connectors_ed_paste_token_label" to "Incolla il tuo token",
+          "settings_connectors_ed_paste_token_placeholder" to "Incolla il tuo token",
+          "settings_connectors_ed_base_url_placeholder" to "URL base (opzionale)",
           "settings_connectors_ed_load_error" to
               "Errore nel caricamento dello stato del connettore ED",
           "settings_connectors_ed_status_error" to
-              "Impossibile caricare lo stato del connettore ED. Riprova più tardi.")
+              "Impossibile caricare lo stato del connettore ED. Riprova più tardi.",
+          "paste" to "Incolla")
 
   private fun edTranslationsPt() =
       mapOf(
@@ -107,10 +180,23 @@ object Localization {
           "ed_connect_api_unreachable" to "A API ED não está acessível. Verifique sua conexão.",
           "settings_connectors_ed_title" to "Conectar ao ED",
           "settings_connectors_ed_api_token_label" to "Token API do ED",
-          "settings_connectors_ed_base_url_label" to "URL base (opcional)",
+          "settings_connectors_ed_base_url_label" to BASE_URL_OPTIONAL_ES,
+          "settings_connectors_ed_token_instructions" to
+              "Para conectar ao ED, você precisa de um token API pessoal. Vamos armazená-lo com segurança e você não precisará colá-lo novamente.",
+          "settings_connectors_ed_get_token_button" to "Obter token",
+          "settings_connectors_ed_description" to "Conectar-se à plataforma Q&A",
+          "settings_connectors_ed_how_to_connect_title" to "Como conectar",
+          "settings_connectors_ed_step_1" to
+              "Abra https://eu.edstem.org/settings/api-tokens no seu navegador",
+          "settings_connectors_ed_step_2" to "Copie o token para a área de transferência",
+          "settings_connectors_ed_step_3" to "Volte aqui e cole abaixo",
+          "settings_connectors_ed_paste_token_label" to "Cole seu token",
+          "settings_connectors_ed_paste_token_placeholder" to "Cole seu token",
+          "settings_connectors_ed_base_url_placeholder" to BASE_URL_OPTIONAL_ES,
           "settings_connectors_ed_load_error" to "Falha ao carregar o status do conector ED",
           "settings_connectors_ed_status_error" to
-              "Não foi possível carregar o status do conector ED. Tente novamente mais tarde.")
+              "Não foi possível carregar o status do conector ED. Tente novamente mais tarde.",
+          "paste" to "Colar")
 
   private fun edTranslationsZh() =
       mapOf(
@@ -120,8 +206,20 @@ object Localization {
           "settings_connectors_ed_title" to "连接到 ED",
           "settings_connectors_ed_api_token_label" to "ED API 令牌",
           "settings_connectors_ed_base_url_label" to "基础 URL（可选）",
+          "settings_connectors_ed_token_instructions" to
+              "要连接到 ED，您需要一个个人 API 令牌。我们将安全地存储它，您无需再次粘贴。",
+          "settings_connectors_ed_get_token_button" to "获取令牌",
+          "settings_connectors_ed_description" to "连接到 Q&A 平台",
+          "settings_connectors_ed_how_to_connect_title" to "如何连接",
+          "settings_connectors_ed_step_1" to "在浏览器中打开 https://eu.edstem.org/settings/api-tokens",
+          "settings_connectors_ed_step_2" to "将令牌复制到剪贴板",
+          "settings_connectors_ed_step_3" to "返回此处并在下方粘贴",
+          "settings_connectors_ed_paste_token_label" to "粘贴您的令牌",
+          "settings_connectors_ed_paste_token_placeholder" to "粘贴您的令牌",
+          "settings_connectors_ed_base_url_placeholder" to "基础 URL（可选）",
           "settings_connectors_ed_load_error" to "加载 ED 连接器状态失败",
-          "settings_connectors_ed_status_error" to "无法加载 ED 连接器状态。请稍后再试。")
+          "settings_connectors_ed_status_error" to "无法加载 ED 连接器状态。请稍后再试。",
+          "paste" to "粘贴")
 
   private fun english() =
       mapOf(
@@ -160,22 +258,20 @@ object Localization {
           "euler_thinking" to "Euler is thinking",
           "ask_euler_anything" to "Ask Euler Anything",
 
-          // Home Screen - Suggestions
-          "suggestion_what_is_epfl" to "What is EPFL",
-          "suggestion_check_ed" to "Check Ed Discussion",
-          "suggestion_show_schedule" to "Show my schedule",
-          "suggestion_library" to "Find library resources",
-          "suggestion_check_grades" to "Check grades on IS-Academia",
-          "suggestion_search_moodle" to "Search Moodle courses",
-          "suggestion_whats_due" to "What's due this week?",
-          "suggestion_study_help" to "Help me study for CS220",
+          // Home Screen - Suggestions (offline-friendly general EPFL knowledge)
+          "suggestion_what_is_epfl" to "What is EPFL?",
+          "suggestion_where_epfl" to "Where is EPFL located?",
+          "suggestion_epfl_founded" to "When was EPFL founded?",
+          "suggestion_epfl_students" to "How many students at EPFL?",
+          "suggestion_epfl_research" to "What are EPFL's research areas?",
+          "suggestion_epfl_campus" to "Tell me about EPFL campus",
 
           // Home Screen - Animated Intro Suggestions
-          "intro_suggestion_1" to "Find CS220 past exams",
-          "intro_suggestion_2" to "Check my Moodle assignments",
-          "intro_suggestion_3" to "What's on Ed Discussion?",
-          "intro_suggestion_4" to "Show my IS-Academia schedule",
-          "intro_suggestion_5" to "Search EPFL Drive files",
+          "intro_suggestion_1" to "What is EPFL?",
+          "intro_suggestion_2" to "Where is EPFL located?",
+          "intro_suggestion_3" to "When was EPFL founded?",
+          "intro_suggestion_4" to "How many students at EPFL?",
+          "intro_suggestion_5" to "Tell me about EPFL campus",
 
           // Home Screen - Actions
           "share" to "Share",
@@ -231,6 +327,10 @@ object Localization {
               "settings_connectors_moodle_base_url_label" to "Moodle URL",
               "settings_connectors_moodle_username_label" to "Username",
               "settings_connectors_moodle_password_label" to "Password",
+              "settings_connectors_moodle_login_title" to "Log in",
+              "settings_connectors_moodle_login_button" to "Log in",
+              "settings_connectors_moodle_forgot_password" to "Forgot password?",
+              "settings_connectors_moodle_redirecting" to "Connecting to Moodle...",
               "settings_connectors_moodle_login_instructions" to
                   "Enter your Moodle credentials to connect. Your password will be securely sent to your Moodle server.",
               "settings_connectors_moodle_load_error" to "Failed to load Moodle connector status",
@@ -274,22 +374,20 @@ object Localization {
           "euler_thinking" to "Euler réfléchit",
           "ask_euler_anything" to "Demandez n'importe quoi à Euler",
 
-          // Home Screen - Suggestions
-          "suggestion_what_is_epfl" to "Qu'est-ce que l'EPFL",
-          "suggestion_check_ed" to "Vérifier Ed Discussion",
-          "suggestion_show_schedule" to "Afficher mon horaire",
-          "suggestion_library" to "Trouver des ressources de bibliothèque",
-          "suggestion_check_grades" to "Vérifier les notes sur IS-Academia",
-          "suggestion_search_moodle" to "Rechercher des cours Moodle",
-          "suggestion_whats_due" to "Qu'est-ce qui est dû cette semaine ?",
-          "suggestion_study_help" to "Aide-moi à étudier pour CS220",
+          // Home Screen - Suggestions (offline-friendly general EPFL knowledge)
+          "suggestion_what_is_epfl" to "Qu'est-ce que l'EPFL ?",
+          "suggestion_where_epfl" to "Où se trouve l'EPFL ?",
+          "suggestion_epfl_founded" to "Quand l'EPFL a-t-elle été fondée ?",
+          "suggestion_epfl_students" to "Combien d'étudiants à l'EPFL ?",
+          "suggestion_epfl_research" to "Quels sont les domaines de recherche de l'EPFL ?",
+          "suggestion_epfl_campus" to "Parle-moi du campus de l'EPFL",
 
           // Home Screen - Animated Intro Suggestions
-          "intro_suggestion_1" to "Trouver les examens passés de CS220",
-          "intro_suggestion_2" to "Vérifier mes devoirs Moodle",
-          "intro_suggestion_3" to "Quoi de neuf sur Ed Discussion ?",
-          "intro_suggestion_4" to "Afficher mon horaire IS-Academia",
-          "intro_suggestion_5" to "Rechercher des fichiers EPFL Drive",
+          "intro_suggestion_1" to "Qu'est-ce que l'EPFL ?",
+          "intro_suggestion_2" to "Où se trouve l'EPFL ?",
+          "intro_suggestion_3" to "Quand l'EPFL a-t-elle été fondée ?",
+          "intro_suggestion_4" to "Combien d'étudiants à l'EPFL ?",
+          "intro_suggestion_5" to "Parle-moi du campus de l'EPFL",
 
           // Home Screen - Actions
           "share" to "Partager",
@@ -348,6 +446,10 @@ object Localization {
               "settings_connectors_moodle_base_url_label" to "URL Moodle",
               "settings_connectors_moodle_username_label" to "Nom d'utilisateur",
               "settings_connectors_moodle_password_label" to "Mot de passe",
+              "settings_connectors_moodle_login_title" to "Connexion",
+              "settings_connectors_moodle_login_button" to "Connexion",
+              "settings_connectors_moodle_forgot_password" to "Mot de passe perdu ?",
+              "settings_connectors_moodle_redirecting" to "Connexion à Moodle...",
               "settings_connectors_moodle_login_instructions" to
                   "Entrez vos identifiants Moodle pour vous connecter. Votre mot de passe sera envoyé de manière sécurisée à votre serveur Moodle.",
               "settings_connectors_moodle_load_error" to
@@ -386,7 +488,7 @@ object Localization {
               "ED-API ist nicht erreichbar. Bitte überprüfen Sie Ihre Verbindung.",
           "settings_connectors_ed_title" to "Mit ED verbinden",
           "settings_connectors_ed_api_token_label" to "ED API-Token",
-          "settings_connectors_ed_base_url_label" to "Basis-URL (optional)",
+          "settings_connectors_ed_base_url_label" to BASE_URL_OPTIONAL_DE,
           "settings_connectors_ed_load_error" to "Fehler beim Laden des ED-Connector-Status",
           "settings_connectors_ed_status_error" to
               "ED-Connector-Status konnte nicht geladen werden. Bitte versuchen Sie es später erneut.",
@@ -404,22 +506,20 @@ object Localization {
           "euler_thinking" to "Euler denkt nach",
           "ask_euler_anything" to "Fragen Sie Euler alles",
 
-          // Home Screen - Suggestions
-          "suggestion_what_is_epfl" to "Was ist EPFL",
-          "suggestion_check_ed" to "Ed Discussion prüfen",
-          "suggestion_show_schedule" to "Meinen Stundenplan anzeigen",
-          "suggestion_library" to "Bibliotheksressourcen finden",
-          "suggestion_check_grades" to "Noten auf IS-Academia prüfen",
-          "suggestion_search_moodle" to "Moodle-Kurse suchen",
-          "suggestion_whats_due" to "Was ist diese Woche fällig?",
-          "suggestion_study_help" to "Hilf mir für CS220 zu lernen",
+          // Home Screen - Suggestions (offline-friendly general EPFL knowledge)
+          "suggestion_what_is_epfl" to "Was ist EPFL?",
+          "suggestion_where_epfl" to "Wo befindet sich die EPFL?",
+          "suggestion_epfl_founded" to "Wann wurde die EPFL gegründet?",
+          "suggestion_epfl_students" to "Wie viele Studenten hat die EPFL?",
+          "suggestion_epfl_research" to "Was sind die Forschungsbereiche der EPFL?",
+          "suggestion_epfl_campus" to "Erzähl mir vom EPFL Campus",
 
           // Home Screen - Animated Intro Suggestions
-          "intro_suggestion_1" to "CS220 frühere Prüfungen finden",
-          "intro_suggestion_2" to "Meine Moodle-Aufgaben prüfen",
-          "intro_suggestion_3" to "Was gibt's Neues auf Ed Discussion?",
-          "intro_suggestion_4" to "Meinen IS-Academia-Stundenplan anzeigen",
-          "intro_suggestion_5" to "EPFL Drive-Dateien durchsuchen",
+          "intro_suggestion_1" to "Was ist EPFL?",
+          "intro_suggestion_2" to "Wo befindet sich die EPFL?",
+          "intro_suggestion_3" to "Wann wurde die EPFL gegründet?",
+          "intro_suggestion_4" to "Wie viele Studenten hat die EPFL?",
+          "intro_suggestion_5" to "Erzähl mir vom EPFL Campus",
 
           // Home Screen - Actions
           "share" to "Teilen",
@@ -456,6 +556,10 @@ object Localization {
               "settings_connectors_moodle_base_url_label" to "Moodle-URL",
               "settings_connectors_moodle_username_label" to "Benutzername",
               "settings_connectors_moodle_password_label" to "Passwort",
+              "settings_connectors_moodle_login_title" to "Anmelden",
+              "settings_connectors_moodle_login_button" to "Anmelden",
+              "settings_connectors_moodle_forgot_password" to "Passwort vergessen?",
+              "settings_connectors_moodle_redirecting" to "Verbindung zu Moodle...",
               "settings_connectors_moodle_login_instructions" to
                   "Geben Sie Ihre Moodle-Anmeldedaten ein, um sich zu verbinden. Ihr Passwort wird sicher an Ihren Moodle-Server gesendet.",
               "settings_connectors_moodle_load_error" to
@@ -500,22 +604,20 @@ object Localization {
           "euler_thinking" to "Euler está pensando",
           "ask_euler_anything" to "Pregunta a Euler cualquier cosa",
 
-          // Home Screen - Suggestions
-          "suggestion_what_is_epfl" to "Qué es EPFL",
-          "suggestion_check_ed" to "Verificar Ed Discussion",
-          "suggestion_show_schedule" to "Mostrar mi horario",
-          "suggestion_library" to "Encontrar recursos de biblioteca",
-          "suggestion_check_grades" to "Verificar calificaciones en IS-Academia",
-          "suggestion_search_moodle" to "Buscar cursos de Moodle",
-          "suggestion_whats_due" to "¿Qué vence esta semana?",
-          "suggestion_study_help" to "Ayúdame a estudiar para CS220",
+          // Home Screen - Suggestions (offline-friendly general EPFL knowledge)
+          "suggestion_what_is_epfl" to "¿Qué es EPFL?",
+          "suggestion_where_epfl" to "¿Dónde está ubicada EPFL?",
+          "suggestion_epfl_founded" to "¿Cuándo se fundó EPFL?",
+          "suggestion_epfl_students" to "¿Cuántos estudiantes tiene EPFL?",
+          "suggestion_epfl_research" to "¿Cuáles son las áreas de investigación de EPFL?",
+          "suggestion_epfl_campus" to "Cuéntame sobre el campus de EPFL",
 
           // Home Screen - Animated Intro Suggestions
-          "intro_suggestion_1" to "Encontrar exámenes pasados de CS220",
-          "intro_suggestion_2" to "Verificar mis tareas de Moodle",
-          "intro_suggestion_3" to "¿Qué hay en Ed Discussion?",
-          "intro_suggestion_4" to "Mostrar mi horario de IS-Academia",
-          "intro_suggestion_5" to "Buscar archivos de EPFL Drive",
+          "intro_suggestion_1" to "¿Qué es EPFL?",
+          "intro_suggestion_2" to "¿Dónde está ubicada EPFL?",
+          "intro_suggestion_3" to "¿Cuándo se fundó EPFL?",
+          "intro_suggestion_4" to "¿Cuántos estudiantes tiene EPFL?",
+          "intro_suggestion_5" to "Cuéntame sobre el campus de EPFL",
 
           // Home Screen - Actions
           "share" to "Compartir",
@@ -552,6 +654,10 @@ object Localization {
               "settings_connectors_moodle_base_url_label" to "URL de Moodle",
               "settings_connectors_moodle_username_label" to "Nombre de usuario",
               "settings_connectors_moodle_password_label" to "Contraseña",
+              "settings_connectors_moodle_login_title" to "Iniciar sesión",
+              "settings_connectors_moodle_login_button" to "Iniciar sesión",
+              "settings_connectors_moodle_forgot_password" to "¿Olvidó su contraseña?",
+              "settings_connectors_moodle_redirecting" to "Conectando a Moodle...",
               "settings_connectors_moodle_login_instructions" to
                   "Ingrese sus credenciales de Moodle para conectarse. Su contraseña se enviará de forma segura a su servidor Moodle.",
               "settings_connectors_moodle_load_error" to
@@ -596,22 +702,20 @@ object Localization {
           "euler_thinking" to "Euler sta pensando",
           "ask_euler_anything" to "Chiedi qualsiasi cosa a Euler",
 
-          // Home Screen - Suggestions
-          "suggestion_what_is_epfl" to "Cos'è EPFL",
-          "suggestion_check_ed" to "Controlla Ed Discussion",
-          "suggestion_show_schedule" to "Mostra il mio orario",
-          "suggestion_library" to "Trova risorse della biblioteca",
-          "suggestion_check_grades" to "Controlla i voti su IS-Academia",
-          "suggestion_search_moodle" to "Cerca corsi Moodle",
-          "suggestion_whats_due" to "Cosa scade questa settimana?",
-          "suggestion_study_help" to "Aiutami a studiare per CS220",
+          // Home Screen - Suggestions (offline-friendly general EPFL knowledge)
+          "suggestion_what_is_epfl" to "Cos'è l'EPFL?",
+          "suggestion_where_epfl" to "Dove si trova l'EPFL?",
+          "suggestion_epfl_founded" to "Quando è stata fondata l'EPFL?",
+          "suggestion_epfl_students" to "Quanti studenti ha l'EPFL?",
+          "suggestion_epfl_research" to "Quali sono le aree di ricerca dell'EPFL?",
+          "suggestion_epfl_campus" to "Parlami del campus EPFL",
 
           // Home Screen - Animated Intro Suggestions
-          "intro_suggestion_1" to "Trova esami passati di CS220",
-          "intro_suggestion_2" to "Controlla i miei compiti Moodle",
-          "intro_suggestion_3" to "Cosa c'è su Ed Discussion?",
-          "intro_suggestion_4" to "Mostra il mio orario IS-Academia",
-          "intro_suggestion_5" to "Cerca file EPFL Drive",
+          "intro_suggestion_1" to "Cos'è l'EPFL?",
+          "intro_suggestion_2" to "Dove si trova l'EPFL?",
+          "intro_suggestion_3" to "Quando è stata fondata l'EPFL?",
+          "intro_suggestion_4" to "Quanti studenti ha l'EPFL?",
+          "intro_suggestion_5" to "Parlami del campus EPFL",
 
           // Home Screen - Actions
           "share" to "Condividi",
@@ -647,6 +751,10 @@ object Localization {
               "settings_connectors_moodle_base_url_label" to "URL Moodle",
               "settings_connectors_moodle_username_label" to "Nome utente",
               "settings_connectors_moodle_password_label" to "Password",
+              "settings_connectors_moodle_login_title" to "Accedi",
+              "settings_connectors_moodle_login_button" to "Accedi",
+              "settings_connectors_moodle_forgot_password" to "Password dimenticata?",
+              "settings_connectors_moodle_redirecting" to "Connessione a Moodle...",
               "settings_connectors_moodle_login_instructions" to
                   "Inserisci le tue credenziali Moodle per connetterti. La tua password verrà inviata in modo sicuro al tuo server Moodle.",
               "settings_connectors_moodle_load_error" to
@@ -691,22 +799,20 @@ object Localization {
           "euler_thinking" to "Euler está pensando",
           "ask_euler_anything" to "Pergunte qualquer coisa ao Euler",
 
-          // Home Screen - Suggestions
-          "suggestion_what_is_epfl" to "O que é EPFL",
-          "suggestion_check_ed" to "Verificar Ed Discussion",
-          "suggestion_show_schedule" to "Mostrar minha agenda",
-          "suggestion_library" to "Encontrar recursos da biblioteca",
-          "suggestion_check_grades" to "Verificar notas no IS-Academia",
-          "suggestion_search_moodle" to "Pesquisar cursos Moodle",
-          "suggestion_whats_due" to "O que vence esta semana?",
-          "suggestion_study_help" to "Ajude-me a estudar para CS220",
+          // Home Screen - Suggestions (offline-friendly general EPFL knowledge)
+          "suggestion_what_is_epfl" to "O que é a EPFL?",
+          "suggestion_where_epfl" to "Onde fica a EPFL?",
+          "suggestion_epfl_founded" to "Quando a EPFL foi fundada?",
+          "suggestion_epfl_students" to "Quantos estudantes a EPFL tem?",
+          "suggestion_epfl_research" to "Quais são as áreas de pesquisa da EPFL?",
+          "suggestion_epfl_campus" to "Conte-me sobre o campus da EPFL",
 
           // Home Screen - Animated Intro Suggestions
-          "intro_suggestion_1" to "Encontrar exames anteriores de CS220",
-          "intro_suggestion_2" to "Verificar minhas tarefas do Moodle",
-          "intro_suggestion_3" to "O que há no Ed Discussion?",
-          "intro_suggestion_4" to "Mostrar minha agenda IS-Academia",
-          "intro_suggestion_5" to "Pesquisar arquivos EPFL Drive",
+          "intro_suggestion_1" to "O que é a EPFL?",
+          "intro_suggestion_2" to "Onde fica a EPFL?",
+          "intro_suggestion_3" to "Quando a EPFL foi fundada?",
+          "intro_suggestion_4" to "Quantos estudantes a EPFL tem?",
+          "intro_suggestion_5" to "Conte-me sobre o campus da EPFL",
 
           // Home Screen - Actions
           "share" to "Compartilhar",
@@ -742,6 +848,10 @@ object Localization {
               "settings_connectors_moodle_base_url_label" to "URL do Moodle",
               "settings_connectors_moodle_username_label" to "Nome de usuário",
               "settings_connectors_moodle_password_label" to "Senha",
+              "settings_connectors_moodle_login_title" to "Entrar",
+              "settings_connectors_moodle_login_button" to "Entrar",
+              "settings_connectors_moodle_forgot_password" to "Esqueceu a senha?",
+              "settings_connectors_moodle_redirecting" to "Conectando ao Moodle...",
               "settings_connectors_moodle_login_instructions" to
                   "Digite suas credenciais do Moodle para conectar. Sua senha será enviada com segurança para o servidor Moodle.",
               "settings_connectors_moodle_load_error" to
@@ -786,22 +896,20 @@ object Localization {
           "euler_thinking" to "Euler 正在思考",
           "ask_euler_anything" to "向 Euler 提问任何问题",
 
-          // Home Screen - Suggestions
-          "suggestion_what_is_epfl" to "什么是 EPFL",
-          "suggestion_check_ed" to "查看 Ed Discussion",
-          "suggestion_show_schedule" to "显示我的日程",
-          "suggestion_library" to "查找图书馆资源",
-          "suggestion_check_grades" to "在 IS-Academia 上查看成绩",
-          "suggestion_search_moodle" to "搜索 Moodle 课程",
-          "suggestion_whats_due" to "本周有什么截止日期？",
-          "suggestion_study_help" to "帮我学习 CS220",
+          // Home Screen - Suggestions (offline-friendly general EPFL knowledge)
+          "suggestion_what_is_epfl" to "什么是 EPFL？",
+          "suggestion_where_epfl" to "EPFL 在哪里？",
+          "suggestion_epfl_founded" to "EPFL 是什么时候成立的？",
+          "suggestion_epfl_students" to "EPFL 有多少学生？",
+          "suggestion_epfl_research" to "EPFL 的研究领域有哪些？",
+          "suggestion_epfl_campus" to "介绍一下 EPFL 校园",
 
           // Home Screen - Animated Intro Suggestions
-          "intro_suggestion_1" to "查找 CS220 往年考试",
-          "intro_suggestion_2" to "查看我的 Moodle 作业",
-          "intro_suggestion_3" to "Ed Discussion 上有什么？",
-          "intro_suggestion_4" to "显示我的 IS-Academia 日程",
-          "intro_suggestion_5" to "搜索 EPFL Drive 文件",
+          "intro_suggestion_1" to "什么是 EPFL？",
+          "intro_suggestion_2" to "EPFL 在哪里？",
+          "intro_suggestion_3" to "EPFL 是什么时候成立的？",
+          "intro_suggestion_4" to "EPFL 有多少学生？",
+          "intro_suggestion_5" to "介绍一下 EPFL 校园",
 
           // Home Screen - Actions
           "share" to "分享",
@@ -835,6 +943,10 @@ object Localization {
               "settings_connectors_moodle_base_url_label" to "Moodle URL",
               "settings_connectors_moodle_username_label" to "用户名",
               "settings_connectors_moodle_password_label" to "密码",
+              "settings_connectors_moodle_login_title" to "登录",
+              "settings_connectors_moodle_login_button" to "登录",
+              "settings_connectors_moodle_forgot_password" to "忘记密码？",
+              "settings_connectors_moodle_redirecting" to "正在连接 Moodle...",
               "settings_connectors_moodle_login_instructions" to
                   "输入您的 Moodle 凭据以连接。您的密码将安全地发送到您的 Moodle 服务器。",
               "settings_connectors_moodle_load_error" to "加载 Moodle 连接器状态失败",
