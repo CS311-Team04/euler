@@ -135,6 +135,11 @@ class HomeViewModel(
   // Auth / Firestore handles
   private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
   private var conversationId: String? = null
+  
+  // Map to preserve moodleFile attachments when messages are reloaded from Firestore
+  // Key: message text + timestamp (to uniquely identify messages)
+  // Value: moodleFile attachment
+  private val moodleFileCache = mutableMapOf<String, com.android.sample.Chat.MoodleFileAttachment>()
 
   // private val auth: FirebaseAuth = FirebaseAuth.getInstance()
   private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
@@ -355,13 +360,38 @@ class HomeViewModel(
               }
               .collect { msgs ->
                 val streamingId = _uiState.value.streamingMessageId
-                if (streamingId != null) {
-
+                val currentState = _uiState.value
+                
+                // If we're streaming and have messages with moodleFiles, preserve them
+                val messagesWithMoodleFiles = if (streamingId != null) {
+                  currentState.messages.filter { it.moodleFile != null }
+                } else {
+                  emptyList()
+                }
+                
+                if (streamingId != null && messagesWithMoodleFiles.isNotEmpty()) {
+                  // Don't replace messages while streaming if they have moodleFiles
+                  Log.d(TAG, "Skipping Firestore update during streaming (preserving ${messagesWithMoodleFiles.size} messages with moodleFiles)")
                   return@collect
                 }
 
-                _uiState.update { currentState ->
-                  val firestoreMessages = msgs.map { it.toUi() }
+                _uiState.update { state ->
+                  // Convert Firestore messages to UI models, preserving moodleFiles from cache
+                  val firestoreMessages = msgs.map { dto ->
+                    val uiModel = dto.toUi()
+                    // Try to find matching moodleFile in cache by text (more flexible matching)
+                    // Match by text content, allowing for slight timestamp differences
+                    val cachedFile = moodleFileCache.entries.find { (key, _) ->
+                      key.startsWith("${uiModel.text}_") || key.contains(uiModel.text)
+                    }?.value
+                    
+                    if (cachedFile != null) {
+                      Log.d(TAG, "Restored moodleFile from cache for message: ${uiModel.text.take(30)}...")
+                      uiModel.copy(moodleFile = cachedFile)
+                    } else {
+                      uiModel
+                    }
+                  }
 
                   val existingSourceCards =
                       currentState.messages.filter { it.source != null && it.text.isBlank() }
@@ -959,8 +989,51 @@ class HomeViewModel(
               return@launch
             }
 
+            // Handle Moodle intent detection - attach file to message
+            val moodleFileAttachment =
+                if (reply.moodleIntent.detected && reply.moodleIntent.file != null) {
+                  Log.d(TAG, "Moodle file attachment created: ${reply.moodleIntent.file.filename}")
+                  com.android.sample.Chat.MoodleFileAttachment(
+                      url = reply.moodleIntent.file.url,
+                      filename = reply.moodleIntent.file.filename,
+                      mimetype = reply.moodleIntent.file.mimetype,
+                      courseName = reply.moodleIntent.file.courseName,
+                      fileType = reply.moodleIntent.file.fileType,
+                      fileNumber = reply.moodleIntent.file.fileNumber,
+                      week = reply.moodleIntent.file.week)
+                } else {
+                  Log.d(TAG, "No Moodle file attachment (detected=${reply.moodleIntent.detected}, file=${reply.moodleIntent.file != null})")
+                  null
+                }
+
+            // Cache the moodleFile IMMEDIATELY with the final text, before streaming starts
+            // This ensures the cache is ready when Firestore updates come in
+            if (moodleFileAttachment != null) {
+              val finalText = reply.reply
+              val cacheKeyWithText = "${finalText}_${System.currentTimeMillis()}"
+              moodleFileCache[cacheKeyWithText] = moodleFileAttachment
+              moodleFileCache[finalText] = moodleFileAttachment
+              Log.d(TAG, "Cached moodleFile immediately with final text: '$finalText' (cache size=${moodleFileCache.size})")
+            }
+
             // simulate stream into the placeholder AI message
-            simulateStreamingFromText(messageId, reply.reply)
+            simulateStreamingFromText(messageId, reply.reply, moodleFileAttachment)
+            
+            // Ensure moodleFile is set on the message after streaming completes
+            if (moodleFileAttachment != null) {
+              withContext(Dispatchers.Main) {
+                _uiState.update { state ->
+                  val updated = state.messages.map { msg ->
+                    if (msg.id == messageId) {
+                      msg.copy(moodleFile = moodleFileAttachment)
+                    } else {
+                      msg
+                    }
+                  }
+                  state.copy(messages = updated)
+                }
+              }
+            }
 
             // add optional source card based on source type
             val meta: SourceMeta? =
@@ -1077,13 +1150,20 @@ class HomeViewModel(
     clearStreamingState(messageId)
   }
 
-  private suspend fun appendStreamingChunk(messageId: String, chunk: String) =
+  private suspend fun appendStreamingChunk(
+      messageId: String,
+      chunk: String,
+      moodleFile: com.android.sample.Chat.MoodleFileAttachment? = null
+  ) =
       withContext(Dispatchers.Main) {
         _uiState.update { state ->
           val updated =
               state.messages.map { message ->
                 if (message.id == messageId) {
-                  message.copy(text = message.text + chunk, isThinking = false)
+                  message.copy(
+                      text = message.text + chunk,
+                      isThinking = false,
+                      moodleFile = moodleFile ?: message.moodleFile)
                 } else {
                   message
                 }
@@ -1095,12 +1175,21 @@ class HomeViewModel(
         }
       }
 
-  private suspend fun markMessageFinished(messageId: String) =
+  private suspend fun markMessageFinished(
+      messageId: String,
+      moodleFile: com.android.sample.Chat.MoodleFileAttachment? = null
+  ) =
       withContext(Dispatchers.Main) {
         _uiState.update { state ->
           val updated =
               state.messages.map { message ->
-                if (message.id == messageId) message.copy(isThinking = false) else message
+                if (message.id == messageId) {
+                  message.copy(
+                      isThinking = false,
+                      moodleFile = moodleFile ?: message.moodleFile)
+                } else {
+                  message
+                }
               }
           state.copy(messages = updated, streamingSequence = state.streamingSequence + 1)
         }
@@ -1123,16 +1212,20 @@ class HomeViewModel(
     setStreamingText(messageId, "Erreur: $message")
   }
 
-  private suspend fun simulateStreamingFromText(messageId: String, fullText: String) {
+  private suspend fun simulateStreamingFromText(
+      messageId: String,
+      fullText: String,
+      moodleFile: com.android.sample.Chat.MoodleFileAttachment? = null
+  ) {
     // Use current dispatcher instead of Dispatchers.Default to allow test control
     val pattern = Regex("\\S+\\s*")
     val parts = pattern.findAll(fullText).map { it.value }.toList().ifEmpty { listOf(fullText) }
     for (chunk in parts) {
       // delay() already checks for cancellation, so ensureActive() is not strictly necessary
-      appendStreamingChunk(messageId, chunk)
+      appendStreamingChunk(messageId, chunk, moodleFile)
       delay(60)
     }
-    markMessageFinished(messageId)
+    markMessageFinished(messageId, moodleFile)
   }
 
   private suspend fun clearStreamingState(messageId: String) =

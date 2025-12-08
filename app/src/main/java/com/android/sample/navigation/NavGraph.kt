@@ -2,6 +2,7 @@ package com.android.sample.navigation
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.net.Uri
 import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -16,10 +17,12 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavOptionsBuilder
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import androidx.navigation.navigation
 import com.android.sample.VoiceChat.Backend.VoiceChatViewModel
 import com.android.sample.VoiceChat.UI.VoiceScreen
@@ -42,6 +45,7 @@ import com.android.sample.sign_in.AuthViewModel
 import com.android.sample.speech.SpeechPlayback
 import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.splash.OpeningScreen
+import com.android.sample.pdf.PdfViewerScreen
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
@@ -59,6 +63,7 @@ object Routes {
   const val EdConnect = "ed_connect"
   const val VoiceChat = "voice_chat"
   const val EpflCampus = "epfl_campus"
+  const val PdfViewer = "pdf_viewer/{pdfUrl}/{filename}"
 }
 
 @VisibleForTesting internal var appNavControllerObserver: ((NavHostController) -> Unit)? = null
@@ -505,6 +510,13 @@ fun AppNav(
                     restoreState = false
                   }
                 },
+                onPdfClick = { pdfUrl, filename ->
+                  val encodedUrl = Uri.encode(pdfUrl, "")
+                  val encodedFilename = Uri.encode(filename, "")
+                  nav.navigate("pdf_viewer/$encodedUrl/$encodedFilename") {
+                    launchSingleTop = true
+                  }
+                },
                 onSettingsClick = { nav.navigate(Routes.Settings) },
                 onConnectorsClick = {
                   navigateToConnectors { route, builder -> nav.navigate(route) { builder(this) } }
@@ -552,6 +564,13 @@ fun AppNav(
                   navigateSignOut(
                       navigate = { route, builder -> nav.navigate(route) { builder(this) } },
                       startDestinationRoute = nav.graph.startDestinationRoute)
+                },
+                onPdfClick = { pdfUrl, filename ->
+                  val encodedUrl = Uri.encode(pdfUrl, "")
+                  val encodedFilename = Uri.encode(filename, "")
+                  nav.navigate("pdf_viewer/$encodedUrl/$encodedFilename") {
+                    launchSingleTop = true
+                  }
                 },
                 onSettingsClick = {
                   navigateToSettings { route, builder -> nav.navigate(route) { builder(this) } }
@@ -672,6 +691,24 @@ fun AppNav(
           }
           // Uses VoiceChatComposableContent which is tested in NavGraphTest
           composable(Routes.VoiceChat) { VoiceChatComposableContent(nav, speechHelper) }
+          
+          // PDF Viewer Screen
+          composable(
+              route = Routes.PdfViewer,
+              arguments =
+                  listOf(
+                      navArgument("pdfUrl") { type = NavType.StringType },
+                      navArgument("filename") { type = NavType.StringType })) { backStackEntry ->
+                val encodedPdfUrl = backStackEntry.arguments?.getString("pdfUrl") ?: ""
+                val encodedFilename = backStackEntry.arguments?.getString("filename") ?: "document.pdf"
+                // Decode the URL and filename that were encoded during navigation
+                val pdfUrl = Uri.decode(encodedPdfUrl)
+                val filename = Uri.decode(encodedFilename)
+                PdfViewerScreen(
+                    pdfUrl = pdfUrl,
+                    filename = filename,
+                    navController = nav)
+              }
         }
       }
 }

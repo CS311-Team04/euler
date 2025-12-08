@@ -14,6 +14,8 @@ import { EdConnectorService } from "./connectors/ed/EdConnectorService";
 import { encryptSecret, decryptSecret } from "./security/secretCrypto";
 import { detectPostToEdIntentCore, buildEdIntentPromptForApertus } from "./edIntent";
 import { parseEdPostResponse } from "./edIntentParser";
+import { detectMoodleFileFetchIntentCore, extractFileInfo } from "./moodleIntent";
+import { MoodleClient } from "./connectors/moodle/MoodleClient";
 
 
 const europeFunctions = functions.region("europe-west6");
@@ -867,6 +869,313 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
     }
     // === End ED Intent Detection ===
 
+    // === Moodle Intent Detection (fast, regex-based) ===
+    // First layer: General detection - determines if this is a Moodle fetch request
+    const moodleIntentResult = detectMoodleFileFetchIntentCore(question);
+    if (moodleIntentResult.moodle_intent_detected && moodleIntentResult.moodle_intent && uid) {
+      logger.info("answerWithRagFn.moodleIntentDetected", {
+        intent: moodleIntentResult.moodle_intent,
+        questionLen: question.length,
+        uid,
+      });
+      
+      try {
+        // Get Moodle config
+        const moodleConfig = await moodleService.getStatus(uid);
+        if (moodleConfig.status !== "connected" || !moodleConfig.baseUrl || !moodleConfig.tokenEncrypted) {
+          return {
+            reply: "Vous n'êtes pas connecté à Moodle. Veuillez vous connecter dans les paramètres.",
+            primary_url: null,
+            best_score: 0,
+            sources: [],
+            moodle_intent_detected: true,
+            moodle_intent: moodleIntentResult.moodle_intent,
+            moodle_file: null,
+          };
+        }
+
+        // Second layer: Extract specific file type, number, course name, and week
+        const fileInfo = extractFileInfo(question);
+        if (!fileInfo) {
+          return {
+            reply: "Je n'ai pas pu identifier le type de fichier demandé. Veuillez préciser (ex: \"Lecture 5\", \"Homework 3\", \"Solution devoir 2\", \"Homework from week 7\").",
+            primary_url: null,
+            best_score: 0,
+            sources: [],
+            moodle_intent_detected: true,
+            moodle_intent: moodleIntentResult.moodle_intent,
+            moodle_file: null,
+          };
+        }
+
+        // Decrypt the token and trim any whitespace
+        let token: string;
+        try {
+          token = decryptSecret(moodleConfig.tokenEncrypted).trim();
+          if (!token) {
+            throw new Error("Decrypted token is empty");
+          }
+          logger.info("answerWithRagFn.tokenDecrypted", {
+            uid,
+            tokenLength: token.length,
+            tokenPreview: token.substring(0, 10) + "...",
+          });
+        } catch (decryptError: any) {
+          logger.error("answerWithRagFn.tokenDecryptionFailed", {
+            uid,
+            error: String(decryptError),
+            errorMessage: decryptError.message,
+            hasTokenEncrypted: !!moodleConfig.tokenEncrypted,
+            tokenEncryptedLength: moodleConfig.tokenEncrypted?.length || 0,
+          });
+          return {
+            reply: "Erreur lors du décryptage du token Moodle. Veuillez vous reconnecter à Moodle dans les paramètres.",
+            primary_url: null,
+            best_score: 0,
+            sources: [],
+            moodle_intent_detected: true,
+            moodle_intent: moodleIntentResult.moodle_intent,
+            moodle_file: null,
+          };
+        }
+        
+        const client = new MoodleClient(moodleConfig.baseUrl, token);
+        
+        logger.info("answerWithRagFn.moodleFileFetch", {
+          uid,
+          baseUrl: moodleConfig.baseUrl,
+          fileType: fileInfo.fileType,
+          fileNumber: fileInfo.fileNumber,
+          courseName: fileInfo.courseName,
+          week: fileInfo.week,
+        });
+        
+        let foundFile: { fileurl: string; filename: string; mimetype: string } | null = null;
+        let foundInCourse: any = null; // Track which course the file was found in
+        
+        // If course name is specified, search only in that course
+        if (fileInfo.courseName) {
+          const targetCourse = await client.findCourseByName(fileInfo.courseName);
+          if (!targetCourse) {
+            return {
+              reply: `Je n'ai pas trouvé le cours "${fileInfo.courseName}" dans vos cours Moodle.`,
+              primary_url: null,
+              best_score: 0,
+              sources: [],
+              moodle_intent_detected: true,
+              moodle_intent: moodleIntentResult.moodle_intent,
+              moodle_file: null,
+            };
+          }
+          
+          // Validate course ID - Moodle returns 'id' field for courses
+          const courseId = targetCourse.id;
+          if (!courseId) {
+            logger.error("answerWithRagFn.missingCourseId", {
+              courseName: fileInfo.courseName,
+              course: targetCourse,
+              availableFields: Object.keys(targetCourse),
+            });
+            return {
+              reply: `Erreur: Impossible de trouver l'ID du cours "${fileInfo.courseName}".`,
+              primary_url: null,
+              best_score: 0,
+              sources: [],
+              moodle_intent_detected: true,
+              moodle_intent: moodleIntentResult.moodle_intent,
+              moodle_file: null,
+            };
+          }
+          
+          const courseIdNum = typeof courseId === "number" ? courseId : parseInt(String(courseId), 10);
+          if (isNaN(courseIdNum) || courseIdNum <= 0) {
+            logger.error("answerWithRagFn.invalidCourseId", {
+              courseName: fileInfo.courseName,
+              course: targetCourse,
+              courseId,
+              courseIdNum,
+            });
+            return {
+              reply: `Erreur: ID de cours invalide pour "${fileInfo.courseName}".`,
+              primary_url: null,
+              best_score: 0,
+              sources: [],
+              moodle_intent_detected: true,
+              moodle_intent: moodleIntentResult.moodle_intent,
+              moodle_file: null,
+            };
+          }
+          
+          logger.info("answerWithRagFn.searchingCourse", {
+            courseName: fileInfo.courseName,
+            courseId: courseIdNum,
+            courseFullname: targetCourse.fullname,
+            courseShortname: targetCourse.shortname,
+            fileType: fileInfo.fileType,
+            fileNumber: fileInfo.fileNumber,
+            week: fileInfo.week,
+          });
+          
+          // Search in the specific course
+          foundFile = await client.findFile(
+            courseIdNum,
+            fileInfo.fileType,
+            fileInfo.fileNumber,
+            fileInfo.week
+          );
+          if (foundFile) {
+            foundInCourse = targetCourse;
+          }
+        } else {
+          // No course specified - search in all courses
+          const courses = await client.getEnrolledCourses();
+          if (courses.length === 0) {
+            return {
+              reply: "Aucun cours trouvé dans votre Moodle.",
+              primary_url: null,
+              best_score: 0,
+              sources: [],
+              moodle_intent_detected: true,
+              moodle_intent: moodleIntentResult.moodle_intent,
+              moodle_file: null,
+            };
+          }
+          
+          // Search for file in all courses and track which course it was found in
+          let foundInCourse: any = null;
+          for (const course of courses) {
+            const courseId = course.id; // Moodle returns 'id' field
+            if (!courseId) {
+              logger.warn("answerWithRagFn.courseWithoutId", { 
+                course,
+                availableFields: Object.keys(course),
+              });
+              continue;
+            }
+            
+            const courseIdNum = typeof courseId === "number" ? courseId : parseInt(String(courseId), 10);
+            if (isNaN(courseIdNum) || courseIdNum <= 0) {
+              logger.warn("answerWithRagFn.invalidCourseIdInList", { 
+                course, 
+                courseId,
+                courseIdNum,
+              });
+              continue;
+            }
+            
+            logger.info("answerWithRagFn.searchingInCourse", {
+              courseId: courseIdNum,
+              courseFullname: course.fullname,
+              fileType: fileInfo.fileType,
+              fileNumber: fileInfo.fileNumber,
+              week: fileInfo.week,
+            });
+            
+            const file = await client.findFile(
+              courseIdNum,
+              fileInfo.fileType,
+              fileInfo.fileNumber,
+              fileInfo.week
+            );
+            if (file) {
+              foundFile = file;
+              foundInCourse = course;
+              break;
+            }
+          }
+          
+          // Store the course for later use in response
+          if (foundInCourse) {
+            fileInfo.courseName = foundInCourse.fullname || foundInCourse.shortname || foundInCourse.displayname;
+          }
+        }
+
+        if (!foundFile) {
+          const fileTypeNames: Record<string, string> = {
+            "lecture": "cours",
+            "homework": "devoir",
+            "homework_solution": "solution de devoir",
+          };
+          return {
+            reply: `Je n'ai pas trouvé ${fileTypeNames[fileInfo.fileType]} ${fileInfo.fileNumber} dans vos cours Moodle.`,
+            primary_url: null,
+            best_score: 0,
+            sources: [],
+            moodle_intent_detected: true,
+            moodle_intent: moodleIntentResult.moodle_intent,
+            moodle_file: null,
+          };
+        }
+
+        // Get direct download URL (follows redirects if needed)
+        const downloadUrl = await client.getDirectFileUrl(foundFile.fileurl);
+
+        // Get course name for the response
+        let courseDisplayName = "Moodle";
+        if (foundInCourse) {
+          courseDisplayName = foundInCourse.fullname || foundInCourse.shortname || foundInCourse.displayname || "Moodle";
+        } else if (fileInfo.courseName) {
+          // If course name was specified but we don't have the full course object, use the name
+          courseDisplayName = fileInfo.courseName;
+        }
+
+        // Empty reply - card will show all details
+        let replyText = ``;
+
+        const moodleFileResponse = {
+          url: downloadUrl,
+          filename: foundFile.filename,
+          mimetype: foundFile.mimetype,
+          courseName: courseDisplayName,
+          fileType: fileInfo.fileType,
+          fileNumber: fileInfo.fileNumber,
+          week: fileInfo.week,
+        };
+
+        logger.info("answerWithRagFn.moodleFileFound", {
+          uid,
+          filename: foundFile.filename,
+          url: downloadUrl.substring(0, 100) + "...",
+          mimetype: foundFile.mimetype,
+          courseName: courseDisplayName,
+          moodleFileResponse,
+        });
+
+        return {
+          reply: replyText,
+          primary_url: null,
+          best_score: 0,
+          sources: [],
+          moodle_intent_detected: true,
+          moodle_intent: moodleIntentResult.moodle_intent,
+          moodle_file: moodleFileResponse,
+        };
+      } catch (e: any) {
+        const fileInfoForLog = extractFileInfo(question);
+        logger.error("answerWithRagFn.moodleFileFetchFailed", {
+          error: String(e),
+          errorMessage: e.message,
+          errorStack: e.stack,
+          uid,
+          intent: moodleIntentResult.moodle_intent,
+          fileType: fileInfoForLog?.fileType,
+          fileNumber: fileInfoForLog?.fileNumber,
+          courseName: fileInfoForLog?.courseName,
+          week: fileInfoForLog?.week,
+        });
+        return {
+          reply: `Erreur lors de la récupération du fichier Moodle : ${e.message || "erreur inconnue"}`,
+          primary_url: null,
+          best_score: 0,
+          sources: [],
+          moodle_intent_detected: true,
+          moodle_intent: moodleIntentResult.moodle_intent,
+          moodle_file: null,
+        };
+      }
+    }
+    // === End Moodle Intent Detection ===
+
     const profileContext =
       typeof (data as any)?.profileContext === "string" ? (data as any).profileContext : undefined;
 
@@ -904,6 +1213,9 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
       ...ragResult,
       ed_intent_detected: false,
       ed_intent: null,
+      moodle_intent_detected: false,
+      moodle_intent: null,
+      moodle_file: null,
     };
   } catch (e: any) {
     logger.error("answerWithRagFn.failed", { error: String(e) });
@@ -993,6 +1305,9 @@ export const answerWithRagHttp = europeFunctions.https.onRequest(async (req: fun
       ...ragResult,
       ed_intent_detected: false,
       ed_intent: null,
+      moodle_intent_detected: false,
+      moodle_intent: null,
+      moodle_file: null,
     });
   } catch (e: any) {
     res.status(e.code === 401 ? 401 : 400).json({ error: String(e) });

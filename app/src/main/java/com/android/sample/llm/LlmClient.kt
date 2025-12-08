@@ -46,18 +46,54 @@ data class EdIntent(
 )
 
 /**
+ * Moodle file information.
+ *
+ * @param url The download URL for the file
+ * @param filename The name of the file
+ * @param mimetype The MIME type of the file (e.g., "application/pdf")
+ * @param courseName The name of the course (optional)
+ * @param fileType The type of file: "lecture", "homework", or "homework_solution" (optional)
+ * @param fileNumber The file number (optional)
+ * @param week The week number (optional)
+ */
+data class MoodleFile(
+    val url: String,
+    val filename: String,
+    val mimetype: String,
+    val courseName: String? = null,
+    val fileType: String? = null,
+    val fileNumber: String? = null,
+    val week: Int? = null
+)
+
+/**
+ * Moodle intent information.
+ *
+ * @param detected Whether a Moodle file fetch intent was detected
+ * @param intent The type of Moodle intent detected (e.g., "fetch_lecture")
+ * @param file The Moodle file information (when detected is true and file found)
+ */
+data class MoodleIntent(
+    val detected: Boolean = false,
+    val intent: String? = null,
+    val file: MoodleFile? = null
+)
+
+/**
  * Response from the LLM backend.
  *
  * @param reply The text response from the LLM
  * @param url Optional URL source reference
  * @param sourceType The type of source used for the answer
  * @param edIntent ED Discussion intent information
+ * @param moodleIntent Moodle intent information
  */
 data class BotReply(
     val reply: String,
     val url: String?,
     val sourceType: SourceType = SourceType.NONE,
-    val edIntent: EdIntent = EdIntent()
+    val edIntent: EdIntent = EdIntent(),
+    val moodleIntent: MoodleIntent = MoodleIntent()
 ) {
   // Backward compatibility properties
   @Deprecated("Use edIntent.detected instead", ReplaceWith("edIntent.detected"))
@@ -249,6 +285,65 @@ class FirebaseFunctionsLlmClient(
   private fun parseEdFormattedTitle(map: Map<String, Any?>): String? =
       map[KEY_ED_FORMATTED_TITLE] as? String
 
+  private fun parseMoodleIntentDetected(map: Map<String, Any?>): Boolean =
+      map[KEY_MOODLE_INTENT_DETECTED] as? Boolean ?: false
+
+  private fun parseMoodleIntentType(map: Map<String, Any?>): String? =
+      map[KEY_MOODLE_INTENT] as? String
+
+  @Suppress("UNCHECKED_CAST")
+  private fun parseMoodleFile(map: Map<String, Any?>): MoodleFile? {
+    val moodleFileMap = map[KEY_MOODLE_FILE] as? Map<String, Any?> ?: return null
+    
+    // Get raw URL - handle different types that Firebase might return
+    val rawUrl = moodleFileMap["url"]
+    val url = when (rawUrl) {
+      is String -> {
+        // URL might be encoded, try to decode it
+        try {
+          java.net.URLDecoder.decode(rawUrl, "UTF-8")
+        } catch (e: Exception) {
+          Log.w(TAG, "Failed to decode URL, using raw: ${e.message}")
+          rawUrl
+        }
+      }
+      else -> {
+        val urlString = rawUrl?.toString() ?: return null
+        try {
+          java.net.URLDecoder.decode(urlString, "UTF-8")
+        } catch (e: Exception) {
+          urlString
+        }
+      }
+    }
+    
+    // Log the full URL to debug
+    Log.d(TAG, "parseMoodleFile: rawUrl type=${rawUrl?.javaClass?.simpleName}, url length=${url.length}")
+    Log.d(TAG, "parseMoodleFile: full URL=$url")
+    
+    val filename = moodleFileMap["filename"] as? String ?: return null
+    val mimetype = moodleFileMap["mimetype"] as? String ?: "application/pdf"
+    
+    // Ensure URL is not truncated or modified - preserve the full URL
+    val finalUrl = url.trim()
+    if (finalUrl.isEmpty()) {
+      Log.e(TAG, "parseMoodleFile: URL is empty after trimming")
+      return null
+    }
+    
+    // Verify URL is valid
+    try {
+      java.net.URI(finalUrl) // Validate URL format
+    } catch (e: Exception) {
+      Log.e(TAG, "parseMoodleFile: Invalid URL format: $finalUrl", e)
+      return null
+    }
+    
+    Log.d(TAG, "parseMoodleFile: Successfully parsed - filename=$filename, url length=${finalUrl.length}")
+    
+    return MoodleFile(finalUrl, filename, mimetype)
+  }
+
   private fun buildBotReply(map: Map<String, Any?>, replyText: String): BotReply {
     val url = parsePrimaryUrl(map)
     val sourceType = parseSourceType(map)
@@ -267,7 +362,43 @@ class FirebaseFunctionsLlmClient(
             intent = edIntentType,
             formattedQuestion = edFormattedQuestion,
             formattedTitle = edFormattedTitle)
-    return BotReply(replyText, url, sourceType, edIntent)
+
+    val moodleIntentDetected = parseMoodleIntentDetected(map)
+    val moodleIntentType = parseMoodleIntentType(map)
+    
+    // Debug: Log the raw moodle_file data from the response
+    val moodleFileRaw = map[KEY_MOODLE_FILE]
+    Log.d(TAG, "Moodle file raw data: $moodleFileRaw (type: ${moodleFileRaw?.javaClass?.simpleName})")
+    
+    // If it's a Map, log its contents
+    if (moodleFileRaw is Map<*, *>) {
+      @Suppress("UNCHECKED_CAST")
+      val moodleFileMap = moodleFileRaw as Map<String, Any?>
+      Log.d(TAG, "Moodle file map keys: ${moodleFileMap.keys}")
+      moodleFileMap["url"]?.let { 
+        Log.d(TAG, "Moodle file URL from map: $it (type: ${it.javaClass.simpleName}, length: ${it.toString().length})")
+      }
+    }
+    
+    val moodleFile = parseMoodleFile(map)
+
+    if (moodleIntentDetected) {
+      Log.d(TAG, "Moodle intent detected: $moodleIntentType, file=${moodleFile != null}")
+      if (moodleFile != null) {
+        Log.d(TAG, "Moodle file parsed: url=${moodleFile.url}, filename=${moodleFile.filename}, mimetype=${moodleFile.mimetype}")
+        Log.d(TAG, "Moodle file URL length: ${moodleFile.url.length}, starts with: ${moodleFile.url.take(50)}")
+      } else {
+        Log.w(TAG, "Moodle file is null despite intent being detected. Raw data: $moodleFileRaw")
+      }
+    }
+
+    val moodleIntent =
+        MoodleIntent(
+            detected = moodleIntentDetected,
+            intent = moodleIntentType,
+            file = moodleFile)
+
+    return BotReply(replyText, url, sourceType, edIntent, moodleIntent)
   }
 
   companion object {
@@ -289,6 +420,9 @@ class FirebaseFunctionsLlmClient(
     private const val KEY_ED_INTENT = "ed_intent"
     private const val KEY_ED_FORMATTED_QUESTION = "ed_formatted_question"
     private const val KEY_ED_FORMATTED_TITLE = "ed_formatted_title"
+    private const val KEY_MOODLE_INTENT_DETECTED = "moodle_intent_detected"
+    private const val KEY_MOODLE_INTENT = "moodle_intent"
+    private const val KEY_MOODLE_FILE = "moodle_file"
 
     /**
      * Creates a region-scoped [FirebaseFunctions] instance and wires the local emulator when
