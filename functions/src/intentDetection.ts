@@ -79,10 +79,10 @@ const ED_BLOCK_PATTERNS: RegExp[] = [
  * These patterns prevent false positives when users ask about Moodle itself
  */
 const MOODLE_BLOCK_PATTERNS: RegExp[] = [
-  /\b(c['']?est\s+quoi|qu['']?est[- ]ce\s+que?)\b.*\bmoodle\b/i,
-  /\bcomment\s+(marche|fonctionne|utiliser?)\b.*\bmoodle\b/i,
-  /\b(où|ou)\s+(trouver?|est)\b.*\bmoodle\b/i,
-  /\bexplique[rz]?\b.*\bmoodle\b/i,
+  /\b(c['']?est\s+quoi|qu['']?est[- ]ce\s+que?)\b.{0,50}\bmoodle\b/i,
+  /\bcomment\s+(marche|fonctionne|utiliser?)\b.{0,50}\bmoodle\b/i,
+  /\b(où|ou)\s+(trouver?|est)\b.{0,50}\bmoodle\b/i,
+  /\bexplique[rz]?\b.{0,50}\bmoodle\b/i,
 ];
 
 /**
@@ -118,15 +118,20 @@ export const MOODLE_INTENT_CONFIGS: IntentConfig[] = [
   // ===== GENERAL MOODLE FETCH INTENT =====
   // This is the first layer detection - catches any "fetch me the..." type request
   // The specific file type (lecture/homework/solution) is determined in the second layer
+  // Note: These patterns are intentionally broad to catch various phrasings. False positives
+  // are filtered out in the second layer (moodleIntent.ts) which requires Moodle-specific
+  // keywords (lecture, homework, solution, cours, etc.) or explicit "moodle" mentions.
   {
     id: "fetch_file",
     matchPatterns: [
-      // English patterns
-      /\b(fetch|get|show|display|download|retrieve|bring)\s+(me\s+)?(the\s+)?/i,
-      /\b(i\s+)?(want|need|would\s+like)\s+(to\s+)?(fetch|get|see|view|download|retrieve)\s+(the\s+)?/i,
-      // French patterns - "donne" (give), "récupère" (fetch), etc.
-      /\b(donne|donner?|récupérer?|obtenir?|télécharger?|charger?|voir|afficher?|montrer?|ouvrir?|chercher?|trouver?)\s+(moi\s+)?(le\s+|la\s+|les\s+)?/i,
-      /\b(je\s+)?(veux|voudrais|souhaite|ai\s+besoin)\s+(de\s+)?(récupérer?|obtenir?|voir|afficher?|télécharger?|donner?)\s+(le\s+|la\s+|les\s+)?/i,
+      // English patterns - require file-related context or explicit moodle mention
+      /\b(fetch|get|show|display|download|retrieve|bring)\s+(me\s+)?(the\s+)?(lecture|homework|solution|file|document|cours|moodle)/i,
+      /\b(fetch|get|show|display|download|retrieve|bring)\s+(me\s+)?(the\s+).*\bmoodle\b/i,
+      /\b(i\s+)?(want|need|would\s+like)\s+(to\s+)?(fetch|get|see|view|download|retrieve)\s+(the\s+)?(lecture|homework|solution|file|document|cours|moodle)/i,
+      // French patterns - require file-related context or explicit moodle mention
+      /\b(donne|donner?|récupérer?|obtenir?|télécharger?|charger?|voir|afficher?|montrer?|ouvrir?|chercher?|trouver?)\s+(moi\s+)?(le\s+|la\s+|les\s+)?(cours|devoir|lecture|fichier|document|moodle)/i,
+      /\b(donne|donner?|récupérer?|obtenir?|télécharger?|charger?|voir|afficher?|montrer?|ouvrir?|chercher?|trouver?)\s+(moi\s+)?(le\s+|la\s+|les\s+)?.*\bmoodle\b/i,
+      /\b(je\s+)?(veux|voudrais|souhaite|ai\s+besoin)\s+(de\s+)?(récupérer?|obtenir?|voir|afficher?|télécharger?|donner?)\s+(le\s+|la\s+|les\s+)?(cours|devoir|lecture|fichier|document|moodle)/i,
       // Patterns that include file type keywords (lecture, homework, etc.)
       /\b(lecture|leçon|lesson|devoir|homework|home\s*work|travail|solution|correction|corrigé|cours)\s+(\d+|[a-z])/i,
       // Patterns with "cours" (course) and "semaine" (week) - common French patterns

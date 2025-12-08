@@ -918,7 +918,6 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
           logger.info("answerWithRagFn.tokenDecrypted", {
             uid,
             tokenLength: token.length,
-            tokenPreview: token.substring(0, 10) + "...",
           });
         } catch (decryptError: any) {
           logger.error("answerWithRagFn.tokenDecryptionFailed", {
@@ -1041,16 +1040,19 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
             };
           }
 
-          // Search for file in all courses and track which course it was found in
+          // Search for file in all courses in parallel for better performance
+          // We use Promise.allSettled to search all courses simultaneously, then
+          // check results in order and take the first match (maintains deterministic behavior)
           let foundInCourse: any = null;
-          for (const course of courses) {
+          
+          const searchPromises = courses.map(async (course) => {
             const courseId = course.id; // Moodle returns 'id' field
             if (!courseId) {
               logger.warn("answerWithRagFn.courseWithoutId", {
                 course,
                 availableFields: Object.keys(course),
               });
-              continue;
+              return { course, file: null };
             }
 
             const courseIdNum = typeof courseId === "number" ? courseId : parseInt(String(courseId), 10);
@@ -1060,7 +1062,7 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
                 courseId,
                 courseIdNum,
               });
-              continue;
+              return { course, file: null };
             }
 
             logger.info("answerWithRagFn.searchingInCourse", {
@@ -1077,10 +1079,16 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
               fileInfo.fileNumber,
               fileInfo.week
             );
-            if (file) {
-              foundFile = file;
-              foundInCourse = course;
-              break;
+            return { course, file };
+          });
+
+          // Wait for all searches to complete (in parallel), then find first match
+          const results = await Promise.allSettled(searchPromises);
+          for (const result of results) {
+            if (result.status === "fulfilled" && result.value.file) {
+              foundFile = result.value.file;
+              foundInCourse = result.value.course;
+              break; // Take first match (maintains original behavior)
             }
           }
 

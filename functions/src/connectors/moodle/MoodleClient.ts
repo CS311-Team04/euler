@@ -1,7 +1,40 @@
 /**
     * A simple Moodle web service client for testing connectivity and fetching files.
- */
+*/
 import * as logger from "firebase-functions/logger";
+
+/**
+ * Escapes special regex characters in a string to prevent regex injection attacks.
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Redacts tokens from URLs before logging to prevent sensitive data leakage.
+ */
+function redactTokensFromUrl(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    // Remove token query parameters
+    urlObj.searchParams.delete("token");
+    urlObj.searchParams.delete("wstoken");
+    // Redact any remaining suspicious query params
+    const redactedParams = new URLSearchParams();
+    urlObj.searchParams.forEach((value, key) => {
+      if (key.toLowerCase().includes("token") || key.toLowerCase().includes("auth")) {
+        redactedParams.set(key, "[REDACTED]");
+      } else {
+        redactedParams.set(key, value);
+      }
+    });
+    urlObj.search = redactedParams.toString();
+    return urlObj.toString();
+  } catch {
+    // If URL parsing fails, do a simple string replacement
+    return url.replace(/[?&](?:token|wstoken)=[^&]*/gi, "[REDACTED]");
+  }
+}
 
 export class MoodleClient {
   constructor(
@@ -355,7 +388,7 @@ export class MoodleClient {
     const patterns: RegExp[] = [];
 
     if (fileNumber) {
-      const normalizedNumber = fileNumber.toLowerCase().trim();
+      const normalizedNumber = escapeRegex(fileNumber.toLowerCase().trim());
 
       switch (fileType) {
         case "lecture":
@@ -658,8 +691,8 @@ export class MoodleClient {
       const finalUrl = res.url;
 
       logger.info("MoodleClient.getDirectFileUrl", {
-        originalUrl: fileUrl.substring(0, 100),
-        finalUrl: finalUrl.substring(0, 100),
+        originalUrl: redactTokensFromUrl(fileUrl).substring(0, 100),
+        finalUrl: redactTokensFromUrl(finalUrl).substring(0, 100),
         status: res.status,
         contentType: res.headers.get("content-type"),
       });

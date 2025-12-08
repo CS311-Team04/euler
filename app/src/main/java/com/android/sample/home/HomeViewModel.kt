@@ -835,7 +835,7 @@ class HomeViewModel(
         try {
           repo.appendMessage(cid, "user", msg)
         } catch (e: Exception) {
-          Log.e(TAG, "Failed to persist user message", e)
+          Log.e(TAG, "Failed to persist user message: ${e.message}", e)
           handleSendMessageError(e, aiMessageId)
           return@launch
         }

@@ -59,10 +59,25 @@ export function extractFileInfo(question: string): {
 } | null {
   const trimmed = question.trim();
 
-  // 1) Always extract a number if present (first numeric token)
+  // 1) Extract number closest to file type keywords (lecture/homework/solution)
   let number: string | null = null;
-  const numMatch = trimmed.match(/\b(\d+)\b/);
-  if (numMatch) number = numMatch[1];
+  
+  // Try to find number near file type keywords first
+  const lectureNumMatch = trimmed.match(/\b(lecture|leçon|lesson|cours)\s*(\d+)/i);
+  const homeworkNumMatch = trimmed.match(/\b(devoir|homework|home\s*work|travail|serie|série)\s*(\d+)/i);
+  const solutionNumMatch = trimmed.match(/\b(solution|correction|corrigé)\s*(\d+)/i);
+  
+  if (solutionNumMatch) {
+    number = solutionNumMatch[2];
+  } else if (homeworkNumMatch) {
+    number = homeworkNumMatch[2];
+  } else if (lectureNumMatch) {
+    number = lectureNumMatch[2];
+  } else {
+    // Fallback: extract first number if no keyword match
+    const numMatch = trimmed.match(/\b(\d+)\b/);
+    if (numMatch) number = numMatch[1];
+  }
 
   // 2) Detect file type by keywords (priority: solution > homework > lecture)
   const isSolution = /\b(solution|correction|corrigé)\b/i.test(trimmed);
@@ -119,16 +134,18 @@ export function extractFileInfo(question: string): {
     }
   }
 
-  // Pattern D: standalone capitalized phrase
+  // Pattern D: standalone capitalized phrase (limited to prevent ReDoS)
   if (!courseName) {
-    const standalonePattern = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*(?:\s*-\s*[a-z\s]+)?)\b/;
-    const standaloneMatch = trimmed.match(standalonePattern);
-    if (standaloneMatch) {
-      const potential = standaloneMatch[1]?.trim();
-      const excludeWords =
-        /^(Fetch|Get|Show|Display|Download|I|Want|Need|Would|Like|The|From|Of|Week|Semaine|Donne|Donner)/i;
-      if (potential && !excludeWords.test(potential)) {
-        courseName = potential;
+    // Limit to max 5 words and 100 chars to prevent ReDoS attacks
+    const maxLength = 100;
+    if (trimmed.length <= maxLength) {
+      const standalonePattern = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,4}(?:\s*-\s*[a-z\s]{0,30})?)\b/;
+      const standaloneMatch = trimmed.match(standalonePattern);
+      if (standaloneMatch) {
+        const potential = standaloneMatch[1]?.trim();
+        if (potential && potential.length > 2 && potential.length <= 50) {
+          courseName = potential;
+        }
       }
     }
   }
