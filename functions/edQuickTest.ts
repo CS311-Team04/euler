@@ -10,7 +10,7 @@ import {
 async function main() {
   // ⚠️ Mets ton vrai token ED ici pour le test.
   // N'OUBLIE PAS de l'enlever avant de commit.
-  const token = "azB3eR.5mOAIYhFjN46SFerhY2Rx8T7IdKSfjPRQh7dwfJu";
+  const token = "mettre ton token ED ici";
   const baseUrl = "https://eu.edstem.org/api";
 
   const client = new EdDiscussionClient(baseUrl, token);
