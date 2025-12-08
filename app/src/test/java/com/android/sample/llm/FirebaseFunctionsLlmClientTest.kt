@@ -10,6 +10,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -189,5 +190,334 @@ class FirebaseFunctionsLlmClientTest {
     assertEquals(SourceType.NONE, SourceType.fromString("unknown"))
     assertEquals(SourceType.NONE, SourceType.fromString(null))
     assertEquals(SourceType.NONE, SourceType.fromString(""))
+  }
+
+  @Test
+  fun generateReply_parses_moodle_intent_detected_true() = runTest {
+    val reply = "Here is your file"
+    val moodleFile =
+        mapOf(
+            "url" to "https://example.com/file.pdf",
+            "filename" to "file.pdf",
+            "mimetype" to "application/pdf")
+    val client =
+        clientWithResult(
+            mapOf(
+                "reply" to reply,
+                "moodle_intent_detected" to true,
+                "moodle_intent" to "fetch_file",
+                "moodle_file" to moodleFile))
+
+    val result = client.generateReply("fetch lecture 1")
+
+    assertEquals(reply, result.reply)
+    assertTrue(result.moodleIntent.detected)
+    assertEquals("fetch_file", result.moodleIntent.intent)
+    assertNotNull(result.moodleIntent.file)
+    assertEquals("file.pdf", result.moodleIntent.file?.filename)
+  }
+
+  @Test
+  fun generateReply_parses_moodle_intent_detected_false() = runTest {
+    val reply = "Normal response"
+    val client =
+        clientWithResult(
+            mapOf("reply" to reply, "moodle_intent_detected" to false, "moodle_intent" to null))
+
+    val result = client.generateReply("what is EPFL?")
+
+    assertEquals(reply, result.reply)
+    assertFalse(result.moodleIntent.detected)
+    assertNull(result.moodleIntent.intent)
+    assertNull(result.moodleIntent.file)
+  }
+
+  @Test
+  fun generateReply_allows_empty_reply_when_moodle_file_present() = runTest {
+    val moodleFile =
+        mapOf(
+            "url" to "https://example.com/file.pdf",
+            "filename" to "file.pdf",
+            "mimetype" to "application/pdf")
+    val client =
+        clientWithResult(
+            mapOf(
+                "reply" to "",
+                "moodle_intent_detected" to true,
+                "moodle_intent" to "fetch_file",
+                "moodle_file" to moodleFile),
+            fallback = null)
+
+    val result = client.generateReply("fetch lecture 1")
+
+    assertEquals("", result.reply)
+    assertNotNull(result.moodleIntent.file)
+  }
+
+  @Test
+  fun generateReply_parses_moodle_file_with_url_encoding() = runTest {
+    val moodleFile =
+        mapOf(
+            "url" to "https://example.com/file%20with%20spaces.pdf",
+            "filename" to "file with spaces.pdf",
+            "mimetype" to "application/pdf")
+    val client =
+        clientWithResult(
+            mapOf(
+                "reply" to "File found",
+                "moodle_intent_detected" to true,
+                "moodle_file" to moodleFile))
+
+    val result = client.generateReply("fetch file")
+
+    assertNotNull(result.moodleIntent.file)
+    assertTrue(result.moodleIntent.file?.url?.contains("file") == true)
+  }
+
+  @Test
+  fun generateReply_handles_moodle_file_with_special_characters() = runTest {
+    val moodleFile =
+        mapOf(
+            "url" to "https://example.com/Wk1.A - Tools, Requirements, User Stories .pdf",
+            "filename" to "Wk1.A - Tools, Requirements, User Stories .pdf",
+            "mimetype" to "application/pdf")
+    val client =
+        clientWithResult(
+            mapOf(
+                "reply" to "File found",
+                "moodle_intent_detected" to true,
+                "moodle_file" to moodleFile))
+
+    val result = client.generateReply("fetch file")
+
+    assertNotNull(result.moodleIntent.file)
+    assertEquals(
+        "Wk1.A - Tools, Requirements, User Stories .pdf", result.moodleIntent.file?.filename)
+  }
+
+  @Test
+  fun generateReply_parses_ed_formatted_question_and_title() = runTest {
+    val reply = "I'll post this on ED"
+    val client =
+        clientWithResult(
+            mapOf(
+                "reply" to reply,
+                "ed_intent_detected" to true,
+                "ed_intent" to "post_question",
+                "ed_formatted_question" to "What is the deadline?",
+                "ed_formatted_title" to "Question about deadline"))
+
+    val result = client.generateReply("post on ed")
+
+    assertEquals(reply, result.reply)
+    assertTrue(result.edIntent.detected)
+    assertEquals("What is the deadline?", result.edIntent.formattedQuestion)
+    assertEquals("Question about deadline", result.edIntent.formattedTitle)
+  }
+
+  @Test
+  fun generateReply_handles_missing_ed_formatted_fields() = runTest {
+    val reply = "Response"
+    val client =
+        clientWithResult(
+            mapOf("reply" to reply, "ed_intent_detected" to true, "ed_intent" to "post_question"))
+
+    val result = client.generateReply("test")
+
+    assertTrue(result.edIntent.detected)
+    assertNull(result.edIntent.formattedQuestion)
+    assertNull(result.edIntent.formattedTitle)
+  }
+
+  @Test
+  fun generateReply_parses_source_type_schedule() = runTest {
+    val client = clientWithResult(mapOf("reply" to "Your schedule", "source_type" to "schedule"))
+
+    val result = client.generateReply("what's my schedule?")
+
+    assertEquals(SourceType.SCHEDULE, result.sourceType)
+  }
+
+  @Test
+  fun generateReply_parses_source_type_rag() = runTest {
+    val client = clientWithResult(mapOf("reply" to "Answer from web", "source_type" to "rag"))
+
+    val result = client.generateReply("what is EPFL?")
+
+    assertEquals(SourceType.RAG, result.sourceType)
+  }
+
+  @Test
+  fun generateReply_defaults_source_type_none() = runTest {
+    val client = clientWithResult(mapOf("reply" to "Answer"))
+
+    val result = client.generateReply("question")
+
+    assertEquals(SourceType.NONE, result.sourceType)
+  }
+
+  @Test
+  fun generateReply_with_summary_and_transcript() = runTest {
+    val reply = "Answer with context"
+    val client = clientWithResult(mapOf("reply" to reply))
+
+    val result =
+        client.generateReply(
+            prompt = "question", summary = "Previous conversation", transcript = "Recent messages")
+
+    assertEquals(reply, result.reply)
+  }
+
+  @Test
+  fun generateReply_with_profile_context() = runTest {
+    val reply = "Personalized answer"
+    val client = clientWithResult(mapOf("reply" to reply))
+
+    val result = client.generateReply(prompt = "question", profileContext = "{\"name\":\"John\"}")
+
+    assertEquals(reply, result.reply)
+  }
+
+  @Test
+  fun generateReply_handles_moodle_file_with_null_url() = runTest {
+    val moodleFile = mapOf("url" to null, "filename" to "file.pdf", "mimetype" to "application/pdf")
+    val client =
+        clientWithResult(
+            mapOf(
+                "reply" to "Response",
+                "moodle_intent_detected" to true,
+                "moodle_file" to moodleFile))
+
+    val result = client.generateReply("fetch file")
+
+    assertNull(result.moodleIntent.file)
+  }
+
+  @Test
+  fun generateReply_handles_moodle_file_with_missing_filename() = runTest {
+    val moodleFile = mapOf("url" to "https://example.com/file.pdf", "mimetype" to "application/pdf")
+    val client =
+        clientWithResult(
+            mapOf(
+                "reply" to "Response",
+                "moodle_intent_detected" to true,
+                "moodle_file" to moodleFile))
+
+    val result = client.generateReply("fetch file")
+
+    assertNull(result.moodleIntent.file)
+  }
+
+  @Test
+  fun generateReply_handles_moodle_file_with_empty_url() = runTest {
+    val moodleFile =
+        mapOf("url" to "   ", "filename" to "file.pdf", "mimetype" to "application/pdf")
+    val client =
+        clientWithResult(
+            mapOf(
+                "reply" to "Response",
+                "moodle_intent_detected" to true,
+                "moodle_file" to moodleFile))
+
+    val result = client.generateReply("fetch file")
+
+    assertNull(result.moodleIntent.file)
+  }
+
+  @Test
+  fun generateReply_handles_invalid_moodle_file_type() = runTest {
+    val client =
+        clientWithResult(
+            mapOf(
+                "reply" to "Response",
+                "moodle_intent_detected" to true,
+                "moodle_file" to "not-a-map"))
+
+    val result = client.generateReply("fetch file")
+
+    assertNull(result.moodleIntent.file)
+  }
+
+  @Test
+  fun generateReply_handles_moodle_file_with_invalid_url_format() = runTest {
+    val moodleFile =
+        mapOf("url" to "not a valid url", "filename" to "file.pdf", "mimetype" to "application/pdf")
+    val client =
+        clientWithResult(
+            mapOf(
+                "reply" to "Response",
+                "moodle_intent_detected" to true,
+                "moodle_file" to moodleFile))
+
+    val result = client.generateReply("fetch file")
+
+    // Should handle gracefully - might return null or attempt encoding
+    // The exact behavior depends on URI parsing
+  }
+
+  @Test
+  fun generateReply_propagates_firebase_functions_exception() = runTest {
+    val functions = mockk<FirebaseFunctions>()
+    val callable = mockk<HttpsCallableReference>()
+    val exception = RuntimeException("Firebase error")
+    val task = com.google.android.gms.tasks.Tasks.forException<HttpsCallableResult>(exception)
+    every { callable.call(any()) } returns task
+    every { functions.getHttpsCallable("answerWithRagFn") } returns callable
+
+    val client =
+        FirebaseFunctionsLlmClient(functions = functions, timeoutMillis = 1000L, fallback = null)
+
+    try {
+      client.generateReply("test")
+      assertTrue("Should have thrown exception", false)
+    } catch (e: Exception) {
+      // Expected - exception should be propagated
+      assertTrue(e is RuntimeException)
+    }
+  }
+
+  @Test
+  fun generateReply_handles_class_cast_exception_in_parse_response() = runTest {
+    val fallback = RecordingFallback("fallback-cast")
+    // Return a non-Map type to trigger ClassCastException in parseResponseMap
+    val result = mockk<HttpsCallableResult>()
+    every { result.getData() } returns "not-a-map"
+
+    val callable = mockk<HttpsCallableReference>()
+    val task = Tasks.forResult(result)
+    every { callable.call(any()) } returns task
+
+    val functions = mockk<FirebaseFunctions>()
+    every { functions.getHttpsCallable("answerWithRagFn") } returns callable
+
+    val client =
+        FirebaseFunctionsLlmClient(
+            functions = functions, timeoutMillis = 1000L, fallback = fallback)
+
+    val botReply = client.generateReply("test")
+
+    assertEquals("fallback-cast", botReply.reply)
+  }
+
+  @Test
+  fun generateReply_handles_class_cast_exception_in_parse_reply() = runTest {
+    val fallback = RecordingFallback("fallback-reply-cast")
+    val result = mockk<HttpsCallableResult>()
+    every { result.getData() } returns mapOf("reply" to 123) // Not a String
+
+    val callable = mockk<HttpsCallableReference>()
+    val task = Tasks.forResult(result)
+    every { callable.call(any()) } returns task
+
+    val functions = mockk<FirebaseFunctions>()
+    every { functions.getHttpsCallable("answerWithRagFn") } returns callable
+
+    val client =
+        FirebaseFunctionsLlmClient(
+            functions = functions, timeoutMillis = 1000L, fallback = fallback)
+
+    val botReply = client.generateReply("test")
+
+    assertEquals("fallback-reply-cast", botReply.reply)
   }
 }

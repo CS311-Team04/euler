@@ -907,3 +907,141 @@ class NavGraphPdfViewerTest {
     assertTrue(route.startsWith("pdf_viewer/"))
   }
 }
+
+/** Additional tests for NavGraph helper functions to increase coverage. */
+class NavGraphAdditionalHelpersTest {
+
+  @Test
+  fun navigateToSettings_sets_correct_route() {
+    var capturedRoute: String? = null
+    navigateToSettings { route, _ -> capturedRoute = route }
+    assertEquals(Routes.Settings, capturedRoute)
+  }
+
+  @Test
+  fun navigateToProfile_sets_correct_route() {
+    var capturedRoute: String? = null
+    navigateToProfile { route, _ -> capturedRoute = route }
+    assertEquals(Routes.Profile, capturedRoute)
+  }
+
+  @Test
+  fun navigateToVoiceChat_sets_correct_route() {
+    var capturedRoute: String? = null
+    navigateToVoiceChat { route, _ -> capturedRoute = route }
+    assertEquals(Routes.VoiceChat, capturedRoute)
+  }
+
+  @Test
+  fun handleProfileClick_calls_showGuestWarning_when_guest() {
+    var warningCalled = false
+    var navigateCalled = false
+
+    handleProfileClick(
+        isGuest = true,
+        showGuestWarning = { warningCalled = true },
+        navigateToProfile = { navigateCalled = true })
+
+    assertTrue("Warning should be called for guest", warningCalled)
+    assertFalse("Navigate should not be called for guest", navigateCalled)
+  }
+
+  @Test
+  fun handleProfileClick_calls_navigateToProfile_when_not_guest() {
+    var warningCalled = false
+    var navigateCalled = false
+
+    handleProfileClick(
+        isGuest = false,
+        showGuestWarning = { warningCalled = true },
+        navigateToProfile = { navigateCalled = true })
+
+    assertFalse("Warning should not be called for non-guest", warningCalled)
+    assertTrue("Navigate should be called for non-guest", navigateCalled)
+  }
+
+  @Test
+  fun navigateSignOut_with_null_startRoute_uses_opening() {
+    var capturedRoute: String? = null
+    var inclusive: Boolean? = null
+    var restoreState = true
+    var launchSingleTop = false
+
+    navigateSignOut(
+        navigate = { route, builder ->
+          capturedRoute = route
+          val options = navOptions(builder)
+          inclusive = options.extractInclusive()
+          restoreState = options.shouldRestoreState()
+          launchSingleTop = options.shouldLaunchSingleTop()
+        },
+        startDestinationRoute = null)
+
+    assertEquals(Routes.SignIn, capturedRoute)
+    assertEquals(true, inclusive)
+    assertFalse(restoreState)
+    assertTrue(launchSingleTop)
+  }
+
+  @Test
+  fun navigateSignOut_with_custom_startRoute() {
+    var capturedRoute: String? = null
+    var inclusive: Boolean? = null
+
+    navigateSignOut(
+        navigate = { route, builder ->
+          capturedRoute = route
+          val options = navOptions(builder)
+          inclusive = options.extractInclusive()
+        },
+        startDestinationRoute = Routes.Home)
+
+    assertEquals(Routes.SignIn, capturedRoute)
+    assertEquals(true, inclusive)
+  }
+
+  @Test
+  fun buildAuthenticationErrorMessage_returns_error_message() {
+    val errorState = com.android.sample.authentification.AuthUiState.Error("Test error")
+    val result = buildAuthenticationErrorMessage(errorState, "Fallback")
+    assertEquals("Test error", result)
+  }
+
+  @Test
+  fun buildAuthenticationErrorMessage_returns_fallback_for_non_error() {
+    val idleState = com.android.sample.authentification.AuthUiState.Idle
+    val result = buildAuthenticationErrorMessage(idleState, "Fallback message")
+    assertEquals("Fallback message", result)
+  }
+
+  @Test
+  fun Routes_constants_are_defined() {
+    assertEquals("opening", Routes.Opening)
+    assertEquals("signin", Routes.SignIn)
+    assertEquals("onboarding_personal_info", Routes.OnboardingPersonalInfo)
+    assertEquals("onboarding_role", Routes.OnboardingRole)
+    assertEquals("onboarding_academic", Routes.OnboardingAcademic)
+    assertEquals("home", Routes.Home)
+    assertEquals("home_with_drawer", Routes.HomeWithDrawer)
+    assertEquals("settings", Routes.Settings)
+    assertEquals("profile", Routes.Profile)
+    assertEquals("connectors", Routes.Connectors)
+    assertEquals("ed_connect", Routes.EdConnect)
+    assertEquals("voice_chat", Routes.VoiceChat)
+    assertEquals("epfl_campus", Routes.EpflCampus)
+  }
+
+  private fun NavOptions.extractInclusive(): Boolean? {
+    val methodNames = listOf("isPopUpToInclusive", "shouldPopUpToInclusive")
+    for (name in methodNames) {
+      try {
+        val method = NavOptions::class.java.getDeclaredMethod(name)
+        method.isAccessible = true
+        return method.invoke(this) as Boolean
+      } catch (_: Exception) {
+        // ignore and try next name
+      }
+    }
+    return null
+  }
+}
