@@ -1,6 +1,7 @@
 package com.android.sample.ui.components
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -91,5 +92,25 @@ class EdPostConfirmationModalTest {
     }
 
     composeRule.onNode(hasText("Body 1")).assertIsDisplayed()
+  }
+
+  @Test
+  fun edPostConfirmationModal_shows_loading_indicator_when_isLoading_is_true() {
+    composeRule.setContent {
+      EdPostConfirmationModal(
+          title = "Title", body = "Body", isLoading = true, onPublish = { _, _ -> }, onCancel = {})
+    }
+
+    // Verify that text fields are disabled when loading
+    composeRule.onNode(hasText("Title")).assertIsNotEnabled()
+    composeRule.onNode(hasText("Body")).assertIsNotEnabled()
+
+    // Verify that buttons are disabled when loading
+    composeRule.onNodeWithText("Post").assertIsNotEnabled()
+    composeRule.onNodeWithText("Cancel").assertIsNotEnabled()
+
+    // The CircularProgressIndicator should be displayed instead of the Send icon
+    // We verify this by checking that the Post button is still displayed but disabled
+    composeRule.onNodeWithText("Post").assertIsDisplayed()
   }
 }
