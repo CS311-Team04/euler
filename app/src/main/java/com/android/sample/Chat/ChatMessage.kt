@@ -209,7 +209,8 @@ fun MoodleFileViewer(
     Card(
         modifier =
             Modifier.fillMaxWidth()
-                .border(width = 1.dp, color = accent, shape = RoundedCornerShape(14.dp)),
+                .border(width = 1.dp, color = accent, shape = RoundedCornerShape(14.dp))
+                .testTag("moodle_file_card"),
         colors = CardDefaults.cardColors(containerColor = cardBg),
         shape = RoundedCornerShape(14.dp)) {
           Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -266,7 +267,8 @@ fun MoodleFileViewer(
                           Modifier.size(40.dp)
                               .clip(RoundedCornerShape(14.dp))
                               .background(iconBg)
-                              .clickable { onPdfClick(file.url, file.filename) },
+                              .clickable { onPdfClick(file.url, file.filename) }
+                              .testTag("moodle_file_view_button"),
                       contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Filled.Visibility,
@@ -279,7 +281,8 @@ fun MoodleFileViewer(
                           Modifier.size(40.dp)
                               .clip(RoundedCornerShape(14.dp))
                               .background(iconBg)
-                              .clickable { onDownloadClick(file.url, file.filename) },
+                              .clickable { onDownloadClick(file.url, file.filename) }
+                              .testTag("moodle_file_download_button"),
                       contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Filled.Download,

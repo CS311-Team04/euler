@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
@@ -24,12 +25,14 @@ fun PdfViewerScreen(pdfUrl: String, filename: String, navController: NavControll
         TopAppBar(
             title = { Text(text = filename, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             navigationIcon = {
-              IconButton(onClick = { navController.popBackStack() }) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = "Close",
-                    tint = MaterialTheme.colorScheme.onSurface)
-              }
+              IconButton(
+                  onClick = { navController.popBackStack() },
+                  modifier = Modifier.testTag("pdf_viewer_close_button")) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "Close",
+                        tint = MaterialTheme.colorScheme.onSurface)
+                  }
             },
             colors =
                 TopAppBarDefaults.topAppBarColors(
@@ -55,7 +58,7 @@ fun PdfViewerScreen(pdfUrl: String, filename: String, navController: NavControll
                   loadUrl(viewerUrl)
                 }
               },
-              modifier = Modifier.fillMaxSize())
+              modifier = Modifier.fillMaxSize().testTag("pdf_viewer_webview"))
         }
       }
 }

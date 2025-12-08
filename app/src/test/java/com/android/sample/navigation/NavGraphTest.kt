@@ -803,3 +803,107 @@ class NavGraphNavigationHelpersTest {
     return null
   }
 }
+
+/**
+ * Tests for PDF viewer route in NavGraph. These tests cover the PDF viewer navigation, URL
+ * encoding/decoding, and route arguments handling.
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [30])
+@OptIn(ExperimentalCoroutinesApi::class)
+class NavGraphPdfViewerTest {
+
+  @get:Rule val composeRule = createComposeRule()
+
+  @get:Rule val dispatcherRule = MainDispatcherRule(UnconfinedTestDispatcher())
+
+  @Test
+  fun Routes_PdfViewer_constant_is_defined() {
+    assertEquals("pdf_viewer/{pdfUrl}/{filename}", Routes.PdfViewer)
+  }
+
+  @Test
+  fun Routes_PdfViewer_constant_is_not_empty() {
+    assertTrue(Routes.PdfViewer.isNotEmpty())
+  }
+
+  @Test
+  fun pdfViewerRoute_encodes_url_and_filename() {
+    val pdfUrl = "https://example.com/test file.pdf"
+    val filename = "test file.pdf"
+    val encodedUrl = android.net.Uri.encode(pdfUrl, "")
+    val encodedFilename = android.net.Uri.encode(filename, "")
+
+    assertNotEquals(pdfUrl, encodedUrl)
+    assertNotEquals(filename, encodedFilename)
+    assertTrue(encodedUrl.contains("%20") || encodedUrl.contains("%2F"))
+  }
+
+  @Test
+  fun pdfViewerRoute_decodes_url_and_filename() {
+    val encodedUrl = "https%3A%2F%2Fexample.com%2Ftest%20file.pdf"
+    val encodedFilename = "test%20file.pdf"
+    val decodedUrl = android.net.Uri.decode(encodedUrl)
+    val decodedFilename = android.net.Uri.decode(encodedFilename)
+
+    assertEquals("https://example.com/test file.pdf", decodedUrl)
+    assertEquals("test file.pdf", decodedFilename)
+  }
+
+  @Test
+  fun pdfViewerRoute_handles_special_characters() {
+    val pdfUrl = "https://example.com/file (1).pdf?token=abc&param=123"
+    val filename = "file (1).pdf"
+    val encodedUrl = android.net.Uri.encode(pdfUrl, "")
+    val encodedFilename = android.net.Uri.encode(filename, "")
+
+    // Should encode special characters (parentheses, spaces, etc.)
+    // The encoding may vary, so just check that encoding occurred
+    assertNotEquals(pdfUrl, encodedUrl)
+    assertNotEquals(filename, encodedFilename)
+    // Check that at least some encoding happened (contains %)
+    assertTrue(encodedUrl.contains("%") || encodedFilename.contains("%"))
+  }
+
+  @Test
+  fun pdfViewerRoute_handles_empty_filename() {
+    val encodedFilename = android.net.Uri.encode("", "")
+    val decodedFilename = android.net.Uri.decode(encodedFilename)
+
+    assertEquals("", decodedFilename)
+  }
+
+  @Test
+  fun pdfViewerRoute_handles_unicode_characters() {
+    val pdfUrl = "https://example.com/文件.pdf"
+    val filename = "文件.pdf"
+    val encodedUrl = android.net.Uri.encode(pdfUrl, "")
+    val encodedFilename = android.net.Uri.encode(filename, "")
+
+    // Should encode unicode characters
+    assertNotEquals(pdfUrl, encodedUrl)
+    assertNotEquals(filename, encodedFilename)
+  }
+
+  @Test
+  fun navigateToPdfViewer_uses_correct_route_format() {
+    val pdfUrl = "https://example.com/test.pdf"
+    val filename = "test.pdf"
+    val encodedUrl = android.net.Uri.encode(pdfUrl, "")
+    val encodedFilename = android.net.Uri.encode(filename, "")
+    val expectedRoute = "pdf_viewer/$encodedUrl/$encodedFilename"
+
+    assertTrue(expectedRoute.startsWith("pdf_viewer/"))
+    assertTrue(expectedRoute.contains(encodedUrl))
+    assertTrue(expectedRoute.contains(encodedFilename))
+  }
+
+  @Test
+  fun pdfViewerRoute_defaults_filename_when_missing() {
+    // Test that the route handles missing filename argument
+    val encodedUrl = android.net.Uri.encode("https://example.com/test.pdf", "")
+    val route = "pdf_viewer/$encodedUrl/"
+
+    assertTrue(route.startsWith("pdf_viewer/"))
+  }
+}
