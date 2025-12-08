@@ -44,6 +44,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,6 +62,7 @@ import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.ui.components.EdPostConfirmationModal
 import com.android.sample.ui.components.EdPostedCard
 import com.android.sample.ui.components.GuestProfileWarningModal
+import com.android.sample.ui.theme.EdPostDimensions
 import com.android.sample.ui.theme.EulerRed
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -578,19 +580,19 @@ fun HomeScreen(
             is EdPostResult.Published -> {
               bg = MaterialTheme.colorScheme.surfaceVariant
               icon = Icons.Default.CheckCircle
-              title = "Posted to Ed"
-              subtitle = "Your question was published."
+              title = stringResource(R.string.ed_post_published_title)
+              subtitle = stringResource(R.string.ed_post_published_subtitle)
             }
             is EdPostResult.Cancelled -> {
               bg = MaterialTheme.colorScheme.surfaceVariant
               icon = Icons.Default.Close
-              title = "Post cancelled"
-              subtitle = "Draft was discarded."
+              title = stringResource(R.string.ed_post_cancelled_title)
+              subtitle = stringResource(R.string.ed_post_cancelled_subtitle)
             }
             is EdPostResult.Failed -> {
               bg = MaterialTheme.colorScheme.errorContainer
               icon = Icons.Default.Error
-              title = "Failed to post on Ed"
+              title = stringResource(R.string.ed_post_failed_title)
               subtitle = result.message
             }
             else -> {
@@ -602,14 +604,15 @@ fun HomeScreen(
           }
 
           Surface(
-              tonalElevation = 8.dp,
-              shape = RoundedCornerShape(16.dp),
+              tonalElevation = EdPostDimensions.ResultCardElevation,
+              shape = RoundedCornerShape(EdPostDimensions.ResultCardCornerRadius),
               color = bg,
-              modifier = Modifier.padding(16.dp)) {
+              modifier = Modifier.padding(EdPostDimensions.ResultCardPadding)) {
                 Row(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(EdPostDimensions.ResultCardPadding),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    horizontalArrangement =
+                        Arrangement.spacedBy(EdPostDimensions.ResultCardRowSpacing)) {
                       Icon(icon, contentDescription = null)
                       Column(modifier = Modifier.weight(1f)) {
                         Text(text = title, fontWeight = FontWeight.Bold)
@@ -618,7 +621,9 @@ fun HomeScreen(
                         }
                       }
                       IconButton(onClick = { viewModel.clearEdPostResult() }) {
-                        Icon(Icons.Default.Close, contentDescription = "Dismiss")
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = stringResource(R.string.dismiss))
                       }
                     }
               }
