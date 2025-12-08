@@ -78,7 +78,8 @@ class HomeViewModel(
         UserProfileRepository(),
     private val networkMonitor: NetworkConnectivityMonitor? = null,
     private val cacheRepo: CachedResponseRepository =
-        CachedResponseRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance())
+        CachedResponseRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance()),
+    private val edPostDataSourceOverride: EdPostRemoteDataSource? = null
 ) : ViewModel() {
   companion object {
     private const val TAG = "HomeViewModel"
@@ -178,6 +179,10 @@ class HomeViewModel(
         useEmulator(BuildConfig.FUNCTIONS_HOST, BuildConfig.FUNCTIONS_PORT)
       }
     }
+  }
+
+  private val edPostDataSource: EdPostRemoteDataSource by lazy {
+    edPostDataSourceOverride ?: EdPostRemoteDataSource(functions)
   }
 
   private var activeStreamJob: Job? = null
@@ -642,38 +647,52 @@ class HomeViewModel(
   fun publishEdPost(title: String, body: String) {
     Log.d(TAG, "publishEdPost: title='$title', body length=${body.length}")
 
-    val now = System.currentTimeMillis()
+    val sanitizedTitle = title.trim()
+    val sanitizedBody = body.trim()
+
     _uiState.update {
       it.copy(
-          pendingAction = null,
+          pendingAction =
+              PendingAction.PostOnEd(draftTitle = sanitizedTitle, draftBody = sanitizedBody),
           edPostResult = null,
-          edPostCards =
-              it.edPostCards +
-                  EdPostCard(
-                      id = UUID.randomUUID().toString(),
-                      title = title,
-                      body = body,
-                      status = EdPostStatus.Published,
-                      createdAt = now),
+          isPostingToEd = true,
           isSending = false,
           streamingMessageId = null)
     }
 
-    // TODO: Implement actual ED post creation via Firebase function
-    // For now, we just log and clear the pending action
-    // This should call a Firebase function like edConnectorPostFn(title, body)
     viewModelScope.launch(exceptionHandler) {
       try {
-        // Placeholder: In the future, this will call a Firebase function
-        // val result = functions.getHttpsCallable("edConnectorPostFn")
-        //   .call(hashMapOf("title" to title, "body" to body))
-        //   .await()
-
-        Log.d(TAG, "publishEdPost: Post would be created with title='$title'")
-        // Show success message or navigate to the post
+        edPostDataSource.publish(sanitizedTitle, sanitizedBody)
+        val now = System.currentTimeMillis()
+        _uiState.update {
+          it.copy(
+              pendingAction = null,
+              edPostResult = EdPostResult.Published(sanitizedTitle, sanitizedBody),
+              edPostCards =
+                  it.edPostCards +
+                      EdPostCard(
+                          id = UUID.randomUUID().toString(),
+                          title = sanitizedTitle,
+                          body = sanitizedBody,
+                          status = EdPostStatus.Published,
+                          createdAt = now),
+              isPostingToEd = false)
+        }
       } catch (e: Exception) {
         Log.e(TAG, "publishEdPost: Failed to create post", e)
-        // Show error message to user
+        val errText =
+            (e as? FirebaseFunctionsException)?.details as? String
+                ?: e.message
+                ?: "Failed to post to Ed"
+        _uiState.update {
+          it.copy(
+              pendingAction =
+                  PendingAction.PostOnEd(draftTitle = sanitizedTitle, draftBody = sanitizedBody),
+              edPostResult = EdPostResult.Failed(errText),
+              isPostingToEd = false,
+              isSending = false,
+              streamingMessageId = null)
+        }
       }
     }
   }
@@ -688,7 +707,7 @@ class HomeViewModel(
     _uiState.update {
       it.copy(
           pendingAction = null,
-          edPostResult = null,
+          edPostResult = EdPostResult.Cancelled,
           edPostCards =
               it.edPostCards +
                   EdPostCard(
@@ -698,7 +717,8 @@ class HomeViewModel(
                       status = EdPostStatus.Cancelled,
                       createdAt = now),
           isSending = false,
-          streamingMessageId = null)
+          streamingMessageId = null,
+          isPostingToEd = false)
     }
   }
 

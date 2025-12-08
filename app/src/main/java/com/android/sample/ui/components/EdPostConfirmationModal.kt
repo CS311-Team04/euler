@@ -42,6 +42,7 @@ fun EdPostConfirmationModal(
     modifier: Modifier = Modifier,
     title: String,
     body: String,
+    isLoading: Boolean = false,
     onPublish: (String, String) -> Unit,
     onCancel: () -> Unit
 ) {
@@ -70,6 +71,7 @@ fun EdPostConfirmationModal(
                 OutlinedTextField(
                     value = editedTitle,
                     onValueChange = { editedTitle = it },
+                    enabled = !isLoading,
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = {
                       Text(
@@ -105,6 +107,7 @@ fun EdPostConfirmationModal(
                 OutlinedTextField(
                     value = editedBody,
                     onValueChange = { editedBody = it },
+                    enabled = !isLoading,
                     modifier =
                         Modifier.fillMaxWidth()
                             .heightIn(
@@ -141,6 +144,7 @@ fun EdPostConfirmationModal(
                       // Cancel button (outline)
                       OutlinedButton(
                           onClick = onCancel,
+                          enabled = !isLoading,
                           modifier = Modifier.weight(1f),
                           colors =
                               ButtonDefaults.outlinedButtonColors(contentColor = EdPostTextPrimary),
@@ -157,6 +161,7 @@ fun EdPostConfirmationModal(
                       // Post button (gradient purple)
                       Button(
                           onClick = { onPublish(editedTitle, editedBody) },
+                          enabled = !isLoading,
                           modifier = Modifier.weight(1f),
                           colors = ButtonDefaults.buttonColors(containerColor = EdPostTransparent),
                           contentPadding = PaddingValues(),
@@ -183,11 +188,20 @@ fun EdPostConfirmationModal(
                                             modifier =
                                                 Modifier.width(
                                                     EdPostDimensions.ButtonIconSpacerWidth))
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Rounded.Send,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(EdPostDimensions.IconSendSize),
-                                            tint = EdPostTextPrimary)
+                                        if (isLoading) {
+                                          CircularProgressIndicator(
+                                              color = EdPostTextPrimary,
+                                              strokeWidth = EdPostDimensions.ButtonBorderWidth,
+                                              modifier =
+                                                  Modifier.size(EdPostDimensions.IconSendSize))
+                                        } else {
+                                          Icon(
+                                              imageVector = Icons.AutoMirrored.Rounded.Send,
+                                              contentDescription = null,
+                                              modifier =
+                                                  Modifier.size(EdPostDimensions.IconSendSize),
+                                              tint = EdPostTextPrimary)
+                                        }
                                       }
                                 }
                           }

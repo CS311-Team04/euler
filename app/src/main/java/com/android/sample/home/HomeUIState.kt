@@ -27,7 +27,8 @@ data class HomeUiState(
     val showOfflineMessage: Boolean = false,
     val pendingAction: PendingAction? = null,
     val edPostResult: EdPostResult? = null,
-    val edPostCards: List<EdPostCard> = emptyList()
+    val edPostCards: List<EdPostCard> = emptyList(),
+    val isPostingToEd: Boolean = false
 )
 
 /** Represents an EPFL system (e.g., IS-Academia, Moodle, Drive) and its connection state. */
@@ -55,6 +56,8 @@ sealed class EdPostResult {
   data class Published(val title: String, val body: String) : EdPostResult()
 
   data object Cancelled : EdPostResult()
+
+  data class Failed(val message: String) : EdPostResult()
 }
 
 /** Card model shown in chat after ED post flow completes. */
