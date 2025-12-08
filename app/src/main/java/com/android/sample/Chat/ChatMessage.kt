@@ -3,6 +3,7 @@ package com.android.sample.Chat
 import android.annotation.SuppressLint
 import android.app.DownloadManager
 import android.content.Context
+import android.net.Uri
 import android.os.Environment
 import android.widget.Toast
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -11,6 +12,9 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -21,53 +25,36 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import android.content.Intent
-import android.net.Uri
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VolumeUp
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.Icons.Default as DefaultIcons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.sample.ui.theme.EulerAudioButtonLoadingColor
@@ -168,10 +155,7 @@ fun ChatMessage(
             MoodleFileViewer(
                 file = file,
                 onPdfClick = onPdfClick,
-                onDownloadClick = { url, filename ->
-                    downloadPdf(context, url, filename)
-                }
-            )
+                onDownloadClick = { url, filename -> downloadPdf(context, url, filename) })
           }
         }
       }
@@ -180,9 +164,9 @@ fun ChatMessage(
 }
 
 /**
- * Professional PDF viewer component for Moodle files.
- * Displays a card with PDF preview and download option.
- * 
+ * Professional PDF viewer component for Moodle files. Displays a card with PDF preview and download
+ * option.
+ *
  * @param file The Moodle file attachment to display
  * @param onPdfClick Callback when PDF card is clicked - should navigate to PDF viewer screen
  */
@@ -192,139 +176,122 @@ fun MoodleFileViewer(
     onPdfClick: (String, String) -> Unit = { _, _ -> },
     onDownloadClick: (String, String) -> Unit = { _, _ -> }
 ) {
-    // Build file type display name in English
-    val fileTypeDisplay = when (file.fileType) {
+  // Build file type display name in English
+  val fileTypeDisplay =
+      when (file.fileType) {
         "lecture" -> "Lecture"
         "homework" -> "Homework"
         "homework_solution" -> "Homework solution"
         else -> "file"
-    }
+      }
 
-    val fileTypeWithNumber = if (file.fileNumber != null) {
+  val fileTypeWithNumber =
+      if (file.fileNumber != null) {
         "$fileTypeDisplay ${file.fileNumber}"
-    } else {
+      } else {
         fileTypeDisplay
-    }
+      }
 
-    val courseName = file.courseName ?: "Moodle"
-    val accent = Color(0xFFFF8C00)
-    val cardBg = Color(0xFF141414)
-    val pillBg = Color(0x33FFFFFF)
-    val iconBg = Color(0xFF2A2A2A)
-    val textPrimary = Color.White
-    val textSecondary = Color(0xCCFFFFFF)
+  val courseName = file.courseName ?: "Moodle"
+  val accent = Color(0xFFFF8C00)
+  val cardBg = Color(0xFF141414)
+  val pillBg = Color(0x33FFFFFF)
+  val iconBg = Color(0xFF2A2A2A)
+  val textPrimary = Color.White
+  val textSecondary = Color(0xCCFFFFFF)
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp)
-    ) {
-        Text(
-            text = "Here is the $fileTypeWithNumber from ${courseName}",
-            style = MaterialTheme.typography.bodyLarge.copy(color = textPrimary),
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
+  Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+    Text(
+        text = "Here is the $fileTypeWithNumber from ${courseName}",
+        style = MaterialTheme.typography.bodyLarge.copy(color = textPrimary),
+        modifier = Modifier.padding(bottom = 8.dp))
 
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
+    Card(
+        modifier =
+            Modifier.fillMaxWidth()
                 .border(width = 1.dp, color = accent, shape = RoundedCornerShape(14.dp)),
-            colors = CardDefaults.cardColors(containerColor = cardBg),
-            shape = RoundedCornerShape(14.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Logo (drawn to avoid white PNG background)
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(accent),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "m",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            color = Color.White,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                    )
+        colors = CardDefaults.cardColors(containerColor = cardBg),
+        shape = RoundedCornerShape(14.dp)) {
+          Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Logo (drawn to avoid white PNG background)
+            Box(
+                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).background(accent),
+                contentAlignment = Alignment.Center) {
+                  Text(
+                      text = "m",
+                      style =
+                          MaterialTheme.typography.titleMedium.copy(
+                              color = Color.White, fontWeight = FontWeight.ExtraBold))
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
-                // Texts and pill
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = file.filename,
-                        style = MaterialTheme.typography.titleMedium.copy(color = textPrimary, fontWeight = FontWeight.SemiBold),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Texts and pill
+            Column(
+                modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                  Text(
+                      text = file.filename,
+                      style =
+                          MaterialTheme.typography.titleMedium.copy(
+                              color = textPrimary, fontWeight = FontWeight.SemiBold),
+                      maxLines = 1,
+                      overflow = TextOverflow.Ellipsis)
+                  Row(
+                      verticalAlignment = Alignment.CenterVertically,
+                      horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Box(
-                            modifier = Modifier
-                                .border(1.dp, accent, RoundedCornerShape(8.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = "PDF",
-                                style = MaterialTheme.typography.labelSmall.copy(color = accent, fontWeight = FontWeight.Bold)
-                            )
-                        }
+                            modifier =
+                                Modifier.border(1.dp, accent, RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)) {
+                              Text(
+                                  text = "PDF",
+                                  style =
+                                      MaterialTheme.typography.labelSmall.copy(
+                                          color = accent, fontWeight = FontWeight.Bold))
+                            }
                         Text(
                             text = fileTypeWithNumber,
-                            style = MaterialTheme.typography.bodyMedium.copy(color = textSecondary)
-                        )
-                    }
+                            style = MaterialTheme.typography.bodyMedium.copy(color = textSecondary))
+                      }
                 }
 
-                Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
-                // Actions
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(iconBg)
-                            .clickable { onPdfClick(file.url, file.filename) },
-                        contentAlignment = Alignment.Center
-                    ) {
+            // Actions
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                  Box(
+                      modifier =
+                          Modifier.size(40.dp)
+                              .clip(RoundedCornerShape(14.dp))
+                              .background(iconBg)
+                              .clickable { onPdfClick(file.url, file.filename) },
+                      contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Filled.Visibility,
                             contentDescription = "View",
                             tint = textPrimary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(iconBg)
-                            .clickable { onDownloadClick(file.url, file.filename) },
-                        contentAlignment = Alignment.Center
-                    ) {
+                            modifier = Modifier.size(20.dp))
+                      }
+                  Box(
+                      modifier =
+                          Modifier.size(40.dp)
+                              .clip(RoundedCornerShape(14.dp))
+                              .background(iconBg)
+                              .clickable { onDownloadClick(file.url, file.filename) },
+                      contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Filled.Download,
                             contentDescription = "Download",
                             tint = textPrimary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                            modifier = Modifier.size(20.dp))
+                      }
                 }
-            }
+          }
         }
-    }
+  }
 }
-
-
 
 @Composable
 fun LeadingThinkingDot(color: Color) {
@@ -389,25 +356,24 @@ fun AudioPlaybackButton(
   }
 }
 
-/**
- * Downloads a PDF file from a URL using Android's DownloadManager.
- */
+/** Downloads a PDF file from a URL using Android's DownloadManager. */
 @SuppressLint("Range")
 private fun downloadPdf(context: Context, url: String, filename: String) {
-    try {
-        val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        
-        val request = DownloadManager.Request(Uri.parse(url))
+  try {
+    val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+
+    val request =
+        DownloadManager.Request(Uri.parse(url))
             .setTitle(filename)
             .setDescription("Downloading PDF")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename)
             .setAllowedOverMetered(true)
             .setAllowedOverRoaming(true)
-        
-        val downloadId = downloadManager.enqueue(request)
-        Toast.makeText(context, "Download started: $filename", Toast.LENGTH_SHORT).show()
-    } catch (e: Exception) {
-        Toast.makeText(context, "Failed to download: ${e.message}", Toast.LENGTH_SHORT).show()
-    }
+
+    val downloadId = downloadManager.enqueue(request)
+    Toast.makeText(context, "Download started: $filename", Toast.LENGTH_SHORT).show()
+  } catch (e: Exception) {
+    Toast.makeText(context, "Failed to download: ${e.message}", Toast.LENGTH_SHORT).show()
+  }
 }

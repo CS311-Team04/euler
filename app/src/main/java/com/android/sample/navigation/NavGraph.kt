@@ -36,6 +36,7 @@ import com.android.sample.network.AndroidNetworkConnectivityMonitor
 import com.android.sample.onboarding.OnboardingAcademicScreen
 import com.android.sample.onboarding.OnboardingPersonalInfoScreen
 import com.android.sample.onboarding.OnboardingRoleScreen
+import com.android.sample.pdf.PdfViewerScreen
 import com.android.sample.profile.UserProfileRepository
 import com.android.sample.settings.ProfileScreen
 import com.android.sample.settings.SettingsPage
@@ -45,7 +46,6 @@ import com.android.sample.sign_in.AuthViewModel
 import com.android.sample.speech.SpeechPlayback
 import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.splash.OpeningScreen
-import com.android.sample.pdf.PdfViewerScreen
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
@@ -513,9 +513,7 @@ fun AppNav(
                 onPdfClick = { pdfUrl, filename ->
                   val encodedUrl = Uri.encode(pdfUrl, "")
                   val encodedFilename = Uri.encode(filename, "")
-                  nav.navigate("pdf_viewer/$encodedUrl/$encodedFilename") {
-                    launchSingleTop = true
-                  }
+                  nav.navigate("pdf_viewer/$encodedUrl/$encodedFilename") { launchSingleTop = true }
                 },
                 onSettingsClick = { nav.navigate(Routes.Settings) },
                 onConnectorsClick = {
@@ -568,9 +566,7 @@ fun AppNav(
                 onPdfClick = { pdfUrl, filename ->
                   val encodedUrl = Uri.encode(pdfUrl, "")
                   val encodedFilename = Uri.encode(filename, "")
-                  nav.navigate("pdf_viewer/$encodedUrl/$encodedFilename") {
-                    launchSingleTop = true
-                  }
+                  nav.navigate("pdf_viewer/$encodedUrl/$encodedFilename") { launchSingleTop = true }
                 },
                 onSettingsClick = {
                   navigateToSettings { route, builder -> nav.navigate(route) { builder(this) } }
@@ -691,7 +687,7 @@ fun AppNav(
           }
           // Uses VoiceChatComposableContent which is tested in NavGraphTest
           composable(Routes.VoiceChat) { VoiceChatComposableContent(nav, speechHelper) }
-          
+
           // PDF Viewer Screen
           composable(
               route = Routes.PdfViewer,
@@ -700,14 +696,12 @@ fun AppNav(
                       navArgument("pdfUrl") { type = NavType.StringType },
                       navArgument("filename") { type = NavType.StringType })) { backStackEntry ->
                 val encodedPdfUrl = backStackEntry.arguments?.getString("pdfUrl") ?: ""
-                val encodedFilename = backStackEntry.arguments?.getString("filename") ?: "document.pdf"
+                val encodedFilename =
+                    backStackEntry.arguments?.getString("filename") ?: "document.pdf"
                 // Decode the URL and filename that were encoded during navigation
                 val pdfUrl = Uri.decode(encodedPdfUrl)
                 val filename = Uri.decode(encodedFilename)
-                PdfViewerScreen(
-                    pdfUrl = pdfUrl,
-                    filename = filename,
-                    navController = nav)
+                PdfViewerScreen(pdfUrl = pdfUrl, filename = filename, navController = nav)
               }
         }
       }

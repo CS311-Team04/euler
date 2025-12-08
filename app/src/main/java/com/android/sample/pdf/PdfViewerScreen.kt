@@ -6,34 +6,23 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
 
 /**
- * PDF Viewer Screen using Google Docs viewer.
- * Displays a PDF in a full-screen view with a close button.
+ * PDF Viewer Screen using Google Docs viewer. Displays a PDF in a full-screen view with a close
+ * button.
  */
 @SuppressLint("SetJavaScriptEnabled")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PdfViewerScreen(
-    pdfUrl: String,
-    filename: String,
-    navController: NavController
-) {
+fun PdfViewerScreen(pdfUrl: String, filename: String, navController: NavController) {
   Scaffold(
       topBar = {
         TopAppBar(
-            title = {
-              Text(
-                  text = filename,
-                  maxLines = 1,
-                  overflow = TextOverflow.Ellipsis)
-            },
+            title = { Text(text = filename, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             navigationIcon = {
               IconButton(onClick = { navController.popBackStack() }) {
                 Icon(
@@ -59,7 +48,7 @@ fun PdfViewerScreen(
                   settings.domStorageEnabled = true
                   settings.allowFileAccess = true
                   settings.allowContentAccess = true
-                  
+
                   // Use Google Docs viewer for better PDF rendering
                   val encodedUrl = android.net.Uri.encode(pdfUrl, "")
                   val viewerUrl = "https://docs.google.com/viewer?url=$encodedUrl&embedded=true"
@@ -70,4 +59,3 @@ fun PdfViewerScreen(
         }
       }
 }
-

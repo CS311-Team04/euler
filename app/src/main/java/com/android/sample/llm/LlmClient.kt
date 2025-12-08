@@ -196,14 +196,13 @@ class FirebaseFunctionsLlmClient(
                     ?: throw IllegalStateException("Invalid LLM response payload: null data")
 
         val replyText = parseReplyText(map)
-        
+
         // Check if there's a moodleFile - if so, empty reply is allowed
         val hasMoodleFile = parseMoodleFile(map) != null
-        
+
         // Only throw exception if reply is empty AND there's no moodleFile
         if (replyText == null && !hasMoodleFile) {
-          return@withContext fallback?.generateReply(
-              prompt, summary, transcript, profileContext)
+          return@withContext fallback?.generateReply(prompt, summary, transcript, profileContext)
               ?: throw IllegalStateException("Empty LLM reply")
         }
 
@@ -300,36 +299,39 @@ class FirebaseFunctionsLlmClient(
   @Suppress("UNCHECKED_CAST")
   private fun parseMoodleFile(map: Map<String, Any?>): MoodleFile? {
     val moodleFileMap = map[KEY_MOODLE_FILE] as? Map<String, Any?> ?: return null
-    
+
     // Get raw URL - handle different types that Firebase might return
     val rawUrl = moodleFileMap["url"]
-    val url = when (rawUrl) {
-      is String -> {
-        // URL might be encoded, try to decode it
-        try {
-          java.net.URLDecoder.decode(rawUrl, "UTF-8")
-        } catch (e: Exception) {
-          Log.w(TAG, "Failed to decode URL, using raw: ${e.message}")
-          rawUrl
+    val url =
+        when (rawUrl) {
+          is String -> {
+            // URL might be encoded, try to decode it
+            try {
+              java.net.URLDecoder.decode(rawUrl, "UTF-8")
+            } catch (e: Exception) {
+              Log.w(TAG, "Failed to decode URL, using raw: ${e.message}")
+              rawUrl
+            }
+          }
+          else -> {
+            val urlString = rawUrl?.toString() ?: return null
+            try {
+              java.net.URLDecoder.decode(urlString, "UTF-8")
+            } catch (e: Exception) {
+              urlString
+            }
+          }
         }
-      }
-      else -> {
-        val urlString = rawUrl?.toString() ?: return null
-        try {
-          java.net.URLDecoder.decode(urlString, "UTF-8")
-        } catch (e: Exception) {
-          urlString
-        }
-      }
-    }
-    
+
     // Log the full URL to debug
-    Log.d(TAG, "parseMoodleFile: rawUrl type=${rawUrl?.javaClass?.simpleName}, url length=${url.length}")
+    Log.d(
+        TAG,
+        "parseMoodleFile: rawUrl type=${rawUrl?.javaClass?.simpleName}, url length=${url.length}")
     Log.d(TAG, "parseMoodleFile: full URL=$url")
-    
+
     val filename = moodleFileMap["filename"] as? String ?: return null
     val mimetype = moodleFileMap["mimetype"] as? String ?: "application/pdf"
-    
+
     // Ensure URL is not truncated or modified - preserve the full URL
     val trimmedUrl = url.trim()
     if (trimmedUrl.isEmpty()) {
@@ -338,25 +340,20 @@ class FirebaseFunctionsLlmClient(
     }
 
     // Percent-encode the path/filename if it contains spaces or other characters
-    val encodedUrl = try {
-      val uri = java.net.URI(trimmedUrl)
-      // Rebuild with encoded path/query to satisfy URI parser
-      val encodedPath = uri.rawPath ?: ""
-      val safePath = if (encodedPath.isNotEmpty()) encodedPath else uri.path.replace(" ", "%20")
-      val query = uri.rawQuery ?: ""
-      java.net.URI(
-          uri.scheme,
-          uri.userInfo,
-          uri.host,
-          uri.port,
-          safePath,
-          query,
-          uri.rawFragment
-      ).toString()
-    } catch (e: Exception) {
-      // Fallback: simple replace spaces with %20
-      trimmedUrl.replace(" ", "%20")
-    }
+    val encodedUrl =
+        try {
+          val uri = java.net.URI(trimmedUrl)
+          // Rebuild with encoded path/query to satisfy URI parser
+          val encodedPath = uri.rawPath ?: ""
+          val safePath = if (encodedPath.isNotEmpty()) encodedPath else uri.path.replace(" ", "%20")
+          val query = uri.rawQuery ?: ""
+          java.net
+              .URI(uri.scheme, uri.userInfo, uri.host, uri.port, safePath, query, uri.rawFragment)
+              .toString()
+        } catch (e: Exception) {
+          // Fallback: simple replace spaces with %20
+          trimmedUrl.replace(" ", "%20")
+        }
 
     // Verify URL is valid
     try {
@@ -365,9 +362,11 @@ class FirebaseFunctionsLlmClient(
       Log.e(TAG, "parseMoodleFile: Invalid URL format even after encoding: $encodedUrl", e)
       return null
     }
-    
-    Log.d(TAG, "parseMoodleFile: Successfully parsed - filename=$filename, url length=${encodedUrl.length}")
-    
+
+    Log.d(
+        TAG,
+        "parseMoodleFile: Successfully parsed - filename=$filename, url length=${encodedUrl.length}")
+
     return MoodleFile(encodedUrl, filename, mimetype)
   }
 
@@ -392,38 +391,41 @@ class FirebaseFunctionsLlmClient(
 
     val moodleIntentDetected = parseMoodleIntentDetected(map)
     val moodleIntentType = parseMoodleIntentType(map)
-    
+
     // Debug: Log the raw moodle_file data from the response
     val moodleFileRaw = map[KEY_MOODLE_FILE]
-    Log.d(TAG, "Moodle file raw data: $moodleFileRaw (type: ${moodleFileRaw?.javaClass?.simpleName})")
-    
+    Log.d(
+        TAG, "Moodle file raw data: $moodleFileRaw (type: ${moodleFileRaw?.javaClass?.simpleName})")
+
     // If it's a Map, log its contents
     if (moodleFileRaw is Map<*, *>) {
-      @Suppress("UNCHECKED_CAST")
-      val moodleFileMap = moodleFileRaw as Map<String, Any?>
+      @Suppress("UNCHECKED_CAST") val moodleFileMap = moodleFileRaw as Map<String, Any?>
       Log.d(TAG, "Moodle file map keys: ${moodleFileMap.keys}")
-      moodleFileMap["url"]?.let { 
-        Log.d(TAG, "Moodle file URL from map: $it (type: ${it.javaClass.simpleName}, length: ${it.toString().length})")
+      moodleFileMap["url"]?.let {
+        Log.d(
+            TAG,
+            "Moodle file URL from map: $it (type: ${it.javaClass.simpleName}, length: ${it.toString().length})")
       }
     }
-    
+
     val moodleFile = parseMoodleFile(map)
 
     if (moodleIntentDetected) {
       Log.d(TAG, "Moodle intent detected: $moodleIntentType, file=${moodleFile != null}")
       if (moodleFile != null) {
-        Log.d(TAG, "Moodle file parsed: url=${moodleFile.url}, filename=${moodleFile.filename}, mimetype=${moodleFile.mimetype}")
-        Log.d(TAG, "Moodle file URL length: ${moodleFile.url.length}, starts with: ${moodleFile.url.take(50)}")
+        Log.d(
+            TAG,
+            "Moodle file parsed: url=${moodleFile.url}, filename=${moodleFile.filename}, mimetype=${moodleFile.mimetype}")
+        Log.d(
+            TAG,
+            "Moodle file URL length: ${moodleFile.url.length}, starts with: ${moodleFile.url.take(50)}")
       } else {
         Log.w(TAG, "Moodle file is null despite intent being detected. Raw data: $moodleFileRaw")
       }
     }
 
     val moodleIntent =
-        MoodleIntent(
-            detected = moodleIntentDetected,
-            intent = moodleIntentType,
-            file = moodleFile)
+        MoodleIntent(detected = moodleIntentDetected, intent = moodleIntentType, file = moodleFile)
 
     return BotReply(replyText, url, sourceType, edIntent, moodleIntent)
   }

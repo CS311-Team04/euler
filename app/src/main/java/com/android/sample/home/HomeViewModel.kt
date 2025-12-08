@@ -135,7 +135,7 @@ class HomeViewModel(
   // Auth / Firestore handles
   private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
   private var conversationId: String? = null
-  
+
   // Map to preserve moodleFile attachments when messages are reloaded from Firestore
   // Key: message text + timestamp (to uniquely identify messages)
   // Value: moodleFile attachment
@@ -147,7 +147,8 @@ class HomeViewModel(
   private var conversationsJob: kotlinx.coroutines.Job? = null
   private var messagesJob: kotlinx.coroutines.Job? = null
   private var lastUid: String? = null
-  // Holds the most recent Moodle file attachment to apply to the next AI message arriving from Firestore
+  // Holds the most recent Moodle file attachment to apply to the next AI message arriving from
+  // Firestore
   private var pendingMoodleFile: com.android.sample.Chat.MoodleFileAttachment? = null
 
   private val _uiState =
@@ -363,17 +364,20 @@ class HomeViewModel(
               .collect { msgs ->
                 val streamingId = _uiState.value.streamingMessageId
                 val currentState = _uiState.value
-                
+
                 // If we're streaming and have messages with moodleFiles, preserve them
-                val messagesWithMoodleFiles = if (streamingId != null) {
-                  currentState.messages.filter { it.moodleFile != null }
-                } else {
-                  emptyList()
-                }
-                
+                val messagesWithMoodleFiles =
+                    if (streamingId != null) {
+                      currentState.messages.filter { it.moodleFile != null }
+                    } else {
+                      emptyList()
+                    }
+
                 if (streamingId != null && messagesWithMoodleFiles.isNotEmpty()) {
                   // Don't replace messages while streaming if they have moodleFiles
-                  Log.d(TAG, "Skipping Firestore update during streaming (preserving ${messagesWithMoodleFiles.size} messages with moodleFiles)")
+                  Log.d(
+                      TAG,
+                      "Skipping Firestore update during streaming (preserving ${messagesWithMoodleFiles.size} messages with moodleFiles)")
                   return@collect
                 }
 
@@ -381,7 +385,8 @@ class HomeViewModel(
                   // Convert Firestore messages to UI models
                   val firestoreMessages = msgs.map { dto -> dto.toUi() }.toMutableList()
 
-                  // If existing UI has Moodle files, preserve them when Firestore messages are blank
+                  // If existing UI has Moodle files, preserve them when Firestore messages are
+                  // blank
                   val existingMessages = state.messages
                   val maxCount = minOf(existingMessages.size, firestoreMessages.size)
                   for (i in 0 until maxCount) {
@@ -399,15 +404,21 @@ class HomeViewModel(
                   for (i in firestoreMessages.indices) {
                     val incoming = firestoreMessages[i]
                     if (incoming.moodleFile == null && incoming.text.isNotBlank()) {
-                      val cachedFile = moodleFileCache.entries.find { (key, _) ->
-                        key.startsWith("${incoming.text}_") || key == incoming.text
-                      }?.value
+                      val cachedFile =
+                          moodleFileCache.entries
+                              .find { (key, _) ->
+                                key.startsWith("${incoming.text}_") || key == incoming.text
+                              }
+                              ?.value
                       if (cachedFile != null) {
                         firestoreMessages[i] = incoming.copy(moodleFile = cachedFile)
-                        Log.d(TAG, "Restored moodleFile from cache for message: ${incoming.text.take(30)}...")
+                        Log.d(
+                            TAG,
+                            "Restored moodleFile from cache for message: ${incoming.text.take(30)}...")
                       }
                     }
-                    // If still missing, and we have a pending Moodle file, attach it to the first AI message without file
+                    // If still missing, and we have a pending Moodle file, attach it to the first
+                    // AI message without file
                     if (incoming.moodleFile == null &&
                         pendingMoodleFile != null &&
                         incoming.type == ChatType.AI) {
@@ -1018,7 +1029,9 @@ class HomeViewModel(
                       fileNumber = reply.moodleIntent.file.fileNumber,
                       week = reply.moodleIntent.file.week)
                 } else {
-                  Log.d(TAG, "No Moodle file attachment (detected=${reply.moodleIntent.detected}, file=${reply.moodleIntent.file != null})")
+                  Log.d(
+                      TAG,
+                      "No Moodle file attachment (detected=${reply.moodleIntent.detected}, file=${reply.moodleIntent.file != null})")
                   null
                 }
 
@@ -1031,23 +1044,26 @@ class HomeViewModel(
               val cacheKeyWithText = "${finalText}_${System.currentTimeMillis()}"
               moodleFileCache[cacheKeyWithText] = moodleFileAttachment
               moodleFileCache[finalText] = moodleFileAttachment
-              Log.d(TAG, "Cached moodleFile immediately with final text: '$finalText' (cache size=${moodleFileCache.size})")
+              Log.d(
+                  TAG,
+                  "Cached moodleFile immediately with final text: '$finalText' (cache size=${moodleFileCache.size})")
             }
 
             // simulate stream into the placeholder AI message
             simulateStreamingFromText(messageId, reply.reply, moodleFileAttachment)
-            
+
             // Ensure moodleFile is set on the message after streaming completes
             if (moodleFileAttachment != null) {
               withContext(Dispatchers.Main) {
                 _uiState.update { state ->
-                  val updated = state.messages.map { msg ->
-                    if (msg.id == messageId) {
-                      msg.copy(moodleFile = moodleFileAttachment)
-                    } else {
-                      msg
-                    }
-                  }
+                  val updated =
+                      state.messages.map { msg ->
+                        if (msg.id == messageId) {
+                          msg.copy(moodleFile = moodleFileAttachment)
+                        } else {
+                          msg
+                        }
+                      }
                   state.copy(messages = updated)
                 }
               }
@@ -1202,9 +1218,7 @@ class HomeViewModel(
           val updated =
               state.messages.map { message ->
                 if (message.id == messageId) {
-                  message.copy(
-                      isThinking = false,
-                      moodleFile = moodleFile ?: message.moodleFile)
+                  message.copy(isThinking = false, moodleFile = moodleFile ?: message.moodleFile)
                 } else {
                   message
                 }
