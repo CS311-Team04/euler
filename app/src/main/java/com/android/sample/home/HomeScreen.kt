@@ -122,7 +122,8 @@ fun HomeScreen(
     openDrawerOnStart: Boolean = false,
     speechHelper: SpeechToTextHelper? = null,
     ttsHelper: SpeechPlayback? = null,
-    forceNewChatOnFirstOpen: Boolean = false
+    forceNewChatOnFirstOpen: Boolean = false,
+    onPdfClick: (String, String) -> Unit = { _, _ -> }
 ) {
   val ui by viewModel.uiState.collectAsState()
   val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -487,7 +488,8 @@ fun HomeScreen(
                                       modifier = Modifier.fillMaxWidth(),
                                       isStreaming = showLeadingDot,
                                       audioState = audioState,
-                                      aiText = textPrimary)
+                                      aiText = textPrimary,
+                                      onPdfClick = onPdfClick)
                                 }
                                 is TimelineItem.CardItem -> {
                                   EdPostedCard(item.card, modifier = Modifier.fillMaxWidth())

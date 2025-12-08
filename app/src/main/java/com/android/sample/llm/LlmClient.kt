@@ -195,13 +195,19 @@ class FirebaseFunctionsLlmClient(
                     prompt, summary, transcript, profileContext)
                     ?: throw IllegalStateException("Invalid LLM response payload: null data")
 
-        val replyText =
-            parseReplyText(map)
-                ?: return@withContext fallback?.generateReply(
-                    prompt, summary, transcript, profileContext)
-                    ?: throw IllegalStateException("Empty LLM reply")
+        val replyText = parseReplyText(map)
+        
+        // Check if there's a moodleFile - if so, empty reply is allowed
+        val hasMoodleFile = parseMoodleFile(map) != null
+        
+        // Only throw exception if reply is empty AND there's no moodleFile
+        if (replyText == null && !hasMoodleFile) {
+          return@withContext fallback?.generateReply(
+              prompt, summary, transcript, profileContext)
+              ?: throw IllegalStateException("Empty LLM reply")
+        }
 
-        buildBotReply(map, replyText)
+        buildBotReply(map, replyText ?: "")
       }
 
   private fun buildRequestPayload(
@@ -325,23 +331,44 @@ class FirebaseFunctionsLlmClient(
     val mimetype = moodleFileMap["mimetype"] as? String ?: "application/pdf"
     
     // Ensure URL is not truncated or modified - preserve the full URL
-    val finalUrl = url.trim()
-    if (finalUrl.isEmpty()) {
+    val trimmedUrl = url.trim()
+    if (trimmedUrl.isEmpty()) {
       Log.e(TAG, "parseMoodleFile: URL is empty after trimming")
       return null
     }
-    
+
+    // Percent-encode the path/filename if it contains spaces or other characters
+    val encodedUrl = try {
+      val uri = java.net.URI(trimmedUrl)
+      // Rebuild with encoded path/query to satisfy URI parser
+      val encodedPath = uri.rawPath ?: ""
+      val safePath = if (encodedPath.isNotEmpty()) encodedPath else uri.path.replace(" ", "%20")
+      val query = uri.rawQuery ?: ""
+      java.net.URI(
+          uri.scheme,
+          uri.userInfo,
+          uri.host,
+          uri.port,
+          safePath,
+          query,
+          uri.rawFragment
+      ).toString()
+    } catch (e: Exception) {
+      // Fallback: simple replace spaces with %20
+      trimmedUrl.replace(" ", "%20")
+    }
+
     // Verify URL is valid
     try {
-      java.net.URI(finalUrl) // Validate URL format
+      java.net.URI(encodedUrl) // Validate URL format
     } catch (e: Exception) {
-      Log.e(TAG, "parseMoodleFile: Invalid URL format: $finalUrl", e)
+      Log.e(TAG, "parseMoodleFile: Invalid URL format even after encoding: $encodedUrl", e)
       return null
     }
     
-    Log.d(TAG, "parseMoodleFile: Successfully parsed - filename=$filename, url length=${finalUrl.length}")
+    Log.d(TAG, "parseMoodleFile: Successfully parsed - filename=$filename, url length=${encodedUrl.length}")
     
-    return MoodleFile(finalUrl, filename, mimetype)
+    return MoodleFile(encodedUrl, filename, mimetype)
   }
 
   private fun buildBotReply(map: Map<String, Any?>, replyText: String): BotReply {

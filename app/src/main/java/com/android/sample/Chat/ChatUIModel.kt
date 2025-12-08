@@ -13,16 +13,39 @@ enum class ChatType {
 }
 
 /**
+ * Moodle file attachment for chat messages.
+ *
+ * @property url The download URL for the file
+ * @property filename The name of the file
+ * @property mimetype The MIME type of the file
+ * @property courseName The name of the course (optional)
+ * @property fileType The type of file: "lecture", "homework", or "homework_solution" (optional)
+ * @property fileNumber The file number (optional)
+ * @property week The week number (optional)
+ */
+data class MoodleFileAttachment(
+    val url: String,
+    val filename: String,
+    val mimetype: String,
+    val courseName: String? = null,
+    val fileType: String? = null,
+    val fileNumber: String? = null,
+    val week: Int? = null
+)
+
+/**
  * UI model for a single chat message.
  *
  * This is a presentation-layer model for Compose. It encodes who spoke, the display text, when it
- * was produced, and an optional flag for a “still generating” placeholder.
+ * was produced, and an optional flag for a "still generating" placeholder.
  *
  * @property id Stable unique ID (UUID recommended). Use as the LazyColumn `key`.
  * @property text Display text of the message (already formatted for UI if needed).
  * @property timestamp Epoch millis (System.currentTimeMillis) for ordering/labels.
  * @property type Speaker role (USER/AI) to drive alignment and styling.
- * @property isThinking True if this represents a “thinking/placeholder” entry.
+ * @property isThinking True if this represents a "thinking/placeholder" entry.
+ * @property source Optional source metadata for the message.
+ * @property moodleFile Optional Moodle file attachment (PDF, etc.).
  */
 data class ChatUIModel(
     val id: String,
@@ -30,5 +53,6 @@ data class ChatUIModel(
     val timestamp: Long,
     val type: ChatType,
     val isThinking: Boolean = false,
-    val source: SourceMeta? = null
+    val source: SourceMeta? = null,
+    val moodleFile: MoodleFileAttachment? = null
 )

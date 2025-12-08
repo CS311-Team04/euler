@@ -147,6 +147,8 @@ class HomeViewModel(
   private var conversationsJob: kotlinx.coroutines.Job? = null
   private var messagesJob: kotlinx.coroutines.Job? = null
   private var lastUid: String? = null
+  // Holds the most recent Moodle file attachment to apply to the next AI message arriving from Firestore
+  private var pendingMoodleFile: com.android.sample.Chat.MoodleFileAttachment? = null
 
   private val _uiState =
       MutableStateFlow(
@@ -376,61 +378,75 @@ class HomeViewModel(
                 }
 
                 _uiState.update { state ->
-                  // Convert Firestore messages to UI models, preserving moodleFiles from cache
-                  val firestoreMessages = msgs.map { dto ->
-                    val uiModel = dto.toUi()
-                    // Try to find matching moodleFile in cache by text (more flexible matching)
-                    // Match by text content, allowing for slight timestamp differences
-                    val cachedFile = moodleFileCache.entries.find { (key, _) ->
-                      key.startsWith("${uiModel.text}_") || key.contains(uiModel.text)
-                    }?.value
-                    
-                    if (cachedFile != null) {
-                      Log.d(TAG, "Restored moodleFile from cache for message: ${uiModel.text.take(30)}...")
-                      uiModel.copy(moodleFile = cachedFile)
-                    } else {
-                      uiModel
+                  // Convert Firestore messages to UI models
+                  val firestoreMessages = msgs.map { dto -> dto.toUi() }.toMutableList()
+
+                  // If existing UI has Moodle files, preserve them when Firestore messages are blank
+                  val existingMessages = state.messages
+                  val maxCount = minOf(existingMessages.size, firestoreMessages.size)
+                  for (i in 0 until maxCount) {
+                    val existing = existingMessages[i]
+                    val incoming = firestoreMessages[i]
+                    if (existing.moodleFile != null &&
+                        incoming.type == ChatType.AI &&
+                        incoming.moodleFile == null &&
+                        incoming.text.isBlank()) {
+                      firestoreMessages[i] = incoming.copy(moodleFile = existing.moodleFile)
+                    }
+                  }
+
+                  // Also try cache by non-blank text
+                  for (i in firestoreMessages.indices) {
+                    val incoming = firestoreMessages[i]
+                    if (incoming.moodleFile == null && incoming.text.isNotBlank()) {
+                      val cachedFile = moodleFileCache.entries.find { (key, _) ->
+                        key.startsWith("${incoming.text}_") || key == incoming.text
+                      }?.value
+                      if (cachedFile != null) {
+                        firestoreMessages[i] = incoming.copy(moodleFile = cachedFile)
+                        Log.d(TAG, "Restored moodleFile from cache for message: ${incoming.text.take(30)}...")
+                      }
+                    }
+                    // If still missing, and we have a pending Moodle file, attach it to the first AI message without file
+                    if (incoming.moodleFile == null &&
+                        pendingMoodleFile != null &&
+                        incoming.type == ChatType.AI) {
+                      firestoreMessages[i] = incoming.copy(moodleFile = pendingMoodleFile)
+                      Log.d(TAG, "Applied pending moodleFile to message (id=${incoming.id})")
+                      pendingMoodleFile = null
                     }
                   }
 
                   val existingSourceCards =
-                      currentState.messages.filter { it.source != null && it.text.isBlank() }
+                      state.messages.filter { it.source != null && it.text.isBlank() }
 
                   val finalMessages = mutableListOf<ChatUIModel>()
-
                   finalMessages.addAll(firestoreMessages)
 
                   existingSourceCards.forEach { sourceCard ->
-                    val originalIndex =
-                        currentState.messages.indexOfFirst { it.id == sourceCard.id }
+                    val originalIndex = state.messages.indexOfFirst { it.id == sourceCard.id }
                     if (originalIndex > 0) {
-
-                      val precedingAssistant = currentState.messages[originalIndex - 1]
+                      val precedingAssistant = state.messages[originalIndex - 1]
                       if (precedingAssistant.type == ChatType.AI &&
                           precedingAssistant.text.isNotBlank()) {
-
                         val firestoreIndex =
                             finalMessages.indexOfFirst {
                               it.type == ChatType.AI && it.text == precedingAssistant.text
                             }
                         if (firestoreIndex >= 0) {
-
                           finalMessages.add(firestoreIndex + 1, sourceCard)
                         } else {
-
                           finalMessages.add(sourceCard)
                         }
                       } else {
-
                         finalMessages.add(sourceCard)
                       }
                     } else {
-
                       finalMessages.add(sourceCard)
                     }
                   }
 
-                  currentState.copy(messages = finalMessages)
+                  state.copy(messages = finalMessages)
                 }
               }
         }
@@ -1009,6 +1025,8 @@ class HomeViewModel(
             // Cache the moodleFile IMMEDIATELY with the final text, before streaming starts
             // This ensures the cache is ready when Firestore updates come in
             if (moodleFileAttachment != null) {
+              // Track pending Moodle file for the next incoming Firestore AI message
+              pendingMoodleFile = moodleFileAttachment
               val finalText = reply.reply
               val cacheKeyWithText = "${finalText}_${System.currentTimeMillis()}"
               moodleFileCache[cacheKeyWithText] = moodleFileAttachment
