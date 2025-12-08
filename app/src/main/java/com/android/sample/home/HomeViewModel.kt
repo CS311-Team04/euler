@@ -24,7 +24,6 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
-import java.io.IOException
 import java.util.UUID
 import kotlin.getValue
 import kotlinx.coroutines.CancellationException
@@ -819,51 +818,11 @@ class HomeViewModel(
       try {
         Log.d(TAG, "sendMessage: starting, message='${msg.take(50)}...'")
 
-        // Check cache when offline (for signed-in users only)
-        // Use Firestore offline persistence to read from local cache
         val isOffline = current.isOffline || networkMonitor?.isCurrentlyOnline() == false
+        // If offline and signed in, we no longer read Firestore cache for AI replies; proceed to
+        // LLM.
         if (isOffline && !isGuest()) {
-          Log.d(TAG, "sendMessage: offline, checking Firestore local cache for question")
-          try {
-            // Use canonical English question for cache lookup (handles localized suggestions)
-            val canonicalQuestion = getCanonicalQuestion(msg)
-            Log.d(TAG, "sendMessage: looking up cache for canonical question: $canonicalQuestion")
-            // Use preferCache=true to force reading from local Firestore cache
-            val cachedResponse = cacheRepo.getCachedResponse(canonicalQuestion, preferCache = true)
-            if (cachedResponse != null && cachedResponse.isNotBlank()) {
-              Log.d(TAG, "sendMessage: found cached response in local Firestore cache, using it")
-              // Use cached response
-              simulateStreamingFromText(aiMessageId, cachedResponse)
-
-              // Persist to conversation if we have one
-              val cid = _uiState.value.currentConversationId
-              if (cid != null) {
-                try {
-                  repo.appendMessage(cid, "assistant", cachedResponse)
-                } catch (e: Exception) {
-                  Log.w(TAG, "Failed to persist cached response to conversation", e)
-                }
-              }
-              return@launch
-            } else {
-              Log.d(
-                  TAG,
-                  "sendMessage: no cached response found in local Firestore cache for offline request")
-              // No cache and offline - show error immediately
-              handleSendMessageError(
-                  IOException(
-                      "No cached response available. Please connect to the internet to get a response."),
-                  aiMessageId)
-              return@launch
-            }
-          } catch (e: Exception) {
-            Log.w(TAG, "Error checking Firestore local cache", e)
-            // If cache check fails and we're offline, show error
-            handleSendMessageError(
-                IOException("Unable to retrieve cached response. Please connect to the internet."),
-                aiMessageId)
-            return@launch
-          }
+          Log.d(TAG, "sendMessage: offline; skipping cache and proceeding to LLM")
         }
 
         // GUEST: no Firestore, just streaming UI
