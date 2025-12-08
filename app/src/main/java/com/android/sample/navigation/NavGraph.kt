@@ -50,20 +50,20 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
 object Routes {
-    const val Opening = "opening"
-    const val SignIn = "signin"
-    const val OnboardingPersonalInfo = "onboarding_personal_info"
-    const val OnboardingRole = "onboarding_role"
-    const val OnboardingAcademic = "onboarding_academic"
-    const val Home = "home"
-    const val HomeWithDrawer = "home_with_drawer"
-    const val Settings = "settings"
-    const val Profile = "profile"
-    const val Connectors = "connectors"
-    const val EdConnect = "ed_connect"
-    const val VoiceChat = "voice_chat"
-    const val EpflCampus = "epfl_campus"
-    const val PdfViewer = "pdf_viewer/{pdfUrl}/{filename}"
+  const val Opening = "opening"
+  const val SignIn = "signin"
+  const val OnboardingPersonalInfo = "onboarding_personal_info"
+  const val OnboardingRole = "onboarding_role"
+  const val OnboardingAcademic = "onboarding_academic"
+  const val Home = "home"
+  const val HomeWithDrawer = "home_with_drawer"
+  const val Settings = "settings"
+  const val Profile = "profile"
+  const val Connectors = "connectors"
+  const val EdConnect = "ed_connect"
+  const val VoiceChat = "voice_chat"
+  const val EpflCampus = "epfl_campus"
+  const val PdfViewer = "pdf_viewer/{pdfUrl}/{filename}"
 }
 
 @VisibleForTesting internal var appNavControllerObserver: ((NavHostController) -> Unit)? = null
@@ -73,20 +73,20 @@ object Routes {
 internal typealias NavigateAction = (String, NavOptionsBuilder.() -> Unit) -> Unit
 
 internal sealed class AuthCommand {
-    object StartMicrosoftSignIn : AuthCommand()
+  object StartMicrosoftSignIn : AuthCommand()
 
-    object NavigateHome : AuthCommand()
+  object NavigateHome : AuthCommand()
 
-    object None : AuthCommand()
+  object None : AuthCommand()
 }
 
 @VisibleForTesting
 internal fun resolveAuthCommand(authState: AuthUiState, currentDestination: String?): AuthCommand {
-    return when {
-        shouldTriggerMicrosoftAuth(authState) -> AuthCommand.StartMicrosoftSignIn
-        shouldNavigateToHomeFromSignIn(authState, currentDestination) -> AuthCommand.NavigateHome
-        else -> AuthCommand.None
-    }
+  return when {
+    shouldTriggerMicrosoftAuth(authState) -> AuthCommand.StartMicrosoftSignIn
+    shouldNavigateToHomeFromSignIn(authState, currentDestination) -> AuthCommand.NavigateHome
+    else -> AuthCommand.None
+  }
 }
 
 @VisibleForTesting
@@ -95,84 +95,84 @@ internal fun executeAuthCommand(
     startMicrosoftSignIn: () -> Unit,
     navigateHome: () -> Unit
 ) {
-    when (command) {
-        AuthCommand.StartMicrosoftSignIn -> startMicrosoftSignIn()
-        AuthCommand.NavigateHome -> navigateHome()
-        AuthCommand.None -> {}
-    }
+  when (command) {
+    AuthCommand.StartMicrosoftSignIn -> startMicrosoftSignIn()
+    AuthCommand.NavigateHome -> navigateHome()
+    AuthCommand.None -> {}
+  }
 }
 
 @VisibleForTesting
 internal fun buildAuthenticationErrorMessage(authState: AuthUiState, fallback: String): String {
-    return if (authState is AuthUiState.Error) getErrorMessage(authState, fallback) else fallback
+  return if (authState is AuthUiState.Error) getErrorMessage(authState, fallback) else fallback
 }
 
 @VisibleForTesting
 internal fun navigateOpeningToSignIn(navigate: NavigateAction) {
-    navigate(Routes.SignIn) {
-        popUpTo(Routes.Opening) { inclusive = true }
-        launchSingleTop = true
-    }
+  navigate(Routes.SignIn) {
+    popUpTo(Routes.Opening) { inclusive = true }
+    launchSingleTop = true
+  }
 }
 
 @VisibleForTesting
 internal fun navigateOpeningToHome(navigate: NavigateAction) {
-    navigate(Routes.Home) {
-        popUpTo(Routes.Opening) { inclusive = true }
-        launchSingleTop = true
-    }
+  navigate(Routes.Home) {
+    popUpTo(Routes.Opening) { inclusive = true }
+    launchSingleTop = true
+  }
 }
 
 @VisibleForTesting
 internal fun navigateHomeFromSignIn(navigate: NavigateAction) {
-    navigate(Routes.Home) {
-        popUpTo(Routes.SignIn) { inclusive = true }
-        launchSingleTop = true
-        restoreState = true
-    }
+  navigate(Routes.Home) {
+    popUpTo(Routes.SignIn) { inclusive = true }
+    launchSingleTop = true
+    restoreState = true
+  }
 }
 
 @VisibleForTesting
 internal fun navigateHomeToSignIn(navigate: NavigateAction) {
-    navigate(Routes.SignIn) {
-        popUpTo(Routes.Home) { inclusive = true }
-        launchSingleTop = true
-    }
+  navigate(Routes.SignIn) {
+    popUpTo(Routes.Home) { inclusive = true }
+    launchSingleTop = true
+  }
 }
 
 @VisibleForTesting
 internal fun navigateSettingsBack(navigate: NavigateAction) {
-    navigate(Routes.HomeWithDrawer) { popUpTo(Routes.Home) { inclusive = false } }
+  navigate(Routes.HomeWithDrawer) { popUpTo(Routes.Home) { inclusive = false } }
 }
 
 @VisibleForTesting
 internal fun navigateSignOut(navigate: NavigateAction, startDestinationRoute: String?) {
-    val startRoute = startDestinationRoute ?: Routes.Opening
-    navigate(Routes.SignIn) {
-        popUpTo(startRoute) { inclusive = true }
-        launchSingleTop = true
-        restoreState = false
-    }
+  val startRoute = startDestinationRoute ?: Routes.Opening
+  navigate(Routes.SignIn) {
+    popUpTo(startRoute) { inclusive = true }
+    launchSingleTop = true
+    restoreState = false
+  }
 }
 
 @VisibleForTesting
 internal fun navigateToSettings(navigate: NavigateAction) {
-    navigate(Routes.Settings) {}
+  navigate(Routes.Settings) {}
 }
 
 @VisibleForTesting
 internal fun navigateToProfile(navigate: NavigateAction) {
-    navigate(Routes.Profile) {}
+  navigate(Routes.Profile) {}
 }
 
 @VisibleForTesting
 internal fun navigateToVoiceChat(navigate: NavigateAction) {
-    navigate(Routes.VoiceChat) {}
+  navigate(Routes.VoiceChat) {}
 }
 
 @VisibleForTesting
 internal fun navigateToConnectors(navigate: NavigateAction) {
-    navigate(Routes.Connectors) {}
+  navigate(Routes.Connectors) {}
 }
 
 @VisibleForTesting
@@ -181,11 +181,11 @@ internal fun handleProfileClick(
     showGuestWarning: () -> Unit,
     navigateToProfile: () -> Unit
 ) {
-    if (isGuest) {
-        showGuestWarning()
-    } else {
-        navigateToProfile()
-    }
+  if (isGuest) {
+    showGuestWarning()
+  } else {
+    navigateToProfile()
+  }
 }
 
 /**
@@ -195,23 +195,23 @@ internal fun handleProfileClick(
  * - Otherwise, navigates to home.
  */
 private suspend fun navigateToOnboardingOrHome(nav: NavHostController) {
-    val profileRepository = UserProfileRepository()
-    val profile = profileRepository.loadProfile()
+  val profileRepository = UserProfileRepository()
+  val profile = profileRepository.loadProfile()
 
-    if (profile == null || profile.fullName.isBlank()) {
-        // User needs onboarding - navigate to onboarding screen
-        nav.navigate(Routes.OnboardingPersonalInfo) {
-            popUpTo(Routes.SignIn) { inclusive = true }
-            launchSingleTop = true
-        }
-    } else {
-        // User has profile - navigate to home
-        nav.navigate(Routes.Home) {
-            popUpTo(Routes.SignIn) { inclusive = true }
-            launchSingleTop = true
-            restoreState = true
-        }
+  if (profile == null || profile.fullName.isBlank()) {
+    // User needs onboarding - navigate to onboarding screen
+    nav.navigate(Routes.OnboardingPersonalInfo) {
+      popUpTo(Routes.SignIn) { inclusive = true }
+      launchSingleTop = true
     }
+  } else {
+    // User has profile - navigate to home
+    nav.navigate(Routes.Home) {
+      popUpTo(Routes.SignIn) { inclusive = true }
+      launchSingleTop = true
+      restoreState = true
+    }
+  }
 }
 
 /**
@@ -220,11 +220,11 @@ private suspend fun navigateToOnboardingOrHome(nav: NavHostController) {
  */
 @VisibleForTesting
 internal fun createConversationRepositoryOrNull(): ConversationRepository? {
-    return try {
-        ConversationRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance())
-    } catch (e: Exception) {
-        null // Guest mode - no repository
-    }
+  return try {
+    ConversationRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance())
+  } catch (e: Exception) {
+    null // Guest mode - no repository
+  }
 }
 
 /**
@@ -233,7 +233,7 @@ internal fun createConversationRepositoryOrNull(): ConversationRepository? {
  */
 @VisibleForTesting
 internal fun createGetCurrentConversationIdLambda(homeViewModel: HomeViewModel): () -> String? {
-    return { homeViewModel.uiState.value.currentConversationId }
+  return { homeViewModel.uiState.value.currentConversationId }
 }
 
 /**
@@ -242,10 +242,10 @@ internal fun createGetCurrentConversationIdLambda(homeViewModel: HomeViewModel):
  */
 @VisibleForTesting
 internal fun createOnConversationCreatedCallback(homeViewModel: HomeViewModel): (String) -> Unit {
-    return { conversationId ->
-        // Select the newly created conversation in HomeViewModel
-        homeViewModel.selectConversation(conversationId)
-    }
+  return { conversationId ->
+    // Select the newly created conversation in HomeViewModel
+    homeViewModel.selectConversation(conversationId)
+  }
 }
 
 /**
@@ -267,11 +267,11 @@ internal fun createVoiceChatViewModel(
     createGetCurrentConversationIdLambda: (HomeViewModel) -> () -> String?,
     createOnConversationCreatedCallback: (HomeViewModel) -> (String) -> Unit
 ): VoiceChatViewModel {
-    val conversationRepo = createConversationRepositoryOrNull()
-    return VoiceChatViewModel(
-        conversationRepository = conversationRepo,
-        getCurrentConversationId = createGetCurrentConversationIdLambda(homeViewModel),
-        onConversationCreated = createOnConversationCreatedCallback(homeViewModel))
+  val conversationRepo = createConversationRepositoryOrNull()
+  return VoiceChatViewModel(
+      conversationRepository = conversationRepo,
+      getCurrentConversationId = createGetCurrentConversationIdLambda(homeViewModel),
+      onConversationCreated = createOnConversationCreatedCallback(homeViewModel))
 }
 
 /**
@@ -283,12 +283,12 @@ internal fun createVoiceChatViewModel(
 internal fun createVoiceChatViewModelForComposable(
     homeViewModel: HomeViewModel
 ): VoiceChatViewModel {
-    // This reproduces EXACTLY the code from lines 610-618 of the composable
-    return createVoiceChatViewModel(
-        homeViewModel = homeViewModel,
-        createConversationRepositoryOrNull = { createConversationRepositoryOrNull() },
-        createGetCurrentConversationIdLambda = { createGetCurrentConversationIdLambda(it) },
-        createOnConversationCreatedCallback = { createOnConversationCreatedCallback(it) })
+  // This reproduces EXACTLY the code from lines 610-618 of the composable
+  return createVoiceChatViewModel(
+      homeViewModel = homeViewModel,
+      createConversationRepositoryOrNull = { createConversationRepositoryOrNull() },
+      createGetCurrentConversationIdLambda = { createGetCurrentConversationIdLambda(it) },
+      createOnConversationCreatedCallback = { createOnConversationCreatedCallback(it) })
 }
 
 /**
@@ -306,14 +306,14 @@ internal fun VoiceChatContent(
     speechHelper: SpeechToTextHelper,
     onClose: () -> Unit
 ) {
-    val voiceChatViewModel =
-        remember(homeViewModel) { createVoiceChatViewModelForComposable(homeViewModel) }
+  val voiceChatViewModel =
+      remember(homeViewModel) { createVoiceChatViewModelForComposable(homeViewModel) }
 
-    VoiceScreen(
-        onClose = onClose,
-        modifier = Modifier.fillMaxSize(),
-        speechHelper = speechHelper,
-        voiceChatViewModel = voiceChatViewModel)
+  VoiceScreen(
+      onClose = onClose,
+      modifier = Modifier.fillMaxSize(),
+      speechHelper = speechHelper,
+      voiceChatViewModel = voiceChatViewModel)
 }
 
 /**
@@ -326,11 +326,11 @@ internal fun VoiceChatContent(
 @VisibleForTesting
 @Composable
 internal fun VoiceChatComposableContent(nav: NavHostController, speechHelper: SpeechToTextHelper) {
-    @Suppress("UnrememberedGetBackStackEntry") val parentEntry = nav.getBackStackEntry("home_root")
-    val homeViewModel: HomeViewModel = viewModel(parentEntry)
+  @Suppress("UnrememberedGetBackStackEntry") val parentEntry = nav.getBackStackEntry("home_root")
+  val homeViewModel: HomeViewModel = viewModel(parentEntry)
 
-    VoiceChatContent(
-        homeViewModel = homeViewModel, speechHelper = speechHelper, onClose = { nav.popBackStack() })
+  VoiceChatContent(
+      homeViewModel = homeViewModel, speechHelper = speechHelper, onClose = { nav.popBackStack() })
 }
 
 @SuppressLint("UnrememberedGetBackStackEntry")
@@ -341,360 +341,360 @@ fun AppNav(
     speechHelper: SpeechToTextHelper,
     ttsHelper: SpeechPlayback
 ) {
-    val context = LocalContext.current
-    val networkMonitor = remember { AndroidNetworkConnectivityMonitor(context) }
+  val context = LocalContext.current
+  val networkMonitor = remember { AndroidNetworkConnectivityMonitor(context) }
 
-    // Cleanup network monitor when composable is disposed
-    DisposableEffect(networkMonitor) { onDispose { networkMonitor.unregister() } }
+  // Cleanup network monitor when composable is disposed
+  DisposableEffect(networkMonitor) { onDispose { networkMonitor.unregister() } }
 
-    val nav =
-        rememberNavController().also { controller -> appNavControllerObserver?.invoke(controller) }
-    val authViewModel =
-        remember(networkMonitor) {
-            authViewModelFactory?.invoke() ?: AuthViewModel(networkMonitor = networkMonitor)
+  val nav =
+      rememberNavController().also { controller -> appNavControllerObserver?.invoke(controller) }
+  val authViewModel =
+      remember(networkMonitor) {
+        authViewModelFactory?.invoke() ?: AuthViewModel(networkMonitor = networkMonitor)
+      }
+  val authState by authViewModel.state.collectAsState()
+
+  // Get current back stack entry
+  val navBackStackEntry by nav.currentBackStackEntryAsState()
+  val currentDestination = navBackStackEntry?.destination?.route
+
+  // Check for onboarding after sign-in
+  LaunchedEffect(authState, currentDestination) {
+    when {
+      authState is AuthUiState.SignedIn && currentDestination == Routes.SignIn -> {
+        navigateToOnboardingOrHome(nav)
+      }
+      authState is AuthUiState.Guest && currentDestination == Routes.SignIn -> {
+        // Navigate directly to Home for guest users (skip onboarding)
+        nav.navigate(Routes.Home) {
+          popUpTo(Routes.SignIn) { inclusive = true }
+          launchSingleTop = true
+          restoreState = true
         }
-    val authState by authViewModel.state.collectAsState()
-
-    // Get current back stack entry
-    val navBackStackEntry by nav.currentBackStackEntryAsState()
-    val currentDestination = navBackStackEntry?.destination?.route
-
-    // Check for onboarding after sign-in
-    LaunchedEffect(authState, currentDestination) {
-        when {
-            authState is AuthUiState.SignedIn && currentDestination == Routes.SignIn -> {
-                navigateToOnboardingOrHome(nav)
-            }
-            authState is AuthUiState.Guest && currentDestination == Routes.SignIn -> {
-                // Navigate directly to Home for guest users (skip onboarding)
-                nav.navigate(Routes.Home) {
-                    popUpTo(Routes.SignIn) { inclusive = true }
-                    launchSingleTop = true
-                    restoreState = true
-                }
-            }
-        }
+      }
     }
+  }
 
-    // Handle Microsoft authentication when loading
-    LaunchedEffect(authState) {
-        val currentState = authState
-        val command = resolveAuthCommand(currentState, currentDestination)
-        executeAuthCommand(
-            command,
-            startMicrosoftSignIn = {
-                MicrosoftAuth.signIn(
-                    activity = activity,
-                    onSuccess = { authViewModel.onAuthenticationSuccess() },
-                    onError = { exception ->
-                        val errorMessage =
-                            buildAuthenticationErrorMessage(
-                                currentState, exception.message ?: "Authentication failed")
-                        authViewModel.onAuthenticationError(errorMessage)
-                    })
-            },
-            navigateHome = {
-                // Navigation will be handled by the onboarding check LaunchedEffect above
-                // This is kept for backward compatibility but the actual navigation
-                // happens in the navigateToOnboardingOrHome function
-            })
-    }
+  // Handle Microsoft authentication when loading
+  LaunchedEffect(authState) {
+    val currentState = authState
+    val command = resolveAuthCommand(currentState, currentDestination)
+    executeAuthCommand(
+        command,
+        startMicrosoftSignIn = {
+          MicrosoftAuth.signIn(
+              activity = activity,
+              onSuccess = { authViewModel.onAuthenticationSuccess() },
+              onError = { exception ->
+                val errorMessage =
+                    buildAuthenticationErrorMessage(
+                        currentState, exception.message ?: "Authentication failed")
+                authViewModel.onAuthenticationError(errorMessage)
+              })
+        },
+        navigateHome = {
+          // Navigation will be handled by the onboarding check LaunchedEffect above
+          // This is kept for backward compatibility but the actual navigation
+          // happens in the navigateToOnboardingOrHome function
+        })
+  }
 
-    NavHost(
-        navController = nav,
-        startDestination = if (startOnSignedIn) Routes.Home else Routes.Opening) {
+  NavHost(
+      navController = nav,
+      startDestination = if (startOnSignedIn) Routes.Home else Routes.Opening) {
         // Opening Screen (new flow)
         composable(Routes.Opening) {
-            OpeningScreen(
-                authState = authState,
-                onNavigateToSignIn = {
-                    navigateOpeningToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
-                },
-                onNavigateToHome = {
-                    navigateOpeningToHome { route, builder -> nav.navigate(route) { builder(this) } }
-                })
+          OpeningScreen(
+              authState = authState,
+              onNavigateToSignIn = {
+                navigateOpeningToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
+              },
+              onNavigateToHome = {
+                navigateOpeningToHome { route, builder -> nav.navigate(route) { builder(this) } }
+              })
         }
 
         // SignIn Screen
         composable(Routes.SignIn) {
-            val isOffline by authViewModel.isOffline.collectAsState()
-            AuthUIScreen(
-                state = authState,
-                onMicrosoftLogin = { authViewModel.onMicrosoftLoginClick() },
-                onSwitchEduLogin = { authViewModel.onSwitchEduLoginClick() },
-                isOffline = isOffline)
+          val isOffline by authViewModel.isOffline.collectAsState()
+          AuthUIScreen(
+              state = authState,
+              onMicrosoftLogin = { authViewModel.onMicrosoftLoginClick() },
+              onSwitchEduLogin = { authViewModel.onSwitchEduLoginClick() },
+              isOffline = isOffline)
         }
 
         // Onboarding Personal Info Screen (Step 1)
         composable(Routes.OnboardingPersonalInfo) {
-            OnboardingPersonalInfoScreen(
-                onContinue = {
-                    // Navigate to step 2 (OnboardingRole)
-                    nav.navigate(Routes.OnboardingRole) {
-                        popUpTo(Routes.OnboardingPersonalInfo) { inclusive = false }
-                        launchSingleTop = true
-                    }
-                })
+          OnboardingPersonalInfoScreen(
+              onContinue = {
+                // Navigate to step 2 (OnboardingRole)
+                nav.navigate(Routes.OnboardingRole) {
+                  popUpTo(Routes.OnboardingPersonalInfo) { inclusive = false }
+                  launchSingleTop = true
+                }
+              })
         }
 
         // Onboarding Role Screen (Step 2)
         composable(Routes.OnboardingRole) {
-            OnboardingRoleScreen(
-                onContinue = {
-                    // Navigate to step 3 (OnboardingAcademic)
-                    nav.navigate(Routes.OnboardingAcademic) {
-                        popUpTo(Routes.OnboardingRole) { inclusive = false }
-                        launchSingleTop = true
-                    }
-                })
+          OnboardingRoleScreen(
+              onContinue = {
+                // Navigate to step 3 (OnboardingAcademic)
+                nav.navigate(Routes.OnboardingAcademic) {
+                  popUpTo(Routes.OnboardingRole) { inclusive = false }
+                  launchSingleTop = true
+                }
+              })
         }
 
         // Onboarding Academic Screen (Step 3)
         composable(Routes.OnboardingAcademic) {
-            OnboardingAcademicScreen(
-                onContinue = {
-                    // Navigate to home after onboarding is complete
-                    // Clear entire back stack so Home becomes the new root
-                    nav.navigate(Routes.Home) {
-                        popUpTo(Routes.SignIn) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                })
+          OnboardingAcademicScreen(
+              onContinue = {
+                // Navigate to home after onboarding is complete
+                // Clear entire back stack so Home becomes the new root
+                nav.navigate(Routes.Home) {
+                  popUpTo(Routes.SignIn) { inclusive = true }
+                  launchSingleTop = true
+                }
+              })
         }
         navigation(startDestination = Routes.Home, route = "home_root") {
-            // Home Screen
-            composable(Routes.Home) {
-                val parentEntry = nav.getBackStackEntry("home_root")
-                val homeViewModel: HomeViewModel =
-                    viewModel(
-                        parentEntry,
-                        factory =
-                            object : ViewModelProvider.Factory {
-                                @Suppress("UNCHECKED_CAST")
-                                override fun <T : androidx.lifecycle.ViewModel> create(
-                                    modelClass: Class<T>
-                                ): T {
-                                    return HomeViewModel(networkMonitor = networkMonitor) as T
-                                }
-                            })
-                val homeUiState by homeViewModel.uiState.collectAsState()
+          // Home Screen
+          composable(Routes.Home) {
+            val parentEntry = nav.getBackStackEntry("home_root")
+            val homeViewModel: HomeViewModel =
+                viewModel(
+                    parentEntry,
+                    factory =
+                        object : ViewModelProvider.Factory {
+                          @Suppress("UNCHECKED_CAST")
+                          override fun <T : androidx.lifecycle.ViewModel> create(
+                              modelClass: Class<T>
+                          ): T {
+                            return HomeViewModel(networkMonitor = networkMonitor) as T
+                          }
+                        })
+            val homeUiState by homeViewModel.uiState.collectAsState()
 
-                // LaunchedEffect for guest mode synchronization
-                LaunchedEffect(authState) {
-                    when (authState) {
-                        is AuthUiState.Guest -> homeViewModel.setGuestMode(true)
-                        is AuthUiState.SignedIn -> {
-                            homeViewModel.setGuestMode(false)
-                            homeViewModel.refreshProfile()
-                        }
-                        else -> {}
-                    }
+            // LaunchedEffect for guest mode synchronization
+            LaunchedEffect(authState) {
+              when (authState) {
+                is AuthUiState.Guest -> homeViewModel.setGuestMode(true)
+                is AuthUiState.SignedIn -> {
+                  homeViewModel.setGuestMode(false)
+                  homeViewModel.refreshProfile()
                 }
-                HomeScreen(
-                    viewModel = homeViewModel,
-                    onAction1Click = { /* ... */},
-                    onAction2Click = { /* ... */},
-                    onSendMessage = { /* ... */},
-                    speechHelper = speechHelper,
-                    ttsHelper = ttsHelper,
-                    onSignOut = {
-                        android.util.Log.d("NavGraph", "Sign out button clicked")
-                        homeViewModel.clearProfile()
-                        authViewModel.signOut()
-                        android.util.Log.d("NavGraph", "Navigating to SignIn")
-                        // Navigate to SignIn and clear entire back stack
-                        val startRoute = nav.graph.startDestinationRoute ?: Routes.Opening
-                        nav.navigate(Routes.SignIn) {
-                            popUpTo(startRoute) { inclusive = true }
-                            launchSingleTop = true
-                            restoreState = false
+                else -> {}
+              }
+            }
+            HomeScreen(
+                viewModel = homeViewModel,
+                onAction1Click = { /* ... */},
+                onAction2Click = { /* ... */},
+                onSendMessage = { /* ... */},
+                speechHelper = speechHelper,
+                ttsHelper = ttsHelper,
+                onSignOut = {
+                  android.util.Log.d("NavGraph", "Sign out button clicked")
+                  homeViewModel.clearProfile()
+                  authViewModel.signOut()
+                  android.util.Log.d("NavGraph", "Navigating to SignIn")
+                  // Navigate to SignIn and clear entire back stack
+                  val startRoute = nav.graph.startDestinationRoute ?: Routes.Opening
+                  nav.navigate(Routes.SignIn) {
+                    popUpTo(startRoute) { inclusive = true }
+                    launchSingleTop = true
+                    restoreState = false
+                  }
+                },
+                onPdfClick = { pdfUrl, filename ->
+                  val encodedUrl = Uri.encode(pdfUrl, "")
+                  val encodedFilename = Uri.encode(filename, "")
+                  nav.navigate("pdf_viewer/$encodedUrl/$encodedFilename") { launchSingleTop = true }
+                },
+                onSettingsClick = { nav.navigate(Routes.Settings) },
+                onConnectorsClick = {
+                  navigateToConnectors { route, builder -> nav.navigate(route) { builder(this) } }
+                },
+                onProfileClick = {
+                  if (homeUiState.isGuest) {
+                    homeViewModel.showGuestProfileWarning()
+                  } else {
+                    nav.navigate(Routes.Profile)
+                  }
+                },
+                onVoiceChatClick = { nav.navigate(Routes.VoiceChat) })
+          }
+
+          // Home With Drawer
+          composable(Routes.HomeWithDrawer) {
+            val parentEntry = nav.getBackStackEntry("home_root")
+            val homeViewModel: HomeViewModel =
+                viewModel(
+                    parentEntry,
+                    factory =
+                        object : ViewModelProvider.Factory {
+                          @Suppress("UNCHECKED_CAST")
+                          override fun <T : androidx.lifecycle.ViewModel> create(
+                              modelClass: Class<T>
+                          ): T {
+                            return HomeViewModel(networkMonitor = networkMonitor) as T
+                          }
+                        })
+            val homeUiState by homeViewModel.uiState.collectAsState()
+
+            HomeScreen(
+                viewModel = homeViewModel,
+                onAction1Click = { /* ... */},
+                onAction2Click = { /* ... */},
+                onSendMessage = { /* ... */},
+                speechHelper = speechHelper,
+                ttsHelper = ttsHelper,
+                onSignOut = {
+                  android.util.Log.d("NavGraph", "Sign out button clicked (HomeWithDrawer)")
+                  homeViewModel.clearProfile()
+                  authViewModel.signOut()
+                  android.util.Log.d("NavGraph", "Navigating to SignIn (HomeWithDrawer)")
+                  // Navigate to SignIn and clear entire back stack
+                  navigateSignOut(
+                      navigate = { route, builder -> nav.navigate(route) { builder(this) } },
+                      startDestinationRoute = nav.graph.startDestinationRoute)
+                },
+                onPdfClick = { pdfUrl, filename ->
+                  val encodedUrl = Uri.encode(pdfUrl, "")
+                  val encodedFilename = Uri.encode(filename, "")
+                  nav.navigate("pdf_viewer/$encodedUrl/$encodedFilename") { launchSingleTop = true }
+                },
+                onSettingsClick = {
+                  navigateToSettings { route, builder -> nav.navigate(route) { builder(this) } }
+                },
+                onConnectorsClick = {
+                  navigateToConnectors { route, builder -> nav.navigate(route) { builder(this) } }
+                },
+                onProfileClick = {
+                  handleProfileClick(
+                      isGuest = homeUiState.isGuest,
+                      showGuestWarning = { homeViewModel.showGuestProfileWarning() },
+                      navigateToProfile = {
+                        navigateToProfile { route, builder ->
+                          nav.navigate(route) { builder(this) }
                         }
-                    },
-                    onPdfClick = { pdfUrl, filename ->
-                        val encodedUrl = Uri.encode(pdfUrl, "")
-                        val encodedFilename = Uri.encode(filename, "")
-                        nav.navigate("pdf_viewer/$encodedUrl/$encodedFilename") { launchSingleTop = true }
-                    },
-                    onSettingsClick = { nav.navigate(Routes.Settings) },
-                    onConnectorsClick = {
-                        navigateToConnectors { route, builder -> nav.navigate(route) { builder(this) } }
-                    },
-                    onProfileClick = {
-                        if (homeUiState.isGuest) {
-                            homeViewModel.showGuestProfileWarning()
-                        } else {
-                            nav.navigate(Routes.Profile)
-                        }
-                    },
-                    onVoiceChatClick = { nav.navigate(Routes.VoiceChat) })
+                      })
+                },
+                onVoiceChatClick = {
+                  navigateToVoiceChat { route, builder -> nav.navigate(route) { builder(this) } }
+                },
+                openDrawerOnStart = true)
+          }
+
+          // Settings
+          composable(Routes.Settings) {
+            val parentEntry = nav.getBackStackEntry("home_root")
+            val homeViewModel: HomeViewModel =
+                viewModel(
+                    parentEntry,
+                    factory =
+                        object : ViewModelProvider.Factory {
+                          @Suppress("UNCHECKED_CAST")
+                          override fun <T : androidx.lifecycle.ViewModel> create(
+                              modelClass: Class<T>
+                          ): T {
+                            return HomeViewModel(networkMonitor = networkMonitor) as T
+                          }
+                        })
+            val homeUiState by homeViewModel.uiState.collectAsState()
+
+            SettingsPage(
+                onBackClick = {
+                  nav.navigate(Routes.HomeWithDrawer) { popUpTo(Routes.Home) { inclusive = false } }
+                },
+                onSignOut = {
+                  android.util.Log.d("NavGraph", "Sign out button clicked (Settings)")
+                  homeViewModel.clearProfile()
+                  authViewModel.signOut()
+                  android.util.Log.d("NavGraph", "Navigating to SignIn (Settings)")
+                  // Navigate to SignIn and clear entire back stack
+                  val startRoute = nav.graph.startDestinationRoute ?: Routes.Opening
+                  nav.navigate(Routes.SignIn) {
+                    popUpTo(startRoute) { inclusive = true }
+                    launchSingleTop = true
+                    restoreState = false
+                  }
+                },
+                onProfileClick = {
+                  if (homeUiState.isGuest) {
+                    homeViewModel.showGuestProfileWarning()
+                  } else {
+                    nav.navigate(Routes.Profile)
+                  }
+                },
+                onProfileDisabledClick = { homeViewModel.showGuestProfileWarning() },
+                isProfileEnabled = !homeUiState.isGuest,
+                showProfileWarning = homeUiState.showGuestProfileWarning,
+                onDismissProfileWarning = { homeViewModel.hideGuestProfileWarning() },
+                onConnectorsClick = { nav.navigate(Routes.Connectors) })
+          }
+
+          composable(Routes.Profile) {
+            val parentEntry = nav.getBackStackEntry("home_root")
+            val homeViewModel: HomeViewModel =
+                viewModel(
+                    parentEntry,
+                    factory =
+                        object : ViewModelProvider.Factory {
+                          @Suppress("UNCHECKED_CAST")
+                          override fun <T : androidx.lifecycle.ViewModel> create(
+                              modelClass: Class<T>
+                          ): T {
+                            return HomeViewModel(networkMonitor = networkMonitor) as T
+                          }
+                        })
+            val homeUiState by homeViewModel.uiState.collectAsState()
+
+            if (homeUiState.isGuest) {
+              LaunchedEffect(Unit) {
+                homeViewModel.showGuestProfileWarning()
+                nav.popBackStack()
+              }
+            } else {
+              // Use ProfileScreen which manages its own ViewModel and loads profile from Firestore
+              ProfileScreen(onBackClick = { nav.popBackStack() })
             }
+          }
+          // Connectors Screen
+          composable(Routes.Connectors) {
+            ConnectorsScreen(
+                onBackClick = { nav.popBackStack() },
+                onConnectorClick = { connectorId ->
+                  when (connectorId) {
+                    "ed" -> nav.navigate(Routes.EdConnect)
+                    "epfl_campus" -> nav.navigate(Routes.EpflCampus)
+                    else -> android.util.Log.d("NavGraph", "Connector clicked: $connectorId")
+                  }
+                })
+          }
 
-            // Home With Drawer
-            composable(Routes.HomeWithDrawer) {
-                val parentEntry = nav.getBackStackEntry("home_root")
-                val homeViewModel: HomeViewModel =
-                    viewModel(
-                        parentEntry,
-                        factory =
-                            object : ViewModelProvider.Factory {
-                                @Suppress("UNCHECKED_CAST")
-                                override fun <T : androidx.lifecycle.ViewModel> create(
-                                    modelClass: Class<T>
-                                ): T {
-                                    return HomeViewModel(networkMonitor = networkMonitor) as T
-                                }
-                            })
-                val homeUiState by homeViewModel.uiState.collectAsState()
+          // ED Connect Screen
+          composable(Routes.EdConnect) { EdConnectScreen(onBackClick = { nav.popBackStack() }) }
 
-                HomeScreen(
-                    viewModel = homeViewModel,
-                    onAction1Click = { /* ... */},
-                    onAction2Click = { /* ... */},
-                    onSendMessage = { /* ... */},
-                    speechHelper = speechHelper,
-                    ttsHelper = ttsHelper,
-                    onSignOut = {
-                        android.util.Log.d("NavGraph", "Sign out button clicked (HomeWithDrawer)")
-                        homeViewModel.clearProfile()
-                        authViewModel.signOut()
-                        android.util.Log.d("NavGraph", "Navigating to SignIn (HomeWithDrawer)")
-                        // Navigate to SignIn and clear entire back stack
-                        navigateSignOut(
-                            navigate = { route, builder -> nav.navigate(route) { builder(this) } },
-                            startDestinationRoute = nav.graph.startDestinationRoute)
-                    },
-                    onPdfClick = { pdfUrl, filename ->
-                        val encodedUrl = Uri.encode(pdfUrl, "")
-                        val encodedFilename = Uri.encode(filename, "")
-                        nav.navigate("pdf_viewer/$encodedUrl/$encodedFilename") { launchSingleTop = true }
-                    },
-                    onSettingsClick = {
-                        navigateToSettings { route, builder -> nav.navigate(route) { builder(this) } }
-                    },
-                    onConnectorsClick = {
-                        navigateToConnectors { route, builder -> nav.navigate(route) { builder(this) } }
-                    },
-                    onProfileClick = {
-                        handleProfileClick(
-                            isGuest = homeUiState.isGuest,
-                            showGuestWarning = { homeViewModel.showGuestProfileWarning() },
-                            navigateToProfile = {
-                                navigateToProfile { route, builder ->
-                                    nav.navigate(route) { builder(this) }
-                                }
-                            })
-                    },
-                    onVoiceChatClick = {
-                        navigateToVoiceChat { route, builder -> nav.navigate(route) { builder(this) } }
-                    },
-                    openDrawerOnStart = true)
-            }
+          // Voice Chat Screen
+          // EPFL Campus Connector Screen
+          composable(Routes.EpflCampus) {
+            com.android.sample.epfl.EpflCampusConnectorScreen(onBackClick = { nav.popBackStack() })
+          }
+          // Uses VoiceChatComposableContent which is tested in NavGraphTest
+          composable(Routes.VoiceChat) { VoiceChatComposableContent(nav, speechHelper) }
 
-            // Settings
-            composable(Routes.Settings) {
-                val parentEntry = nav.getBackStackEntry("home_root")
-                val homeViewModel: HomeViewModel =
-                    viewModel(
-                        parentEntry,
-                        factory =
-                            object : ViewModelProvider.Factory {
-                                @Suppress("UNCHECKED_CAST")
-                                override fun <T : androidx.lifecycle.ViewModel> create(
-                                    modelClass: Class<T>
-                                ): T {
-                                    return HomeViewModel(networkMonitor = networkMonitor) as T
-                                }
-                            })
-                val homeUiState by homeViewModel.uiState.collectAsState()
-
-                SettingsPage(
-                    onBackClick = {
-                        nav.navigate(Routes.HomeWithDrawer) { popUpTo(Routes.Home) { inclusive = false } }
-                    },
-                    onSignOut = {
-                        android.util.Log.d("NavGraph", "Sign out button clicked (Settings)")
-                        homeViewModel.clearProfile()
-                        authViewModel.signOut()
-                        android.util.Log.d("NavGraph", "Navigating to SignIn (Settings)")
-                        // Navigate to SignIn and clear entire back stack
-                        val startRoute = nav.graph.startDestinationRoute ?: Routes.Opening
-                        nav.navigate(Routes.SignIn) {
-                            popUpTo(startRoute) { inclusive = true }
-                            launchSingleTop = true
-                            restoreState = false
-                        }
-                    },
-                    onProfileClick = {
-                        if (homeUiState.isGuest) {
-                            homeViewModel.showGuestProfileWarning()
-                        } else {
-                            nav.navigate(Routes.Profile)
-                        }
-                    },
-                    onProfileDisabledClick = { homeViewModel.showGuestProfileWarning() },
-                    isProfileEnabled = !homeUiState.isGuest,
-                    showProfileWarning = homeUiState.showGuestProfileWarning,
-                    onDismissProfileWarning = { homeViewModel.hideGuestProfileWarning() },
-                    onConnectorsClick = { nav.navigate(Routes.Connectors) })
-            }
-
-            composable(Routes.Profile) {
-                val parentEntry = nav.getBackStackEntry("home_root")
-                val homeViewModel: HomeViewModel =
-                    viewModel(
-                        parentEntry,
-                        factory =
-                            object : ViewModelProvider.Factory {
-                                @Suppress("UNCHECKED_CAST")
-                                override fun <T : androidx.lifecycle.ViewModel> create(
-                                    modelClass: Class<T>
-                                ): T {
-                                    return HomeViewModel(networkMonitor = networkMonitor) as T
-                                }
-                            })
-                val homeUiState by homeViewModel.uiState.collectAsState()
-
-                if (homeUiState.isGuest) {
-                    LaunchedEffect(Unit) {
-                        homeViewModel.showGuestProfileWarning()
-                        nav.popBackStack()
-                    }
-                } else {
-                    // Use ProfileScreen which manages its own ViewModel and loads profile from Firestore
-                    ProfileScreen(onBackClick = { nav.popBackStack() })
-                }
-            }
-            // Connectors Screen
-            composable(Routes.Connectors) {
-                ConnectorsScreen(
-                    onBackClick = { nav.popBackStack() },
-                    onConnectorClick = { connectorId ->
-                        when (connectorId) {
-                            "ed" -> nav.navigate(Routes.EdConnect)
-                            "epfl_campus" -> nav.navigate(Routes.EpflCampus)
-                            else -> android.util.Log.d("NavGraph", "Connector clicked: $connectorId")
-                        }
-                    })
-            }
-
-            // ED Connect Screen
-            composable(Routes.EdConnect) { EdConnectScreen(onBackClick = { nav.popBackStack() }) }
-
-            // Voice Chat Screen
-            // EPFL Campus Connector Screen
-            composable(Routes.EpflCampus) {
-                com.android.sample.epfl.EpflCampusConnectorScreen(onBackClick = { nav.popBackStack() })
-            }
-            // Uses VoiceChatComposableContent which is tested in NavGraphTest
-            composable(Routes.VoiceChat) { VoiceChatComposableContent(nav, speechHelper) }
-
-            // PDF Viewer Screen
-            composable(
-                route = Routes.PdfViewer,
-                arguments =
-                    listOf(
-                        navArgument("pdfUrl") { type = NavType.StringType },
-                        navArgument("filename") { type = NavType.StringType })) { backStackEntry ->
+          // PDF Viewer Screen
+          composable(
+              route = Routes.PdfViewer,
+              arguments =
+                  listOf(
+                      navArgument("pdfUrl") { type = NavType.StringType },
+                      navArgument("filename") { type = NavType.StringType })) { backStackEntry ->
                 val encodedPdfUrl = backStackEntry.arguments?.getString("pdfUrl") ?: ""
                 val encodedFilename =
                     backStackEntry.arguments?.getString("filename") ?: "document.pdf"
@@ -702,7 +702,7 @@ fun AppNav(
                 val pdfUrl = Uri.decode(encodedPdfUrl)
                 val filename = Uri.decode(encodedFilename)
                 PdfViewerScreen(pdfUrl = pdfUrl, filename = filename, navController = nav)
-            }
+              }
         }
-    }
+      }
 }
