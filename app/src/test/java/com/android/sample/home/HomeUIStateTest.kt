@@ -779,6 +779,9 @@ class HomeUIStateMoreTest {
 
     val state3 = HomeUiState(edPostResult = EdPostResult.Cancelled)
     assertTrue(state3.edPostResult is EdPostResult.Cancelled)
+
+    val state4 = HomeUiState(edPostResult = EdPostResult.Failed("Oops"))
+    assertTrue(state4.edPostResult is EdPostResult.Failed)
   }
 
   // ===== ED Post Card Tests =====

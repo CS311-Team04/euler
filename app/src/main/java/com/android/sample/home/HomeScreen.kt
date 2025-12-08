@@ -22,8 +22,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
@@ -37,10 +39,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,6 +62,7 @@ import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.ui.components.EdPostConfirmationModal
 import com.android.sample.ui.components.EdPostedCard
 import com.android.sample.ui.components.GuestProfileWarningModal
+import com.android.sample.ui.theme.EdPostDimensions
 import com.android.sample.ui.theme.EulerRed
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -514,6 +519,7 @@ fun HomeScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     title = edPostAction.draftTitle,
                                     body = edPostAction.draftBody,
+                                    isLoading = ui.isPostingToEd,
                                     onPublish = { title, body ->
                                       viewModel.publishEdPost(title, body)
                                     },
@@ -551,7 +557,78 @@ fun HomeScreen(
             })
       }
 
-  // ED post status banner (published / cancelled)
+  // ED post status banner (published / cancelled / failed)
+  val edPostResult = ui.edPostResult
+  LaunchedEffect(edPostResult) {
+    if (edPostResult != null) {
+      // Auto-dismiss after a short delay
+      delay(4_000)
+      viewModel.clearEdPostResult()
+    }
+  }
+  AnimatedVisibility(
+      visible = edPostResult != null,
+      enter = fadeIn(tween(150)),
+      exit = fadeOut(tween(150)),
+      modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+          val bg: Color
+          val icon: ImageVector
+          val title: String
+          val subtitle: String
+          when (val result = edPostResult) {
+            is EdPostResult.Published -> {
+              bg = MaterialTheme.colorScheme.surfaceVariant
+              icon = Icons.Default.CheckCircle
+              title = stringResource(R.string.ed_post_published_title)
+              subtitle = stringResource(R.string.ed_post_published_subtitle)
+            }
+            is EdPostResult.Cancelled -> {
+              bg = MaterialTheme.colorScheme.surfaceVariant
+              icon = Icons.Default.Close
+              title = stringResource(R.string.ed_post_cancelled_title)
+              subtitle = stringResource(R.string.ed_post_cancelled_subtitle)
+            }
+            is EdPostResult.Failed -> {
+              bg = MaterialTheme.colorScheme.errorContainer
+              icon = Icons.Default.Error
+              title = stringResource(R.string.ed_post_failed_title)
+              subtitle = result.message
+            }
+            else -> {
+              bg = MaterialTheme.colorScheme.surface
+              icon = Icons.Default.Check
+              title = ""
+              subtitle = ""
+            }
+          }
+
+          Surface(
+              tonalElevation = EdPostDimensions.ResultCardElevation,
+              shape = RoundedCornerShape(EdPostDimensions.ResultCardCornerRadius),
+              color = bg,
+              modifier = Modifier.padding(EdPostDimensions.ResultCardPadding)) {
+                Row(
+                    modifier = Modifier.padding(EdPostDimensions.ResultCardPadding),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement =
+                        Arrangement.spacedBy(EdPostDimensions.ResultCardRowSpacing)) {
+                      Icon(icon, contentDescription = null)
+                      Column(modifier = Modifier.weight(1f)) {
+                        Text(text = title, fontWeight = FontWeight.Bold)
+                        if (subtitle.isNotBlank()) {
+                          Text(text = subtitle, style = MaterialTheme.typography.bodyMedium)
+                        }
+                      }
+                      IconButton(onClick = { viewModel.clearEdPostResult() }) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = stringResource(R.string.dismiss))
+                      }
+                    }
+              }
+        }
+      }
 }
 
 /** Compact, rounded action button used in the bottom actions row. */

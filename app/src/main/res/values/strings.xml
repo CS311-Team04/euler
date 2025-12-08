@@ -17,4 +17,13 @@
     <string name="ed_post_body_placeholder">Votre question pour ED…</string>
     <string name="ed_post_cancel_button">Cancel</string>
     <string name="ed_post_post_button">Post</string>
+
+    <string name="ed_post_published_title">Posted to Ed</string>
+    <string name="ed_post_published_subtitle">Your question was published.</string>
+    <string name="ed_post_cancelled_title">Post cancelled</string>
+    <string name="ed_post_cancelled_subtitle">Draft was discarded.</string>
+    <string name="ed_post_failed_title">Failed to post on Ed</string>
+    <string name="ed_post_failed_default">Failed to post to Ed</string>
+    <string name="dismiss">Dismiss</string>
+
 </resources>

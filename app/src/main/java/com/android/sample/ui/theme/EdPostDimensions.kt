@@ -59,4 +59,10 @@ object EdPostDimensions {
   val CardTitleFontSize = 18.sp
   val CardRowHorizontalSpacing = 8.dp
   val CardFooterHorizontalSpacing = 6.dp
+
+  // ========== Result Card Dimensions ==========
+  val ResultCardElevation = 8.dp
+  val ResultCardCornerRadius = 16.dp
+  val ResultCardPadding = 16.dp
+  val ResultCardRowSpacing = 12.dp
 }
