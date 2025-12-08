@@ -75,6 +75,17 @@ const ED_BLOCK_PATTERNS: RegExp[] = [
 ];
 
 /**
+ * Block patterns - questions ABOUT Moodle (not action intents)
+ * These patterns prevent false positives when users ask about Moodle itself
+ */
+const MOODLE_BLOCK_PATTERNS: RegExp[] = [
+  /\b(c['']?est\s+quoi|qu['']?est[- ]ce\s+que?)\b.*\bmoodle\b/i,
+  /\bcomment\s+(marche|fonctionne|utiliser?)\b.*\bmoodle\b/i,
+  /\b(où|ou)\s+(trouver?|est)\b.*\bmoodle\b/i,
+  /\bexplique[rz]?\b.*\bmoodle\b/i,
+];
+
+/**
  * Registry of all ED intents
  * ADD NEW FUNCTIONS HERE
  */
@@ -97,6 +108,37 @@ export const ED_INTENT_CONFIGS: IntentConfig[] = [
 
 ];
 
+/**
+ * Registry of all Moodle intents
+ *
+ * First layer: General Moodle fetch detection - catches "fetch me the...", "get me the...", etc.
+ * This determines if the request is for Moodle (vs RAG/schedule/ED) early on.
+ */
+export const MOODLE_INTENT_CONFIGS: IntentConfig[] = [
+  // ===== GENERAL MOODLE FETCH INTENT =====
+  // This is the first layer detection - catches any "fetch me the..." type request
+  // The specific file type (lecture/homework/solution) is determined in the second layer
+  {
+    id: "fetch_file",
+    matchPatterns: [
+      // English patterns
+      /\b(fetch|get|show|display|download|retrieve|bring)\s+(me\s+)?(the\s+)?/i,
+      /\b(i\s+)?(want|need|would\s+like)\s+(to\s+)?(fetch|get|see|view|download|retrieve)\s+(the\s+)?/i,
+      // French patterns - "donne" (give), "récupère" (fetch), etc.
+      /\b(donne|donner?|récupérer?|obtenir?|télécharger?|charger?|voir|afficher?|montrer?|ouvrir?|chercher?|trouver?)\s+(moi\s+)?(le\s+|la\s+|les\s+)?/i,
+      /\b(je\s+)?(veux|voudrais|souhaite|ai\s+besoin)\s+(de\s+)?(récupérer?|obtenir?|voir|afficher?|télécharger?|donner?)\s+(le\s+|la\s+|les\s+)?/i,
+      // Patterns that include file type keywords (lecture, homework, etc.)
+      /\b(lecture|leçon|lesson|devoir|homework|home\s*work|travail|solution|correction|corrigé|cours)\s+(\d+|[a-z])/i,
+      // Patterns with "cours" (course) and "semaine" (week) - common French patterns
+      /\b(cours|leçon|lecture|devoir|homework)\s+(semaine|week)\s+\d+/i,
+      /\b(semaine|week)\s+\d+\s+(de|du|of)\s+/i,
+      // Pattern for "sur moodle" (on moodle) - explicit Moodle request
+      /\b(sur|on|from)\s+moodle/i,
+    ],
+    blockPatterns: MOODLE_BLOCK_PATTERNS,
+  },
+];
+
 // MAIN FUNCTION TO USE
 
 /**
@@ -107,4 +149,14 @@ export const ED_INTENT_CONFIGS: IntentConfig[] = [
  */
 export function detectEdIntent(question: string): IntentDetectionResult {
   return detectIntent(question, ED_INTENT_CONFIGS);
+}
+
+/**
+ * Detects a Moodle intent in the user's message
+ *
+ * @param question - The user's message
+ * @returns Detection result with the detected intent
+ */
+export function detectMoodleIntent(question: string): IntentDetectionResult {
+  return detectIntent(question, MOODLE_INTENT_CONFIGS);
 }
