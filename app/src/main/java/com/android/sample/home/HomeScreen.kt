@@ -463,18 +463,33 @@ fun HomeScreen(
                                   val audioState =
                                       audioController.audioStateFor(msg, ui.streamingMessageId)
 
-                                  // If this message carries a source, draw the card first
+                                  // First render the chat bubble (for USER/AI text)
+                                  ChatMessage(
+                                      message = msg,
+                                      modifier = Modifier.fillMaxWidth(),
+                                      isStreaming = showLeadingDot,
+                                      audioState = audioState,
+                                      aiText = textPrimary)
+
+                                  // Then show the source card AFTER the answer (if any)
                                   if (msg.source != null && !msg.isThinking) {
+                                    Spacer(Modifier.height(8.dp))
                                     val context = androidx.compose.ui.platform.LocalContext.current
+                                    val sourceSiteLabel =
+                                        msg.source.siteLabelRes?.let { stringResource(id = it) }
+                                            ?: msg.source.siteLabel.orEmpty()
+                                    val sourceTitle =
+                                        msg.source.titleRes?.let { stringResource(id = it) }
+                                            ?: msg.source.title.orEmpty()
                                     SourceCard(
-                                        siteLabel = msg.source.siteLabel,
-                                        title = msg.source.title,
+                                        siteLabel = sourceSiteLabel,
+                                        title = sourceTitle,
                                         url = msg.source.url,
                                         retrievedAt = msg.source.retrievedAt,
-                                        isScheduleSource = msg.source.isScheduleSource,
+                                        compactType = msg.source.compactType,
                                         onVisit =
                                             if (msg.source.url != null &&
-                                                !msg.source.isScheduleSource) {
+                                                msg.source.compactType == CompactSourceType.NONE) {
                                               {
                                                 val intent =
                                                     Intent(
@@ -483,16 +498,7 @@ fun HomeScreen(
                                                 context.startActivity(intent)
                                               }
                                             } else null)
-                                    Spacer(Modifier.height(8.dp))
                                   }
-
-                                  // Then render the usual chat bubble (for USER/AI text)
-                                  ChatMessage(
-                                      message = msg,
-                                      modifier = Modifier.fillMaxWidth(),
-                                      isStreaming = showLeadingDot,
-                                      audioState = audioState,
-                                      aiText = textPrimary)
                                 }
                                 is TimelineItem.CardItem -> {
                                   EdPostedCard(item.card, modifier = Modifier.fillMaxWidth())
@@ -1079,13 +1085,19 @@ private fun SourceCard(
     title: String,
     url: String?,
     retrievedAt: Long,
-    isScheduleSource: Boolean = false,
+    compactType: CompactSourceType = CompactSourceType.NONE,
     onVisit: (() -> Unit)? = null
 ) {
   val colorScheme = MaterialTheme.colorScheme
 
-  if (isScheduleSource) {
-    // Compact schedule indicator - just a small inline badge
+  if (compactType != CompactSourceType.NONE) {
+    // Compact indicator - small inline badge with emoji based on type
+    val emoji =
+        when (compactType) {
+          CompactSourceType.SCHEDULE -> "📅"
+          CompactSourceType.FOOD -> "🍴"
+          else -> ""
+        }
     Row(
         modifier =
             Modifier.clip(RoundedCornerShape(8.dp))
@@ -1099,7 +1111,7 @@ private fun SourceCard(
               modifier = Modifier.size(12.dp))
           Spacer(Modifier.width(6.dp))
           Text(
-              text = "📅 $siteLabel",
+              text = "$emoji $siteLabel",
               color = colorScheme.onSurfaceVariant,
               style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp))
         }
