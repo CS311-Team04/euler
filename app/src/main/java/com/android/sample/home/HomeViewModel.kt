@@ -860,7 +860,13 @@ class HomeViewModel(
 
         isInLocalNewChat = false
         // Persister immédiatement le message USER côté repo
-        repo.appendMessage(cid, "user", msg)
+        try {
+          repo.appendMessage(cid, "user", msg)
+        } catch (e: Exception) {
+          Log.e(TAG, "Failed to persist user message: ${e.message}", e)
+          handleSendMessageError(e, aiMessageId)
+          return@launch
+        }
 
         // ---------- Firestore + RAG (from second snippet) ----------
 
@@ -1047,6 +1053,8 @@ class HomeViewModel(
                 repo.appendMessage(conversationId, "assistant", reply.reply)
               } catch (e: Exception) {
                 Log.w(TAG, "Failed to persist assistant message: ${e.message}")
+                handleSendMessageError(e, messageId)
+                return@launch
               }
             }
           } catch (ce: CancellationException) {
