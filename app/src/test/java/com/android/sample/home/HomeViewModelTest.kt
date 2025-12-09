@@ -2057,8 +2057,10 @@ class HomeViewModelTest {
     assertNotNull("pendingAction should be set", state.pendingAction)
     assertTrue("pendingAction should be PostOnEd", state.pendingAction is PendingAction.PostOnEd)
     val postOnEd = state.pendingAction as PendingAction.PostOnEd
+    // When formatted fields are missing, fallback to empty title and original question
+    // Note: question is trimmed in sendMessage(), so we compare with trimmed version
     assertEquals("", postOnEd.draftTitle) // Falls back to empty string
-    assertEquals(question, postOnEd.draftBody) // Falls back to original question
+    assertEquals(question.trim(), postOnEd.draftBody) // Falls back to original question (trimmed)
   }
 
   // ==================== Profile Context Tests ====================
