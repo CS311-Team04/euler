@@ -39,21 +39,22 @@ fun PdfViewerScreen(pdfUrl: String, filename: String, navController: NavControll
                     containerColor = MaterialTheme.colorScheme.surface))
       }) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-          // WebView for PDF display using Google Docs viewer
           AndroidView(
               factory = { context ->
                 android.webkit.WebView(context).apply {
+                  // JavaScript required for Google Docs viewer
+                  @Suppress("SetJavaScriptEnabled")
                   settings.javaScriptEnabled = true
                   settings.loadWithOverviewMode = true
                   settings.useWideViewPort = true
                   settings.builtInZoomControls = true
                   settings.displayZoomControls = false
                   settings.domStorageEnabled = true
-                  settings.allowFileAccess = true
-                  settings.allowContentAccess = true
+                  // File access not needed for remote URLs via Google Docs viewer
+                  // Removed allowFileAccess and allowContentAccess for security
 
-                  // Use Google Docs viewer for better PDF rendering
-                  val encodedUrl = android.net.Uri.encode(pdfUrl, "")
+                  // Use Google Docs viewer - encode only special chars needed for URL parameter
+                  val encodedUrl = pdfUrl.replace("&", "%26").replace("#", "%23")
                   val viewerUrl = "https://docs.google.com/viewer?url=$encodedUrl&embedded=true"
                   loadUrl(viewerUrl)
                 }
