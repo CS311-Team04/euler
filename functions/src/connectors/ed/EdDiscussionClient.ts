@@ -257,6 +257,7 @@ export class EdDiscussionClient {
       ),
     };
   }
+  /**
   * Creates a new thread in a course.
    *
    * Mirrors the Python edapi `post_thread` call:

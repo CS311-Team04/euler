@@ -18,7 +18,7 @@ import {
 async function main() {
   // ⚠️ Mets ton vrai token ED ici pour le test.
   // N'OUBLIE PAS de l'enlever avant de commit.
-  const token = "azB3eR.5mOAIYhFjN46SFerhY2Rx8T7IdKSfjPRQh7dwfJu";
+  const token = "met ton token ed ici";
   const baseUrl = "https://eu.edstem.org/api";
 
   const client = new EdDiscussionClient(baseUrl, token);
@@ -37,7 +37,7 @@ async function main() {
   // ⚠️ Important : prends un cours avec un code du style COM-202, COM-300, CS-202, etc.
   // (le parser actuel cherche ce pattern: [A-Z]{2,4}-[0-9]{2,3})
   const sampleQueries = [
-    "Show posts about module 2 exo 4 in COM-300",
+    "check on the CompSec ED what people say about the 3th assignment",
   ];
 
   for (const q of sampleQueries) {
