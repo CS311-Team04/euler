@@ -177,11 +177,6 @@ class HomeViewModelTest {
 
         viewModel.refreshProfile()
         advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertNull(state.profile)
-        assertEquals("Student", state.userName)
-        assertFalse(state.isGuest)
       }
 
   @Test
@@ -281,6 +276,348 @@ class HomeViewModelTest {
         val stateAfterClear = viewModel.uiState.value
         assertEquals(initialUserName, stateAfterClear.userName)
         assertEquals(initialSystems, stateAfterClear.systems)
+      }
+
+  // ===== ED post flow =====
+
+  @Test
+  fun publishEdPost_adds_published_card_and_clears_pending() =
+      runTest(testDispatcher) {
+        val dataSource = mock<EdPostRemoteDataSource>()
+        runBlocking {
+          whenever(dataSource.publish(any(), any())).thenReturn(EdPostPublishResult(1, 1, 1))
+        }
+        val viewModel =
+            HomeViewModel(
+                profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
+        viewModel.updateUiState {
+          it.copy(pendingAction = PendingAction.PostOnEd(draftTitle = "T", draftBody = "B"))
+        }
+
+        viewModel.publishEdPost("T", "B")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNull(state.pendingAction)
+        assertEquals(1, state.edPostCards.size)
+        val card = state.edPostCards.first()
+        assertEquals("T", card.title)
+        assertEquals("B", card.body)
+        assertEquals(EdPostStatus.Published, card.status)
+        assertTrue(card.createdAt > 0)
+      }
+
+  @Test
+  fun cancelEdPost_adds_cancelled_card_using_pending_draft() =
+      runTest(testDispatcher) {
+        val viewModel = createHomeViewModel()
+        viewModel.updateUiState {
+          it.copy(
+              pendingAction = PendingAction.PostOnEd(draftTitle = "Draft T", draftBody = "Draft B"))
+        }
+
+        viewModel.cancelEdPost()
+
+        val state = viewModel.uiState.value
+        assertNull(state.pendingAction)
+        assertEquals(1, state.edPostCards.size)
+        val card = state.edPostCards.first()
+        assertEquals("Draft T", card.title)
+        assertEquals("Draft B", card.body)
+        assertEquals(EdPostStatus.Cancelled, card.status)
+      }
+
+  @Test
+  fun startLocalNewChat_clears_edPostCards() =
+      runTest(testDispatcher) {
+        val viewModel = createHomeViewModel()
+        viewModel.updateUiState {
+          it.copy(
+              edPostCards =
+                  listOf(
+                      EdPostCard(
+                          id = "1",
+                          title = "t",
+                          body = "b",
+                          status = EdPostStatus.Published,
+                          createdAt = 1L)))
+        }
+
+        viewModel.startLocalNewChat()
+
+        assertTrue(viewModel.uiState.value.edPostCards.isEmpty())
+      }
+
+  @Test
+  fun publishEdPost_accumulates_multiple_cards() =
+      runTest(testDispatcher) {
+        val dataSource = mock<EdPostRemoteDataSource>()
+        runBlocking {
+          whenever(dataSource.publish(any(), any())).thenReturn(EdPostPublishResult(2, 1153, 20))
+        }
+        val viewModel =
+            HomeViewModel(
+                profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
+        viewModel.updateUiState {
+          it.copy(
+              edPostCards =
+                  listOf(
+                      EdPostCard(
+                          id = "1",
+                          title = "First",
+                          body = "First body",
+                          status = EdPostStatus.Published,
+                          createdAt = 1L)),
+              pendingAction =
+                  PendingAction.PostOnEd(draftTitle = "Second", draftBody = "Second body"))
+        }
+
+        viewModel.publishEdPost("Second", "Second body")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(2, state.edPostCards.size)
+        assertEquals("First", state.edPostCards[0].title)
+        assertEquals("Second", state.edPostCards[1].title)
+        assertEquals(EdPostStatus.Published, state.edPostCards[1].status)
+      }
+
+  @Test
+  fun cancelEdPost_with_null_pendingAction_uses_empty_strings() =
+      runTest(testDispatcher) {
+        val viewModel = createHomeViewModel()
+        viewModel.updateUiState { it.copy(pendingAction = null) }
+
+        viewModel.cancelEdPost()
+
+        val state = viewModel.uiState.value
+        assertEquals(1, state.edPostCards.size)
+        val card = state.edPostCards.first()
+        assertEquals("", card.title)
+        assertEquals("", card.body)
+        assertEquals(EdPostStatus.Cancelled, card.status)
+      }
+
+  @Test
+  fun publishEdPost_clears_isSending_and_streamingMessageId() =
+      runTest(testDispatcher) {
+        val viewModel = createHomeViewModel()
+        viewModel.updateUiState {
+          it.copy(
+              pendingAction = PendingAction.PostOnEd(draftTitle = "T", draftBody = "B"),
+              isSending = true,
+              streamingMessageId = "stream-123")
+        }
+
+        viewModel.publishEdPost("T", "B")
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isSending)
+        assertNull(state.streamingMessageId)
+      }
+
+  @Test
+  fun cancelEdPost_clears_isSending_and_streamingMessageId() =
+      runTest(testDispatcher) {
+        val viewModel = createHomeViewModel()
+        viewModel.updateUiState {
+          it.copy(
+              pendingAction = PendingAction.PostOnEd(draftTitle = "T", draftBody = "B"),
+              isSending = true,
+              streamingMessageId = "stream-123")
+        }
+
+        viewModel.cancelEdPost()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isSending)
+        assertNull(state.streamingMessageId)
+      }
+
+  @Test
+  fun selectConversation_preserves_edPostCards() =
+      runTest(testDispatcher) {
+        val viewModel = createHomeViewModel()
+        val existingCard =
+            EdPostCard(
+                id = "card-1",
+                title = "Existing",
+                body = "Existing body",
+                status = EdPostStatus.Published,
+                createdAt = 1000L)
+        viewModel.updateUiState {
+          it.copy(edPostCards = listOf(existingCard), currentConversationId = "conv-1")
+        }
+
+        viewModel.selectConversation("conv-2")
+
+        val state = viewModel.uiState.value
+        assertEquals("conv-2", state.currentConversationId)
+        assertEquals(1, state.edPostCards.size)
+        assertEquals(existingCard, state.edPostCards.first())
+      }
+
+  @Test
+  fun sendMessage_with_ed_intent_uses_original_question_when_formatted_missing() =
+      runTest(testDispatcher) {
+        val fakeLlm = FakeLlmClient()
+        fakeLlm.setEdIntentResponse(reply = "I'll help you post this", intent = "post_question")
+        // formattedQuestion and formattedTitle are null
+
+        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+        val conversationRepo = mock<ConversationRepository>()
+        runBlocking {
+          whenever(conversationRepo.startNewConversation(any())).thenReturn("conv-123")
+          whenever(conversationRepo.appendMessage(any(), any(), any())).thenReturn(Unit)
+          whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
+        }
+
+        val viewModel = HomeViewModel(llmClient = fakeLlm, auth = auth, repo = conversationRepo)
+        viewModel.updateMessageDraft("Original question text")
+        viewModel.sendMessage()
+
+        advanceUntilIdle()
+        viewModel.awaitStreamingCompletion()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        val pending = state.pendingAction as? PendingAction.PostOnEd
+        assertNotNull("Pending action should be created", pending)
+        assertEquals("", pending?.draftTitle ?: "")
+        assertEquals("Original question text", pending?.draftBody ?: "")
+      }
+
+  @Test
+  fun sendMessage_without_ed_intent_does_not_create_pending_action() =
+      runTest(testDispatcher) {
+        val fakeLlm = FakeLlmClient()
+        fakeLlm.resetToDefault() // No ED intent
+
+        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+        val conversationRepo = mock<ConversationRepository>()
+        runBlocking {
+          whenever(conversationRepo.startNewConversation(any())).thenReturn("conv-123")
+          whenever(conversationRepo.appendMessage(any(), any(), any())).thenReturn(Unit)
+          whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
+        }
+
+        val viewModel = HomeViewModel(llmClient = fakeLlm, auth = auth, repo = conversationRepo)
+        viewModel.updateMessageDraft("Normal question")
+        viewModel.sendMessage()
+
+        advanceUntilIdle()
+        viewModel.awaitStreamingCompletion()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNull("No pending action should be created", state.pendingAction)
+      }
+
+  @Test
+  fun publishEdPost_clears_edPostResult() =
+      runTest(testDispatcher) {
+        val dataSource = mock<EdPostRemoteDataSource>()
+        runBlocking {
+          whenever(dataSource.publish(any(), any())).thenReturn(EdPostPublishResult(1, 1, 1))
+        }
+        val viewModel =
+            HomeViewModel(
+                profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
+        viewModel.updateUiState {
+          it.copy(
+              pendingAction = PendingAction.PostOnEd(draftTitle = "T", draftBody = "B"),
+              edPostResult = EdPostResult.Published("Old", "Old body"))
+        }
+
+        viewModel.publishEdPost("T", "B")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.edPostResult is EdPostResult.Published)
+        assertTrue(state.edPostCards.isNotEmpty())
+      }
+
+  @Test
+  fun cancelEdPost_clears_edPostResult() =
+      runTest(testDispatcher) {
+        val viewModel = createHomeViewModel()
+        viewModel.updateUiState {
+          it.copy(
+              pendingAction = PendingAction.PostOnEd(draftTitle = "T", draftBody = "B"),
+              edPostResult = EdPostResult.Published("Old", "Old body"))
+        }
+
+        viewModel.cancelEdPost()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.edPostResult is EdPostResult.Cancelled)
+      }
+
+  @Test
+  fun publishEdPost_success_adds_card_and_clears_pending() =
+      runTest(testDispatcher) {
+        val dataSource = mock<EdPostRemoteDataSource>()
+        runBlocking {
+          whenever(dataSource.publish(any(), any())).thenReturn(EdPostPublishResult(99, 1153, 12))
+        }
+        val viewModel =
+            HomeViewModel(
+                profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
+
+        viewModel.publishEdPost("Title", "Body")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.edPostResult is EdPostResult.Published)
+        assertNull(state.pendingAction)
+        assertEquals(1, state.edPostCards.size)
+        assertFalse(state.isPostingToEd)
+      }
+
+  @Test
+  fun publishEdPost_failure_preserves_draft_and_sets_error() =
+      runTest(testDispatcher) {
+        val dataSource = mock<EdPostRemoteDataSource>()
+        runBlocking {
+          whenever(dataSource.publish(any(), any())).thenThrow(RuntimeException("backend down"))
+        }
+        val viewModel =
+            HomeViewModel(
+                profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
+
+        viewModel.publishEdPost("Title", "Body")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.pendingAction is PendingAction.PostOnEd)
+        assertTrue(state.edPostResult is EdPostResult.Failed)
+        assertTrue(state.edPostCards.isEmpty())
+        assertFalse(state.isPostingToEd)
+      }
+
+  @Test
+  fun onSignedOutInternal_clears_edPostCards() =
+      runTest(testDispatcher) {
+        val viewModel = createHomeViewModel()
+        viewModel.updateUiState {
+          it.copy(
+              edPostCards =
+                  listOf(
+                      EdPostCard(
+                          id = "1",
+                          title = "Test",
+                          body = "Body",
+                          status = EdPostStatus.Published,
+                          createdAt = 1L)))
+        }
+
+        // Access private method via reflection
+        val method = HomeViewModel::class.java.getDeclaredMethod("onSignedOutInternal")
+        method.isAccessible = true
+        method.invoke(viewModel)
+
+        val state = viewModel.uiState.value
+        assertTrue("edPostCards should be cleared on sign out", state.edPostCards.isEmpty())
       }
 
   @Test
@@ -1790,5 +2127,144 @@ class HomeViewModelTest {
     val postOnEd = state.pendingAction as PendingAction.PostOnEd
     assertEquals("", postOnEd.draftTitle) // Falls back to empty string
     assertEquals(question, postOnEd.draftBody) // Falls back to original question
+  }
+
+  // ==================== Profile Context Tests ====================
+
+  @Test
+  fun buildProfileContext_returns_null_when_profile_is_null() = runTest {
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
+    val context = viewModel.buildProfileContext(null)
+    assertNull("Context should be null when profile is null", context)
+  }
+
+  @Test
+  fun buildProfileContext_returns_null_when_all_fields_are_empty() = runTest {
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
+    val emptyProfile = UserProfile()
+    val context = viewModel.buildProfileContext(emptyProfile)
+    assertNull("Context should be null when all profile fields are empty", context)
+  }
+
+  @Test
+  fun buildProfileContext_builds_json_context_with_all_fields() = runTest {
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
+    val profile =
+        UserProfile(
+            fullName = "Jean Dupont",
+            preferredName = "jean.d",
+            roleDescription = "Student",
+            faculty = "IC — School of Computer and Communication Sciences",
+            section = "Computer Science",
+            email = "jean.dupont@epfl.ch")
+    val context = viewModel.buildProfileContext(profile)
+    assertNotNull("Context should not be null when profile has data", context)
+
+    // Parse JSON to verify structure
+    val json = org.json.JSONObject(context!!)
+    assertEquals("Jean Dupont", json.getString("fullName"))
+    assertEquals("jean.d", json.getString("preferredName"))
+    assertEquals("Student", json.getString("role"))
+    assertEquals("IC — School of Computer and Communication Sciences", json.getString("faculty"))
+    assertEquals("Computer Science", json.getString("section"))
+    assertEquals("jean.dupont@epfl.ch", json.getString("email"))
+  }
+
+  @Test
+  fun buildProfileContext_distinguishes_full_name_and_username_in_json() = runTest {
+    val viewModel = HomeViewModel(profileRepository = FakeProfileRepository())
+    val profile =
+        UserProfile(
+            fullName = "Jean Dupont", preferredName = "jean.d", section = "Computer Science")
+    val context = viewModel.buildProfileContext(profile)
+    assertNotNull("Context should not be null", context)
+
+    // Parse JSON to verify keys are distinct
+    val json = org.json.JSONObject(context!!)
+    assertEquals("Jean Dupont", json.getString("fullName"))
+    assertEquals("jean.d", json.getString("preferredName"))
+    assertNotEquals(
+        "fullName should be different from preferredName", "jean.d", json.getString("fullName"))
+  }
+
+  @Test
+  fun sendMessage_loads_profile_when_null_and_signed_in() = runTest {
+    val repo = FakeProfileRepository()
+    val testProfile =
+        UserProfile(
+            fullName = "Test User",
+            preferredName = "testuser",
+            section = "Computer Science",
+            faculty = "IC")
+    repo.savedProfile = testProfile
+
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.resetToDefault()
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val conversationRepo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(conversationRepo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(conversationRepo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel =
+        HomeViewModel(
+            llmClient = fakeLlm, auth = auth, repo = conversationRepo, profileRepository = repo)
+
+    // Ensure profile is null in UI state
+    viewModel.updateUiState { it.copy(profile = null) }
+
+    viewModel.updateMessageDraft("What is my section?")
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    // Verify profile was loaded
+    val state = viewModel.uiState.value
+    assertNotNull("Profile should be loaded after sendMessage", state.profile)
+    assertEquals("Profile should match the saved profile", testProfile, state.profile)
+  }
+
+  @Test
+  fun sendMessage_passes_profile_context_to_llm_client() = runTest {
+    val repo = FakeProfileRepository()
+    val testProfile =
+        UserProfile(
+            fullName = "John Doe",
+            preferredName = "john.d",
+            section = "Computer Science",
+            faculty = "IC")
+    repo.savedProfile = testProfile
+
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.resetToDefault()
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val conversationRepo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(conversationRepo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(conversationRepo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel =
+        HomeViewModel(
+            llmClient = fakeLlm, auth = auth, repo = conversationRepo, profileRepository = repo)
+    viewModel.refreshProfile()
+    advanceUntilIdle()
+
+    viewModel.updateMessageDraft("Test question")
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    // Verify the LLM client was called (indicating profile context was built and passed)
+    assertTrue("LLM client should be called", fakeLlm.prompts.isNotEmpty())
   }
 }

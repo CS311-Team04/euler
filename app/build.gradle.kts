@@ -286,6 +286,9 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.gson)
 
+    // Coil for image loading (Moodle logo, etc.)
+    implementation(libs.coil.compose)
+
     // DataStore for preferences
     implementation(libs.datastore.core)
     implementation(libs.datastore.preferences)

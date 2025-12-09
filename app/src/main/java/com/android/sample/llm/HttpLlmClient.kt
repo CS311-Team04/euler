@@ -35,13 +35,30 @@ class HttpLlmClient(
 
   /** Performs a blocking HTTP call on [Dispatchers.IO] and returns the non-empty `reply` field. */
   override suspend fun generateReply(prompt: String): BotReply =
+      generateReply(prompt = prompt, summary = null, transcript = null, profileContext = null)
+
+  /**
+   * Advanced API with context support. Includes summary, transcript, and profile context in the
+   * HTTP payload.
+   */
+  override suspend fun generateReply(
+      prompt: String,
+      summary: String?,
+      transcript: String?,
+      profileContext: String?
+  ): BotReply =
       withContext(Dispatchers.IO) {
         if (endpoint.isBlank()) {
           throw IllegalStateException("LLM HTTP endpoint not configured")
         }
         validateEndpoint(endpoint)
 
-        val payloadString = gson.toJson(mapOf(JSON_KEY_QUESTION to prompt))
+        val payloadMap = mutableMapOf<String, Any?>(JSON_KEY_QUESTION to prompt)
+        summary?.let { payloadMap[JSON_KEY_SUMMARY] = it }
+        transcript?.let { payloadMap[JSON_KEY_TRANSCRIPT] = it }
+        profileContext?.let { payloadMap[JSON_KEY_PROFILE_CONTEXT] = it }
+
+        val payloadString = gson.toJson(payloadMap)
         val payload = payloadString.toRequestBody(jsonMediaType)
 
         val builder =
@@ -172,6 +189,9 @@ private const val HEADER_AUTHORIZATION = "Authorization"
 private const val AUTH_SCHEME_BEARER = "Bearer"
 private const val CONTENT_TYPE_JSON = "application/json; charset=utf-8"
 private const val JSON_KEY_QUESTION = "question"
+private const val JSON_KEY_SUMMARY = "summary"
+private const val JSON_KEY_TRANSCRIPT = "recentTranscript"
+private const val JSON_KEY_PROFILE_CONTEXT = "profileContext"
 private const val JSON_KEY_REPLY = "reply"
 private const val JSON_KEY_PRIMARY_URL = "primary_url"
 private const val JSON_KEY_SOURCE_TYPE = "source_type"

@@ -20,11 +20,40 @@ export class EdConnectorService {
     private readonly repo: EdConnectorRepository,
     private readonly encrypt: (plain: string) => string,
     private readonly decrypt: (cipher: string) => string,
-    private readonly defaultBaseUrl: string = "https://eu.edstem.org/api"
+    private readonly defaultBaseUrl: string = "https://eu.edstem.org/api",
+    private readonly defaultCourseId: number = 1153
   ) {}
 
   private resolveBaseUrl(baseUrl?: string): string {
     return baseUrl?.trim() || this.defaultBaseUrl;
+  }
+
+  private escapeXml(text: string): string {
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
+  }
+
+  private buildContentXml(body: string): string {
+    const trimmed = body.trim();
+    if (!trimmed) {
+      return '<document version="2.0"></document>';
+    }
+    // Split into paragraphs on blank lines, keep line breaks as <br/> within a paragraph.
+    const paragraphs = trimmed
+      .split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .map((p) => {
+        const withBreaks = this.escapeXml(p).replace(/\n+/g, "<br/>");
+        return `<paragraph>${withBreaks}</paragraph>`;
+      })
+      .join("");
+
+    return `<document version="2.0">${paragraphs}</document>`;
   }
 
   /**
@@ -114,5 +143,40 @@ export class EdConnectorService {
 
     await this.repo.saveConfig(userId, updated);
     return updated;
+  }
+
+  /**
+   * Creates a thread on ED using the stored connector credentials.
+   */
+  async postThread(
+    userId: string,
+    params: { title: string; body: string; courseId?: number }
+  ): Promise<{
+    threadId?: number;
+    courseId?: number;
+    threadNumber?: number;
+    title?: string;
+  }> {
+    const existing = await this.repo.getConfig(userId);
+    if (!existing || !existing.apiKeyEncrypted) {
+      throw new Error("ED connector is not connected");
+    }
+
+    const apiToken = this.decrypt(existing.apiKeyEncrypted);
+    const baseUrl = this.resolveBaseUrl(existing.baseUrl);
+    const courseId = params.courseId ?? this.defaultCourseId;
+    const client = new EdDiscussionClient(baseUrl, apiToken);
+
+    const thread = await client.postThread(courseId, {
+      title: params.title,
+      content: this.buildContentXml(params.body),
+    });
+
+    return {
+      threadId: thread.id,
+      courseId: thread.course_id,
+      threadNumber: thread.number,
+      title: thread.title,
+    };
   }
 }

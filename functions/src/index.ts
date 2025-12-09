@@ -9,7 +9,13 @@ import OpenAI from "openai";
 import { randomUUID } from "node:crypto";
 import * as functions from "firebase-functions/v1";
 import admin from "firebase-admin";
+import { EdConnectorRepository } from "./connectors/ed/EdConnectorRepository";
+import { EdConnectorService } from "./connectors/ed/EdConnectorService";
+import { encryptSecret, decryptSecret } from "./security/secretCrypto";
 import { detectPostToEdIntentCore, buildEdIntentPromptForApertus } from "./edIntent";
+import { parseEdPostResponse } from "./edIntentParser";
+import { detectMoodleFileFetchIntentCore, extractFileInfo } from "./moodleIntent";
+import { MoodleClient } from "./connectors/moodle/MoodleClient";
 import { 
   scrapeWeeklyMenu, 
   formatMenuForContext,
@@ -70,6 +76,20 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
+const ED_DEFAULT_COURSE_ID = Number(
+  process.env.ED_DEFAULT_COURSE_ID || "1153"
+);
+
+// ED Discussion connector (stored in Firestore under connectors_ed/{userId})
+const edConnectorRepository = new EdConnectorRepository(db);
+const edConnectorService = new EdConnectorService(
+  edConnectorRepository,
+  encryptSecret,
+  decryptSecret,
+  "https://eu.edstem.org/api",
+  ED_DEFAULT_COURSE_ID
+);
+
 // Embeddings = Jina
 const EMBED_URL = withV1(process.env.EMBED_BASE_URL) + "/embeddings";
 const EMBED_KEY = process.env.EMBED_API_KEY!;
@@ -92,7 +112,7 @@ export async function apertusChatFnCore({
   messages, model, temperature, client,
 }: {
   messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
-  model?: string; 
+  model?: string;
   temperature?: number;
   client?: OpenAI;
 }) {
@@ -380,6 +400,7 @@ type AnswerWithRagInput = {
   model?: string;
   summary?: string;
   recentTranscript?: string;
+  profileContext?: string;
   uid?: string; // Optional: for schedule context
 };
 
@@ -390,13 +411,13 @@ const SCHEDULE_PATTERNS = /\b(horaire|schedule|timetable|cours|class|lecture|pla
 const FOOD_PATTERNS = /\b(manger|menu|plat|repas|resto|restaurant|nourriture|déjeuner|dîner|lunch|food|meal|cantine|cafétéria|végétarien|végé|veggie|vegan|prix|cheapest|moins cher|alpine|arcadie|esplanade|espla|native|ornithorynque|orni|piano|qu'est-ce qu'on mange|il y a quoi)\b/i;
 
 export async function answerWithRagCore({
-  question, topK, model, summary, recentTranscript, uid, client,
+  question, topK, model, summary, recentTranscript, profileContext, uid, client,
 }: AnswerWithRagInput & { client?: OpenAI }) {
   const q = question.trim();
-  
+
   // Check if this is a food-related question FIRST (before schedule/RAG)
   const isFoodQuestion = FOOD_PATTERNS.test(q);
-  
+
   if (isFoodQuestion) {
     try {
       logger.info("answerWithRagCore.foodQuestion", { questionLen: q.length });
@@ -413,19 +434,19 @@ export async function answerWithRagCore({
       // Fall through to regular RAG if food query fails
     }
   }
-  
+
   // Check if this is a schedule-related question and fetch schedule context
   let scheduleContext = "";
   const isScheduleQuestion = SCHEDULE_PATTERNS.test(q);
-  
+
   if (isScheduleQuestion && uid) {
     try {
       scheduleContext = await getScheduleContextCore(uid);
       if (scheduleContext) {
-        logger.info("answerWithRagCore.scheduleContext", { 
-          uid, 
-          hasSchedule: true, 
-          contextLen: scheduleContext.length 
+        logger.info("answerWithRagCore.scheduleContext", {
+          uid,
+          hasSchedule: true,
+          contextLen: scheduleContext.length
         });
       }
     } catch (e) {
@@ -505,8 +526,11 @@ export async function answerWithRagCore({
     trimmedSummaryLen: trimmedSummary.length,
     hasTranscript: Boolean(trimmedTranscript),
     transcriptLen: trimmedTranscript.length,
+    hasProfileContext: Boolean(profileContext),
+    profileContextLen: profileContext ? profileContext.length : 0,
     titles: chosen.map(c => c.title).filter(Boolean).slice(0, 5),
     summaryHead: trimmedSummary.slice(0, 120),
+    profileContextHead: profileContext ? profileContext.slice(0, 120) : null,
   });
 
   // OPTIMIZED: Concise system content - all context in one place
@@ -523,6 +547,13 @@ export async function answerWithRagCore({
   }
   
   const systemContent = systemParts.join("\n\n");
+
+  // Log system content to verify profile context is included (structured logging only)
+  logger.info("answerWithRagCore.systemContent", {
+    systemContentLen: systemContent.length,
+    containsPriorityContext: systemContent.includes("PRIORITY USER CONTEXT"),
+    containsProfileData: profileContext ? systemContent.includes(profileContext.slice(0, 50)) : false,
+  });
 
   const activeClient = client ?? getChatClient();
   const chat = await activeClient.chat.completions.create({
@@ -541,7 +572,7 @@ export async function answerWithRagCore({
   // Determine source type: schedule takes priority over RAG for schedule questions
   const usedSchedule = isScheduleQuestion && scheduleContext.length > 0;
   const usedRag = chosen.length > 0 && !usedSchedule;
-  
+
   // source_type: "schedule" | "rag" | "none"
   let source_type: "schedule" | "rag" | "none" = "none";
   if (usedSchedule) {
@@ -724,7 +755,7 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
       typeof (data as any)?.recentTranscript === "string" ? (data as any).recentTranscript : undefined;
     // Get uid from auth context for schedule integration
     const uid = context.auth?.uid;
-    
+
     if (!question) throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
 
     // === ED Intent Detection (fast, regex-based) ===
@@ -734,12 +765,13 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
         intent: edIntentResult.ed_intent,
         questionLen: question.length,
       });
-      
-      // Hybrid approach: REGEX detects, Apertus responds naturally
-      const { reply } = await apertusChatFnCore({
+      // Hybrid approach: REGEX detects, Apertus responds naturally and formats the question
+      const { reply: rawReply } = await apertusChatFnCore({
         messages: [{ role: "user", content: buildEdIntentPromptForApertus(question) }],
         temperature: 0.3,
       });
+
+      const { reply, formattedQuestion, formattedTitle } = parseEdPostResponse(rawReply);
 
       return {
         reply,
@@ -748,9 +780,337 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
         sources: [],
         ed_intent_detected: true,
         ed_intent: edIntentResult.ed_intent,
+        ed_formatted_question: formattedQuestion,
+        ed_formatted_title: formattedTitle,
       };
     }
     // === End ED Intent Detection ===
+
+    // === Moodle Intent Detection (fast, regex-based) ===
+    // First layer: General detection - determines if this is a Moodle fetch request
+    const moodleIntentResult = detectMoodleFileFetchIntentCore(question);
+    if (moodleIntentResult.moodle_intent_detected && moodleIntentResult.moodle_intent && uid) {
+      logger.info("answerWithRagFn.moodleIntentDetected", {
+        intent: moodleIntentResult.moodle_intent,
+        questionLen: question.length,
+        uid,
+      });
+
+      try {
+        // Get Moodle config
+        const moodleConfig = await moodleService.getStatus(uid);
+        if (moodleConfig.status !== "connected" || !moodleConfig.baseUrl || !moodleConfig.tokenEncrypted) {
+          return {
+            reply: "Vous n'êtes pas connecté à Moodle. Veuillez vous connecter dans les paramètres.",
+            primary_url: null,
+            best_score: 0,
+            sources: [],
+            moodle_intent_detected: true,
+            moodle_intent: moodleIntentResult.moodle_intent,
+            moodle_file: null,
+          };
+        }
+
+        // Second layer: Extract specific file type, number, course name, and week
+        const fileInfo = extractFileInfo(question);
+        if (!fileInfo) {
+          return {
+            reply: "Je n'ai pas pu identifier le type de fichier demandé. Veuillez préciser (ex: \"Lecture 5\", \"Homework 3\", \"Solution devoir 2\", \"Homework from week 7\").",
+            primary_url: null,
+            best_score: 0,
+            sources: [],
+            moodle_intent_detected: true,
+            moodle_intent: moodleIntentResult.moodle_intent,
+            moodle_file: null,
+          };
+        }
+
+        // Decrypt the token and trim any whitespace
+        let token: string;
+        try {
+          token = decryptSecret(moodleConfig.tokenEncrypted).trim();
+          if (!token) {
+            throw new Error("Decrypted token is empty");
+          }
+          logger.info("answerWithRagFn.tokenDecrypted", {
+            uid,
+            tokenLength: token.length,
+          });
+        } catch (decryptError: any) {
+          logger.error("answerWithRagFn.tokenDecryptionFailed", {
+            uid,
+            error: String(decryptError),
+            errorMessage: decryptError.message,
+            hasTokenEncrypted: !!moodleConfig.tokenEncrypted,
+            tokenEncryptedLength: moodleConfig.tokenEncrypted?.length || 0,
+          });
+          return {
+            reply: "Erreur lors du décryptage du token Moodle. Veuillez vous reconnecter à Moodle dans les paramètres.",
+            primary_url: null,
+            best_score: 0,
+            sources: [],
+            moodle_intent_detected: true,
+            moodle_intent: moodleIntentResult.moodle_intent,
+            moodle_file: null,
+          };
+        }
+
+        const client = new MoodleClient(moodleConfig.baseUrl, token);
+
+        logger.info("answerWithRagFn.moodleFileFetch", {
+          uid,
+          baseUrl: moodleConfig.baseUrl,
+          fileType: fileInfo.fileType,
+          fileNumber: fileInfo.fileNumber,
+          courseName: fileInfo.courseName,
+          week: fileInfo.week,
+        });
+
+        let foundFile: { fileurl: string; filename: string; mimetype: string } | null = null;
+        let foundInCourse: any = null; // Track which course the file was found in
+
+        // If course name is specified, search only in that course
+        if (fileInfo.courseName) {
+          const targetCourse = await client.findCourseByName(fileInfo.courseName);
+          if (!targetCourse) {
+            return {
+              reply: `Je n'ai pas trouvé le cours "${fileInfo.courseName}" dans vos cours Moodle.`,
+              primary_url: null,
+              best_score: 0,
+              sources: [],
+              moodle_intent_detected: true,
+              moodle_intent: moodleIntentResult.moodle_intent,
+              moodle_file: null,
+            };
+          }
+
+          // Validate course ID - Moodle returns 'id' field for courses
+          const courseId = targetCourse.id;
+          if (!courseId) {
+            logger.error("answerWithRagFn.missingCourseId", {
+              courseName: fileInfo.courseName,
+              course: targetCourse,
+              availableFields: Object.keys(targetCourse),
+            });
+            return {
+              reply: `Erreur: Impossible de trouver l'ID du cours "${fileInfo.courseName}".`,
+              primary_url: null,
+              best_score: 0,
+              sources: [],
+              moodle_intent_detected: true,
+              moodle_intent: moodleIntentResult.moodle_intent,
+              moodle_file: null,
+            };
+          }
+
+          const courseIdNum = typeof courseId === "number" ? courseId : parseInt(String(courseId), 10);
+          if (isNaN(courseIdNum) || courseIdNum <= 0) {
+            logger.error("answerWithRagFn.invalidCourseId", {
+              courseName: fileInfo.courseName,
+              course: targetCourse,
+              courseId,
+              courseIdNum,
+            });
+            return {
+              reply: `Erreur: ID de cours invalide pour "${fileInfo.courseName}".`,
+              primary_url: null,
+              best_score: 0,
+              sources: [],
+              moodle_intent_detected: true,
+              moodle_intent: moodleIntentResult.moodle_intent,
+              moodle_file: null,
+            };
+          }
+
+          logger.info("answerWithRagFn.searchingCourse", {
+            courseName: fileInfo.courseName,
+            courseId: courseIdNum,
+            courseFullname: targetCourse.fullname,
+            courseShortname: targetCourse.shortname,
+            fileType: fileInfo.fileType,
+            fileNumber: fileInfo.fileNumber,
+            week: fileInfo.week,
+          });
+
+          // Search in the specific course
+          foundFile = await client.findFile(
+            courseIdNum,
+            fileInfo.fileType,
+            fileInfo.fileNumber,
+            fileInfo.week
+          );
+          if (foundFile) {
+            foundInCourse = targetCourse;
+          }
+        } else {
+          // No course specified - search in all courses
+          const courses = await client.getEnrolledCourses();
+          if (courses.length === 0) {
+            return {
+              reply: "Aucun cours trouvé dans votre Moodle.",
+              primary_url: null,
+              best_score: 0,
+              sources: [],
+              moodle_intent_detected: true,
+              moodle_intent: moodleIntentResult.moodle_intent,
+              moodle_file: null,
+            };
+          }
+
+          // Search for file in all courses in parallel for better performance
+          // We use Promise.allSettled to search all courses simultaneously, then
+          // check results in order and take the first match (maintains deterministic behavior)
+          let foundInCourse: any = null;
+          
+          const searchPromises = courses.map(async (course) => {
+            const courseId = course.id; // Moodle returns 'id' field
+            if (!courseId) {
+              logger.warn("answerWithRagFn.courseWithoutId", {
+                course,
+                availableFields: Object.keys(course),
+              });
+              return { course, file: null };
+            }
+
+            const courseIdNum = typeof courseId === "number" ? courseId : parseInt(String(courseId), 10);
+            if (isNaN(courseIdNum) || courseIdNum <= 0) {
+              logger.warn("answerWithRagFn.invalidCourseIdInList", {
+                course,
+                courseId,
+                courseIdNum,
+              });
+              return { course, file: null };
+            }
+
+            logger.info("answerWithRagFn.searchingInCourse", {
+              courseId: courseIdNum,
+              courseFullname: course.fullname,
+              fileType: fileInfo.fileType,
+              fileNumber: fileInfo.fileNumber,
+              week: fileInfo.week,
+            });
+
+            const file = await client.findFile(
+              courseIdNum,
+              fileInfo.fileType,
+              fileInfo.fileNumber,
+              fileInfo.week
+            );
+            return { course, file };
+          });
+
+          // Wait for all searches to complete (in parallel), then find first match
+          const results = await Promise.allSettled(searchPromises);
+          for (const result of results) {
+            if (result.status === "fulfilled" && result.value.file) {
+              foundFile = result.value.file;
+              foundInCourse = result.value.course;
+              break; // Take first match (maintains original behavior)
+            }
+          }
+
+          // Store the course for later use in response
+          if (foundInCourse) {
+            fileInfo.courseName = foundInCourse.fullname || foundInCourse.shortname || foundInCourse.displayname;
+          }
+        }
+
+        if (!foundFile) {
+          const fileTypeNames: Record<string, string> = {
+            "lecture": "cours",
+            "homework": "devoir",
+            "homework_solution": "solution de devoir",
+          };
+          return {
+            reply: `Je n'ai pas trouvé ${fileTypeNames[fileInfo.fileType]} ${fileInfo.fileNumber} dans vos cours Moodle.`,
+            primary_url: null,
+            best_score: 0,
+            sources: [],
+            moodle_intent_detected: true,
+            moodle_intent: moodleIntentResult.moodle_intent,
+            moodle_file: null,
+          };
+        }
+
+        // Get direct download URL (follows redirects if needed)
+        const downloadUrl = await client.getDirectFileUrl(foundFile.fileurl);
+
+        // Get course name for the response
+        let courseDisplayName = "Moodle";
+        if (foundInCourse) {
+          courseDisplayName = foundInCourse.fullname || foundInCourse.shortname || foundInCourse.displayname || "Moodle";
+        } else if (fileInfo.courseName) {
+          // If course name was specified but we don't have the full course object, use the name
+          courseDisplayName = fileInfo.courseName;
+        }
+
+        // Empty reply - card will show all details
+        let replyText = ``;
+
+        const moodleFileResponse = {
+          url: downloadUrl,
+          filename: foundFile.filename,
+          mimetype: foundFile.mimetype,
+          courseName: courseDisplayName,
+          fileType: fileInfo.fileType,
+          fileNumber: fileInfo.fileNumber,
+          week: fileInfo.week,
+        };
+
+        logger.info("answerWithRagFn.moodleFileFound", {
+          uid,
+          filename: foundFile.filename,
+          url: downloadUrl.substring(0, 100) + "...",
+          mimetype: foundFile.mimetype,
+          courseName: courseDisplayName,
+          moodleFileResponse,
+        });
+
+        return {
+          reply: replyText,
+          primary_url: null,
+          best_score: 0,
+          sources: [],
+          moodle_intent_detected: true,
+          moodle_intent: moodleIntentResult.moodle_intent,
+          moodle_file: moodleFileResponse,
+        };
+      } catch (e: any) {
+        const fileInfoForLog = extractFileInfo(question);
+        logger.error("answerWithRagFn.moodleFileFetchFailed", {
+          error: String(e),
+          errorMessage: e.message,
+          errorStack: e.stack,
+          uid,
+          intent: moodleIntentResult.moodle_intent,
+          fileType: fileInfoForLog?.fileType,
+          fileNumber: fileInfoForLog?.fileNumber,
+          courseName: fileInfoForLog?.courseName,
+          week: fileInfoForLog?.week,
+        });
+        return {
+          reply: `Erreur lors de la récupération du fichier Moodle : ${e.message || "erreur inconnue"}`,
+          primary_url: null,
+          best_score: 0,
+          sources: [],
+          moodle_intent_detected: true,
+          moodle_intent: moodleIntentResult.moodle_intent,
+          moodle_file: null,
+        };
+      }
+    }
+    // === End Moodle Intent Detection ===
+
+    const profileContext =
+      typeof (data as any)?.profileContext === "string" ? (data as any).profileContext : undefined;
+
+    // Log received profile context (structured logging only)
+    logger.info("answerWithRagFn.profileContext", {
+      received: Boolean(profileContext),
+      length: profileContext ? profileContext.length : 0,
+      preview: profileContext ? profileContext.slice(0, 200) : null,
+      fullContent: profileContext || null, // Log full content for debugging
+    });
 
     logger.info("answerWithRagFn.input", {
       questionLen: question.length,
@@ -758,15 +1118,29 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
       summaryLen: summary ? summary.length : 0,
       hasTranscript: Boolean(recentTranscript),
       transcriptLen: recentTranscript ? recentTranscript.length : 0,
+      hasProfileContext: Boolean(profileContext),
+      profileContextLen: profileContext ? profileContext.length : 0,
       hasUid: Boolean(uid),
       topK,
       model: model ?? process.env.APERTUS_MODEL_ID!,
     });
-    const ragResult = await answerWithRagCore({ question, topK, model, summary, recentTranscript, uid });
+
+    const ragResult = await answerWithRagCore({
+      question,
+      topK,
+      model,
+      summary,
+      recentTranscript,
+      profileContext,
+      uid,
+    });
     return {
       ...ragResult,
       ed_intent_detected: false,
       ed_intent: null,
+      moodle_intent_detected: false,
+      moodle_intent: null,
+      moodle_file: null,
     };
   } catch (e: any) {
     logger.error("answerWithRagFn.failed", { error: String(e) });
@@ -788,6 +1162,17 @@ function checkKey(req: functions.https.Request) {
     (e as any).code = 401;
     throw e;
   }
+}
+
+function requireAuth(context: functions.https.CallableContext): string {
+  const uid = context.auth?.uid;
+  if (!uid) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "Authentication is required"
+    );
+  }
+  return uid;
 }
 
 export const indexChunksHttp = europeFunctions.https.onRequest(async (req: functions.https.Request, res: functions.Response<any>) => {
@@ -816,12 +1201,13 @@ export const answerWithRagHttp = europeFunctions.https.onRequest(async (req: fun
         intent: edIntentResult.ed_intent,
         questionLen: question.length,
       });
-      
-      // Hybrid approach: REGEX detects, Apertus responds naturally
-      const { reply } = await apertusChatFnCore({
+      // Hybrid approach: REGEX detects, Apertus responds naturally and formats the question
+      const { reply: rawReply } = await apertusChatFnCore({
         messages: [{ role: "user", content: buildEdIntentPromptForApertus(question) }],
         temperature: 0.3,
       });
+
+      const { reply, formattedQuestion, formattedTitle } = parseEdPostResponse(rawReply);
 
       res.status(200).json({
         reply,
@@ -830,6 +1216,8 @@ export const answerWithRagHttp = europeFunctions.https.onRequest(async (req: fun
         sources: [],
         ed_intent_detected: true,
         ed_intent: edIntentResult.ed_intent,
+        ed_formatted_question: formattedQuestion,
+        ed_formatted_title: formattedTitle,
       });
       return;
     }
@@ -840,6 +1228,9 @@ export const answerWithRagHttp = europeFunctions.https.onRequest(async (req: fun
       ...ragResult,
       ed_intent_detected: false,
       ed_intent: null,
+      moodle_intent_detected: false,
+      moodle_intent: null,
+      moodle_file: null,
     });
   } catch (e: any) {
     res.status(e.code === 401 ? 401 : 400).json({ error: String(e) });
@@ -853,6 +1244,153 @@ export const generateTitleFn = europeFunctions.https.onCall(async (data: Generat
   return await generateTitleCore({ question: q, model });
 });
 
+type EdConnectorConnectCallableInput = {
+  apiToken?: string;
+  baseUrl?: string;
+};
+
+export const edConnectorStatusFn = europeFunctions.https.onCall(
+  async (_data, context) => {
+    const uid = requireAuth(context);
+
+    try {
+      const config = await edConnectorService.getStatus(uid);
+      return config;
+    } catch (e: any) {
+      logger.error("edConnectorStatusFn.failed", {
+        uid,
+        error: String(e),
+      });
+      throw new functions.https.HttpsError(
+        "internal",
+        "Failed to get ED connector status",
+        String(e?.message || e)
+      );
+    }
+  }
+);
+
+export const edConnectorConnectFn = europeFunctions.https.onCall(
+  async (data: EdConnectorConnectCallableInput, context) => {
+    const uid = requireAuth(context);
+
+    const apiToken = String(data?.apiToken || "").trim();
+    const baseUrl =
+      typeof data?.baseUrl === "string" ? data.baseUrl : undefined;
+
+    if (!apiToken) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Missing 'apiToken'"
+      );
+    }
+
+    try {
+      const config = await edConnectorService.connect(uid, {
+        apiToken,
+        baseUrl,
+      });
+      return config;
+    } catch (e: any) {
+      logger.error("edConnectorConnectFn.failed", {
+        uid,
+        error: String(e),
+      });
+      throw new functions.https.HttpsError(
+        "internal",
+        "Failed to connect ED connector",
+        String(e?.message || e)
+      );
+    }
+  }
+);
+
+export const edConnectorDisconnectFn = europeFunctions.https.onCall(
+  async (_data, context) => {
+    const uid = requireAuth(context);
+
+    try {
+      await edConnectorService.disconnect(uid);
+      // For convenience, return a simple status the UI can use.
+      return { status: "not_connected" };
+    } catch (e: any) {
+      logger.error("edConnectorDisconnectFn.failed", {
+        uid,
+        error: String(e),
+      });
+      throw new functions.https.HttpsError(
+        "internal",
+        "Failed to disconnect ED connector",
+        String(e?.message || e)
+      );
+    }
+  }
+);
+
+export const edConnectorTestFn = europeFunctions.https.onCall(
+  async (_data, context) => {
+    const uid = requireAuth(context);
+
+    try {
+      const config = await edConnectorService.test(uid);
+      return config;
+    } catch (e: any) {
+      logger.error("edConnectorTestFn.failed", {
+        uid,
+        error: String(e),
+      });
+      throw new functions.https.HttpsError(
+        "internal",
+        "Failed to test ED connector",
+        String(e?.message || e)
+      );
+    }
+  }
+);
+
+type EdConnectorPostCallableInput = {
+  title?: string;
+  body?: string;
+  courseId?: number;
+};
+
+export const edConnectorPostFn = europeFunctions.https.onCall(
+  async (data: EdConnectorPostCallableInput, context) => {
+    const uid = requireAuth(context);
+
+    const title = String(data?.title || "").trim();
+    const body = String(data?.body || "").trim();
+    const courseId =
+      typeof data?.courseId === "number" ? data.courseId : undefined;
+
+    if (!title && !body) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "title or body is required"
+      );
+    }
+
+    try {
+      const result = await edConnectorService.postThread(uid, {
+        title,
+        body,
+        courseId,
+      });
+      return result;
+    } catch (e: any) {
+      if (e instanceof functions.https.HttpsError) throw e;
+      logger.error("edConnectorPostFn.failed", {
+        uid,
+        error: String(e),
+      });
+      throw new functions.https.HttpsError(
+        "internal",
+        "Failed to post ED thread",
+        String(e?.message || e)
+      );
+    }
+  }
+);
 /* =========================================================
  *                MOODLE CONNECTOR
  * ======================================================= */
@@ -1001,9 +1539,9 @@ function extractCourseCode(description?: string): string | undefined {
 function parseICSOptimized(icsText: string): OptimizedSchedule {
   const allEvents: ScheduleEvent[] = [];
   const lines = icsText.replace(/\r\n /g, '').replace(/\r\n\t/g, '').split(/\r?\n/);
-  
+
   let currentEvent: Partial<ScheduleEvent> | null = null;
-  
+
   for (const line of lines) {
     if (line === 'BEGIN:VEVENT') {
       currentEvent = {};
@@ -1015,15 +1553,15 @@ function parseICSOptimized(icsText: string): OptimizedSchedule {
     } else if (currentEvent) {
       const colonIdx = line.indexOf(':');
       if (colonIdx === -1) continue;
-      
+
       let key = line.slice(0, colonIdx);
       const value = line.slice(colonIdx + 1);
-      
+
       const semicolonIdx = key.indexOf(';');
       if (semicolonIdx !== -1) {
         key = key.slice(0, semicolonIdx);
       }
-      
+
       switch (key) {
         case 'UID':
           currentEvent.uid = value;
@@ -1049,11 +1587,11 @@ function parseICSOptimized(icsText: string): OptimizedSchedule {
       }
     }
   }
-  
+
   // Separate regular classes from exams
   const regularClasses: ScheduleEvent[] = [];
   const examEvents: ScheduleEvent[] = [];
-  
+
   for (const event of allEvents) {
     if (EXAM_PATTERN.test(event.summary)) {
       examEvents.push(event);
@@ -1061,22 +1599,22 @@ function parseICSOptimized(icsText: string): OptimizedSchedule {
       regularClasses.push(event);
     }
   }
-  
+
   // Extract ONE canonical week from regular classes
   // Use a Map to dedupe by: dayOfWeek + startTime + summary
   const weeklyMap = new Map<string, WeeklySlot>();
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  
+
   for (const event of regularClasses) {
     const start = new Date(event.dtstart);
     const end = new Date(event.dtend);
     const dayOfWeek = start.getDay();
     const startTime = `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`;
     const endTime = `${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`;
-    
+
     // Create unique key for deduplication
     const key = `${dayOfWeek}-${startTime}-${event.summary}`;
-    
+
     if (!weeklyMap.has(key)) {
       // Only include defined fields (Firestore doesn't accept undefined)
       const slot: WeeklySlot = {
@@ -1092,7 +1630,7 @@ function parseICSOptimized(icsText: string): OptimizedSchedule {
       weeklyMap.set(key, slot);
     }
   }
-  
+
   // Convert to sorted array (Monday first, then by time)
   const weeklySlots = Array.from(weeklyMap.values())
     .sort((a, b) => {
@@ -1102,10 +1640,10 @@ function parseICSOptimized(icsText: string): OptimizedSchedule {
       if (dayA !== dayB) return dayA - dayB;
       return a.startTime.localeCompare(b.startTime);
     });
-  
+
   // Extract final exams (dedupe by course)
   const examMap = new Map<string, FinalExam>();
-  
+
   for (const event of examEvents) {
     const start = new Date(event.dtstart);
     const end = new Date(event.dtend);
@@ -1113,7 +1651,7 @@ function parseICSOptimized(icsText: string): OptimizedSchedule {
     const startTime = `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`;
     const endTime = `${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`;
     const courseCode = extractCourseCode(event.description);
-    
+
     // Dedupe by summary (one exam per course)
     const key = event.summary;
     if (!examMap.has(key)) {
@@ -1129,16 +1667,16 @@ function parseICSOptimized(icsText: string): OptimizedSchedule {
       examMap.set(key, exam);
     }
   }
-  
+
   const finalExams = Array.from(examMap.values())
     .sort((a, b) => a.date.localeCompare(b.date));
-  
+
   logger.info("parseICSOptimized.result", {
     totalEvents: allEvents.length,
     uniqueWeeklySlots: weeklySlots.length,
     finalExams: finalExams.length,
   });
-  
+
   return { weeklySlots, finalExams };
 }
 
@@ -1159,12 +1697,11 @@ function parseICSDate(icsDate: string): string {
 /** Format optimized schedule for LLM context - Markdown formatted */
 function formatOptimizedScheduleForContext(schedule: OptimizedSchedule): string {
   const lines: string[] = [];
-  
+
   // Weekly schedule template
   if (schedule.weeklySlots.length > 0) {
     lines.push("## 📚 Emploi du temps hebdomadaire");
     lines.push("");
-    
     let currentDay = '';
     for (const slot of schedule.weeklySlots) {
       if (slot.dayName !== currentDay) {
@@ -1176,7 +1713,7 @@ function formatOptimizedScheduleForContext(schedule: OptimizedSchedule): string 
       lines.push(`- ⏰ **${slot.startTime}–${slot.endTime}** — ${slot.summary}${code}${loc}`);
     }
   }
-  
+
   // Final exams - format with COURSE NAME FIRST for better model matching
   if (schedule.finalExams.length > 0) {
     lines.push("");
@@ -1184,9 +1721,9 @@ function formatOptimizedScheduleForContext(schedule: OptimizedSchedule): string 
     lines.push("");
     for (const exam of schedule.finalExams) {
       const dateObj = new Date(exam.date);
-      const dateStr = dateObj.toLocaleDateString('fr-CH', { 
-        weekday: 'long', 
-        day: 'numeric', 
+      const dateStr = dateObj.toLocaleDateString('fr-CH', {
+        weekday: 'long',
+        day: 'numeric',
         month: 'long',
         year: 'numeric'
       });
@@ -1195,11 +1732,11 @@ function formatOptimizedScheduleForContext(schedule: OptimizedSchedule): string 
       lines.push(`- **${exam.summary}** — 📅 ${dateStr}, ⏰ ${exam.startTime}–${exam.endTime}${loc}`);
     }
   }
-  
+
   if (lines.length === 0) {
     return "Aucun cours ou examen trouvé.";
   }
-  
+
   return lines.join('\n');
 }
 
@@ -1221,7 +1758,7 @@ function getZurichDayOfWeek(date: Date): number {
 /** Generate schedule for a specific date range using the weekly template - Markdown formatted */
 function generateScheduleForDateRange(schedule: OptimizedSchedule, startDate: Date, endDate: Date): string {
   const lines: string[] = [];
-  
+
   // Group weekly slots by day
   const slotsByDay = new Map<number, WeeklySlot[]>();
   for (const slot of schedule.weeklySlots) {
@@ -1230,91 +1767,117 @@ function generateScheduleForDateRange(schedule: OptimizedSchedule, startDate: Da
     }
     slotsByDay.get(slot.dayOfWeek)!.push(slot);
   }
-  
+
   // Iterate through each day in range (using Zurich timezone)
   const current = new Date(startDate);
   while (current <= endDate) {
     // Use Zurich timezone for day of week calculation
     const dayOfWeek = getZurichDayOfWeek(current);
     const slots = slotsByDay.get(dayOfWeek) || [];
-    
+
     // Check for exams on this date (use Zurich date string)
     const zurichDateParts = current.toLocaleDateString('en-CA', { timeZone: 'Europe/Zurich' }); // YYYY-MM-DD format
     const examsToday = schedule.finalExams.filter(e => e.date === zurichDateParts);
-    
+
     if (slots.length > 0 || examsToday.length > 0) {
-      const dayLabel = current.toLocaleDateString('fr-CH', { 
+      const dayLabel = current.toLocaleDateString('fr-CH', {
         timeZone: 'Europe/Zurich',
-        weekday: 'long', 
-        day: 'numeric', 
-        month: 'long' 
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long'
       });
       lines.push("");
       lines.push(`### 📅 ${dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1)}`);
-      
       // Add regular classes
       for (const slot of slots) {
         const loc = slot.location ? ` 📍 *${slot.location}*` : '';
         lines.push(`- ⏰ **${slot.startTime}–${slot.endTime}** — ${slot.summary}${loc}`);
       }
-      
+
       // Add exams
       for (const exam of examsToday) {
         const loc = exam.location ? ` 📍 *${exam.location}*` : '';
         lines.push(`- ⏰ **${exam.startTime}–${exam.endTime}** — 📝 **EXAMEN**: ${exam.summary}${loc}`);
       }
     }
-    
+
     current.setDate(current.getDate() + 1);
   }
-  
+
   return lines.length > 0 ? lines.join('\n') : "Aucun cours prévu sur cette période.";
 }
 
 /** Sync user's EPFL schedule from ICS URL */
 type SyncScheduleInput = { icsUrl: string };
 
+// Allowlist of hosts that are permitted for ICS URL fetching (SSRF protection)
+const ALLOWED_ICS_HOSTS = [
+  'campus.epfl.ch',
+  'isa.epfl.ch',
+  'isacademia.epfl.ch',
+  'edu.epfl.ch',
+  'moodle.epfl.ch',
+];
+
+function isAllowedIcsHost(urlString: string): boolean {
+  try {
+    const parsed = new URL(urlString);
+    const host = parsed.hostname.toLowerCase();
+    return ALLOWED_ICS_HOSTS.some(allowed =>
+      host === allowed || host.endsWith('.' + allowed)
+    );
+  } catch {
+    return false;
+  }
+}
+
 export async function syncEpflScheduleCore(uid: string, { icsUrl }: SyncScheduleInput) {
   // Validate URL
   if (!icsUrl || typeof icsUrl !== 'string') {
     throw new Error("Missing or invalid 'icsUrl'");
   }
-  
+
   // Basic URL validation - should look like an EPFL/IS-Academia ICS URL
   const url = icsUrl.trim();
   if (!url.startsWith('http://') && !url.startsWith('https://')) {
     throw new Error("Invalid URL format");
   }
-  
+
+  // SSRF protection: Only allow fetching from known EPFL hosts
+  if (!isAllowedIcsHost(url)) {
+    logger.warn("syncEpflSchedule.rejectedHost", { uid, urlPreview: url.slice(0, 60) });
+    throw new Error("URL must be from an EPFL domain (campus.epfl.ch, isa.epfl.ch, etc.)");
+  }
+
   // Fetch the ICS file
   logger.info("syncEpflSchedule.fetching", { uid, urlPreview: url.slice(0, 60) });
-  
+
   const response = await fetch(url, {
     headers: {
       'User-Agent': 'EULER-App/1.0',
       'Accept': 'text/calendar, */*',
     },
   });
-  
+
   if (!response.ok) {
     throw new Error(`Failed to fetch ICS: ${response.status} ${response.statusText}`);
   }
-  
+
   const icsText = await response.text();
-  
+
   if (!icsText.includes('BEGIN:VCALENDAR')) {
     throw new Error("Invalid ICS format: not a valid calendar file");
   }
-  
+
   // Parse with OPTIMIZED parser (one week + exams only)
   const schedule = parseICSOptimized(icsText);
-  
-  logger.info("syncEpflSchedule.parsed", { 
-    uid, 
+
+  logger.info("syncEpflSchedule.parsed", {
+    uid,
     weeklySlots: schedule.weeklySlots.length,
     finalExams: schedule.finalExams.length,
   });
-  
+
   // Store OPTIMIZED structure in Firestore (much smaller!)
   const userRef = db.collection('users').doc(uid);
   await userRef.set({
@@ -1327,13 +1890,13 @@ export async function syncEpflScheduleCore(uid: string, { icsUrl }: SyncSchedule
       examCount: schedule.finalExams.length,
     }
   }, { merge: true });
-  
-  logger.info("syncEpflSchedule.stored", { 
-    uid, 
+
+  logger.info("syncEpflSchedule.stored", {
+    uid,
     weeklySlots: schedule.weeklySlots.length,
     finalExams: schedule.finalExams.length,
   });
-  
+
   return {
     success: true,
     eventCount: schedule.weeklySlots.length + schedule.finalExams.length,
@@ -1347,41 +1910,41 @@ export async function syncEpflScheduleCore(uid: string, { icsUrl }: SyncSchedule
 export async function getScheduleContextCore(uid: string): Promise<string> {
   const userDoc = await db.collection('users').doc(uid).get();
   const data = userDoc.data();
-  
+
   if (!data?.epflSchedule) {
     return "";
   }
-  
+
   // Check for new optimized format
   if (data.epflSchedule.weeklySlots) {
     const schedule: OptimizedSchedule = {
       weeklySlots: data.epflSchedule.weeklySlots || [],
       finalExams: data.epflSchedule.finalExams || [],
     };
-    
+
     // For context, show the weekly template + upcoming week + exams
     // Use Zurich timezone for "now"
     const now = getZurichDate();
     const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    
+
     const lines: string[] = [];
-    
+
     // Weekly template (always useful)
     lines.push(formatOptimizedScheduleForContext(schedule));
-    
+
     // Also show specific dates for the next 7 days
     lines.push("\n\n## 📆 Cette semaine");
     lines.push(generateScheduleForDateRange(schedule, now, nextWeek));
-    
+
     return lines.join('\n');
   }
-  
+
   // Fallback for old format (legacy)
   if (data.epflSchedule.events && data.epflSchedule.events.length > 0) {
     // Old format - just show a message to re-sync
     return "Emploi du temps disponible. Pour de meilleures performances, reconnectez votre calendrier EPFL Campus.";
   }
-  
+
   return "";
 }
 
@@ -1390,7 +1953,7 @@ export const syncEpflScheduleFn = europeFunctions.https.onCall(async (data: Sync
   if (!context.auth?.uid) {
     throw new functions.https.HttpsError("unauthenticated", "User must be signed in");
   }
-  
+
   try {
     return await syncEpflScheduleCore(context.auth.uid, data);
   } catch (e: any) {
@@ -1404,13 +1967,13 @@ export const disconnectEpflScheduleFn = europeFunctions.https.onCall(async (_dat
   if (!context.auth?.uid) {
     throw new functions.https.HttpsError("unauthenticated", "User must be signed in");
   }
-  
+
   try {
     const userRef = db.collection('users').doc(context.auth.uid);
     await userRef.update({
       epflSchedule: admin.firestore.FieldValue.delete(),
     });
-    
+
     logger.info("disconnectEpflSchedule.success", { uid: context.auth.uid });
     return { success: true, message: "EPFL schedule disconnected" };
   } catch (e: any) {
@@ -1424,15 +1987,15 @@ export const getEpflScheduleStatusFn = europeFunctions.https.onCall(async (_data
   if (!context.auth?.uid) {
     throw new functions.https.HttpsError("unauthenticated", "User must be signed in");
   }
-  
+
   try {
     const userDoc = await db.collection('users').doc(context.auth.uid).get();
     const data = userDoc.data();
-    
+
     if (!data?.epflSchedule) {
       return { connected: false };
     }
-    
+
     // New optimized format
     if (data.epflSchedule.weeklySlots) {
       return {
@@ -1444,7 +2007,7 @@ export const getEpflScheduleStatusFn = europeFunctions.https.onCall(async (_data
         optimized: true,
       };
     }
-    
+
     // Legacy format
     return {
       connected: true,
