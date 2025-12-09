@@ -1,5 +1,13 @@
 // functions/edQuickTest.ts
 
+import path from "node:path";
+import dotenv from "dotenv";
+
+dotenv.config({
+  // .env is located at the functions root (same folder as edQuickTest.ts when using ts-node)
+  path: path.join(__dirname, ".env"),
+});
+
 import { EdDiscussionClient } from "./src/connectors/ed/EdDiscussionClient";
 import {
   parseEdSearchQuery,
@@ -10,7 +18,7 @@ import {
 async function main() {
   // ⚠️ Mets ton vrai token ED ici pour le test.
   // N'OUBLIE PAS de l'enlever avant de commit.
-  const token = "mettre ton token ED ici";
+  const token = "azB3eR.5mOAIYhFjN46SFerhY2Rx8T7IdKSfjPRQh7dwfJu";
   const baseUrl = "https://eu.edstem.org/api";
 
   const client = new EdDiscussionClient(baseUrl, token);
@@ -29,7 +37,7 @@ async function main() {
   // ⚠️ Important : prends un cours avec un code du style COM-202, COM-300, CS-202, etc.
   // (le parser actuel cherche ce pattern: [A-Z]{2,4}-[0-9]{2,3})
   const sampleQueries = [
-    "show posts about homework 2 in CS-328",
+    "Show posts about module 2 exo 4 in COM-300",
   ];
 
   for (const q of sampleQueries) {

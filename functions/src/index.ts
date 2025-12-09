@@ -121,7 +121,7 @@ async function edBrainSearchCore(
     };
   }
 
-  // 1) Récupérer la config ED du user
+  // 1) Get the user's ED config
   const config = await edConnectorRepository.getConfig(uid);
   if (!config || !config.apiKeyEncrypted || !config.baseUrl) {
     return {
@@ -135,7 +135,7 @@ async function edBrainSearchCore(
     };
   }
 
-  // 2) Déchiffrer le token
+  // 2) Decrypt the token
   let apiToken: string;
   try {
     apiToken = decryptSecret(config.apiKeyEncrypted);
@@ -154,7 +154,7 @@ async function edBrainSearchCore(
 
   const client = new EdDiscussionClient(config.baseUrl, apiToken);
 
-  // 3) Récupérer les cours ED de l'utilisateur
+  // 3) Get the user's ED courses
   let courses;
   try {
     const userInfo = await client.getUser();
@@ -196,13 +196,13 @@ async function edBrainSearchCore(
     };
   }
 
-  // 4) Parser la requête NL
+  // 4) Parse the natural language query
   const parsed = parseEdSearchQuery(query);
   if (input.limit != null) {
     parsed.limit = input.limit;
   }
 
-  // 5) Résoudre le cours + options fetch
+  // 5) Resolve the course + fetch options
   const req = await buildEdSearchRequest(client, parsed, courses);
   if (isEdBrainError(req)) {
     return {
@@ -218,7 +218,7 @@ async function edBrainSearchCore(
     };
   }
 
-  // 6) Fetch des threads ED
+  // 6) Fetch ED threads
   let threads;
   try {
     threads = await client.fetchThreads(req.fetchOptions);
@@ -285,7 +285,7 @@ async function edBrainSearchCore(
     };
   }
 
-  // 7) Normaliser pour le frontend
+  // 7) Normalize for the frontend
   const posts = normalizeEdThreads(threads, req.resolvedCourse);
 
   return {

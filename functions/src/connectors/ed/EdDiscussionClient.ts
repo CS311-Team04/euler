@@ -4,21 +4,21 @@ export interface EdCourse {
   id: number;
   code: string;
   name: string;
-  // ED renvoie plein d'autres champs, on garde le reste en "unknown" pour l'instant.
+  // ED returns many other fields, we keep the rest as "unknown" for now.
   [key: string]: unknown;
 }
 
-// statusFilter interne -> paramètre `filter` de l'API ED
+// Internal statusFilter -> ED API `filter` parameter
 const ED_STATUS_FILTER_PARAM: Record<string, string> = {
   unread: "unread",
   unanswered: "unanswered",
   resolved: "resolved",
 
-  // nouveaux
-  new_replies: "new",      // "Nouvelles réponses"
-  approved: "endorsed",    // "Approuvés"
-  favorites: "starred",    // "Favoris"
-  instructors: "staff",    // "Instructeurs"
+  // new filters
+  new_replies: "new",      // "New replies"
+  approved: "endorsed",    // "Approved"
+  favorites: "starred",    // "Favorites"
+  instructors: "staff",    // "Instructors"
 };
 
 export interface EdUserResponse {
@@ -48,7 +48,7 @@ export interface EdThread {
   content?: string;
   category?: string;
   subcategory?: string;
-  // Le reste des champs n'est pas encore utilisé par notre backend.
+  // The rest of the fields are not yet used by our backend.
   [key: string]: unknown;
 }
 
@@ -56,8 +56,8 @@ export interface FetchThreadsOptions {
   courseId: number;
   limit?: number;
   /**
-   * Filtre haut niveau, on l'adaptera aux paramètres exacts de l'API ED
-   * (ex: "unanswered", "unread", "resolved", etc.).
+   * High-level filter, we'll adapt it to the exact ED API parameters
+   * (e.g., "unanswered", "unread", "resolved", etc.).
    */
    statusFilter?:
     | "all"
@@ -130,7 +130,7 @@ export class EdDiscussionClient {
    */
   async testConnection(): Promise<boolean> {
     try {
-      // Si getUser() passe, le token est valide
+      // If getUser() succeeds, the token is valid
       await this.getUser();
       return true;
     } catch (error) {
@@ -180,7 +180,7 @@ export class EdDiscussionClient {
 
     if (hasSearch) {
       // mimic the UI behaviour
-      if (!params.has("limit")) params.set("limit", "20");
+      if (!params.has("limit")) params.set("limit", "5");
       params.set("sort", "relevance");
     }
 
