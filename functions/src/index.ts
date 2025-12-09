@@ -14,6 +14,14 @@ import { EdConnectorService } from "./connectors/ed/EdConnectorService";
 import { encryptSecret, decryptSecret } from "./security/secretCrypto";
 import { detectPostToEdIntentCore, buildEdIntentPromptForApertus } from "./edIntent";
 import { parseEdPostResponse } from "./edIntentParser";
+import { EdDiscussionClient } from "./connectors/ed/EdDiscussionClient";
+import {
+  parseEdSearchQuery,
+  buildEdSearchRequest,
+  normalizeEdThreads,
+  EdBrainError,
+  NormalizedEdPost,
+} from "./edSearchDomain";
 import { detectMoodleFileFetchIntentCore, extractFileInfo } from "./moodleIntent";
 import { MoodleClient } from "./connectors/moodle/MoodleClient";
 
@@ -79,6 +87,228 @@ const edConnectorService = new EdConnectorService(
   "https://eu.edstem.org/api",
   ED_DEFAULT_COURSE_ID
 );
+
+/* =========================================================
+ *                ED BRAIN SEARCH (core)
+ * ======================================================= */
+
+type EdBrainSearchInput = {
+  query: string;
+  limit?: number;
+};
+
+type EdBrainSearchOutput = {
+  ok: boolean;
+  posts: NormalizedEdPost[];
+  filters: {
+    course?: string;
+    status?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    limit?: number;
+  };
+  error?: EdBrainError;
+};
+
+function isEdBrainError(result: any): result is EdBrainError {
+  return result && typeof result === "object" && "type" in result;
+}
+
+async function edBrainSearchCore(
+  uid: string,
+  input: EdBrainSearchInput
+): Promise<EdBrainSearchOutput> {
+  const query = (input.query || "").trim();
+  if (!query) {
+    return {
+      ok: false,
+      posts: [],
+      filters: {},
+      error: { type: "INVALID_QUERY", message: "Missing 'query'" },
+    };
+  }
+
+  // 1) Get the user's ED config
+  const config = await edConnectorRepository.getConfig(uid);
+  if (!config || !config.apiKeyEncrypted || !config.baseUrl) {
+    return {
+      ok: false,
+      posts: [],
+      filters: {},
+      error: {
+        type: "AUTH_ERROR",
+        message: "ED connector not configured for this user",
+      },
+    };
+  }
+
+  // 2) Decrypt the token
+  let apiToken: string;
+  try {
+    apiToken = decryptSecret(config.apiKeyEncrypted);
+  } catch (e) {
+    logger.error("edBrainSearch.decryptFailed", { uid, error: String(e) });
+    return {
+      ok: false,
+      posts: [],
+      filters: {},
+      error: {
+        type: "AUTH_ERROR",
+        message: "Failed to decrypt ED token",
+      },
+    };
+  }
+
+  const client = new EdDiscussionClient(config.baseUrl, apiToken);
+
+  // 3) Get the user's ED courses
+  let courses;
+  try {
+    const userInfo = await client.getUser();
+    courses = userInfo.courses.map((c) => c.course);
+  } catch (e: any) {
+    const msg = String(e?.message || e);
+    logger.error("edBrainSearch.fetchUserFailed", { uid, error: msg });
+
+    if (msg.includes("401") || msg.includes("403")) {
+      return {
+        ok: false,
+        posts: [],
+        filters: {},
+        error: {
+          type: "AUTH_ERROR",
+          message: "ED authentication failed",
+        },
+      };
+    }
+    if (msg.includes("429")) {
+      return {
+        ok: false,
+        posts: [],
+        filters: {},
+        error: {
+          type: "RATE_LIMIT",
+          message: "ED API rate limit reached",
+        },
+      };
+    }
+    return {
+      ok: false,
+      posts: [],
+      filters: {},
+      error: {
+        type: "NETWORK_ERROR",
+        message: "Failed to contact ED API",
+      },
+    };
+  }
+
+  // 4) Parse the natural language query
+  const parsed = parseEdSearchQuery(query);
+
+  // 5) Resolve the course + fetch options
+  const req = await buildEdSearchRequest(client, parsed, courses);
+  if (isEdBrainError(req)) {
+    return {
+      ok: false,
+      posts: [],
+      filters: {
+        status: "all", // Default, LLM would have set this if successful
+        dateFrom: parsed.dateFrom,
+        dateTo: parsed.dateTo,
+        limit: input.limit ?? 5, // Use input limit or default
+      },
+      error: req,
+    };
+  }
+
+  // Override limit if explicitly provided in input
+  if (input.limit != null) {
+    req.fetchOptions.limit = input.limit;
+  }
+
+  // 6) Fetch ED threads
+  let threads;
+  try {
+    threads = await client.fetchThreads(req.fetchOptions);
+  } catch (e: any) {
+    const msg = String(e?.message || e);
+    logger.error("edBrainSearch.fetchThreadsFailed", { uid, error: msg });
+
+    const filters = {
+      course: req.resolvedCourse.code || req.resolvedCourse.name,
+      status: req.fetchOptions.statusFilter || "all",
+      dateFrom: parsed.dateFrom,
+      dateTo: parsed.dateTo,
+      limit: req.fetchOptions.limit ?? 5,
+    };
+
+    if (msg.includes("401") || msg.includes("403")) {
+      return {
+        ok: false,
+        posts: [],
+        filters,
+        error: {
+          type: "AUTH_ERROR",
+          message: "ED authentication failed",
+        },
+      };
+    }
+    if (msg.includes("429")) {
+      return {
+        ok: false,
+        posts: [],
+        filters,
+        error: {
+          type: "RATE_LIMIT",
+          message: "ED API rate limit reached",
+        },
+      };
+    }
+    return {
+      ok: false,
+      posts: [],
+      filters,
+      error: {
+        type: "NETWORK_ERROR",
+        message: "Failed to contact ED API",
+      },
+    };
+  }
+
+  if (!threads.length) {
+    return {
+      ok: false,
+      posts: [],
+      filters: {
+        course: req.resolvedCourse.code || req.resolvedCourse.name,
+        status: req.fetchOptions.statusFilter || "all",
+        dateFrom: parsed.dateFrom,
+        dateTo: parsed.dateTo,
+        limit: req.fetchOptions.limit ?? 5,
+      },
+      error: {
+        type: "NO_RESULTS",
+        message: "No posts found for these filters",
+      },
+    };
+  }
+
+  // 7) Normalize for the frontend
+  const posts = normalizeEdThreads(threads, req.resolvedCourse);
+
+  return {
+    ok: true,
+    posts,
+    filters: {
+      course: req.resolvedCourse.code || req.resolvedCourse.name,
+      status: req.fetchOptions.statusFilter || "all",
+      dateFrom: parsed.dateFrom,
+      dateTo: parsed.dateTo,
+      limit: req.fetchOptions.limit ?? 5,
+    },
+  };
+}
 
 // Embeddings = Jina
 const EMBED_URL = withV1(process.env.EMBED_BASE_URL) + "/embeddings";
@@ -1432,6 +1662,38 @@ export const edConnectorTestFn = europeFunctions.https.onCall(
       throw new functions.https.HttpsError(
         "internal",
         "Failed to test ED connector",
+        String(e?.message || e)
+      );
+    }
+  }
+);
+
+type EdBrainSearchCallableInput = {
+  query?: string;
+  limit?: number;
+};
+
+export const edBrainSearchFn = europeFunctions.https.onCall(
+  async (data: EdBrainSearchCallableInput, context) => {
+    const uid = requireAuth(context);
+
+    const query = String(data?.query || "").trim();
+    const limit =
+      typeof data?.limit === "number" && Number.isFinite(data.limit)
+        ? data.limit
+        : undefined;
+
+    try {
+      const result = await edBrainSearchCore(uid, { query, limit });
+      return result;
+    } catch (e: any) {
+      logger.error("edBrainSearchFn.failed", {
+        uid,
+        error: String(e),
+      });
+      throw new functions.https.HttpsError(
+        "internal",
+        "edBrainSearch failed",
         String(e?.message || e)
       );
     }
