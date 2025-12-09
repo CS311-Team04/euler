@@ -302,7 +302,7 @@ object Localization {
           "moodle_file_type_lecture" to "Lecture",
           "moodle_file_type_homework" to "Homework",
           "moodle_file_type_homework_solution" to "Homework solution",
-          "moodle_file_type_file" to "File",
+          "moodle_file_type_file" to "file",
           "moodle_default_course_name" to "Moodle",
           "moodle_file_intro" to "Here is the %1\$s from %2\$s",
           "moodle_file_pdf_label" to "PDF",
