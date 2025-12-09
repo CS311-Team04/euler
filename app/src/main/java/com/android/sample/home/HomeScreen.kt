@@ -475,9 +475,15 @@ fun HomeScreen(
                                   if (msg.source != null && !msg.isThinking) {
                                     Spacer(Modifier.height(8.dp))
                                     val context = androidx.compose.ui.platform.LocalContext.current
+                                    val sourceSiteLabel =
+                                        msg.source.siteLabelRes?.let { stringResource(id = it) }
+                                            ?: msg.source.siteLabel.orEmpty()
+                                    val sourceTitle =
+                                        msg.source.titleRes?.let { stringResource(id = it) }
+                                            ?: msg.source.title.orEmpty()
                                     SourceCard(
-                                        siteLabel = msg.source.siteLabel,
-                                        title = msg.source.title,
+                                        siteLabel = sourceSiteLabel,
+                                        title = sourceTitle,
                                         url = msg.source.url,
                                         retrievedAt = msg.source.retrievedAt,
                                         compactType = msg.source.compactType,

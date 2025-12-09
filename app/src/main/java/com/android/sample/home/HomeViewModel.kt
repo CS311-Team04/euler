@@ -2,12 +2,14 @@ package com.android.sample.home
 
 import android.net.Uri
 import android.util.Log
+import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.sample.BuildConfig
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
+import com.android.sample.R
 import com.android.sample.conversations.AuthNotReadyException
 import com.android.sample.conversations.CachedResponseRepository
 import com.android.sample.conversations.ConversationRepository
@@ -55,9 +57,11 @@ enum class CompactSourceType {
 }
 
 data class SourceMeta(
-    val siteLabel: String, // e.g. "EPFL.ch Website" or "Your Schedule"
-    val title: String, // e.g. "Projet de Semestre – Bachelor"
-    val url: String?, // null for schedule sources
+    val siteLabel: String? = null, // e.g. "EPFL.ch Website" or "Your Schedule"
+    @StringRes val siteLabelRes: Int? = null,
+    val title: String? = null, // e.g. "Projet de Semestre – Bachelor"
+    @StringRes val titleRes: Int? = null,
+    val url: String? = null, // null for schedule sources
     val retrievedAt: Long = System.currentTimeMillis(),
     val isScheduleSource: Boolean = false, // DEPRECATED: use compactType instead
     val compactType: CompactSourceType = CompactSourceType.NONE // Type of compact indicator
@@ -1002,8 +1006,8 @@ class HomeViewModel(
                   com.android.sample.llm.SourceType.SCHEDULE -> {
                     // Schedule source - show a small indicator
                     SourceMeta(
-                        siteLabel = "Your EPFL Schedule",
-                        title = "Retrieved from your connected calendar",
+                        siteLabelRes = R.string.source_label_epfl_schedule,
+                        titleRes = R.string.source_label_schedule_description,
                         url = null,
                         isScheduleSource = true,
                         compactType = CompactSourceType.SCHEDULE)
@@ -1011,8 +1015,8 @@ class HomeViewModel(
                   com.android.sample.llm.SourceType.FOOD -> {
                     // Food source - show a small indicator
                     SourceMeta(
-                        siteLabel = "EPFL Restaurants",
-                        title = "Retrieved from Pocket Campus",
+                        siteLabelRes = R.string.source_label_epfl_restaurants,
+                        titleRes = R.string.source_label_food_description,
                         url = reply.url,
                         isScheduleSource = true,
                         compactType = CompactSourceType.FOOD)
