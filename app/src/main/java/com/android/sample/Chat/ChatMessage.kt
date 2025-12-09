@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -221,12 +222,16 @@ fun MoodleFileViewer(
           Row(
               modifier = Modifier.padding(cardPadding),
               verticalAlignment = Alignment.CenterVertically) {
-                // Moodle logo from resources
-                Image(
-                    painter = painterResource(id = R.drawable.moodle_logo),
-                    contentDescription = Localization.t("moodle_logo_description"),
-                    modifier = Modifier.size(36.dp),
-                    contentScale = ContentScale.Fit)
+                // Moodle logo with rounded corners to hide white background
+                Box(
+                    modifier =
+                        Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).background(cardBg)) {
+                      Image(
+                          painter = painterResource(id = R.drawable.moodle_logo),
+                          contentDescription = Localization.t("moodle_logo_description"),
+                          modifier = Modifier.fillMaxSize(),
+                          contentScale = ContentScale.Fit)
+                    }
 
                 Spacer(modifier = Modifier.width(12.dp))
 
