@@ -97,6 +97,11 @@ class HomeViewModel(
     private const val TAG = "HomeViewModel"
     private const val DEFAULT_USER_NAME = "Student"
     private const val ED_INTENT_POST_QUESTION = "post_question"
+    // Fallback English strings for non-Android contexts (e.g., unit tests)
+    private const val FALLBACK_SCHEDULE_LABEL = "Your EPFL Schedule"
+    private const val FALLBACK_SCHEDULE_TITLE = "Retrieved from your connected calendar"
+    private const val FALLBACK_FOOD_LABEL = "EPFL Restaurants"
+    private const val FALLBACK_FOOD_TITLE = "Retrieved from Pocket Campus"
 
     // Canonical suggestion questions (English) for offline cache
     // These must match the localization keys exactly for cache hits
@@ -1006,7 +1011,9 @@ class HomeViewModel(
                   com.android.sample.llm.SourceType.SCHEDULE -> {
                     // Schedule source - show a small indicator
                     SourceMeta(
+                        siteLabel = FALLBACK_SCHEDULE_LABEL,
                         siteLabelRes = R.string.source_label_epfl_schedule,
+                        title = FALLBACK_SCHEDULE_TITLE,
                         titleRes = R.string.source_label_schedule_description,
                         url = null,
                         isScheduleSource = true,
@@ -1015,7 +1022,9 @@ class HomeViewModel(
                   com.android.sample.llm.SourceType.FOOD -> {
                     // Food source - show a small indicator
                     SourceMeta(
+                        siteLabel = FALLBACK_FOOD_LABEL,
                         siteLabelRes = R.string.source_label_epfl_restaurants,
+                        title = FALLBACK_FOOD_TITLE,
                         titleRes = R.string.source_label_food_description,
                         url = reply.url,
                         isScheduleSource = true,
