@@ -463,8 +463,17 @@ fun HomeScreen(
                                   val audioState =
                                       audioController.audioStateFor(msg, ui.streamingMessageId)
 
-                                  // If this message carries a source, draw the card first
+                                  // First render the chat bubble (for USER/AI text)
+                                  ChatMessage(
+                                      message = msg,
+                                      modifier = Modifier.fillMaxWidth(),
+                                      isStreaming = showLeadingDot,
+                                      audioState = audioState,
+                                      aiText = textPrimary)
+
+                                  // Then show the source card AFTER the answer (if any)
                                   if (msg.source != null && !msg.isThinking) {
+                                    Spacer(Modifier.height(8.dp))
                                     val context = androidx.compose.ui.platform.LocalContext.current
                                     SourceCard(
                                         siteLabel = msg.source.siteLabel,
@@ -483,16 +492,7 @@ fun HomeScreen(
                                                 context.startActivity(intent)
                                               }
                                             } else null)
-                                    Spacer(Modifier.height(8.dp))
                                   }
-
-                                  // Then render the usual chat bubble (for USER/AI text)
-                                  ChatMessage(
-                                      message = msg,
-                                      modifier = Modifier.fillMaxWidth(),
-                                      isStreaming = showLeadingDot,
-                                      audioState = audioState,
-                                      aiText = textPrimary)
                                 }
                                 is TimelineItem.CardItem -> {
                                   EdPostedCard(item.card, modifier = Modifier.fillMaxWidth())

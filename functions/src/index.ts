@@ -414,8 +414,40 @@ type AnswerWithRagInput = {
 // Schedule-related question patterns
 const SCHEDULE_PATTERNS = /\b(horaire|schedule|timetable|cours|class|lecture|planning|agenda|calendrier|calendar|demain|tomorrow|aujourd'hui|today|cette semaine|this week|prochaine|next|quand|when|heure|time|salle|room|où|where|leçon|lesson)\b/i;
 
-// Food-related question patterns
-const FOOD_PATTERNS = /\b(manger|menu|plat|repas|resto|restaurant|nourriture|déjeuner|dîner|lunch|food|meal|cantine|cafétéria|végétarien|végé|veggie|vegan|prix|cheapest|moins cher|alpine|arcadie|esplanade|espla|native|ornithorynque|orni|piano|qu'est-ce qu'on mange|il y a quoi)\b/i;
+// Food-related question patterns - split into strong (always trigger) and weak (need context)
+// Strong indicators: EPFL restaurant names, explicit eating phrases
+const FOOD_STRONG_PATTERNS = /\b(alpine|arcadie|esplanade|espla|native|ornithorynque|orni|piano|qu'est-ce qu'on mange|il y a quoi à manger|ya quoi|y'a quoi|où manger|quoi manger|on mange quoi)\b/i;
+
+// Diet queries phrased as "y'a quoi de veggie ..." (captures apostrophes)
+const FOOD_DIET_QUERY = /\b(y['’]?\s*a\s+quoi|ya\s+quoi|qu'est-ce qu'on|on\s+mange\s+quoi|quoi\s+(de|d'))[^.]{0,50}\b(végétarien|végé|veggie|vegan)\b/i;
+
+// Weak indicators: only trigger if combined with food context words
+const FOOD_WEAK_PATTERNS = /\b(manger|menu|plat|repas|resto|restaurant|nourriture|déjeuner|dîner|cantine|cafétéria)\b/i;
+
+// Diet-related patterns: trigger only with eating/restaurant context
+const FOOD_DIET_PATTERNS = /\b(végétarien|végé|veggie|vegan)\b.*\b(manger|plat|resto|restaurant|menu|repas|cantine|midi|soir|déjeuner|dîner)\b|\b(manger|plat|resto|restaurant|menu|repas|cantine|midi|soir|déjeuner|dîner)\b.*\b(végétarien|végé|veggie|vegan)\b/i;
+
+// Price patterns: only for food when combined with eating context
+const FOOD_PRICE_PATTERNS = /\b(moins cher|cheapest|pas cher|prix)\b.*\b(manger|plat|resto|restaurant|menu|repas|midi|soir|déjeuner|dîner|cantine)\b|\b(manger|plat|resto|restaurant|menu|repas|midi|soir|déjeuner|dîner|cantine)\b.*\b(moins cher|cheapest|pas cher|prix)\b/i;
+
+/** Check if question is food-related using refined patterns */
+function isFoodRelatedQuestion(q: string): boolean {
+  // Strong patterns always trigger
+  if (FOOD_STRONG_PATTERNS.test(q)) return true;
+  // "y'a quoi de veggie ..." style queries
+  if (FOOD_DIET_QUERY.test(q)) return true;
+  // Diet patterns with eating context
+  if (FOOD_DIET_PATTERNS.test(q)) return true;
+  // Price patterns with eating context  
+  if (FOOD_PRICE_PATTERNS.test(q)) return true;
+  // Weak patterns only if the question is clearly about eating (not just contains "menu" or "restaurant")
+  // Must have at least 2 food-related words or a clear eating phrase
+  if (FOOD_WEAK_PATTERNS.test(q)) {
+    const foodWords = q.toLowerCase().match(/\b(manger|menu|plat|repas|resto|restaurant|nourriture|déjeuner|dîner|cantine|cafétéria|midi|soir|aujourd'hui|demain)\b/gi);
+    return (foodWords?.length ?? 0) >= 2;
+  }
+  return false;
+}
 
 export async function answerWithRagCore({
   question, topK, model, summary, recentTranscript, profileContext, uid, client,
@@ -423,7 +455,7 @@ export async function answerWithRagCore({
   const q = question.trim();
   
   // Check if this is a food-related question FIRST (before schedule/RAG)
-  const isFoodQuestion = FOOD_PATTERNS.test(q);
+  const isFoodQuestion = isFoodRelatedQuestion(q);
   
   if (isFoodQuestion) {
     try {
