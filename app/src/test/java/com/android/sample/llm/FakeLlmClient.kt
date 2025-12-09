@@ -12,7 +12,8 @@ class FakeLlmClient : LlmClient {
   override suspend fun generateReply(prompt: String): BotReply {
     prompts += prompt
     failure?.let { throw it }
-    return BotReply(nextReply, nextUrl, nextSourceType, nextEdIntent)
+    return BotReply(
+        nextReply, nextUrl, nextSourceType, nextEdIntent.copy(moodleIntent = nextMoodleIntent))
   }
 
   /** Configure the fake to return an ED intent response */
@@ -37,12 +38,47 @@ class FakeLlmClient : LlmClient {
             formattedTitle = formattedTitle)
   }
 
+  var nextMoodleIntent: MoodleIntent = MoodleIntent()
+
+  /** Configure the fake to return a Moodle intent response */
+  fun setMoodleIntentResponse(
+      url: String,
+      filename: String,
+      courseName: String,
+      fileType: String,
+      fileNumber: String? = null,
+      week: Int? = null
+  ) {
+    nextReply = "Here is the $fileType $fileNumber from $courseName"
+    nextMoodleIntent =
+        MoodleIntent(
+            detected = true,
+            file =
+                MoodleFile(
+                    url = url,
+                    filename = filename,
+                    mimetype = "application/pdf",
+                    courseName = courseName,
+                    fileType = fileType,
+                    fileNumber = fileNumber,
+                    week = week))
+  }
+
+  /** Configure the fake to return a source response */
+  fun setSourceResponse(reply: String, sourceType: SourceType, url: String? = null) {
+    nextReply = reply
+    nextSourceType = sourceType
+    nextUrl = url
+    nextEdIntent = EdIntent()
+  }
+
   /** Reset to default non-ED response */
   fun resetToDefault() {
     nextReply = "test-reply"
     nextUrl = null
     nextSourceType = SourceType.NONE
     nextEdIntent = EdIntent()
+    nextMoodleIntent = MoodleIntent()
     failure = null
   }
 }

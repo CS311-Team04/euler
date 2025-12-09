@@ -2199,4 +2199,212 @@ class HomeViewModelTest {
     // Verify the LLM client was called (indicating profile context was built and passed)
     assertTrue("LLM client should be called", fakeLlm.prompts.isNotEmpty())
   }
+
+  @Test
+  fun toggleDrawer_toggles_drawer_state() {
+    val viewModel = HomeViewModel()
+    val initialState = viewModel.uiState.value.isDrawerOpen
+
+    viewModel.toggleDrawer()
+
+    assertEquals(!initialState, viewModel.uiState.value.isDrawerOpen)
+
+    viewModel.toggleDrawer()
+
+    assertEquals(initialState, viewModel.uiState.value.isDrawerOpen)
+  }
+
+  @Test
+  fun setGuestMode_sets_guest_state_and_userName() {
+    val viewModel = HomeViewModel()
+    viewModel.setUserNameForTest("Test User")
+
+    viewModel.setGuestMode(true)
+
+    assertTrue(viewModel.uiState.value.isGuest)
+    assertEquals("guest", viewModel.uiState.value.userName)
+    assertFalse(viewModel.uiState.value.showGuestProfileWarning)
+
+    viewModel.setGuestMode(false)
+
+    assertFalse(viewModel.uiState.value.isGuest)
+    assertEquals("Test User", viewModel.uiState.value.userName)
+  }
+
+  @Test
+  fun setGuestMode_false_uses_default_when_userName_blank() {
+    val viewModel = HomeViewModel()
+    viewModel.setUserNameForTest("")
+
+    viewModel.setGuestMode(false)
+
+    assertEquals("Student", viewModel.uiState.value.userName)
+  }
+
+  @Test
+  fun refreshProfile_loads_profile() =
+      runTest(testDispatcher) {
+        val profileRepo = FakeProfileRepository()
+        profileRepo.profile =
+            UserProfile(fullName = "John Doe", preferredName = "John", section = "IC")
+        val viewModel = HomeViewModel(profileRepository = profileRepo)
+
+        viewModel.refreshProfile()
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.uiState.value.profile)
+        assertEquals("John", viewModel.uiState.value.userName)
+      }
+
+  @Test
+  fun saveProfile_updates_state() =
+      runTest(testDispatcher) {
+        val profileRepo = FakeProfileRepository()
+        val viewModel = HomeViewModel(profileRepository = profileRepo)
+        val profile = UserProfile(fullName = "Jane Smith", preferredName = "Jane", section = "SC")
+
+        viewModel.saveProfile(profile)
+        advanceUntilIdle()
+
+        assertEquals(profile, viewModel.uiState.value.profile)
+        assertEquals("Jane", viewModel.uiState.value.userName)
+        assertFalse(viewModel.uiState.value.isGuest)
+      }
+
+  @Test
+  fun saveProfile_handles_exception() =
+      runTest(testDispatcher) {
+        val profileRepo = FakeProfileRepository()
+        profileRepo.shouldThrow = true
+        val viewModel = HomeViewModel(profileRepository = profileRepo)
+        val profile = UserProfile(fullName = "Test", preferredName = "", section = "")
+
+        viewModel.saveProfile(profile)
+        advanceUntilIdle()
+
+        // Should not crash, state may not be updated
+      }
+
+  @Test
+  fun sendMessage_with_moodle_intent_attaches_file() =
+      runTest(testDispatcher) {
+        val fakeLlm = FakeLlmClient()
+        fakeLlm.setMoodleIntentResponse(
+            url = "https://moodle.epfl.ch/file.pdf",
+            filename = "lecture1.pdf",
+            courseName = "Algebra",
+            fileType = "lecture",
+            fileNumber = "1")
+        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+        val repo = mock<ConversationRepository>()
+        runBlocking {
+          whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+          whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+        }
+
+        val viewModel = HomeViewModel(llmClient = fakeLlm, auth = auth, repo = repo)
+        viewModel.updateMessageDraft("Show me lecture 1")
+        viewModel.sendMessage()
+        advanceUntilIdle()
+        viewModel.awaitStreamingCompletion()
+        advanceUntilIdle()
+
+        val messages = viewModel.uiState.value.messages
+        val aiMessage = messages.firstOrNull { it.type == ChatType.AI && it.moodleFile != null }
+        assertNotNull("Should have AI message with Moodle file", aiMessage)
+        assertEquals("lecture1.pdf", aiMessage!!.moodleFile!!.filename)
+        assertEquals("Algebra", aiMessage.moodleFile!!.courseName)
+      }
+
+  @Test
+  fun sendMessage_with_moodle_intent_preserves_file_after_firestore_update() =
+      runTest(testDispatcher) {
+        val fakeLlm = FakeLlmClient()
+        fakeLlm.setMoodleIntentResponse(
+            url = "https://moodle.epfl.ch/file.pdf",
+            filename = "homework1.pdf",
+            courseName = "Calculus",
+            fileType = "homework",
+            fileNumber = "1")
+        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+        val messagesFlow = MutableSharedFlow<List<MessageDTO>>(replay = 1)
+        val repo = mock<ConversationRepository>()
+        runBlocking {
+          whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+          whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+          whenever(repo.messagesFlow(any())).thenReturn(messagesFlow)
+        }
+
+        val viewModel = HomeViewModel(llmClient = fakeLlm, auth = auth, repo = repo)
+        viewModel.invokeStartData()
+        viewModel.updateMessageDraft("Show homework 1")
+        viewModel.sendMessage()
+        advanceUntilIdle()
+        viewModel.awaitStreamingCompletion()
+        advanceUntilIdle()
+
+        // Simulate Firestore update
+        messagesFlow.emit(listOf(MessageDTO(role = "assistant", text = "Here is the homework 1")))
+        advanceUntilIdle()
+
+        val messages = viewModel.uiState.value.messages
+        val aiMessage = messages.firstOrNull { it.type == ChatType.AI && it.moodleFile != null }
+        assertNotNull("Moodle file should be preserved after Firestore update", aiMessage)
+        assertEquals("homework1.pdf", aiMessage!!.moodleFile!!.filename)
+      }
+
+  @Test
+  fun sendMessage_with_source_card_creates_source_message() =
+      runTest(testDispatcher) {
+        val fakeLlm = FakeLlmClient()
+        fakeLlm.setSourceResponse(
+            reply = "Here's the answer",
+            sourceType = SourceType.RAG,
+            url = "https://www.epfl.ch/campus")
+        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+        val repo = mock<ConversationRepository>()
+        runBlocking {
+          whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+          whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+        }
+
+        val viewModel = HomeViewModel(llmClient = fakeLlm, auth = auth, repo = repo)
+        viewModel.updateMessageDraft("Tell me about campus")
+        viewModel.sendMessage()
+        advanceUntilIdle()
+        viewModel.awaitStreamingCompletion()
+        advanceUntilIdle()
+
+        val messages = viewModel.uiState.value.messages
+        val sourceMessage = messages.firstOrNull { it.source != null }
+        assertNotNull("Should have source card message", sourceMessage)
+        assertEquals("EPFL.ch Website", sourceMessage!!.source!!.siteLabel)
+      }
+
+  @Test
+  fun sendMessage_with_schedule_source_creates_schedule_card() =
+      runTest(testDispatcher) {
+        val fakeLlm = FakeLlmClient()
+        fakeLlm.setSourceResponse(
+            reply = "Here's your schedule", sourceType = SourceType.SCHEDULE, url = null)
+        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+        val repo = mock<ConversationRepository>()
+        runBlocking {
+          whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+          whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+        }
+
+        val viewModel = HomeViewModel(llmClient = fakeLlm, auth = auth, repo = repo)
+        viewModel.updateMessageDraft("What's my schedule?")
+        viewModel.sendMessage()
+        advanceUntilIdle()
+        viewModel.awaitStreamingCompletion()
+        advanceUntilIdle()
+
+        val messages = viewModel.uiState.value.messages
+        val sourceMessage =
+            messages.firstOrNull { it.source != null && it.source!!.isScheduleSource }
+        assertNotNull("Should have schedule source card", sourceMessage)
+        assertEquals("Your EPFL Schedule", sourceMessage!!.source!!.siteLabel)
+      }
 }

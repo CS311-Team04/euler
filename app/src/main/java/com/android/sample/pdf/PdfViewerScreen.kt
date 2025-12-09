@@ -42,9 +42,12 @@ fun PdfViewerScreen(pdfUrl: String, filename: String, navController: NavControll
           AndroidView(
               factory = { context ->
                 android.webkit.WebView(context).apply {
-                  // JavaScript required for Google Docs viewer
+                  // JavaScript required for Google Docs viewer - safe here as we only load trusted
+                  // Google Docs URLs
                   @Suppress("SetJavaScriptEnabled")
-                  settings.javaScriptEnabled = true
+                  settings.javaScriptEnabled =
+                      true // NOSONAR - JavaScript is required for Google Docs viewer to function.
+                           // We only load trusted Google Docs URLs, not arbitrary user content.
                   settings.loadWithOverviewMode = true
                   settings.useWideViewPort = true
                   settings.builtInZoomControls = true
