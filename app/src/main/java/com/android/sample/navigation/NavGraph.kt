@@ -511,9 +511,12 @@ fun AppNav(
                   }
                 },
                 onPdfClick = { pdfUrl, filename ->
-                  val encodedUrl = Uri.encode(pdfUrl, "")
-                  val encodedFilename = Uri.encode(filename, "")
-                  nav.navigate("pdf_viewer/$encodedUrl/$encodedFilename") { launchSingleTop = true }
+                  // Don't encode here - the URL is already properly formatted from the backend
+                  // Encoding would break signed Moodle URLs and cause double-encoding issues
+                  // Use minimal encoding only for path separators to make it safe for navigation
+                  val safeUrl = pdfUrl.replace("/", "%2F").replace("?", "%3F").replace("=", "%3D")
+                  val safeFilename = filename.replace("/", "%2F")
+                  nav.navigate("pdf_viewer/$safeUrl/$safeFilename") { launchSingleTop = true }
                 },
                 onSettingsClick = { nav.navigate(Routes.Settings) },
                 onConnectorsClick = {
@@ -564,9 +567,12 @@ fun AppNav(
                       startDestinationRoute = nav.graph.startDestinationRoute)
                 },
                 onPdfClick = { pdfUrl, filename ->
-                  val encodedUrl = Uri.encode(pdfUrl, "")
-                  val encodedFilename = Uri.encode(filename, "")
-                  nav.navigate("pdf_viewer/$encodedUrl/$encodedFilename") { launchSingleTop = true }
+                  // Don't encode here - the URL is already properly formatted from the backend
+                  // Encoding would break signed Moodle URLs and cause double-encoding issues
+                  // Use minimal encoding only for path separators to make it safe for navigation
+                  val safeUrl = pdfUrl.replace("/", "%2F").replace("?", "%3F").replace("=", "%3D")
+                  val safeFilename = filename.replace("/", "%2F")
+                  nav.navigate("pdf_viewer/$safeUrl/$safeFilename") { launchSingleTop = true }
                 },
                 onSettingsClick = {
                   navigateToSettings { route, builder -> nav.navigate(route) { builder(this) } }

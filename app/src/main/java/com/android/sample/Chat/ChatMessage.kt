@@ -12,6 +12,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -50,16 +51,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.android.sample.R
+import com.android.sample.settings.Localization
+import com.android.sample.settings.connectors.ConnectorsDimensions
 import com.android.sample.ui.theme.EulerAudioButtonLoadingColor
 import com.android.sample.ui.theme.EulerAudioButtonTint
 import com.android.sample.ui.theme.EulerAudioButtonTintSemiTransparent
+import com.android.sample.ui.theme.MoodleOrange
 
 /**
  * Renders a single chat message as either:
@@ -176,122 +183,124 @@ fun MoodleFileViewer(
     onPdfClick: (String, String) -> Unit = { _, _ -> },
     onDownloadClick: (String, String) -> Unit = { _, _ -> }
 ) {
-  // Build file type display name in English
-  val fileTypeDisplay =
-      when (file.fileType) {
-        "lecture" -> "Lecture"
-        "homework" -> "Homework"
-        "homework_solution" -> "Homework solution"
-        else -> "file"
-      }
+  // Use helper function for file type display (moved out of composable for testability)
+  val fileTypeWithNumber = formatMoodleFileTypeWithNumber(file.fileType, file.fileNumber)
+  val courseName = file.courseName ?: Localization.t("moodle_default_course_name")
 
-  val fileTypeWithNumber =
-      if (file.fileNumber != null) {
-        "$fileTypeDisplay ${file.fileNumber}"
-      } else {
-        fileTypeDisplay
-      }
-
-  val courseName = file.courseName ?: "Moodle"
-  val accent = Color(0xFFFF8C00)
+  // Use theme colors from Color.kt
+  val accent = MoodleOrange
   val cardBg = Color(0xFF141414)
-  val pillBg = Color(0x33FFFFFF)
   val iconBg = Color(0xFF2A2A2A)
   val textPrimary = Color.White
   val textSecondary = Color(0xCCFFFFFF)
 
+  // Use dimensions from ConnectorsDimensions
+  val cardCornerRadius = ConnectorsDimensions.CardCornerRadius
+  val cardPadding = ConnectorsDimensions.CardPadding
+  val cardBorderWidth = ConnectorsDimensions.CardBorderWidth
+
   Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
     Text(
-        text = "Here is the $fileTypeWithNumber from ${courseName}",
+        text =
+            Localization.t("moodle_file_intro")
+                .replace("%1\$s", fileTypeWithNumber)
+                .replace("%2\$s", courseName),
         style = MaterialTheme.typography.bodyLarge.copy(color = textPrimary),
         modifier = Modifier.padding(bottom = 8.dp))
 
     Card(
         modifier =
             Modifier.fillMaxWidth()
-                .border(width = 1.dp, color = accent, shape = RoundedCornerShape(14.dp))
+                .border(
+                    width = cardBorderWidth,
+                    color = accent,
+                    shape = RoundedCornerShape(cardCornerRadius))
                 .testTag("moodle_file_card"),
         colors = CardDefaults.cardColors(containerColor = cardBg),
-        shape = RoundedCornerShape(14.dp)) {
-          Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            // Logo (drawn to avoid white PNG background)
-            Box(
-                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).background(accent),
-                contentAlignment = Alignment.Center) {
-                  Text(
-                      text = "m",
-                      style =
-                          MaterialTheme.typography.titleMedium.copy(
-                              color = Color.White, fontWeight = FontWeight.ExtraBold))
-                }
+        shape = RoundedCornerShape(cardCornerRadius)) {
+          Row(
+              modifier = Modifier.padding(cardPadding),
+              verticalAlignment = Alignment.CenterVertically) {
+                // Moodle logo from resources
+                Image(
+                    painter = painterResource(id = R.drawable.moodle_logo),
+                    contentDescription = Localization.t("moodle_logo_description"),
+                    modifier = Modifier.size(36.dp),
+                    contentScale = ContentScale.Fit)
 
-            Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
-            // Texts and pill
-            Column(
-                modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                  Text(
-                      text = file.filename,
-                      style =
-                          MaterialTheme.typography.titleMedium.copy(
-                              color = textPrimary, fontWeight = FontWeight.SemiBold),
-                      maxLines = 1,
-                      overflow = TextOverflow.Ellipsis)
-                  Row(
-                      verticalAlignment = Alignment.CenterVertically,
-                      horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Box(
-                            modifier =
-                                Modifier.border(1.dp, accent, RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)) {
-                              Text(
-                                  text = "PDF",
-                                  style =
-                                      MaterialTheme.typography.labelSmall.copy(
-                                          color = accent, fontWeight = FontWeight.Bold))
-                            }
-                        Text(
-                            text = fileTypeWithNumber,
-                            style = MaterialTheme.typography.bodyMedium.copy(color = textSecondary))
-                      }
-                }
+                // Texts and pill
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                      Text(
+                          text = file.filename,
+                          style =
+                              MaterialTheme.typography.titleMedium.copy(
+                                  color = textPrimary, fontWeight = FontWeight.SemiBold),
+                          maxLines = 1,
+                          overflow = TextOverflow.Ellipsis)
+                      Row(
+                          verticalAlignment = Alignment.CenterVertically,
+                          horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Box(
+                                modifier =
+                                    Modifier.border(
+                                            cardBorderWidth,
+                                            accent,
+                                            RoundedCornerShape(
+                                                ConnectorsDimensions.LogoCornerRadius))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)) {
+                                  Text(
+                                      text = Localization.t("moodle_file_pdf_label"),
+                                      style =
+                                          MaterialTheme.typography.labelSmall.copy(
+                                              color = accent, fontWeight = FontWeight.Bold))
+                                }
+                            Text(
+                                text = fileTypeWithNumber,
+                                style =
+                                    MaterialTheme.typography.bodyMedium.copy(color = textSecondary))
+                          }
+                    }
 
-            Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(10.dp))
 
-            // Actions
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                  Box(
-                      modifier =
-                          Modifier.size(40.dp)
-                              .clip(RoundedCornerShape(14.dp))
-                              .background(iconBg)
-                              .clickable { onPdfClick(file.url, file.filename) }
-                              .testTag("moodle_file_view_button"),
-                      contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Filled.Visibility,
-                            contentDescription = "View",
-                            tint = textPrimary,
-                            modifier = Modifier.size(20.dp))
-                      }
-                  Box(
-                      modifier =
-                          Modifier.size(40.dp)
-                              .clip(RoundedCornerShape(14.dp))
-                              .background(iconBg)
-                              .clickable { onDownloadClick(file.url, file.filename) }
-                              .testTag("moodle_file_download_button"),
-                      contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Filled.Download,
-                            contentDescription = "Download",
-                            tint = textPrimary,
-                            modifier = Modifier.size(20.dp))
-                      }
-                }
-          }
+                // Actions
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                      Box(
+                          modifier =
+                              Modifier.size(40.dp)
+                                  .clip(RoundedCornerShape(cardCornerRadius))
+                                  .background(iconBg)
+                                  .clickable { onPdfClick(file.url, file.filename) }
+                                  .testTag("moodle_file_view_button"),
+                          contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Filled.Visibility,
+                                contentDescription = Localization.t("moodle_file_view_action"),
+                                tint = textPrimary,
+                                modifier = Modifier.size(20.dp))
+                          }
+                      Box(
+                          modifier =
+                              Modifier.size(40.dp)
+                                  .clip(RoundedCornerShape(cardCornerRadius))
+                                  .background(iconBg)
+                                  .clickable { onDownloadClick(file.url, file.filename) }
+                                  .testTag("moodle_file_download_button"),
+                          contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Filled.Download,
+                                contentDescription = Localization.t("moodle_file_download_action"),
+                                tint = textPrimary,
+                                modifier = Modifier.size(20.dp))
+                          }
+                    }
+              }
         }
   }
 }
@@ -374,8 +383,12 @@ private fun downloadPdf(context: Context, url: String, filename: String) {
             .setAllowedOverMetered(true)
             .setAllowedOverRoaming(true)
 
-    val downloadId = downloadManager.enqueue(request)
-    Toast.makeText(context, "Download started: $filename", Toast.LENGTH_SHORT).show()
+    downloadManager.enqueue(request)
+    Toast.makeText(
+            context,
+            Localization.t("moodle_file_download_started").replace("%1\$s", filename),
+            Toast.LENGTH_SHORT)
+        .show()
   } catch (e: Exception) {
     Toast.makeText(context, "Failed to download: ${e.message}", Toast.LENGTH_SHORT).show()
   }

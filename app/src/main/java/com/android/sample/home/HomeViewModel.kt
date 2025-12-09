@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.android.sample.BuildConfig
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
+import com.android.sample.Chat.MoodleFileAttachment
 import com.android.sample.conversations.AuthNotReadyException
 import com.android.sample.conversations.CachedResponseRepository
 import com.android.sample.conversations.ConversationRepository
@@ -371,9 +372,79 @@ class HomeViewModel(
                   val existingSourceCards =
                       currentState.messages.filter { it.source != null && it.text.isBlank() }
 
+                  // Preserve moodleFile attachments from in-memory messages
+                  // Create a map of index -> moodleFile for efficient lookup
+                  // Only consider recent messages (last 10) to avoid matching old attachments
+                  val recentMessageCount = minOf(10, currentState.messages.size)
+                  val recentMessagesStart =
+                      maxOf(0, currentState.messages.size - recentMessageCount)
+                  val messagesWithMoodleFiles =
+                      currentState.messages
+                          .subList(recentMessagesStart, currentState.messages.size)
+                          .mapIndexedNotNull { relativeIndex, msg ->
+                            val absoluteIndex = recentMessagesStart + relativeIndex
+                            if (msg.moodleFile != null) absoluteIndex to msg.moodleFile else null
+                          }
+                          .toMap()
+
                   val finalMessages = mutableListOf<ChatUIModel>()
 
-                  finalMessages.addAll(firestoreMessages)
+                  // Merge Firestore messages with moodleFile attachments from in-memory state
+                  // Match by position/index first (most accurate), then fallback to text matching
+                  finalMessages.addAll(
+                      firestoreMessages.mapIndexed { firestoreIndex, firestoreMsg ->
+                        // Strategy 1: Match by exact position (most reliable)
+                        val matchingMoodleFile =
+                            messagesWithMoodleFiles[firestoreIndex]
+                                ?: run {
+                                  // Strategy 2: Match by text at same position (only if within
+                                  // recent window)
+                                  if (firestoreIndex >= recentMessagesStart) {
+                                    val inMemoryMsgAtPosition =
+                                        currentState.messages.getOrNull(firestoreIndex)
+                                    if (inMemoryMsgAtPosition?.text == firestoreMsg.text &&
+                                        inMemoryMsgAtPosition.moodleFile != null) {
+                                      inMemoryMsgAtPosition.moodleFile
+                                    } else null
+                                  } else null
+                                }
+                                ?: run {
+                                  // Strategy 3: Find by text match but only within recent messages
+                                  // and small window
+                                  // Only search within a small window to avoid matching wrong
+                                  // messages
+                                  if (firestoreIndex >= recentMessagesStart) {
+                                    val searchWindow = 2
+                                    val startIdx =
+                                        maxOf(recentMessagesStart, firestoreIndex - searchWindow)
+                                    val endIdx =
+                                        minOf(
+                                            currentState.messages.size,
+                                            firestoreIndex + searchWindow + 1)
+
+                                    currentState.messages
+                                        .subList(startIdx, endIdx)
+                                        .withIndex()
+                                        .firstOrNull { (relativeIdx, msg) ->
+                                          val absoluteIdx = startIdx + relativeIdx
+                                          msg.type == firestoreMsg.type &&
+                                              msg.text == firestoreMsg.text &&
+                                              msg.moodleFile != null &&
+                                              // Prefer exact match, then nearby
+                                              (absoluteIdx == firestoreIndex ||
+                                                  kotlin.math.abs(absoluteIdx - firestoreIndex) <=
+                                                      1)
+                                        }
+                                        ?.value
+                                        ?.moodleFile
+                                  } else null
+                                }
+
+                        // If found, merge the moodleFile into the Firestore message
+                        matchingMoodleFile?.let { moodleFile ->
+                          firestoreMsg.copy(moodleFile = moodleFile)
+                        } ?: firestoreMsg
+                      })
 
                   existingSourceCards.forEach { sourceCard ->
                     val originalIndex =
@@ -983,6 +1054,34 @@ class HomeViewModel(
             if (handled) {
               // Skip normal streaming; ED flow takes over
               return@launch
+            }
+
+            // Handle Moodle intent - attach Moodle file to the message
+            val moodleFileAttachment =
+                reply.moodleIntent.file?.let { moodleFile ->
+                  MoodleFileAttachment(
+                      url = moodleFile.url,
+                      filename = moodleFile.filename,
+                      mimetype = moodleFile.mimetype,
+                      courseName = moodleFile.courseName,
+                      fileType = moodleFile.fileType,
+                      fileNumber = moodleFile.fileNumber,
+                      week = moodleFile.week)
+                }
+
+            // Update message with Moodle file attachment if present (before streaming)
+            moodleFileAttachment?.let { file ->
+              _uiState.update { state ->
+                val updated =
+                    state.messages.map { message ->
+                      if (message.id == messageId) {
+                        message.copy(moodleFile = file)
+                      } else {
+                        message
+                      }
+                    }
+                state.copy(messages = updated, streamingSequence = state.streamingSequence + 1)
+              }
             }
 
             // simulate stream into the placeholder AI message

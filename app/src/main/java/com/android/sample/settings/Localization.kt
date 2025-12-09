@@ -298,6 +298,19 @@ object Localization {
           "recent_deadline" to "Project deadline query",
           "recent_registration" to "Course registration info",
 
+          // Moodle File Viewer
+          "moodle_file_type_lecture" to "Lecture",
+          "moodle_file_type_homework" to "Homework",
+          "moodle_file_type_homework_solution" to "Homework solution",
+          "moodle_file_type_file" to "File",
+          "moodle_default_course_name" to "Moodle",
+          "moodle_file_intro" to "Here is the %1\$s from %2\$s",
+          "moodle_file_pdf_label" to "PDF",
+          "moodle_file_view_action" to "View",
+          "moodle_file_download_action" to "Download",
+          "moodle_file_download_started" to "Download started: %1\$s",
+          "moodle_logo_description" to "Moodle logo",
+
           // EPFL Campus Connector
           "epfl_campus_title" to "EPFL Campus",
           "epfl_campus_subtitle" to "Connect your schedule",
