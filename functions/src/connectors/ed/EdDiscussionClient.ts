@@ -198,26 +198,6 @@ export class EdDiscussionClient {
   }
 
   /**
-   * Fetches all unique categories from threads in a course.
-   * This is done by fetching a large batch of threads and extracting their categories.
-   */
-  async fetchCategoriesFromThreads(courseId: number): Promise<string[]> {
-    const threads = await this.fetchThreads({
-      courseId,
-      limit: 200,
-      statusFilter: "all",
-    });
-
-    const set = new Set<string>();
-    for (const t of threads) {
-      if (typeof t.category === "string" && t.category.trim().length > 0) {
-        set.add(t.category);
-      }
-    }
-    return Array.from(set);
-  }
-
-  /**
    * Fetches the category tree (categories and their subcategories) from threads in a course.
    */
   async fetchCategoryTreeFromThreads(courseId: number): Promise<EdCategoryTree> {

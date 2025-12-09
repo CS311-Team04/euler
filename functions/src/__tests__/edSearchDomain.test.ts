@@ -23,15 +23,13 @@ function isBrainError(result: unknown): result is EdBrainError {
 }
 
 describe("parseEdSearchQuery", () => {
-  it("devrait extraire status, cours, limite et date pour une requête typique", () => {
+  it("devrait extraire cours et date pour une requête typique", () => {
     const query = "show me unanswered posts from CS-101 yesterday first 5";
 
     const parsed = parseEdSearchQuery(query);
 
     expect(parsed.originalQuery).toBe(query);
-    expect(parsed.status).toBe("unanswered");
     expect(parsed.courseQuery).toBe("CS-101");
-    expect(parsed.limit).toBe(5);
 
     // On vérifie juste que des dates sont bien présentes et valides
     expect(parsed.dateFrom).toBeDefined();
@@ -45,16 +43,14 @@ describe("parseEdSearchQuery", () => {
     }
   });
 
-  it("devrait gérer une requête sans status explicite ni limite", () => {
+  it("devrait gérer une requête basique", () => {
     const query = "show posts from COM-301 today";
 
     const parsed = parseEdSearchQuery(query);
 
-    // Selon ton impl, status peut être "all" ou undefined
-    expect(["all", undefined]).toContain(parsed.status);
     expect(parsed.courseQuery).toBe("COM-301");
-    expect(parsed.limit).toBeUndefined();
-    expect(parsed.tags).toEqual([]);
+    expect(parsed.dateFrom).toBeDefined();
+    expect(parsed.dateTo).toBeDefined();
   });
 });
 
@@ -74,16 +70,13 @@ describe("buildEdSearchRequest", () => {
 
   // Mock EdDiscussionClient that doesn't actually fetch categories
   const mockClient = {
-    fetchCategoriesFromThreads: async () => Promise.resolve([]),
+    fetchCategoryTreeFromThreads: async () => Promise.resolve({ categories: [], subcategoriesByCategory: {} }),
   } as unknown as EdDiscussionClient;
 
   it("devrait résoudre le cours et construire les options pour fetchThreads", async () => {
     const parsed: EdSearchParsedQuery = {
       originalQuery: "show unanswered posts from CS-101",
       courseQuery: "CS-101",
-      status: "unanswered",
-      limit: 10,
-      tags: [],
     };
 
     const result = await buildEdSearchRequest(mockClient, parsed, courses);
@@ -94,8 +87,9 @@ describe("buildEdSearchRequest", () => {
       expect(result.courseId).toBe(1);
       expect(result.resolvedCourse.code).toBe("CS-101");
       expect(result.fetchOptions.courseId).toBe(1);
-      expect(result.fetchOptions.limit).toBe(10);
-      expect(result.fetchOptions.statusFilter).toBe("unanswered");
+      // Limit and status are set by LLM, so we just check they exist
+      expect(result.fetchOptions.limit).toBeDefined();
+      expect(result.fetchOptions.statusFilter).toBeDefined();
     }
   });
 
@@ -103,8 +97,6 @@ describe("buildEdSearchRequest", () => {
     const parsed: EdSearchParsedQuery = {
       originalQuery: "show posts from MATH-999",
       courseQuery: "MATH-999",
-      status: "all",
-      tags: [],
     };
 
     const result = await buildEdSearchRequest(mockClient, parsed, courses);

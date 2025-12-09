@@ -40,16 +40,6 @@ export interface EdSearchParsedQuery {
   /** Date range (ISO) to filter on ED side */
   dateFrom?: string;
   dateTo?: string;
-
-  /** Tags / optional keywords */
-  tags?: string[];
-
-  /** Limit on the number of posts to return (first 5, latest 10, etc.) */
-  limit?: number;
-
-  textQuery?: string;     // free-text to send as `query`
-  categoryHint?: string;  // what the user said: "problem set", "series 5", etc.
-  assignmentIndex?: number; // assignment number if detected (1, 2, 3, ...)
 }
 
 /**
@@ -93,80 +83,11 @@ function normalize(str: string): string {
 
 /**
  * Parses natural language query into structured EdSearchParsedQuery.
- * Extracts course query, status, limit, category hints, and text query.
+ * Extracts course query and date range.
+ * Note: status and limit are now handled by the LLM router.
  */
 export function parseEdSearchQuery(text: string): EdSearchParsedQuery {
   const lower = text.toLowerCase();
-
-  // Status
-  let status: EdPostStatusFilter | undefined = "all";
-
-  // --- new filters first (slightly more specific expressions) ---
-  if (
-    lower.includes("new replies") ||
-    lower.includes("nouvelles reponses") ||
-    lower.includes("nouvelles réponses")
-  ) {
-    status = "new_replies";
-  } else if (
-    lower.includes("favorite") ||
-    lower.includes("favourites") ||
-    lower.includes("favoris") ||
-    lower.includes("favori")
-  ) {
-    status = "favorites";
-  } else if (
-    lower.includes("approved") ||
-    lower.includes("approuve") ||
-    lower.includes("approuvé") ||
-    lower.includes("approuves") ||
-    lower.includes("approuvés") ||
-    lower.includes("endorsed")
-  ) {
-    status = "approved";
-  } else if (
-    lower.includes("instructors") ||
-    lower.includes("instructor") ||
-    lower.includes("staff") ||
-    lower.includes("enseignant") ||
-    lower.includes("enseignants") ||
-    lower.includes("prof ")
-  ) {
-    status = "instructors";
-
-    // --- old filters (already present) ---
-  } else if (
-    lower.includes("unanswered") ||
-    lower.includes("sans reponse") ||
-    lower.includes("sans réponse")
-  ) {
-    status = "unanswered";
-  } else if (
-    lower.includes("unread") ||
-    lower.includes("non lus") ||
-    lower.includes("non lu")
-  ) {
-    status = "unread";
-  } else if (
-    lower.includes("resolved") ||
-    lower.includes("resolus") ||
-    lower.includes("résolus")
-  ) {
-    status = "resolved";
-  }
-
-
-  // Limite ("first 5", "latest 10")
-  let limit: number | undefined;
-  const limitMatch =
-    lower.match(/(first|latest|top)\s+(\d{1,3})/) ||
-    lower.match(/(\d{1,3})\s+(posts?|questions?)/);
-  if (limitMatch) {
-    const value = parseInt(limitMatch[2] ?? limitMatch[1], 10);
-    if (!Number.isNaN(value)) {
-      limit = value;
-    }
-  }
 
   // ===== Course =====
   // 1) First, try a code like COM-301, CS-202, etc.
@@ -231,20 +152,11 @@ export function parseEdSearchQuery(text: string): EdSearchParsedQuery {
     dateTo = now.toISOString();
   }
 
-  const tags: string[] = [];
-
   return {
     originalQuery: text,
     courseQuery,
-    status,
     dateFrom,
     dateTo,
-    tags,
-    limit,
-    // textQuery, categoryHint, assignmentIndex are now handled by LLM router
-    textQuery: undefined,
-    categoryHint: undefined,
-    assignmentIndex: undefined,
   };
 }
 
@@ -355,11 +267,11 @@ export async function buildEdSearchRequest(
     };
   }
 
-  // Initialize fetchOptions from manual resolution and parsed fields
+  // Initialize fetchOptions with defaults (will be overridden by LLM if provided)
   const fetchOptions: FetchThreadsOptions = {
     courseId: resolvedCourse.id,
-    limit: parsed.limit ?? 5, // Default to 5 if not specified
-    statusFilter: parsed.status ?? "all",
+    limit: 5, // Default limit
+    statusFilter: "all", // Default status
   };
 
   // LLM router refines search parameters (textQuery, limit, status, category)

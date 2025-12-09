@@ -205,9 +205,6 @@ async function edBrainSearchCore(
 
   // 4) Parse the natural language query
   const parsed = parseEdSearchQuery(query);
-  if (input.limit != null) {
-    parsed.limit = input.limit;
-  }
 
   // 5) Resolve the course + fetch options
   const req = await buildEdSearchRequest(client, parsed, courses);
@@ -216,13 +213,18 @@ async function edBrainSearchCore(
       ok: false,
       posts: [],
       filters: {
-        status: parsed.status,
+        status: "all", // Default, LLM would have set this if successful
         dateFrom: parsed.dateFrom,
         dateTo: parsed.dateTo,
-        limit: parsed.limit,
+        limit: input.limit ?? 5, // Use input limit or default
       },
       error: req,
     };
+  }
+
+  // Override limit if explicitly provided in input
+  if (input.limit != null) {
+    req.fetchOptions.limit = input.limit;
   }
 
   // 6) Fetch ED threads
@@ -235,10 +237,10 @@ async function edBrainSearchCore(
 
     const filters = {
       course: req.resolvedCourse.code || req.resolvedCourse.name,
-      status: parsed.status,
+      status: req.fetchOptions.statusFilter || "all",
       dateFrom: parsed.dateFrom,
       dateTo: parsed.dateTo,
-      limit: parsed.limit,
+      limit: req.fetchOptions.limit ?? 5,
     };
 
     if (msg.includes("401") || msg.includes("403")) {
@@ -280,10 +282,10 @@ async function edBrainSearchCore(
       posts: [],
       filters: {
         course: req.resolvedCourse.code || req.resolvedCourse.name,
-        status: parsed.status,
+        status: req.fetchOptions.statusFilter || "all",
         dateFrom: parsed.dateFrom,
         dateTo: parsed.dateTo,
-        limit: parsed.limit,
+        limit: req.fetchOptions.limit ?? 5,
       },
       error: {
         type: "NO_RESULTS",
@@ -300,10 +302,10 @@ async function edBrainSearchCore(
     posts,
     filters: {
       course: req.resolvedCourse.code || req.resolvedCourse.name,
-      status: parsed.status,
+      status: req.fetchOptions.statusFilter || "all",
       dateFrom: parsed.dateFrom,
       dateTo: parsed.dateTo,
-      limit: parsed.limit,
+      limit: req.fetchOptions.limit ?? 5,
     },
   };
 }
