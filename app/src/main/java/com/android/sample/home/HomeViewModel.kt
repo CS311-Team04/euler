@@ -78,7 +78,8 @@ class HomeViewModel(
         UserProfileRepository(),
     private val networkMonitor: NetworkConnectivityMonitor? = null,
     private val cacheRepo: CachedResponseRepository =
-        CachedResponseRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance())
+        CachedResponseRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance()),
+    private val edPostDataSourceOverride: EdPostRemoteDataSource? = null
 ) : ViewModel() {
   companion object {
     private const val TAG = "HomeViewModel"
@@ -170,6 +171,10 @@ class HomeViewModel(
         useEmulator(BuildConfig.FUNCTIONS_HOST, BuildConfig.FUNCTIONS_PORT)
       }
     }
+  }
+
+  private val edPostDataSource: EdPostRemoteDataSource by lazy {
+    edPostDataSourceOverride ?: EdPostRemoteDataSource(functions)
   }
 
   private var activeStreamJob: Job? = null
@@ -440,7 +445,8 @@ class HomeViewModel(
           messages = emptyList(),
           messageDraft = "",
           isSending = false,
-          showDeleteConfirmation = false)
+          showDeleteConfirmation = false,
+          edPostCards = emptyList())
     }
   }
 
@@ -567,6 +573,96 @@ class HomeViewModel(
 
   fun hideDeleteConfirmation() {
     _uiState.update { it.copy(showDeleteConfirmation = false) }
+  }
+
+  /** Clears the banner/result shown after an ED post action. */
+  fun clearEdPostResult() {
+    _uiState.update { it.copy(edPostResult = null) }
+  }
+
+  /**
+   * Publishes the ED post with the given title and body. Clears the pending action and triggers the
+   * post creation workflow.
+   *
+   * @param title The final title for the post
+   * @param body The final body text for the post
+   */
+  fun publishEdPost(title: String, body: String) {
+    Log.d(TAG, "publishEdPost: title='$title', body length=${body.length}")
+
+    val sanitizedTitle = title.trim()
+    val sanitizedBody = body.trim()
+
+    _uiState.update {
+      it.copy(
+          pendingAction =
+              PendingAction.PostOnEd(draftTitle = sanitizedTitle, draftBody = sanitizedBody),
+          edPostResult = null,
+          isPostingToEd = true,
+          isSending = false,
+          streamingMessageId = null)
+    }
+
+    viewModelScope.launch(exceptionHandler) {
+      try {
+        edPostDataSource.publish(sanitizedTitle, sanitizedBody)
+        val now = System.currentTimeMillis()
+        _uiState.update {
+          it.copy(
+              pendingAction = null,
+              edPostResult = EdPostResult.Published(sanitizedTitle, sanitizedBody),
+              edPostCards =
+                  it.edPostCards +
+                      EdPostCard(
+                          id = UUID.randomUUID().toString(),
+                          title = sanitizedTitle,
+                          body = sanitizedBody,
+                          status = EdPostStatus.Published,
+                          createdAt = now),
+              isPostingToEd = false)
+        }
+      } catch (e: Exception) {
+        Log.e(TAG, "publishEdPost: Failed to create post", e)
+        val errText =
+            (e as? FirebaseFunctionsException)?.details as? String
+                ?: e.message
+                ?: "Failed to post to Ed"
+        _uiState.update {
+          it.copy(
+              pendingAction =
+                  PendingAction.PostOnEd(draftTitle = sanitizedTitle, draftBody = sanitizedBody),
+              edPostResult = EdPostResult.Failed(errText),
+              isPostingToEd = false,
+              isSending = false,
+              streamingMessageId = null)
+        }
+      }
+    }
+  }
+
+  /** Cancels the ED post creation and clears the pending action. */
+  fun cancelEdPost() {
+    Log.d(TAG, "cancelEdPost: Cancelling ED post creation")
+    val now = System.currentTimeMillis()
+    val pending = _uiState.value.pendingAction as? PendingAction.PostOnEd
+    val title = pending?.draftTitle ?: ""
+    val body = pending?.draftBody ?: ""
+    _uiState.update {
+      it.copy(
+          pendingAction = null,
+          edPostResult = EdPostResult.Cancelled,
+          edPostCards =
+              it.edPostCards +
+                  EdPostCard(
+                      id = UUID.randomUUID().toString(),
+                      title = title,
+                      body = body,
+                      status = EdPostStatus.Cancelled,
+                      createdAt = now),
+          isSending = false,
+          streamingMessageId = null,
+          isPostingToEd = false)
+    }
   }
 
   // ============ SENDING MESSAGE -> Firestore ============
@@ -756,7 +852,13 @@ class HomeViewModel(
 
         isInLocalNewChat = false
         // Persister immédiatement le message USER côté repo
-        repo.appendMessage(cid, "user", msg)
+        try {
+          repo.appendMessage(cid, "user", msg)
+        } catch (e: Exception) {
+          Log.e(TAG, "Failed to persist user message: ${e.message}", e)
+          handleSendMessageError(e, aiMessageId)
+          return@launch
+        }
 
         // ---------- Firestore + RAG (from second snippet) ----------
 
@@ -877,7 +979,11 @@ class HomeViewModel(
                 "startStreaming: received reply, length=${reply.reply.length}, edIntentDetected=${reply.edIntent.detected}, edIntent=${reply.edIntent.intent}")
 
             // Handle ED intent detection - create PostOnEd pending action
-            handleEdIntent(reply, question)
+            val handled = handleEdIntent(reply, question, messageId)
+            if (handled) {
+              // Skip normal streaming; ED flow takes over
+              return@launch
+            }
 
             // simulate stream into the placeholder AI message
             simulateStreamingFromText(messageId, reply.reply)
@@ -928,6 +1034,8 @@ class HomeViewModel(
                 repo.appendMessage(conversationId, "assistant", reply.reply)
               } catch (e: Exception) {
                 Log.w(TAG, "Failed to persist assistant message: ${e.message}")
+                handleSendMessageError(e, messageId)
+                return@launch
               }
             }
           } catch (ce: CancellationException) {
@@ -1371,7 +1479,11 @@ class HomeViewModel(
    * @param reply The BotReply from the LLM
    * @param originalQuestion The original user question (used as fallback for formatted question)
    */
-  private fun handleEdIntent(reply: BotReply, originalQuestion: String) {
+  private fun handleEdIntent(
+      reply: BotReply,
+      originalQuestion: String,
+      messageId: String
+  ): Boolean {
     if (reply.edIntent.detected && reply.edIntent.intent == ED_INTENT_POST_QUESTION) {
       Log.d(TAG, "ED intent detected: ${reply.edIntent.intent} - creating PostOnEd pending action")
       val formattedQuestion = reply.edIntent.formattedQuestion ?: originalQuestion
@@ -1380,8 +1492,13 @@ class HomeViewModel(
       _uiState.update { state ->
         state.copy(
             pendingAction =
-                PendingAction.PostOnEd(draftTitle = formattedTitle, draftBody = formattedQuestion))
+                PendingAction.PostOnEd(draftTitle = formattedTitle, draftBody = formattedQuestion),
+            messages = state.messages.filterNot { it.id == messageId && it.type == ChatType.AI },
+            streamingMessageId = null,
+            isSending = false)
       }
+      return true
     }
+    return false
   }
 }

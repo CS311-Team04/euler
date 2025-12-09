@@ -4,11 +4,13 @@ import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
@@ -17,6 +19,7 @@ import com.android.sample.util.MainDispatcherRule
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -969,5 +972,317 @@ class HomeScreenComposeInteractionsTest {
     composeRule.waitForIdle()
 
     composeRule.onNodeWithTag(HomeTags.MicBtn, useUnmergedTree = true).assertIsDisplayed()
+  }
+
+  // ===== ED Post Tests =====
+
+  @Test
+  fun HomeScreen_displays_edPostConfirmationModal_when_pendingAction_is_PostOnEd() {
+    val viewModel = createViewModel()
+    // Add a message so LazyColumn is displayed (modal is in LazyColumn)
+    val userMsg = ChatUIModel(id = "msg-1", text = "Hello", timestamp = 0L, type = ChatType.USER)
+    viewModel.editState {
+      it.copy(
+          messages = listOf(userMsg),
+          pendingAction =
+              com.android.sample.home.PendingAction.PostOnEd(
+                  draftTitle = "Test Title", draftBody = "Test Body"))
+    }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    // Verify modal is displayed by checking for Post button (most reliable indicator)
+    composeRule.onNodeWithText("Post", useUnmergedTree = true).assertIsDisplayed()
+  }
+
+  @Test
+  fun HomeScreen_edPostConfirmationModal_publish_calls_viewModel_publishEdPost() {
+    val dataSource = mockk<EdPostRemoteDataSource>()
+    coEvery { dataSource.publish(any(), any()) } returns EdPostPublishResult(1, 1153, 10)
+    val viewModel = HomeViewModel(edPostDataSourceOverride = dataSource)
+    // Add a message so LazyColumn is displayed (modal is in LazyColumn)
+    val userMsg = ChatUIModel(id = "msg-1", text = "Hello", timestamp = 0L, type = ChatType.USER)
+    viewModel.editState {
+      it.copy(
+          messages = listOf(userMsg),
+          pendingAction =
+              com.android.sample.home.PendingAction.PostOnEd(
+                  draftTitle = "Original Title", draftBody = "Original Body"))
+    }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    // Click Post button
+    composeRule.onNodeWithText("Post", useUnmergedTree = true).performClick()
+    composeRule.waitForIdle()
+
+    composeRule.runOnIdle {
+      // Verify pendingAction is cleared
+      assertNull(viewModel.uiState.value.pendingAction)
+      // Verify card is created with Published status
+      assertEquals(1, viewModel.uiState.value.edPostCards.size)
+      val card = viewModel.uiState.value.edPostCards.first()
+      assertEquals("Original Title", card.title)
+      assertEquals("Original Body", card.body)
+      assertEquals(EdPostStatus.Published, card.status)
+    }
+  }
+
+  @Test
+  fun HomeScreen_edPostConfirmationModal_cancel_calls_viewModel_cancelEdPost() {
+    val viewModel = createViewModel()
+    // Add a message so LazyColumn is displayed (modal is in LazyColumn)
+    val userMsg = ChatUIModel(id = "msg-1", text = "Hello", timestamp = 0L, type = ChatType.USER)
+    viewModel.editState {
+      it.copy(
+          messages = listOf(userMsg),
+          pendingAction =
+              com.android.sample.home.PendingAction.PostOnEd(
+                  draftTitle = "Cancel Title", draftBody = "Cancel Body"))
+    }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    // Click Cancel button
+    composeRule.onNodeWithText("Cancel", useUnmergedTree = true).performClick()
+    composeRule.waitForIdle()
+
+    composeRule.runOnIdle {
+      // Verify pendingAction is cleared
+      assertNull(viewModel.uiState.value.pendingAction)
+      // Verify card is created with Cancelled status
+      assertEquals(1, viewModel.uiState.value.edPostCards.size)
+      val card = viewModel.uiState.value.edPostCards.first()
+      assertEquals("Cancel Title", card.title)
+      assertEquals("Cancel Body", card.body)
+      assertEquals(EdPostStatus.Cancelled, card.status)
+    }
+  }
+
+  @Test
+  fun HomeScreen_displays_edPostedCards_in_timeline() {
+    val viewModel = createViewModel()
+    // Add a message so LazyColumn is displayed (cards are in LazyColumn)
+    val userMsg = ChatUIModel(id = "msg-1", text = "Hello", timestamp = 0L, type = ChatType.USER)
+    val now = System.currentTimeMillis()
+    val cards =
+        listOf(
+            EdPostCard(
+                id = "card-1",
+                title = "First Published Post",
+                body = "Body 1",
+                status = EdPostStatus.Published,
+                createdAt = now - 1000L),
+            EdPostCard(
+                id = "card-2",
+                title = "Second Cancelled Post",
+                body = "Body 2",
+                status = EdPostStatus.Cancelled,
+                createdAt = now))
+    viewModel.editState { it.copy(messages = listOf(userMsg), edPostCards = cards) }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    // Verify both cards are displayed
+    composeRule.onNodeWithText("First Published Post").assertIsDisplayed()
+    composeRule.onNodeWithText("Second Cancelled Post").assertIsDisplayed()
+    composeRule.onNodeWithText("Published").assertIsDisplayed()
+    composeRule.onNodeWithText("Cancelled").assertIsDisplayed()
+  }
+
+  @Test
+  fun HomeScreen_edPostedCard_displays_published_status() {
+    val viewModel = createViewModel()
+    // Add a message so LazyColumn is displayed (cards are in LazyColumn)
+    val userMsg = ChatUIModel(id = "msg-1", text = "Hello", timestamp = 0L, type = ChatType.USER)
+    val card =
+        EdPostCard(
+            id = "card-1",
+            title = "My Published Question",
+            body = "Question body text",
+            status = EdPostStatus.Published,
+            createdAt = System.currentTimeMillis())
+    viewModel.editState { it.copy(messages = listOf(userMsg), edPostCards = listOf(card)) }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    composeRule.onNodeWithText("My Published Question").assertIsDisplayed()
+    composeRule.onNodeWithText("Published").assertIsDisplayed()
+    composeRule.onNodeWithText("Ed Discussion").assertIsDisplayed()
+  }
+
+  @Test
+  fun HomeScreen_edPostedCard_displays_cancelled_status() {
+    val viewModel = createViewModel()
+    // Add a message so LazyColumn is displayed (cards are in LazyColumn)
+    val userMsg = ChatUIModel(id = "msg-1", text = "Hello", timestamp = 0L, type = ChatType.USER)
+    val card =
+        EdPostCard(
+            id = "card-1",
+            title = "My Cancelled Question",
+            body = "Question body text",
+            status = EdPostStatus.Cancelled,
+            createdAt = System.currentTimeMillis())
+    viewModel.editState { it.copy(messages = listOf(userMsg), edPostCards = listOf(card)) }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    composeRule.onNodeWithText("My Cancelled Question").assertIsDisplayed()
+    composeRule.onNodeWithText("Cancelled").assertIsDisplayed()
+    composeRule.onNodeWithText("Ed Discussion").assertIsDisplayed()
+  }
+
+  @Test
+  fun HomeScreen_edPostedCard_handles_empty_title() {
+    val viewModel = createViewModel()
+    // Add a message so LazyColumn is displayed (cards are in LazyColumn)
+    val userMsg = ChatUIModel(id = "msg-1", text = "Hello", timestamp = 0L, type = ChatType.USER)
+    val card =
+        EdPostCard(
+            id = "card-1",
+            title = "",
+            body = "Body text",
+            status = EdPostStatus.Published,
+            createdAt = System.currentTimeMillis())
+    viewModel.editState { it.copy(messages = listOf(userMsg), edPostCards = listOf(card)) }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    // Empty title should show "ED post" as fallback
+    composeRule.onNodeWithText("ED post").assertIsDisplayed()
+  }
+
+  @Test
+  fun HomeScreen_edPostConfirmationModal_allows_editing_before_publish() {
+    val dataSource = mockk<EdPostRemoteDataSource>()
+    coEvery { dataSource.publish(any(), any()) } returns EdPostPublishResult(2, 1153, 11)
+    val viewModel = HomeViewModel(edPostDataSourceOverride = dataSource)
+    // Add a message so LazyColumn is displayed (modal is in LazyColumn)
+    val userMsg = ChatUIModel(id = "msg-1", text = "Hello", timestamp = 0L, type = ChatType.USER)
+    viewModel.editState {
+      it.copy(
+          messages = listOf(userMsg),
+          pendingAction =
+              com.android.sample.home.PendingAction.PostOnEd(
+                  draftTitle = "Initial Title", draftBody = "Initial Body"))
+    }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    // Edit the fields
+    composeRule.onNode(hasText("Initial Title")).performTextReplacement("Edited Title")
+    composeRule.onNode(hasText("Initial Body")).performTextReplacement("Edited Body")
+
+    // Publish with edited content
+    composeRule.onNodeWithText("Post", useUnmergedTree = true).performClick()
+    composeRule.waitForIdle()
+
+    composeRule.runOnIdle {
+      assertEquals(1, viewModel.uiState.value.edPostCards.size)
+      val card = viewModel.uiState.value.edPostCards.first()
+      assertEquals("Edited Title", card.title)
+      assertEquals("Edited Body", card.body)
+    }
+  }
+
+  @Test
+  fun HomeScreen_edPostConfirmationModal_not_displayed_when_pendingAction_is_null() {
+    val viewModel = createViewModel()
+    viewModel.editState { it.copy(pendingAction = null) }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    // Modal should not be displayed
+    composeRule.onNodeWithText("Post").assertDoesNotExist()
+    composeRule.onNodeWithText("Cancel").assertDoesNotExist()
+  }
+
+  @Test
+  fun HomeScreen_timeline_merges_messages_and_edPostCards() {
+    val viewModel = createViewModel()
+    val now = System.currentTimeMillis()
+    val userMsg =
+        ChatUIModel(id = "msg-1", text = "Hello", timestamp = now - 500L, type = ChatType.USER)
+    val card =
+        EdPostCard(
+            id = "card-1",
+            title = "Timeline Card",
+            body = "Body",
+            status = EdPostStatus.Published,
+            createdAt = now)
+
+    viewModel.editState { it.copy(messages = listOf(userMsg), edPostCards = listOf(card)) }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    // Both message and card should be displayed
+    composeRule.onNodeWithText("Hello").assertIsDisplayed()
+    composeRule.onNodeWithText("Timeline Card").assertIsDisplayed()
+  }
+
+  @Test
+  fun HomeScreen_edPostConfirmationModal_with_empty_strings() {
+    val viewModel = createViewModel()
+    // Add a message so LazyColumn is displayed (modal is in LazyColumn)
+    val userMsg = ChatUIModel(id = "msg-1", text = "Hello", timestamp = 0L, type = ChatType.USER)
+    viewModel.editState {
+      it.copy(
+          messages = listOf(userMsg),
+          pendingAction =
+              com.android.sample.home.PendingAction.PostOnEd(draftTitle = "", draftBody = ""))
+    }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    // Modal should still be displayed even with empty strings
+    composeRule.onNodeWithText("Post", useUnmergedTree = true).assertIsDisplayed()
+    composeRule.onNodeWithText("Cancel", useUnmergedTree = true).assertIsDisplayed()
+  }
+
+  @Test
+  fun HomeScreen_multiple_edPostCards_displayed_correctly() {
+    val viewModel = createViewModel()
+    // Add a message so LazyColumn is displayed (cards are in LazyColumn)
+    val userMsg = ChatUIModel(id = "msg-1", text = "Hello", timestamp = 0L, type = ChatType.USER)
+    val cards =
+        listOf(
+            EdPostCard(
+                id = "card-1",
+                title = "Card One",
+                body = "Body 1",
+                status = EdPostStatus.Published,
+                createdAt = 1000L),
+            EdPostCard(
+                id = "card-2",
+                title = "Card Two",
+                body = "Body 2",
+                status = EdPostStatus.Published,
+                createdAt = 2000L),
+            EdPostCard(
+                id = "card-3",
+                title = "Card Three",
+                body = "Body 3",
+                status = EdPostStatus.Cancelled,
+                createdAt = 3000L))
+    viewModel.editState { it.copy(messages = listOf(userMsg), edPostCards = cards) }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    // All three cards should be displayed
+    composeRule.onNodeWithText("Card One").assertIsDisplayed()
+    composeRule.onNodeWithText("Card Two").assertIsDisplayed()
+    composeRule.onNodeWithText("Card Three").assertIsDisplayed()
   }
 }
