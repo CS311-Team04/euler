@@ -164,9 +164,12 @@ class FirebaseFunctionsLlmClient(
 
         val replyText =
             parseReplyText(map)
-                ?: return@withContext fallback?.generateReply(
-                    prompt, summary, transcript, profileContext)
-                    ?: throw IllegalStateException("Empty LLM reply")
+                ?: run {
+                  Log.w(
+                      TAG,
+                      "LLM reply empty; using fallback text (url=${pickUrl(map)?.take(120) ?: "null"})")
+                  "Voici le document demandé."
+                }
 
         buildBotReply(map, replyText)
       }
@@ -236,7 +239,37 @@ class FirebaseFunctionsLlmClient(
         null
       }
 
-  private fun parsePrimaryUrl(map: Map<String, Any?>): String? = map[KEY_PRIMARY_URL] as? String
+  private fun parsePrimaryUrl(map: Map<String, Any?>): String? =
+      (map[KEY_PRIMARY_URL] as? String)
+          ?: (map["primaryUrl"] as? String)
+          ?: (map["url"] as? String)
+
+  private fun pickUrl(map: Map<String, Any?>): String? {
+    val direct = parsePrimaryUrl(map)
+    if (!direct.isNullOrBlank()) return direct
+
+    // Fallback: Moodle file payload
+    val moodleFile = map["moodle_file"]
+    if (moodleFile is Map<*, *>) {
+      val mfUrl =
+          (moodleFile["url"] as? String)
+              ?: (moodleFile["file_url"] as? String)
+              ?: (moodleFile["fileUrl"] as? String)
+      if (!mfUrl.isNullOrBlank()) return mfUrl
+    }
+
+    // Fallback: look into sources array [{ url: ... }]
+    val sources = map["sources"]
+    if (sources is List<*>) {
+      sources.forEach { entry ->
+        if (entry is Map<*, *>) {
+          val candidate = entry["url"] as? String
+          if (!candidate.isNullOrBlank()) return candidate
+        }
+      }
+    }
+    return null
+  }
 
   private fun parseEdIntentDetected(map: Map<String, Any?>): Boolean =
       map[KEY_ED_INTENT_DETECTED] as? Boolean ?: false
@@ -253,7 +286,10 @@ class FirebaseFunctionsLlmClient(
       map[KEY_ED_FORMATTED_TITLE] as? String
 
   private fun buildBotReply(map: Map<String, Any?>, replyText: String): BotReply {
-    val url = parsePrimaryUrl(map)
+    val url = pickUrl(map)
+    Log.d(
+        TAG,
+        "Parsed LLM payload keys=${map.keys.joinToString()} url=${url?.take(200) ?: "null"} sourceType=${map[KEY_SOURCE_TYPE]} sourcesSize=${(map["sources"] as? List<*>)?.size ?: 0}")
     val sourceType = parseSourceType(map)
     val edIntentDetected = parseEdIntentDetected(map)
     val edIntentType = parseEdIntentType(map)

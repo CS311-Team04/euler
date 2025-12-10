@@ -7,11 +7,14 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -22,6 +25,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.PictureAsPdf
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,14 +42,19 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.sample.ui.theme.EulerAudioButtonLoadingColor
 import com.android.sample.ui.theme.EulerAudioButtonTint
 import com.android.sample.ui.theme.EulerAudioButtonTintSemiTransparent
+import com.android.sample.R
 
 /**
  * Renders a single chat message as either:
@@ -72,7 +86,9 @@ fun ChatMessage(
     userBubbleBg: Color = Color(0xFF2B2B2B),
     userBubbleText: Color = Color.White,
     aiText: Color = Color(0xFFEDEDED),
-    maxUserBubbleWidthFraction: Float = 0.78f
+    maxUserBubbleWidthFraction: Float = 0.78f,
+    onOpenAttachment: (ChatAttachment) -> Unit = {},
+    onDownloadAttachment: (ChatAttachment) -> Unit = {}
 ) {
   val isUser = message.type == ChatType.USER
 
@@ -126,6 +142,14 @@ fun ChatMessage(
                   AudioPlaybackButton(
                       state = audioState, tint = EulerAudioButtonTintSemiTransparent)
                 }
+          }
+
+          message.attachment?.let { attachment ->
+            Spacer(modifier = Modifier.height(10.dp))
+            AttachmentCard(
+                attachment = attachment,
+                onOpen = { onOpenAttachment(attachment) },
+                onDownload = { onDownloadAttachment(attachment) })
           }
         }
       }
@@ -194,4 +218,84 @@ private fun AudioPlaybackButton(
       }
     }
   }
+}
+
+@Composable
+private fun AttachmentCard(
+    attachment: ChatAttachment,
+    onOpen: () -> Unit,
+    onDownload: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+  val bg = Color(0xFF121212)
+  val border = Color(0xFF2A2A2A)
+  val accent = Color(0xFFE65100)
+  Surface(
+      shape = RoundedCornerShape(16.dp),
+      color = bg,
+      border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp, brush = androidx.compose.ui.graphics.SolidColor(border)),
+      modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+              Surface(
+                  shape = RoundedCornerShape(12.dp),
+                  color = Color(0xFF1F1F1F),
+                  modifier = Modifier.size(52.dp)) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                      Image(
+                          painter = painterResource(id = R.drawable.moodle_logo),
+                          contentDescription = "Moodle",
+                          modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
+                          contentScale = ContentScale.Crop)
+                    }
+                  }
+
+              Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = attachment.title.ifBlank { "Document PDF" },
+                    color = Color.White,
+                    style =
+                        MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.SemiBold, fontSize = 15.sp))
+                Surface(
+                    color = accent.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(8.dp)) {
+                      Row(
+                          modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                          verticalAlignment = Alignment.CenterVertically,
+                          horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(
+                                imageVector = Icons.Outlined.PictureAsPdf,
+                                contentDescription = "PDF",
+                                tint = accent,
+                                modifier = Modifier.size(16.dp))
+                            Text("PDF", color = accent, fontSize = 12.sp)
+                          }
+                    }
+              }
+
+              Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconButton(
+                    onClick = onOpen,
+                    modifier = Modifier.size(40.dp)) {
+                      Icon(
+                          imageVector = Icons.Outlined.Visibility,
+                          contentDescription = "Open PDF",
+                          tint = Color.White,
+                          modifier = Modifier.size(22.dp))
+                    }
+                IconButton(
+                    onClick = onDownload,
+                    modifier = Modifier.size(40.dp)) {
+                      Icon(
+                          imageVector = Icons.Outlined.Download,
+                          contentDescription = "Download PDF",
+                          tint = Color.White,
+                          modifier = Modifier.size(22.dp))
+                    }
+              }
+            }
+      }
 }

@@ -1,7 +1,13 @@
 package com.android.sample.home
 
+import android.app.DownloadManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Environment
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -52,9 +58,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.android.sample.Chat.ChatMessage
 import com.android.sample.Chat.ChatType
+import com.android.sample.Chat.ChatAttachment
 import com.android.sample.R
 import com.android.sample.settings.Localization
 import com.android.sample.speech.SpeechPlayback
@@ -139,6 +149,8 @@ fun HomeScreen(
   val textPrimary = colorScheme.onBackground
   val textSecondary = colorScheme.onSurfaceVariant
   val accentColor = colorScheme.primary
+  val context = LocalContext.current
+  var pdfViewerUrl by remember { mutableStateOf<String?>(null) }
 
   val audioController = remember(ttsHelper) { HomeAudioController(ttsHelper) }
 
@@ -469,7 +481,13 @@ fun HomeScreen(
                                       modifier = Modifier.fillMaxWidth(),
                                       isStreaming = showLeadingDot,
                                       audioState = audioState,
-                                      aiText = textPrimary)
+                                      aiText = textPrimary,
+                                      onOpenAttachment = { attachment ->
+                                        pdfViewerUrl = attachment.url
+                                      },
+                                      onDownloadAttachment = { attachment ->
+                                        startPdfDownload(context, attachment)
+                                      })
 
                                   // Then show the source card AFTER the answer (if any)
                                   if (msg.source != null && !msg.isThinking) {
@@ -534,6 +552,10 @@ fun HomeScreen(
                               }
                             }
                           }
+
+  pdfViewerUrl?.let { url ->
+    PdfViewerDialog(url = url, onDismiss = { pdfViewerUrl = null })
+  }
                     }
                   }
             }
@@ -883,6 +905,59 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
                               }
                         }
                   }
+            }
+      }
+}
+
+private fun startPdfDownload(context: Context, attachment: ChatAttachment) {
+  val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager ?: return
+  val fileName = attachment.title.ifBlank { "document.pdf" }
+  val request =
+      DownloadManager.Request(Uri.parse(attachment.url))
+          .setMimeType(attachment.mimeType)
+          .setTitle(fileName)
+          .setNotificationVisibility(
+              DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+  runCatching { request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName) }
+  manager.enqueue(request)
+  Toast.makeText(context, "Download started", Toast.LENGTH_SHORT).show()
+}
+
+@Composable
+private fun PdfViewerDialog(url: String, onDismiss: () -> Unit) {
+  Dialog(
+      onDismissRequest = onDismiss,
+      properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            color = MaterialTheme.colorScheme.background,
+            modifier = Modifier.fillMaxSize()) {
+              Column(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                      Text(
+                          text = "Document",
+                          style =
+                              MaterialTheme.typography.titleMedium.copy(
+                                  fontWeight = FontWeight.Bold),
+                          color = MaterialTheme.colorScheme.onBackground,
+                          modifier = Modifier.weight(1f))
+                      IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close PDF")
+                      }
+                    }
+                Divider()
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { ctx ->
+                      WebView(ctx).apply {
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        webViewClient = WebViewClient()
+                        loadUrl(url)
+                      }
+                    })
+              }
             }
       }
 }
