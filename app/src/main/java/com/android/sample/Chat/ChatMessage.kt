@@ -26,10 +26,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -44,17 +42,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.android.sample.R
 import com.android.sample.ui.theme.EulerAudioButtonLoadingColor
 import com.android.sample.ui.theme.EulerAudioButtonTint
 import com.android.sample.ui.theme.EulerAudioButtonTintSemiTransparent
-import com.android.sample.R
 
 /**
  * Renders a single chat message as either:
@@ -233,7 +231,9 @@ private fun AttachmentCard(
   Surface(
       shape = RoundedCornerShape(16.dp),
       color = bg,
-      border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp, brush = androidx.compose.ui.graphics.SolidColor(border)),
+      border =
+          ButtonDefaults.outlinedButtonBorder.copy(
+              width = 1.dp, brush = androidx.compose.ui.graphics.SolidColor(border)),
       modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -252,16 +252,16 @@ private fun AttachmentCard(
                     }
                   }
 
-              Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = attachment.title.ifBlank { "Document PDF" },
-                    color = Color.White,
-                    style =
-                        MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.SemiBold, fontSize = 15.sp))
-                Surface(
-                    color = accent.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(8.dp)) {
+              Column(
+                  modifier = Modifier.weight(1f),
+                  verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = attachment.title.ifBlank { "Document PDF" },
+                        color = Color.White,
+                        style =
+                            MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.SemiBold, fontSize = 15.sp))
+                    Surface(color = accent.copy(alpha = 0.15f), shape = RoundedCornerShape(8.dp)) {
                       Row(
                           modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                           verticalAlignment = Alignment.CenterVertically,
@@ -274,27 +274,23 @@ private fun AttachmentCard(
                             Text("PDF", color = accent, fontSize = 12.sp)
                           }
                     }
-              }
+                  }
 
               Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                IconButton(
-                    onClick = onOpen,
-                    modifier = Modifier.size(40.dp)) {
-                      Icon(
-                          imageVector = Icons.Outlined.Visibility,
-                          contentDescription = "Open PDF",
-                          tint = Color.White,
-                          modifier = Modifier.size(22.dp))
-                    }
-                IconButton(
-                    onClick = onDownload,
-                    modifier = Modifier.size(40.dp)) {
-                      Icon(
-                          imageVector = Icons.Outlined.Download,
-                          contentDescription = "Download PDF",
-                          tint = Color.White,
-                          modifier = Modifier.size(22.dp))
-                    }
+                IconButton(onClick = onOpen, modifier = Modifier.size(40.dp)) {
+                  Icon(
+                      imageVector = Icons.Outlined.Visibility,
+                      contentDescription = "Open PDF",
+                      tint = Color.White,
+                      modifier = Modifier.size(22.dp))
+                }
+                IconButton(onClick = onDownload, modifier = Modifier.size(40.dp)) {
+                  Icon(
+                      imageVector = Icons.Outlined.Download,
+                      contentDescription = "Download PDF",
+                      tint = Color.White,
+                      modifier = Modifier.size(22.dp))
+                }
               }
             }
       }

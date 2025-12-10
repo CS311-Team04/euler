@@ -240,9 +240,7 @@ class FirebaseFunctionsLlmClient(
       }
 
   private fun parsePrimaryUrl(map: Map<String, Any?>): String? =
-      (map[KEY_PRIMARY_URL] as? String)
-          ?: (map["primaryUrl"] as? String)
-          ?: (map["url"] as? String)
+      (map[KEY_PRIMARY_URL] as? String) ?: (map["primaryUrl"] as? String) ?: (map["url"] as? String)
 
   private fun pickUrl(map: Map<String, Any?>): String? {
     val direct = parsePrimaryUrl(map)

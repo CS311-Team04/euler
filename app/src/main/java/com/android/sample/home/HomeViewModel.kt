@@ -386,7 +386,8 @@ class HomeViewModel(
                 _uiState.update { currentState ->
                   val firestoreMessages = msgs.map { it.toUi() }
 
-                  // Preserve locally added cards (source cards, attachments) that are not in Firestore
+                  // Preserve locally added cards (source cards, attachments) that are not in
+                  // Firestore
                   val existingExtraCards =
                       currentState.messages.filter {
                         (it.source != null || it.attachment != null) && it.text.isBlank()
@@ -1008,7 +1009,8 @@ class HomeViewModel(
             // simulate stream into the placeholder AI message
             simulateStreamingFromText(messageId, reply.reply)
 
-            // If backend returned a URL, surface it as an attachment card in the chat (keep user in-app)
+            // If backend returned a URL, surface it as an attachment card in the chat (keep user
+            // in-app)
             reply.url?.let { pdfUrl ->
               val attachment = ChatAttachment(url = pdfUrl)
               _uiState.update { state ->

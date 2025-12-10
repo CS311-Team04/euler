@@ -62,9 +62,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.android.sample.Chat.ChatAttachment
 import com.android.sample.Chat.ChatMessage
 import com.android.sample.Chat.ChatType
-import com.android.sample.Chat.ChatAttachment
 import com.android.sample.R
 import com.android.sample.settings.Localization
 import com.android.sample.speech.SpeechPlayback
@@ -553,9 +553,9 @@ fun HomeScreen(
                             }
                           }
 
-  pdfViewerUrl?.let { url ->
-    PdfViewerDialog(url = url, onDismiss = { pdfViewerUrl = null })
-  }
+                      pdfViewerUrl?.let { url ->
+                        PdfViewerDialog(url = url, onDismiss = { pdfViewerUrl = null })
+                      }
                     }
                   }
             }
@@ -916,9 +916,10 @@ private fun startPdfDownload(context: Context, attachment: ChatAttachment) {
       DownloadManager.Request(Uri.parse(attachment.url))
           .setMimeType(attachment.mimeType)
           .setTitle(fileName)
-          .setNotificationVisibility(
-              DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-  runCatching { request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName) }
+          .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+  runCatching {
+    request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+  }
   manager.enqueue(request)
   Toast.makeText(context, "Download started", Toast.LENGTH_SHORT).show()
 }
@@ -928,37 +929,34 @@ private fun PdfViewerDialog(url: String, onDismiss: () -> Unit) {
   Dialog(
       onDismissRequest = onDismiss,
       properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(
-            color = MaterialTheme.colorScheme.background,
-            modifier = Modifier.fillMaxSize()) {
-              Column(modifier = Modifier.fillMaxSize()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                      Text(
-                          text = "Document",
-                          style =
-                              MaterialTheme.typography.titleMedium.copy(
-                                  fontWeight = FontWeight.Bold),
-                          color = MaterialTheme.colorScheme.onBackground,
-                          modifier = Modifier.weight(1f))
-                      IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close PDF")
-                      }
-                    }
-                Divider()
-                AndroidView(
-                    modifier = Modifier.fillMaxSize(),
-                    factory = { ctx ->
-                      WebView(ctx).apply {
-                        settings.javaScriptEnabled = true
-                        settings.domStorageEnabled = true
-                        webViewClient = WebViewClient()
-                        loadUrl(url)
-                      }
-                    })
-              }
-            }
+        Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+          Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                  Text(
+                      text = "Document",
+                      style =
+                          MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                      color = MaterialTheme.colorScheme.onBackground,
+                      modifier = Modifier.weight(1f))
+                  IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "Close PDF")
+                  }
+                }
+            Divider()
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx ->
+                  WebView(ctx).apply {
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    webViewClient = WebViewClient()
+                    loadUrl(url)
+                  }
+                })
+          }
+        }
       }
 }
 
