@@ -90,11 +90,12 @@ export function parseEdSearchQuery(text: string): EdSearchParsedQuery {
   const lower = text.toLowerCase();
 
   // ===== Course =====
-  // 1) First, try a code like COM-301, CS-202, etc.
+  // 1) First, try a code like COM-301, CS-202, etc. (case-insensitive)
   let courseQuery: string | undefined;
-  const courseCodeMatch = text.match(/[A-Z]{2,4}-\d{2,3}/);
+  const courseCodeMatch = text.match(/[A-Za-z]{2,4}-\d{2,3}/i);
 
   if (courseCodeMatch) {
+    // Preserve the original case from the match, but normalize for consistency
     courseQuery = courseCodeMatch[0];
   } else {
     // 2) Otherwise, try to extract the name after "in" or "from"
@@ -169,32 +170,47 @@ export interface EdSearchRequestParams {
   resolvedCourse: EdCourse;
 }
 
+/**
+ * Generates course code variants (lowercase, no space, with dash) from a base code.
+ */
+function generateCourseCodeVariants(code: string): string[] {
+  const [prefix, number] = code.split("-");
+  if (!prefix || !number) return [];
+  const lowerPrefix = prefix.toLowerCase();
+  return [
+    `${lowerPrefix} ${number}`,
+    `${lowerPrefix}${number}`,
+    `${lowerPrefix}-${number}`,
+  ];
+}
+
+/**
+ * Course synonyms map. Base aliases are manually defined, code variants are auto-generated.
+ */
 const COURSE_SYNONYMS: Record<string, string[]> = {
   // Software Enterprise (Swent)
-  "CS-311": ["swent", "the software enterprise", "software enterprise"],
+  "CS-311": ["swent", "the software enterprise", "software enterprise", "soft ent", ...generateCourseCodeVariants("CS-311")],
 
   // Computer Security
-  "COM-301": ["compsec", "computer security", "security"],
+  "COM-301": ["compsec", "computer security", "security", "comp sec", "computer sec", "computer secu", ...generateCourseCodeVariants("COM-301")],
 
   // Stochastic models / Modstock
-  "COM-300": ["modstock", "modeles stochastiques", "modèles stochastiques", "stochastics"],
+  "COM-300": ["modstock", "modeles stochastiques", "modèles stochastiques", "stochastics", "mod stoch", "stoch models", "stochastic models", ...generateCourseCodeVariants("COM-300")],
 
   // Signal Processing
-  "COM-302": ["sigproc", "signal processing", "signal proc"],
+  "COM-302": ["sigproc", "signal processing", "signal proc", ...generateCourseCodeVariants("COM-302")],
 
   // Probability & Statistics
-  "MATH-232": ["probastat", "proba stat", "probability and statistics", "probability & statistics"],
+  "MATH-232": ["probastat", "proba stat", "probability and statistics", "probability & statistics", ...generateCourseCodeVariants("MATH-232")],
 
   // Analysis 3
-  "MATH-203": ["analysis 3", "analys 3", "ana3", "analysis iii", "analyse 3", "analyse iii"],
+  "MATH-203": ["analysis 3", "analys 3", "ana3", "analysis iii", "analyse 3", "analyse iii", ...generateCourseCodeVariants("MATH-203")],
 
   // Time & Discrete Systems
-  "CS-234": ["tds", "time and discrete systems", "time & discrete systems"],
+  "CS-234": ["tds", "time and discrete systems", "time & discrete systems", ...generateCourseCodeVariants("CS-234")],
 
   // Algebra
-  "MATH-310": ["algebre", "algèbre", "algebra"],
-
-  // You can add more aliases here if needed.
+  "MATH-310": ["algebra", "algèbre", "algebre", "algebra 3", ...generateCourseCodeVariants("MATH-310")],
 };
 
 /**
@@ -225,72 +241,16 @@ function resolveCourseFromSynonyms(
 }
 
 /**
- * Resolves courseQuery → ED courseId and builds options
- * for EdDiscussionClient.fetchThreads.
- * Uses the LLM router to refine search parameters (textQuery, limit, status, category).
+ * Applies LLM router output to fetchOptions (textQuery, limit, status, category).
+ * This is a helper to avoid code duplication.
  */
-export async function buildEdSearchRequest(
+async function applyLLMParameters(
   edClient: EdDiscussionClient,
-  parsed: EdSearchParsedQuery,
-  availableCourses: EdCourse[]
-): Promise<EdSearchRequestParams | EdBrainError> {
-  // Manual course resolution (always used)
-  if (!parsed.courseQuery) {
-    return {
-      type: "INVALID_QUERY",
-      message: "No course detected in the query",
-    };
-  }
-
-  const normalizedCourseQuery = parsed.courseQuery.toLowerCase();
-
-  let resolvedCourse =
-    availableCourses.find((c) =>
-      c.code?.toLowerCase().includes(normalizedCourseQuery)
-    ) ||
-    availableCourses.find((c) =>
-      c.name?.toLowerCase().includes(normalizedCourseQuery)
-    );
-
-  // Fallback to synonym-based resolution if direct resolution failed
-  if (!resolvedCourse) {
-    resolvedCourse = resolveCourseFromSynonyms(
-      parsed.originalQuery,
-      availableCourses
-    );
-  }
-
-  if (!resolvedCourse) {
-    return {
-      type: "INVALID_QUERY",
-      message: `Could not match course "${parsed.courseQuery}" to any of your ED courses`,
-    };
-  }
-
-  // Initialize fetchOptions with defaults (will be overridden by LLM if provided)
-  const fetchOptions: FetchThreadsOptions = {
-    courseId: resolvedCourse.id,
-    limit: 5, // Default limit
-    statusFilter: "all", // Default status
-  };
-
-  // LLM router refines search parameters (textQuery, limit, status, category)
-  const llmInput: EdLLMRouterInput = {
-    userQuery: parsed.originalQuery,
-    courses: availableCourses.map((c) => ({
-      id: c.id,
-      code: c.code,
-      name: c.name,
-    })),
-  };
-
-  const llm: EdLLMRouterOutput = await callEdRouterLLM(llmInput);
-
-  logger.info("edLLMRouter.output", {
-    originalQuery: parsed.originalQuery,
-    llm,
-  });
-
+  fetchOptions: FetchThreadsOptions,
+  resolvedCourse: EdCourse,
+  llm: EdLLMRouterOutput,
+  originalQuery: string
+): Promise<void> {
   // Update only textQuery, limit, status from LLM (ignore courseId/courseCode)
   if (llm.textQuery && llm.textQuery.trim()) {
     fetchOptions.query = llm.textQuery.trim();
@@ -311,7 +271,7 @@ export async function buildEdSearchRequest(
 
   if (categoryNames.length > 0) {
     const catInput: EdCategoryLLMInput = {
-      userQuery: parsed.originalQuery,
+      userQuery: originalQuery,
       course: {
         id: resolvedCourse.id,
         code: resolvedCourse.code,
@@ -346,6 +306,82 @@ export async function buildEdSearchRequest(
       resolvedSubcategory: fetchOptions.subcategory,
     });
   }
+}
+
+/**
+ * Resolves courseQuery → ED courseId and builds options
+ * for EdDiscussionClient.fetchThreads.
+ * Uses the LLM router to refine search parameters (textQuery, limit, status, category).
+ */
+export async function buildEdSearchRequest(
+  edClient: EdDiscussionClient,
+  parsed: EdSearchParsedQuery,
+  availableCourses: EdCourse[]
+): Promise<EdSearchRequestParams | EdBrainError> {
+  // Manual course resolution (rule-based only, no LLM fallback)
+  if (!parsed.courseQuery) {
+    return {
+      type: "INVALID_QUERY",
+      message: "No course detected in the query",
+    };
+  }
+
+  const normalizedCourseQuery = parsed.courseQuery.toLowerCase();
+
+  // 1) Try direct code match
+  let resolvedCourse =
+    availableCourses.find((c) =>
+      c.code?.toLowerCase().includes(normalizedCourseQuery)
+    ) ||
+    availableCourses.find((c) =>
+      c.name?.toLowerCase().includes(normalizedCourseQuery)
+    );
+
+  // 2) Fallback to synonym-based resolution if direct resolution failed
+  if (!resolvedCourse) {
+    resolvedCourse = resolveCourseFromSynonyms(
+      parsed.originalQuery,
+      availableCourses
+    );
+  }
+
+  // If no course found after all rule-based attempts, return error
+  if (!resolvedCourse) {
+    return {
+      type: "INVALID_QUERY",
+      message: `Could not match course "${parsed.courseQuery}" to any of your ED courses`,
+    };
+  }
+
+  // Manual resolution succeeded - use it and let LLM refine other parameters
+  // Initialize fetchOptions with defaults (will be overridden by LLM if provided)
+  const fetchOptions: FetchThreadsOptions = {
+    courseId: resolvedCourse.id,
+    limit: 5, // Default limit
+    statusFilter: "all", // Default status
+  };
+
+  // LLM router refines search parameters (textQuery, limit, status, category)
+  // Note: We ignore LLM's courseId/courseCode since manual resolution succeeded
+  const llmInput: EdLLMRouterInput = {
+    userQuery: parsed.originalQuery,
+    courses: availableCourses.map((c) => ({
+      id: c.id,
+      code: c.code,
+      name: c.name,
+    })),
+  };
+
+  const llm: EdLLMRouterOutput = await callEdRouterLLM(llmInput);
+
+  logger.info("edLLMRouter.output", {
+    originalQuery: parsed.originalQuery,
+    llm,
+    manuallyResolvedCourse: resolvedCourse.code,
+  });
+
+  // Apply LLM parameters (textQuery, limit, status, category)
+  await applyLLMParameters(edClient, fetchOptions, resolvedCourse, llm, parsed.originalQuery);
 
   return {
     courseId: resolvedCourse.id,
