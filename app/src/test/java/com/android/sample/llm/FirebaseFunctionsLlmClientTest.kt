@@ -167,7 +167,7 @@ class FirebaseFunctionsLlmClientTest {
 
     override suspend fun generateReply(prompt: String): BotReply {
       prompts += prompt
-      return BotReply(reply, null, SourceType.NONE, EdIntent())
+      return BotReply(reply, null, SourceType.NONE, EdIntent(), EdFetchIntent())
     }
   }
 

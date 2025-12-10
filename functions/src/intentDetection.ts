@@ -104,8 +104,17 @@ export const ED_INTENT_CONFIGS: IntentConfig[] = [
     ],
     blockPatterns: ED_BLOCK_PATTERNS,
   },
-    // ===== PLACEHOLDER: FETCH ED POSTS =====
-
+  // ===== FETCH ED POSTS =====
+  {
+    id: "fetch_question",
+    matchPatterns: [
+      /\b(montre|affiche|ouvre|récupère|montres? moi|affiches? moi|donne.?moi)\b.*\b(post|question)\b.*\b(ed|edstem|ed\s*discussion)/i,
+      /\b(post|question)\b.*\b(ed|edstem|ed\s*discussion)\b.*\b(montre|affiche|ouvre)/i,
+      /\b(show|open|display|fetch|get|lookup|check)\b.*\b(ed|edstem|ed\s*discussion)\b.*\b(post|question|thread)/i,
+      /\b(open|show)\b.*\b(this|that)\b.*\b(ed|edstem|ed\s*discussion)\b.*\b(post|question)/i,
+    ],
+    blockPatterns: ED_BLOCK_PATTERNS,
+  },
 ];
 
 /**

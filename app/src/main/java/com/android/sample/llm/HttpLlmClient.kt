@@ -165,7 +165,14 @@ internal fun parseBotReply(body: String, gson: Gson): BotReply {
           intent = edIntentType,
           formattedQuestion = edFormattedQuestion,
           formattedTitle = edFormattedTitle)
-  return BotReply(replyText, url, sourceType, edIntent)
+
+  val edFetchIntent =
+      com.android.sample.llm.EdFetchIntent(
+          detected = json.getBoolean(JSON_KEY_ED_FETCH_INTENT_DETECTED),
+          query = json.getTrimmedString(JSON_KEY_ED_FETCH_QUERY),
+      )
+
+  return BotReply(replyText, url, sourceType, edIntent, edFetchIntent)
 }
 
 private fun JsonObject.getTrimmedString(key: String): String? {
@@ -199,5 +206,7 @@ private const val JSON_KEY_ED_INTENT_DETECTED = "ed_intent_detected"
 private const val JSON_KEY_ED_INTENT = "ed_intent"
 private const val JSON_KEY_ED_FORMATTED_QUESTION = "ed_formatted_question"
 private const val JSON_KEY_ED_FORMATTED_TITLE = "ed_formatted_title"
+private const val JSON_KEY_ED_FETCH_INTENT_DETECTED = "ed_fetch_intent_detected"
+private const val JSON_KEY_ED_FETCH_QUERY = "ed_fetch_query"
 // Standard localhost identifier - safe loopback address (RFC 5735)
 private const val LOCALHOST = "localhost"
