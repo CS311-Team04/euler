@@ -3,10 +3,10 @@ package com.android.sample.home
 import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.Environment
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.os.ParcelFileDescriptor
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.animateColorAsState
@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.Check
@@ -45,6 +46,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -58,7 +61,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -74,8 +76,11 @@ import com.android.sample.ui.components.EdPostedCard
 import com.android.sample.ui.components.GuestProfileWarningModal
 import com.android.sample.ui.theme.EdPostDimensions
 import com.android.sample.ui.theme.EulerRed
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.Request
 
 object HomeTags {
   const val Root = "home_root"
@@ -925,7 +930,61 @@ private fun startPdfDownload(context: Context, attachment: ChatAttachment) {
 }
 
 @Composable
-private fun PdfViewerDialog(url: String, onDismiss: () -> Unit) {
+internal fun PdfViewerDialog(
+    url: String,
+    onDismiss: () -> Unit,
+    testBitmaps: List<ImageBitmap>? = null
+) {
+  var loadFailed by remember { mutableStateOf(false) }
+  var isLoading by remember { mutableStateOf(true) }
+  var pageBitmaps by remember { mutableStateOf<List<ImageBitmap>>(emptyList()) }
+  var renderer by remember { mutableStateOf<PdfRenderer?>(null) }
+  var parcel by remember { mutableStateOf<ParcelFileDescriptor?>(null) }
+  val context = LocalContext.current
+
+  val openExternally: () -> Unit = {
+    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+        .onFailure {
+          Toast.makeText(context, "Aucune appli pour ouvrir le PDF", Toast.LENGTH_SHORT).show()
+        }
+  }
+
+  DisposableEffect(url) {
+    onDispose {
+      renderer?.close()
+      parcel?.close()
+    }
+  }
+
+  LaunchedEffect(url, testBitmaps) {
+    if (testBitmaps != null) {
+      pageBitmaps = testBitmaps
+      isLoading = false
+      loadFailed = false
+      return@LaunchedEffect
+    }
+    isLoading = true
+    loadFailed = false
+    withContext(Dispatchers.IO) {
+      runCatching {
+            val file = downloadPdfToCache(context, url)
+            val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+            val pdfRenderer = PdfRenderer(pfd)
+            parcel = pfd
+            renderer = pdfRenderer
+            val all = renderAllPagesToBitmaps(pdfRenderer).map { it.asImageBitmap() }
+            withContext(Dispatchers.Main) { pageBitmaps = all }
+            withContext(Dispatchers.Main) { isLoading = false }
+          }
+          .onFailure {
+            withContext(Dispatchers.Main) {
+              loadFailed = true
+              isLoading = false
+            }
+          }
+    }
+  }
+
   Dialog(
       onDismissRequest = onDismiss,
       properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -945,16 +1004,43 @@ private fun PdfViewerDialog(url: String, onDismiss: () -> Unit) {
                   }
                 }
             Divider()
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = { ctx ->
-                  WebView(ctx).apply {
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
-                    webViewClient = WebViewClient()
-                    loadUrl(url)
+            if (isLoading) {
+              LinearProgressIndicator(
+                  modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp))
+              Text(
+                  text = "Chargement du PDF...",
+                  modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                  color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                  style = MaterialTheme.typography.bodySmall)
+              Button(
+                  onClick = openExternally,
+                  modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+                    Text("Ouvrir dans une autre app")
                   }
-                })
+            }
+            if (loadFailed) {
+              Column(
+                  modifier = Modifier.fillMaxSize().padding(16.dp),
+                  verticalArrangement = Arrangement.Center,
+                  horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Impossible d'afficher le PDF ici.",
+                        color = MaterialTheme.colorScheme.onBackground)
+                    Spacer(Modifier.height(12.dp))
+                    Button(onClick = { openExternally() }) { Text("Ouvrir dans une autre app") }
+                  }
+            } else {
+              val scrollState = rememberScrollState()
+              Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState)) {
+                pageBitmaps.forEachIndexed { idx, bmp ->
+                  androidx.compose.foundation.Image(
+                      bitmap = bmp,
+                      contentDescription = "PDF page ${idx + 1}",
+                      modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                      contentScale = ContentScale.FillWidth)
+                }
+              }
+            }
           }
         }
       }
