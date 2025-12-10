@@ -167,7 +167,7 @@ class FirebaseFunctionsLlmClient(
                 ?: run {
                   Log.w(
                       TAG,
-                      "LLM reply empty; using fallback text (url=${pickUrl(map)?.take(120) ?: "null"})")
+                      "LLM reply empty; using fallback text (url=${extractUrlFromLlmPayload(map)?.take(120) ?: "null"})")
                   "Voici le document demandé."
                 }
 
@@ -239,36 +239,6 @@ class FirebaseFunctionsLlmClient(
         null
       }
 
-  private fun parsePrimaryUrl(map: Map<String, Any?>): String? =
-      (map[KEY_PRIMARY_URL] as? String) ?: (map["primaryUrl"] as? String) ?: (map["url"] as? String)
-
-  private fun pickUrl(map: Map<String, Any?>): String? {
-    val direct = parsePrimaryUrl(map)
-    if (!direct.isNullOrBlank()) return direct
-
-    // Fallback: Moodle file payload
-    val moodleFile = map["moodle_file"]
-    if (moodleFile is Map<*, *>) {
-      val mfUrl =
-          (moodleFile["url"] as? String)
-              ?: (moodleFile["file_url"] as? String)
-              ?: (moodleFile["fileUrl"] as? String)
-      if (!mfUrl.isNullOrBlank()) return mfUrl
-    }
-
-    // Fallback: look into sources array [{ url: ... }]
-    val sources = map["sources"]
-    if (sources is List<*>) {
-      sources.forEach { entry ->
-        if (entry is Map<*, *>) {
-          val candidate = entry["url"] as? String
-          if (!candidate.isNullOrBlank()) return candidate
-        }
-      }
-    }
-    return null
-  }
-
   private fun parseEdIntentDetected(map: Map<String, Any?>): Boolean =
       map[KEY_ED_INTENT_DETECTED] as? Boolean ?: false
 
@@ -284,7 +254,7 @@ class FirebaseFunctionsLlmClient(
       map[KEY_ED_FORMATTED_TITLE] as? String
 
   private fun buildBotReply(map: Map<String, Any?>, replyText: String): BotReply {
-    val url = pickUrl(map)
+    val url = extractUrlFromLlmPayload(map)
     Log.d(
         TAG,
         "Parsed LLM payload keys=${map.keys.joinToString()} url=${url?.take(200) ?: "null"} sourceType=${map[KEY_SOURCE_TYPE]} sourcesSize=${(map["sources"] as? List<*>)?.size ?: 0}")
@@ -326,6 +296,34 @@ class FirebaseFunctionsLlmClient(
     private const val KEY_ED_INTENT = "ed_intent"
     private const val KEY_ED_FORMATTED_QUESTION = "ed_formatted_question"
     private const val KEY_ED_FORMATTED_TITLE = "ed_formatted_title"
+
+    internal fun extractUrlFromLlmPayload(map: Map<String, Any?>): String? {
+      val direct =
+          (map[KEY_PRIMARY_URL] as? String)
+              ?: (map["primaryUrl"] as? String)
+              ?: (map["url"] as? String)
+      if (!direct.isNullOrBlank()) return direct
+
+      val moodleFile = map["moodle_file"]
+      if (moodleFile is Map<*, *>) {
+        val mfUrl =
+            (moodleFile["url"] as? String)
+                ?: (moodleFile["file_url"] as? String)
+                ?: (moodleFile["fileUrl"] as? String)
+        if (!mfUrl.isNullOrBlank()) return mfUrl
+      }
+
+      val sources = map["sources"]
+      if (sources is List<*>) {
+        sources.forEach { entry ->
+          if (entry is Map<*, *>) {
+            val candidate = entry["url"] as? String
+            if (!candidate.isNullOrBlank()) return candidate
+          }
+        }
+      }
+      return null
+    }
 
     /**
      * Creates a region-scoped [FirebaseFunctions] instance and wires the local emulator when
