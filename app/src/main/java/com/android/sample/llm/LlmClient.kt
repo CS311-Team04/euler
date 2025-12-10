@@ -162,16 +162,18 @@ class FirebaseFunctionsLlmClient(
                     prompt, summary, transcript, profileContext)
                     ?: throw IllegalStateException("Invalid LLM response payload: null data")
 
-        val replyText =
-            parseReplyText(map)
-                ?: run {
-                  Log.w(
-                      TAG,
-                      "LLM reply empty; using fallback text (url=${extractUrlFromLlmPayload(map)?.take(120) ?: "null"})")
-                  "Voici le document demandé."
-                }
+        val parsedReply = parseReplyText(map)
+        if (parsedReply == null) {
+          Log.w(
+              TAG,
+              "LLM reply empty; using fallback (url=${extractUrlFromLlmPayload(map)?.take(120) ?: "null"})")
+          fallback?.let {
+            return@withContext it.generateReply(prompt, summary, transcript, profileContext)
+          }
+          return@withContext buildBotReply(map, "Voici le document demandé.")
+        }
 
-        buildBotReply(map, replyText)
+        return@withContext buildBotReply(map, parsedReply)
       }
 
   private fun buildRequestPayload(
