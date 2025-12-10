@@ -23,22 +23,65 @@ internal fun downloadPdfToCache(context: Context, url: String): File {
 }
 
 /** Renders the given page index to a Bitmap. Caller is responsible for closing the page. */
-internal fun renderPageToBitmap(renderer: PdfRenderer, pageIndex: Int): Bitmap? {
+internal fun renderPageToBitmap(renderer: PdfRenderer, pageIndex: Int): Bitmap? =
+    renderPageToBitmap(PdfRendererAdapter(renderer), pageIndex)
+
+/** Renders all pages to bitmaps. Caller should close renderer separately if needed. */
+internal fun renderAllPagesToBitmaps(renderer: PdfRenderer): List<Bitmap> {
+  return renderAllPagesToBitmaps(PdfRendererAdapter(renderer))
+}
+
+// ---- Test-friendly abstractions ----
+
+internal interface PageLike : AutoCloseable {
+  val width: Int
+  val height: Int
+
+  fun renderTo(bitmap: Bitmap)
+}
+
+internal interface RendererLike {
+  val pageCount: Int
+
+  fun openPage(index: Int): PageLike
+}
+
+private class PdfRendererAdapter(private val renderer: PdfRenderer) : RendererLike {
+  override val pageCount: Int
+    get() = renderer.pageCount
+
+  override fun openPage(index: Int): PageLike {
+    val page = renderer.openPage(index)
+    return object : PageLike {
+      override val width: Int = page.width
+      override val height: Int = page.height
+
+      override fun renderTo(bitmap: Bitmap) {
+        page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+      }
+
+      override fun close() = page.close()
+    }
+  }
+}
+
+/** Renders all pages to bitmaps using a test-friendly renderer abstraction. */
+internal fun renderAllPagesToBitmaps(renderer: RendererLike): List<Bitmap> {
+  val bitmaps = mutableListOf<Bitmap>()
+  for (i in 0 until renderer.pageCount) {
+    val bitmap = renderPageToBitmap(renderer, i) ?: continue
+    bitmaps.add(bitmap)
+  }
+  return bitmaps
+}
+
+private fun renderPageToBitmap(renderer: RendererLike, pageIndex: Int): Bitmap? {
   if (pageIndex < 0 || pageIndex >= renderer.pageCount) return null
   renderer.openPage(pageIndex).use { page ->
     val width = page.width * 2
     val height = page.height * 2
     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+    page.renderTo(bitmap)
     return bitmap
   }
-}
-
-/** Renders all pages to bitmaps. Caller should close renderer separately if needed. */
-internal fun renderAllPagesToBitmaps(renderer: PdfRenderer): List<Bitmap> {
-  val bitmaps = mutableListOf<Bitmap>()
-  for (i in 0 until renderer.pageCount) {
-    renderPageToBitmap(renderer, i)?.let { bitmaps.add(it) }
-  }
-  return bitmaps
 }
