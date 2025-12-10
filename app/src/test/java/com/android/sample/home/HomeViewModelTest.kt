@@ -799,7 +799,114 @@ class HomeViewModelTest {
         assertNull(sourceCard!!.source?.url) // Schedule sources have no URL
         assertEquals("Your EPFL Schedule", sourceCard.source?.siteLabel)
         assertTrue(sourceCard.source?.isScheduleSource == true)
+        assertEquals(CompactSourceType.SCHEDULE, sourceCard.source?.compactType)
       }
+
+  @Test
+  fun sendMessage_guest_appends_food_source_card_when_llm_returns_food_type() = runBlocking {
+    val viewModel = HomeViewModel()
+    viewModel.setPrivateField(
+        "llmClient",
+        object : LlmClient {
+          override suspend fun generateReply(prompt: String): BotReply =
+              BotReply(
+                  "Aujourd'hui au Piano: Pasta 8.50 CHF",
+                  "https://www.epfl.ch/campus/restaurants",
+                  SourceType.FOOD,
+                  EdIntent())
+        })
+
+    viewModel.updateMessageDraft("Qu'est-ce qu'on mange aujourd'hui?")
+    viewModel.sendMessage()
+    dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+    viewModel.awaitStreamingCompletion()
+
+    val messages = viewModel.uiState.value.messages
+    val sourceCard = messages.lastOrNull { it.source != null }
+    assertNotNull("Expected a food source card message", sourceCard)
+    assertEquals("EPFL Restaurants", sourceCard!!.source?.siteLabel)
+    assertEquals("Retrieved from Pocket Campus", sourceCard.source?.title)
+    assertEquals(CompactSourceType.FOOD, sourceCard.source?.compactType)
+  }
+
+  @Test
+  fun sendMessage_guest_no_source_card_when_llm_returns_none_type() = runBlocking {
+    val viewModel = HomeViewModel()
+    viewModel.setPrivateField(
+        "llmClient",
+        object : LlmClient {
+          override suspend fun generateReply(prompt: String): BotReply =
+              BotReply(
+                  "I don't have specific information about that.",
+                  null,
+                  SourceType.NONE,
+                  EdIntent())
+        })
+
+    viewModel.updateMessageDraft("What's something random?")
+    viewModel.sendMessage()
+    dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+    viewModel.awaitStreamingCompletion()
+
+    val messages = viewModel.uiState.value.messages
+    val sourceCard = messages.lastOrNull { it.source != null }
+    assertNull("Should not have a source card for NONE type", sourceCard)
+  }
+
+  @Test
+  fun sendMessage_guest_no_source_card_when_rag_returns_null_url() = runBlocking {
+    val viewModel = HomeViewModel()
+    viewModel.setPrivateField(
+        "llmClient",
+        object : LlmClient {
+          override suspend fun generateReply(prompt: String): BotReply =
+              BotReply(
+                  "Based on my knowledge...",
+                  null, // No URL provided
+                  SourceType.RAG,
+                  EdIntent())
+        })
+
+    viewModel.updateMessageDraft("Tell me about EPFL")
+    viewModel.sendMessage()
+    dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+    viewModel.awaitStreamingCompletion()
+
+    val messages = viewModel.uiState.value.messages
+    val sourceCard = messages.lastOrNull { it.source != null }
+    assertNull("Should not have a source card when RAG has no URL", sourceCard)
+  }
+
+  @Test
+  fun sendMessage_guest_rag_source_card_has_compactType_NONE() = runBlocking {
+    val viewModel = HomeViewModel()
+    viewModel.setPrivateField(
+        "llmClient",
+        object : LlmClient {
+          override suspend fun generateReply(prompt: String): BotReply =
+              BotReply(
+                  "Here's information about projects.",
+                  "https://www.epfl.ch/education/projects",
+                  SourceType.RAG,
+                  EdIntent())
+        })
+
+    viewModel.updateMessageDraft("How to find projects?")
+    viewModel.sendMessage()
+    dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+    viewModel.awaitStreamingCompletion()
+
+    val messages = viewModel.uiState.value.messages
+    val sourceCard = messages.lastOrNull { it.source != null }
+    assertNotNull("Expected a RAG source card", sourceCard)
+    assertEquals(CompactSourceType.NONE, sourceCard!!.source?.compactType)
+    assertFalse(sourceCard.source?.isScheduleSource == true)
+    assertNotNull(sourceCard.source?.url)
+  }
 
   @Test
   fun sendMessage_failure_surfaces_error_message() = runBlocking {

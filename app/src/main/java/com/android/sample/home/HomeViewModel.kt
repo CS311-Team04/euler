@@ -2,12 +2,14 @@ package com.android.sample.home
 
 import android.net.Uri
 import android.util.Log
+import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.sample.BuildConfig
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
+import com.android.sample.R
 import com.android.sample.conversations.AuthNotReadyException
 import com.android.sample.conversations.CachedResponseRepository
 import com.android.sample.conversations.ConversationRepository
@@ -47,12 +49,22 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
+/** Type of compact source indicator */
+enum class CompactSourceType {
+  NONE, // Full RAG card with Visit button
+  SCHEDULE, // 📅 schedule indicator
+  FOOD // 🍴 food/restaurant indicator
+}
+
 data class SourceMeta(
-    val siteLabel: String, // e.g. "EPFL.ch Website" or "Your Schedule"
-    val title: String, // e.g. "Projet de Semestre – Bachelor"
-    val url: String?, // null for schedule sources
+    val siteLabel: String? = null, // e.g. "EPFL.ch Website" or "Your Schedule"
+    @StringRes val siteLabelRes: Int? = null,
+    val title: String? = null, // e.g. "Projet de Semestre – Bachelor"
+    @StringRes val titleRes: Int? = null,
+    val url: String? = null, // null for schedule sources
     val retrievedAt: Long = System.currentTimeMillis(),
-    val isScheduleSource: Boolean = false // true if from user's EPFL schedule
+    val isScheduleSource: Boolean = false, // DEPRECATED: use compactType instead
+    val compactType: CompactSourceType = CompactSourceType.NONE // Type of compact indicator
 )
 /**
  * HomeViewModel
@@ -85,6 +97,11 @@ class HomeViewModel(
     private const val TAG = "HomeViewModel"
     private const val DEFAULT_USER_NAME = "Student"
     private const val ED_INTENT_POST_QUESTION = "post_question"
+    // Fallback English strings for non-Android contexts (e.g., unit tests)
+    private const val FALLBACK_SCHEDULE_LABEL = "Your EPFL Schedule"
+    private const val FALLBACK_SCHEDULE_TITLE = "Retrieved from your connected calendar"
+    private const val FALLBACK_FOOD_LABEL = "EPFL Restaurants"
+    private const val FALLBACK_FOOD_TITLE = "Retrieved from Pocket Campus"
 
     // Canonical suggestion questions (English) for offline cache
     // These must match the localization keys exactly for cache hits
@@ -994,10 +1011,24 @@ class HomeViewModel(
                   com.android.sample.llm.SourceType.SCHEDULE -> {
                     // Schedule source - show a small indicator
                     SourceMeta(
-                        siteLabel = "Your EPFL Schedule",
-                        title = "Retrieved from your connected calendar",
+                        siteLabel = FALLBACK_SCHEDULE_LABEL,
+                        siteLabelRes = R.string.source_label_epfl_schedule,
+                        title = FALLBACK_SCHEDULE_TITLE,
+                        titleRes = R.string.source_label_schedule_description,
                         url = null,
-                        isScheduleSource = true)
+                        isScheduleSource = true,
+                        compactType = CompactSourceType.SCHEDULE)
+                  }
+                  com.android.sample.llm.SourceType.FOOD -> {
+                    // Food source - show a small indicator
+                    SourceMeta(
+                        siteLabel = FALLBACK_FOOD_LABEL,
+                        siteLabelRes = R.string.source_label_epfl_restaurants,
+                        title = FALLBACK_FOOD_TITLE,
+                        titleRes = R.string.source_label_food_description,
+                        url = reply.url,
+                        isScheduleSource = true,
+                        compactType = CompactSourceType.FOOD)
                   }
                   com.android.sample.llm.SourceType.RAG -> {
                     // RAG source - show the web source card if URL exists
@@ -1006,7 +1037,8 @@ class HomeViewModel(
                           siteLabel = buildSiteLabel(url),
                           title = buildFallbackTitle(url),
                           url = url,
-                          isScheduleSource = false)
+                          isScheduleSource = false,
+                          compactType = CompactSourceType.NONE)
                     }
                   }
                   com.android.sample.llm.SourceType.NONE -> null
