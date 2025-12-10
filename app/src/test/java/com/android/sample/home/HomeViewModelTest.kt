@@ -8,6 +8,7 @@ import com.android.sample.conversations.Conversation
 import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.MessageDTO
 import com.android.sample.llm.BotReply
+import com.android.sample.llm.EdFetchIntent
 import com.android.sample.llm.EdIntent
 import com.android.sample.llm.FakeLlmClient
 import com.android.sample.llm.LlmClient
