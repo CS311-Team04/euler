@@ -1136,6 +1136,7 @@ class HomeScreenComposeInteractionsTest {
     assertTrue(meta.isScheduleSource)
     assertNull(meta.url)
   }
+
   @Test
   fun SourceMeta_retrievedAt_has_default_value() {
     val before = System.currentTimeMillis()
