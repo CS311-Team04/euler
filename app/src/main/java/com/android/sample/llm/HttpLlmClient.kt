@@ -168,8 +168,8 @@ internal fun parseBotReply(body: String, gson: Gson): BotReply {
 
   val edFetchIntent =
       com.android.sample.llm.EdFetchIntent(
-          detected = json.getBoolean(JSON_KEY_ED_FETCH_INTENT_DETECTED),
-          query = json.getTrimmedString(JSON_KEY_ED_FETCH_QUERY),
+          detected = json.optBoolean(JSON_KEY_ED_FETCH_INTENT_DETECTED, false),
+          query = json.optString(JSON_KEY_ED_FETCH_QUERY, null)?.takeIf { it.isNotBlank() },
       )
 
   return BotReply(replyText, url, sourceType, edIntent, edFetchIntent)
@@ -189,6 +189,22 @@ private fun JsonObject.getBoolean(key: String): Boolean {
   if (element.isJsonNull || !element.isJsonPrimitive) return false
   val primitive = element.asJsonPrimitive
   return if (primitive.isBoolean) primitive.asBoolean else false
+}
+
+private fun JsonObject.optBoolean(key: String, defaultValue: Boolean): Boolean {
+  val element: JsonElement = get(key) ?: return defaultValue
+  if (element.isJsonNull || !element.isJsonPrimitive) return defaultValue
+  val primitive = element.asJsonPrimitive
+  return if (primitive.isBoolean) primitive.asBoolean else defaultValue
+}
+
+private fun JsonObject.optString(key: String, defaultValue: String?): String? {
+  val element: JsonElement = get(key) ?: return defaultValue
+  if (element.isJsonNull || !element.isJsonPrimitive) return defaultValue
+  val primitive = element.asJsonPrimitive
+  if (!primitive.isString) return defaultValue
+  val value = primitive.asString.trim()
+  return value.takeIf { it.isNotEmpty() } ?: defaultValue
 }
 
 private const val HEADER_CONTENT_TYPE = "Content-Type"

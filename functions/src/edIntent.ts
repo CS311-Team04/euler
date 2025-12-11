@@ -92,6 +92,7 @@ export function detectFetchFromEdIntentCore(
     };
   }
 
+<<<<<<< HEAD
   // Debug: log if we're checking but not detecting
   const lowerQuestion = question.toLowerCase();
   if (lowerQuestion.includes("fetch") && lowerQuestion.includes("post") && lowerQuestion.includes("ed")) {

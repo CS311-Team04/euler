@@ -7,6 +7,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -544,5 +545,111 @@ class HttpLlmClientTest {
         "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
         reply.edIntent.formattedQuestion)
     assertEquals("Question 5 Modstoch", reply.edIntent.formattedTitle)
+  }
+
+  // ==================== ED FETCH INTENT TESTS ====================
+
+  @Test
+  fun generateReply_parses_ed_fetch_intent_detected_true() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody(
+                """{"reply":"Fetching ED question...","ed_fetch_intent_detected":true,"ed_fetch_query":"show me this ED post"}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertTrue(reply.edFetchIntent.detected)
+    assertEquals("show me this ED post", reply.edFetchIntent.query)
+  }
+
+  @Test
+  fun generateReply_parses_ed_fetch_intent_detected_false() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody(
+                """{"reply":"Response","ed_fetch_intent_detected":false,"ed_fetch_query":null}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertFalse(reply.edFetchIntent.detected)
+    assertNull(reply.edFetchIntent.query)
+  }
+
+  @Test
+  fun generateReply_defaults_ed_fetch_intent_when_missing() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody("""{"reply":"Response"}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertFalse(reply.edFetchIntent.detected)
+    assertNull(reply.edFetchIntent.query)
+  }
+
+  @Test
+  fun generateReply_handles_ed_fetch_query_when_detected() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody(
+                """{"reply":"Fetching...","ed_fetch_intent_detected":true,"ed_fetch_query":"fetch this ED question about calculus"}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertTrue(reply.edFetchIntent.detected)
+    assertEquals("fetch this ED question about calculus", reply.edFetchIntent.query)
+  }
+
+  @Test
+  fun generateReply_handles_ed_fetch_query_null() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody(
+                """{"reply":"Response","ed_fetch_intent_detected":true,"ed_fetch_query":null}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertTrue(reply.edFetchIntent.detected)
+    assertNull(reply.edFetchIntent.query)
+  }
+
+  @Test
+  fun generateReply_complete_response_with_fetch_intent() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody(
+                """{"reply":"Response","primary_url":"https://epfl.ch","ed_intent_detected":false,"ed_intent":null,"ed_fetch_intent_detected":true,"ed_fetch_query":"show me the ED post about linear algebra"}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertEquals("Response", reply.reply)
+    assertEquals("https://epfl.ch", reply.url)
+    assertFalse(reply.edIntent.detected)
+    assertTrue(reply.edFetchIntent.detected)
+    assertEquals("show me the ED post about linear algebra", reply.edFetchIntent.query)
   }
 }

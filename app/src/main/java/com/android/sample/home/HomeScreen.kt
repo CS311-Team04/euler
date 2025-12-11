@@ -1,7 +1,13 @@
 package com.android.sample.home
 
+import android.app.DownloadManager
+import android.content.Context
 import android.content.Intent
+import android.graphics.pdf.PdfRenderer
 import android.net.Uri
+import android.os.Environment
+import android.os.ParcelFileDescriptor
+import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -20,6 +26,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.Check
@@ -39,6 +46,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -52,7 +61,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.android.sample.Chat.ChatAttachment
 import com.android.sample.Chat.ChatMessage
 import com.android.sample.Chat.ChatType
 import com.android.sample.R
@@ -64,8 +76,11 @@ import com.android.sample.ui.components.EdPostedCard
 import com.android.sample.ui.components.GuestProfileWarningModal
 import com.android.sample.ui.theme.EdPostDimensions
 import com.android.sample.ui.theme.EulerRed
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.Request
 
 object HomeTags {
   const val Root = "home_root"
@@ -143,6 +158,8 @@ fun HomeScreen(
   val textPrimary = colorScheme.onBackground
   val textSecondary = colorScheme.onSurfaceVariant
   val accentColor = colorScheme.primary
+  val context = LocalContext.current
+  var pdfViewerUrl by remember { mutableStateOf<String?>(null) }
 
   val audioController = remember(ttsHelper) { HomeAudioController(ttsHelper) }
 
@@ -498,7 +515,13 @@ fun HomeScreen(
                                       modifier = Modifier.fillMaxWidth(),
                                       isStreaming = showLeadingDot,
                                       audioState = audioState,
-                                      aiText = textPrimary)
+                                      aiText = textPrimary,
+                                      onOpenAttachment = { attachment ->
+                                        pdfViewerUrl = attachment.url
+                                      },
+                                      onDownloadAttachment = { attachment ->
+                                        startPdfDownload(context, attachment)
+                                      })
 
                                   // Then show the source card AFTER the answer (if any)
                                   if (msg.source != null && !msg.isThinking) {
@@ -589,6 +612,10 @@ fun HomeScreen(
                               }
                             }
                           }
+
+                      pdfViewerUrl?.let { url ->
+                        PdfViewerDialog(url = url, onDismiss = { pdfViewerUrl = null })
+                      }
                     }
                   }
             }
@@ -633,61 +660,10 @@ fun HomeScreen(
       exit = fadeOut(tween(150)),
       modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-          val bg: Color
-          val icon: ImageVector
-          val title: String
-          val subtitle: String
-          when (val result = edPostResult) {
-            is EdPostResult.Published -> {
-              bg = MaterialTheme.colorScheme.surfaceVariant
-              icon = Icons.Default.CheckCircle
-              title = stringResource(R.string.ed_post_published_title)
-              subtitle = stringResource(R.string.ed_post_published_subtitle)
-            }
-            is EdPostResult.Cancelled -> {
-              bg = MaterialTheme.colorScheme.surfaceVariant
-              icon = Icons.Default.Close
-              title = stringResource(R.string.ed_post_cancelled_title)
-              subtitle = stringResource(R.string.ed_post_cancelled_subtitle)
-            }
-            is EdPostResult.Failed -> {
-              bg = MaterialTheme.colorScheme.errorContainer
-              icon = Icons.Default.Error
-              title = stringResource(R.string.ed_post_failed_title)
-              subtitle = result.message
-            }
-            else -> {
-              bg = MaterialTheme.colorScheme.surface
-              icon = Icons.Default.Check
-              title = ""
-              subtitle = ""
-            }
+          val result = edPostResult
+          if (result != null) {
+            EdPostResultBanner(result = result, onDismiss = { viewModel.clearEdPostResult() })
           }
-
-          Surface(
-              tonalElevation = EdPostDimensions.ResultCardElevation,
-              shape = RoundedCornerShape(EdPostDimensions.ResultCardCornerRadius),
-              color = bg,
-              modifier = Modifier.padding(EdPostDimensions.ResultCardPadding)) {
-                Row(
-                    modifier = Modifier.padding(EdPostDimensions.ResultCardPadding),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement =
-                        Arrangement.spacedBy(EdPostDimensions.ResultCardRowSpacing)) {
-                      Icon(icon, contentDescription = null)
-                      Column(modifier = Modifier.weight(1f)) {
-                        Text(text = title, fontWeight = FontWeight.Bold)
-                        if (subtitle.isNotBlank()) {
-                          Text(text = subtitle, style = MaterialTheme.typography.bodyMedium)
-                        }
-                      }
-                      IconButton(onClick = { viewModel.clearEdPostResult() }) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = stringResource(R.string.dismiss))
-                      }
-                    }
-              }
         }
       }
 }
@@ -712,14 +688,74 @@ private fun SuggestionChip(text: String, modifier: Modifier = Modifier, onClick:
 /* ----- Placeholders for external components (drawer + top-right panel) ----- */
 
 @Composable
-private fun TopRightPanelPlaceholder(onDismiss: () -> Unit, onDeleteClick: () -> Unit) {
-  DropdownMenuItem(text = { Text(Localization.t("share")) }, onClick = onDismiss)
+internal fun TopRightPanelPlaceholder(onDismiss: () -> Unit, onDeleteClick: () -> Unit) {
+  DropdownMenuItem(
+      text = { Text(Localization.t("share")) },
+      onClick = onDismiss,
+      modifier = Modifier.testTag("menu_share"))
   DropdownMenuItem(
       text = { Text(Localization.t("delete")) },
       onClick = {
         onDeleteClick()
         onDismiss()
-      })
+      },
+      modifier = Modifier.testTag("menu_delete"))
+}
+
+@Composable
+internal fun EdPostResultBanner(result: EdPostResult, onDismiss: () -> Unit = {}) {
+  val bg: Color
+  val icon: ImageVector
+  val title: String
+  val subtitle: String
+  when (result) {
+    is EdPostResult.Published -> {
+      bg = MaterialTheme.colorScheme.surfaceVariant
+      icon = Icons.Default.CheckCircle
+      title = stringResource(R.string.ed_post_published_title)
+      subtitle = stringResource(R.string.ed_post_published_subtitle)
+    }
+    is EdPostResult.Cancelled -> {
+      bg = MaterialTheme.colorScheme.surfaceVariant
+      icon = Icons.Default.Close
+      title = stringResource(R.string.ed_post_cancelled_title)
+      subtitle = stringResource(R.string.ed_post_cancelled_subtitle)
+    }
+    is EdPostResult.Failed -> {
+      bg = MaterialTheme.colorScheme.errorContainer
+      icon = Icons.Default.Error
+      title = stringResource(R.string.ed_post_failed_title)
+      subtitle = result.message
+    }
+    else -> {
+      bg = MaterialTheme.colorScheme.surface
+      icon = Icons.Default.Check
+      title = ""
+      subtitle = ""
+    }
+  }
+
+  Surface(
+      tonalElevation = EdPostDimensions.ResultCardElevation,
+      shape = RoundedCornerShape(EdPostDimensions.ResultCardCornerRadius),
+      color = bg,
+      modifier = Modifier.padding(EdPostDimensions.ResultCardPadding)) {
+        Row(
+            modifier = Modifier.padding(EdPostDimensions.ResultCardPadding),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(EdPostDimensions.ResultCardRowSpacing)) {
+              Icon(icon, contentDescription = null)
+              Column(modifier = Modifier.weight(1f)) {
+                Text(text = title, fontWeight = FontWeight.Bold)
+                if (subtitle.isNotBlank()) {
+                  Text(text = subtitle, style = MaterialTheme.typography.bodyMedium)
+                }
+              }
+              IconButton(onClick = onDismiss) {
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.dismiss))
+              }
+            }
+      }
 }
 
 /** Delete menu item that turns red on hover/press. */
@@ -942,6 +978,148 @@ private fun DeleteConfirmationModal(onConfirm: () -> Unit, onCancel: () -> Unit)
       }
 }
 
+private fun startPdfDownload(context: Context, attachment: ChatAttachment) {
+  val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager ?: return
+  val fileName = attachment.title.ifBlank { "document.pdf" }
+  val request =
+      DownloadManager.Request(Uri.parse(attachment.url))
+          .setMimeType(attachment.mimeType)
+          .setTitle(fileName)
+          .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+  runCatching {
+    request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+  }
+  manager.enqueue(request)
+  Toast.makeText(context, "Download started", Toast.LENGTH_SHORT).show()
+}
+
+@Composable
+internal fun PdfViewerDialog(
+    url: String,
+    onDismiss: () -> Unit,
+    testBitmaps: List<ImageBitmap>? = null,
+    testForceLoading: Boolean = false
+) {
+  var loadFailed by remember { mutableStateOf(false) }
+  var isLoading by remember { mutableStateOf(true) }
+  var pageBitmaps by remember { mutableStateOf<List<ImageBitmap>>(emptyList()) }
+  var renderer by remember { mutableStateOf<PdfRenderer?>(null) }
+  var parcel by remember { mutableStateOf<ParcelFileDescriptor?>(null) }
+  val context = LocalContext.current
+
+  val openExternally: () -> Unit = {
+    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+        .onFailure {
+          Toast.makeText(context, "Aucune appli pour ouvrir le PDF", Toast.LENGTH_SHORT).show()
+        }
+  }
+
+  DisposableEffect(url) {
+    onDispose {
+      renderer?.close()
+      parcel?.close()
+    }
+  }
+
+  LaunchedEffect(url, testBitmaps) {
+    if (testForceLoading) {
+      isLoading = true
+      loadFailed = false
+      pageBitmaps = emptyList()
+      return@LaunchedEffect
+    }
+    if (testBitmaps != null) {
+      pageBitmaps = testBitmaps
+      isLoading = false
+      loadFailed = testBitmaps.isEmpty()
+      return@LaunchedEffect
+    }
+    isLoading = true
+    loadFailed = false
+    withContext(Dispatchers.IO) {
+      runCatching {
+            val file = downloadPdfToCache(context, url)
+            val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+            val pdfRenderer = PdfRenderer(pfd)
+            parcel = pfd
+            renderer = pdfRenderer
+            val all = renderAllPagesToBitmaps(pdfRenderer).map { it.asImageBitmap() }
+            withContext(Dispatchers.Main) { pageBitmaps = all }
+            withContext(Dispatchers.Main) { isLoading = false }
+          }
+          .onFailure {
+            withContext(Dispatchers.Main) {
+              loadFailed = true
+              isLoading = false
+            }
+          }
+    }
+  }
+
+  Dialog(
+      onDismissRequest = onDismiss,
+      properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+          Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                  Text(
+                      text = "Document",
+                      style =
+                          MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                      color = MaterialTheme.colorScheme.onBackground,
+                      modifier = Modifier.weight(1f))
+                  IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "Close PDF")
+                  }
+                }
+            Divider()
+            if (isLoading) {
+              LinearProgressIndicator(
+                  modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp))
+              Text(
+                  text = "Chargement du PDF...",
+                  modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                  color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                  style = MaterialTheme.typography.bodySmall)
+              Button(
+                  onClick = openExternally,
+                  modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+                    Text("Ouvrir dans une autre app")
+                  }
+            }
+            if (loadFailed) {
+              Column(
+                  modifier = Modifier.fillMaxSize().padding(16.dp).testTag("pdf_error"),
+                  verticalArrangement = Arrangement.Center,
+                  horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Impossible d'afficher le PDF ici.",
+                        color = MaterialTheme.colorScheme.onBackground)
+                    Spacer(Modifier.height(12.dp))
+                    Button(onClick = { openExternally() }) { Text("Ouvrir dans une autre app") }
+                  }
+            } else {
+              val scrollState = rememberScrollState()
+              Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState)) {
+                pageBitmaps.forEachIndexed { idx, bmp ->
+                  androidx.compose.foundation.Image(
+                      bitmap = bmp,
+                      contentDescription = "PDF page ${idx + 1}",
+                      modifier =
+                          Modifier.fillMaxWidth()
+                              .padding(vertical = 8.dp)
+                              .testTag("pdf_page_${idx + 1}"),
+                      contentScale = ContentScale.FillWidth)
+                }
+              }
+            }
+          }
+        }
+      }
+}
+
 /**
  * Small inline indicator shown while awaiting an AI reply. Driven by HomeUiState.isSending and
  * rendered after the last message in the list.
@@ -981,7 +1159,7 @@ private fun ThinkingIndicator(modifier: Modifier = Modifier) {
  * - Disabled when the draft is blank or a send is in progress.
  */
 @Composable
-private fun BubbleSendButton(enabled: Boolean, isSending: Boolean, onClick: () -> Unit) {
+internal fun BubbleSendButton(enabled: Boolean, isSending: Boolean, onClick: () -> Unit) {
   val colorScheme = MaterialTheme.colorScheme
   val accent = colorScheme.primary
   val size = 40.dp
@@ -1017,7 +1195,9 @@ private fun BubbleSendButton(enabled: Boolean, isSending: Boolean, onClick: () -
         contentAlignment = Alignment.Center) {
           if (isSending) {
             CircularProgressIndicator(
-                strokeWidth = 2.dp, modifier = Modifier.size(18.dp), color = colorScheme.onPrimary)
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(18.dp).testTag("send_loading"),
+                color = colorScheme.onPrimary)
           } else {
             val icon =
                 try {
@@ -1032,7 +1212,7 @@ private fun BubbleSendButton(enabled: Boolean, isSending: Boolean, onClick: () -
                       if (canSend) colorScheme.onPrimary
                       else colorScheme.onSurface.copy(alpha = 0.4f),
                   contentDescription = Localization.t("send"),
-                  modifier = Modifier.size(18.dp))
+                  modifier = Modifier.size(18.dp).testTag("send_icon"))
             }
           }
         }
