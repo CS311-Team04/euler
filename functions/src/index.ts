@@ -465,6 +465,9 @@ export async function answerWithRagCore({
   const finalModel = model ?? process.env.APERTUS_MODEL_ID!;
   const finalTemperature = process.env.APERTUS_TEMPERATURE ? Number(process.env.APERTUS_TEMPERATURE) : 0.0;
   const finalMaxTokens = process.env.APERTUS_MAX_TOKENS ? Number(process.env.APERTUS_MAX_TOKENS) : 280;
+  // optional rolling summary (kept concise)
+  const trimmedSummary =
+    summaryBudget > 0 ? (summary ?? "").toString().trim().slice(0, summaryBudget) : "";
   
   // Check if this is a food-related question FIRST (before schedule/RAG)
   const isFoodQuestion = isFoodRelatedQuestion(q);
@@ -521,15 +524,9 @@ export async function answerWithRagCore({
     }
   }
 
-  const personalQuestionRegex = /\b(mon|ma|mes)\s+(nom|pseudo|section|email|role|faculté|filière)\b|qui\s+(suis-je|je\s+suis)|c'?est\s+quoi\s+(ma|mon)\s+(section|nom|pseudo)/i;
-  const alternativePersonalRegex = /(quelle|quel|quelle)\s+est\s+(ma|mon|mes)\s+(section|nom|pseudo|email|faculté|filière)/i;
-  const isPersonalQuestion = personalQuestionRegex.test(question);
-  const isPersonalQuestionAlt = alternativePersonalRegex.test(question);
-  const isPersonal = isPersonalQuestion || isPersonalQuestionAlt;
-
   // Gate 1: skip retrieval on small talk
   const isSmallTalk = SMALL_TALK.test(q) && q.length <= 30;
-  const skipRetrieval = (isPersonal && Boolean(profileContext)) || (isScheduleQuestion && Boolean(scheduleContext));
+  const skipRetrieval = (isScheduleQuestion && Boolean(scheduleContext));
 
   let routedQuestion = q;
   const routerModel = process.env.APERTUS_ROUTER_MODEL_ID;
@@ -612,59 +609,12 @@ export async function answerWithRagCore({
           })
           .join("\n\n");
 
-  // optional rolling summary (kept concise)
-  const trimmedSummary =
-    summaryBudget > 0 ? (summary ?? "").toString().trim().slice(0, summaryBudget) : "";
+  // optional transcript (kept concise)
   const trimmedTranscript =
     transcriptBudget > 0 ? (recentTranscript ?? "").toString().trim().slice(0, transcriptBudget) : "";
 
   if (profileContext) {
     profileContext = profileContext.toString().slice(0, profileBudget);
-  }
-
-  // Fast path: personal questions with profile context -> minimal prompt, no RAG
-  if (isPersonal && profileContext) {
-    const tFastPromptStart = Date.now();
-    const fastPrompt = [
-      "Réponds brièvement (2-3 phrases max) en utilisant uniquement les données de profil ci-dessous. Pas d'intro ni conclusion. Toujours « vous ».",
-      `Profil:\n${profileContext}`,
-      `Question: ${question}`,
-    ].join("\n\n");
-    timePromptMs = Date.now() - tFastPromptStart;
-
-    const fastClient = client ?? getChatClient();
-    const tLLMStartFast = Date.now();
-    const fastChat = await fastClient.chat.completions.create({
-      model: finalModel,
-      messages: [
-        { role: "system", content: "Tu réponds uniquement avec les données de profil fournies. Pas d'autres sources. Réponses courtes en français, sans méta-commentaires." },
-        { role: "user", content: fastPrompt },
-      ],
-      temperature: finalTemperature,
-      max_tokens: Math.min(finalMaxTokens, 200),
-    });
-    timeLLMMs = Date.now() - tLLMStartFast;
-    const reply = (fastChat.choices?.[0]?.message?.content ?? "").trim();
-
-    logger.info("answerWithRagCore.timing", {
-      path: "personal-fast",
-      totalMs: Date.now() - tStart,
-      scheduleMs: timeScheduleMs,
-      retrievalMs: timeRetrievalMs,
-      promptMs: timePromptMs,
-      llmMs: timeLLMMs,
-      chosenCount: 0,
-      contextLen: 0,
-      source_type: "none",
-    });
-
-    return {
-      reply,
-      primary_url: null,
-      best_score: 1.0,
-      sources: [],
-      source_type: "none",
-    };
   }
 
   // Fast path: schedule questions with schedule context -> minimal prompt, no RAG
@@ -712,39 +662,14 @@ export async function answerWithRagCore({
     };
   }
 
-  // ===== HARD OVERRIDE: If personal question + profile exists, NUKE the RAG context =====
   let finalRagsContext = context;
-  let finalProfileInstruction = "";
-
-  if (profileContext && isPersonal) {
-    logger.info("answerWithRagCore.override", {
-      reason: "Personal question detected, ignoring RAG context",
-      questionPreview: question.slice(0, 100),
-      hasProfileContext: Boolean(profileContext),
-      profileContextLen: profileContext.length,
-      originalContextLen: context.length,
-      willUseEmptyContext: true,
-      isPersonalQuestion: isPersonalQuestion,
-      isPersonalQuestionAlt: isPersonalQuestionAlt,
-    });
-    finalRagsContext = ""; // Hide RAG so AI *must* use profile
-    finalProfileInstruction = `\n[Profil utilisateur]\n${profileContext}\nConsigne: question personnelle -> répondre uniquement avec ces données; ignorer tout autre contexte.\n`;
-  } else {
-    // Log when override is NOT triggered for debugging
-    if (isPersonal && !profileContext) {
-      logger.info("answerWithRagCore.override.skipped", {
-        reason: "Personal question detected but no profile context",
-        questionPreview: question.slice(0, 100),
-      });
-    }
-  }
   // Build schedule-specific instructions if schedule context is present
   const scheduleInstructions = scheduleContext
     ? "Horaire: répondre uniquement avec l'emploi du temps fourni. Réponse en liste concise."
     : "";
 
   const sourcePriorityLine =
-    "Sources: Profil > Résumé > Fenêtre récente > Contexte RAG (ignorer RAG pour questions personnelles ou d'horaire).";
+    "Sources: Résumé > Fenêtre récente > Contexte RAG (ignorer RAG pour les questions d'horaire).";
 
   const tPromptStart = Date.now();
   const prompt = [
@@ -755,13 +680,9 @@ export async function answerWithRagCore({
     trimmedSummary ? `Résumé conversationnel (ne pas afficher tel quel):\n${trimmedSummary}\n` : "",
     trimmedTranscript ? `Fenêtre récente (ne pas afficher):\n${trimmedTranscript}\n` : "",
     scheduleContext ? `Emploi du temps de l'utilisateur (à utiliser uniquement pour les questions d'horaire):\n${scheduleContext}\n` : "",
-    finalProfileInstruction,
     (finalRagsContext && !scheduleContext) ? `Contexte RAG:\n${finalRagsContext}\n` : "",
     `Question: ${question}`,
-    isPersonal && profileContext
-      ? "Question personnelle: répondre uniquement avec le profil ci-dessus; ignorer le reste."
-      : "",
-    !scheduleContext && !isPersonal ? "Si l'information n'est pas fournie, dis que vous ne savez pas." : "",
+    !scheduleContext ? "Si l'information n'est pas fournie, dis que vous ne savez pas." : "",
   ].filter(Boolean).join("\n\n");
 
   logger.info("answerWithRagCore.context", {
@@ -779,25 +700,15 @@ export async function answerWithRagCore({
     routedQuestionHead: routedQuestion.slice(0, 120),
   });
 
-  // Strong, explicit rules for leveraging the rolling summary and profile
   const summaryUsageRules =
     [
-      "Sources (ordre): 1) Profil utilisateur, 2) Résumé, 3) Fenêtre récente, 4) Contexte RAG.",
-      "Questions personnelles (section, nom, pseudo, faculté): utiliser uniquement profil/résumé; ignorer RAG.",
+      "Sources (ordre): 1) Résumé, 2) Fenêtre récente, 3) Contexte RAG.",
       "Questions d'emploi du temps: utiliser uniquement l'emploi du temps fourni.",
       "Si une info manque ou est incertaine: le dire et proposer une source EPFL fiable.",
     ].join("\n");
 
-  // Build priority profile context section if available - placed at END for maximum attention
-  const profileContextSection = profileContext
-    ? [
-        "Profil utilisateur (priorité):",
-        profileContext,
-        "Consignes: pour questions personnelles (nom, pseudo, section, faculté, rôle), répondre uniquement avec ces données; ignorer le contexte RAG.",
-      ].join("\n")
-    : "";
+  const profileContextSection = ""; // personal/profile handling removed
 
-  // Merge persona, rules, summary first, then profile at END for priority
   const systemContent = [
     EPFL_SYSTEM_PROMPT,
     summaryUsageRules,
@@ -810,7 +721,7 @@ export async function answerWithRagCore({
     scheduleContext
       ? "Emploi du temps EPFL de l'utilisateur (utiliser pour questions d'horaire, cours, salles):\n" + scheduleContext
       : "",
-    profileContextSection, // Profile context at END for maximum attention
+    profileContextSection,
   ]
     .filter(Boolean)
     .join("\n\n");
