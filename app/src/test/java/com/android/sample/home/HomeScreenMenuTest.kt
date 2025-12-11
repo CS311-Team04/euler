@@ -24,8 +24,7 @@ class HomeScreenMenuTest {
 
     composeRule.setContent {
       TopRightPanelPlaceholder(
-          onDismiss = { dismissCalled = true },
-          onDeleteClick = { deleteCalled = true })
+          onDismiss = { dismissCalled = true }, onDeleteClick = { deleteCalled = true })
     }
 
     composeRule.onNodeWithTag("menu_delete").assertIsDisplayed().performClick()
@@ -36,11 +35,8 @@ class HomeScreenMenuTest {
 
   @Test
   fun topRightPanelPlaceholder_showsShare() {
-    composeRule.setContent {
-      TopRightPanelPlaceholder(onDismiss = {}, onDeleteClick = {})
-    }
+    composeRule.setContent { TopRightPanelPlaceholder(onDismiss = {}, onDeleteClick = {}) }
 
     composeRule.onNodeWithTag("menu_share").assertIsDisplayed()
   }
 }
-

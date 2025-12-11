@@ -2,8 +2,7 @@ package com.android.sample.home
 
 import android.graphics.Bitmap
 import androidx.test.core.app.ApplicationProvider
-import io.mockk.every
-import io.mockk.mockk
+import java.io.File
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.Assert.assertEquals
@@ -13,7 +12,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
@@ -79,7 +77,6 @@ class PdfRenderUtilsTest {
     assertThrows(IllegalStateException::class.java) { downloadPdfToCache(ctx, url) }
     server.shutdown()
   }
-
 
   // --------- fakes for tests ---------
   private class FakePage(override val width: Int, override val height: Int) : PageLike {

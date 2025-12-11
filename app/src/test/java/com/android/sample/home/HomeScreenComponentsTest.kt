@@ -36,4 +36,3 @@ class HomeScreenComponentsTest {
     composeRule.onNodeWithTag("send_icon", useUnmergedTree = true).assertIsDisplayed()
   }
 }
-
