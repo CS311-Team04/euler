@@ -1,6 +1,5 @@
 package com.android.sample.llm
 
-import android.util.Log
 import com.android.sample.BuildConfig
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
@@ -147,14 +146,9 @@ class FirebaseFunctionsLlmClient(
         val result = callFirebaseFunction(data)
 
         if (result == null) {
-          Log.w(TAG, "Function call returned null (timeout or cancelled)")
           return@withContext fallback?.generateReply(prompt, summary, transcript, profileContext)
               ?: throw IllegalStateException("LLM service unavailable: timeout or cancelled")
         }
-
-        Log.d(
-            TAG,
-            "Received response from $FUNCTION_NAME, data type: ${result.getData()?.javaClass?.simpleName}")
 
         val map =
             parseResponseMap(result)
@@ -164,9 +158,6 @@ class FirebaseFunctionsLlmClient(
 
         val parsedReply = parseReplyText(map)
         if (parsedReply == null) {
-          Log.w(
-              TAG,
-              "LLM reply empty; using fallback (url=${extractUrlFromLlmPayload(map)?.take(120) ?: "null"})")
           fallback?.let {
             return@withContext it.generateReply(prompt, summary, transcript, profileContext)
           }
@@ -186,18 +177,8 @@ class FirebaseFunctionsLlmClient(
         hashMapOf<String, Any>(KEY_QUESTION to prompt).apply {
           summary?.let { put(KEY_SUMMARY, it) }
           transcript?.let { put(KEY_TRANSCRIPT, it) }
-          profileContext?.let {
-            Log.d(
-                TAG,
-                "buildRequestPayload: including profileContext, length=${it.length}, preview=${it.take(100)}...")
-            put(KEY_PROFILE_CONTEXT, it)
-          } ?: Log.d(TAG, "buildRequestPayload: profileContext is null, not including in request")
+          profileContext?.let { put(KEY_PROFILE_CONTEXT, it) }
         }
-    // DEBUG: Log full payload structure (without full content to avoid spam)
-    Log.d(
-        TAG,
-        "buildRequestPayload: Payload structure - hasQuestion=${payload.containsKey(KEY_QUESTION)}, hasSummary=${payload.containsKey(KEY_SUMMARY)}, hasTranscript=${payload.containsKey(KEY_TRANSCRIPT)}, hasProfileContext=${payload.containsKey(KEY_PROFILE_CONTEXT)}")
-    Log.d(TAG, "buildRequestPayload: Payload keys: ${payload.keys.joinToString()}")
     return payload
   }
 
@@ -205,20 +186,12 @@ class FirebaseFunctionsLlmClient(
       data: HashMap<String, Any>
   ): com.google.firebase.functions.HttpsCallableResult? =
       try {
-        Log.d(
-            TAG,
-            "Calling $FUNCTION_NAME with data: question=${data[KEY_QUESTION]?.toString()?.take(50)}..., hasSummary=${data.containsKey(KEY_SUMMARY)}, hasTranscript=${data.containsKey(KEY_TRANSCRIPT)}, hasProfileContext=${data.containsKey(KEY_PROFILE_CONTEXT)}")
         withTimeoutOrNull(timeoutMillis) {
           functions.getHttpsCallable(FUNCTION_NAME).call(data).await()
         }
       } catch (e: FirebaseFunctionsException) {
-        Log.e(
-            TAG,
-            "Firebase Functions error: code=${e.code}, message=${e.message}, details=${e.details}",
-            e)
         throw e
       } catch (e: Exception) {
-        Log.e(TAG, "Error calling Firebase Function: ${e.javaClass.simpleName}", e)
         throw e
       }
 
@@ -229,7 +202,6 @@ class FirebaseFunctionsLlmClient(
       try {
         result.getData() as? Map<String, Any?>
       } catch (e: ClassCastException) {
-        Log.e(TAG, "Failed to cast response data to Map", e)
         null
       }
 
@@ -237,7 +209,6 @@ class FirebaseFunctionsLlmClient(
       try {
         (map[KEY_REPLY] as? String)?.takeIf { it.isNotBlank() }
       } catch (e: ClassCastException) {
-        Log.e(TAG, "Failed to cast reply to String", e)
         null
       }
 
@@ -257,16 +228,9 @@ class FirebaseFunctionsLlmClient(
 
   private fun buildBotReply(map: Map<String, Any?>, replyText: String): BotReply {
     val url = extractUrlFromLlmPayload(map)
-    Log.d(
-        TAG,
-        "Parsed LLM payload keys=${map.keys.joinToString()} url=${url?.take(200) ?: "null"} sourceType=${map[KEY_SOURCE_TYPE]} sourcesSize=${(map["sources"] as? List<*>)?.size ?: 0}")
     val sourceType = parseSourceType(map)
     val edIntentDetected = parseEdIntentDetected(map)
     val edIntentType = parseEdIntentType(map)
-
-    if (edIntentDetected) {
-      Log.d(TAG, "ED intent detected: $edIntentType")
-    }
 
     val edFormattedQuestion = parseEdFormattedQuestion(map)
     val edFormattedTitle = parseEdFormattedTitle(map)
