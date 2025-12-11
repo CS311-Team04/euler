@@ -2,7 +2,10 @@
 
 import path from "node:path";
 import dotenv from "dotenv";
-dotenv.config({ path: path.join(__dirname, "..", ".env") });
+// Only load .env if not in CI/test environment (where env vars are set directly)
+if (!process.env.CI && !process.env.FIRESTORE_EMULATOR_HOST) {
+  dotenv.config({ path: path.join(__dirname, "..", ".env") });
+}
 
 import * as logger from "firebase-functions/logger";
 import OpenAI from "openai";
@@ -79,7 +82,8 @@ export function setChatClient(client: OpenAI | null) {
 }
 
 // Firebase Admin (Firestore)
-if (!admin.apps.length) {
+// Only initialize if not already initialized AND not in emulator mode (tests handle their own init)
+if (!admin.apps.length && !process.env.FIRESTORE_EMULATOR_HOST) {
   admin.initializeApp();
 }
 const db = admin.firestore();
