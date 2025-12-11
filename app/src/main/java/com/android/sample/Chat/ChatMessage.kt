@@ -107,9 +107,8 @@ fun ChatMessage(
   } else {
     // AI: full-width plain text
     val moodlePayload = remember(message.text) { parseMoodleOverviewPayload(message.text) }
-    val moodleContent = remember(moodlePayload) {
-      moodlePayload?.let { cleanMoodleMarkdown(it.content) }
-    }
+    val moodleContent =
+        remember(moodlePayload) { moodlePayload?.let { cleanMoodleMarkdown(it.content) } }
 
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
       if (isStreaming && message.text.isEmpty()) {
@@ -125,7 +124,8 @@ fun ChatMessage(
                 modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
             Spacer(modifier = Modifier.height(8.dp))
             MoodleSourceBadge(
-                metadata = moodlePayload.metadata, modifier = Modifier.testTag("chat_ai_moodle_badge"))
+                metadata = moodlePayload.metadata,
+                modifier = Modifier.testTag("chat_ai_moodle_badge"))
           } else {
             Text(
                 text = message.text,

@@ -59,4 +59,3 @@ fun MoodleSourceBadge(metadata: MoodleMetadata, modifier: Modifier = Modifier) {
       }
   Spacer(modifier = Modifier.height(4.dp))
 }
-

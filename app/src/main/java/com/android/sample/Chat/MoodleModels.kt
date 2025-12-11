@@ -21,10 +21,7 @@ data class MoodleMetadata(
     val source: String
 )
 
-private val moodleJson =
-    Json {
-      ignoreUnknownKeys = true
-    }
+private val moodleJson = Json { ignoreUnknownKeys = true }
 
 fun parseMoodleOverviewPayload(raw: String?): MoodleOverviewResponse? {
   val trimmed = raw?.trim() ?: return null
@@ -35,8 +32,7 @@ fun parseMoodleOverviewPayload(raw: String?): MoodleOverviewResponse? {
 fun formatMoodleUpdatedDate(isoString: String): String {
   return runCatching {
         val instant = Instant.parse(isoString)
-        val formatter =
-            DateTimeFormatter.ofPattern("MMM d, HH:mm").withZone(ZoneId.systemDefault())
+        val formatter = DateTimeFormatter.ofPattern("MMM d, HH:mm").withZone(ZoneId.systemDefault())
         formatter.format(instant)
       }
       .getOrElse { isoString }
@@ -65,4 +61,3 @@ fun cleanMoodleMarkdown(content: String): String {
           .filterNotNull()
   return cleaned.joinToString("\n").trim()
 }
-
