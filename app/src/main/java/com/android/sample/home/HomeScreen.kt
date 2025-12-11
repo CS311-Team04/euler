@@ -684,14 +684,18 @@ private fun SuggestionChip(text: String, modifier: Modifier = Modifier, onClick:
 /* ----- Placeholders for external components (drawer + top-right panel) ----- */
 
 @Composable
-private fun TopRightPanelPlaceholder(onDismiss: () -> Unit, onDeleteClick: () -> Unit) {
-  DropdownMenuItem(text = { Text(Localization.t("share")) }, onClick = onDismiss)
+internal fun TopRightPanelPlaceholder(onDismiss: () -> Unit, onDeleteClick: () -> Unit) {
+  DropdownMenuItem(
+      text = { Text(Localization.t("share")) },
+      onClick = onDismiss,
+      modifier = Modifier.testTag("menu_share"))
   DropdownMenuItem(
       text = { Text(Localization.t("delete")) },
       onClick = {
         onDeleteClick()
         onDismiss()
-      })
+      },
+      modifier = Modifier.testTag("menu_delete"))
 }
 
 /** Delete menu item that turns red on hover/press. */
@@ -1085,7 +1089,7 @@ private fun ThinkingIndicator(modifier: Modifier = Modifier) {
  * - Disabled when the draft is blank or a send is in progress.
  */
 @Composable
-private fun BubbleSendButton(enabled: Boolean, isSending: Boolean, onClick: () -> Unit) {
+internal fun BubbleSendButton(enabled: Boolean, isSending: Boolean, onClick: () -> Unit) {
   val colorScheme = MaterialTheme.colorScheme
   val accent = colorScheme.primary
   val size = 40.dp
@@ -1121,7 +1125,9 @@ private fun BubbleSendButton(enabled: Boolean, isSending: Boolean, onClick: () -
         contentAlignment = Alignment.Center) {
           if (isSending) {
             CircularProgressIndicator(
-                strokeWidth = 2.dp, modifier = Modifier.size(18.dp), color = colorScheme.onPrimary)
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(18.dp).testTag("send_loading"),
+                color = colorScheme.onPrimary)
           } else {
             val icon =
                 try {
@@ -1136,7 +1142,7 @@ private fun BubbleSendButton(enabled: Boolean, isSending: Boolean, onClick: () -
                       if (canSend) colorScheme.onPrimary
                       else colorScheme.onSurface.copy(alpha = 0.4f),
                   contentDescription = Localization.t("send"),
-                  modifier = Modifier.size(18.dp))
+                  modifier = Modifier.size(18.dp).testTag("send_icon"))
             }
           }
         }

@@ -1,12 +1,19 @@
 package com.android.sample.home
 
 import android.graphics.Bitmap
+import androidx.test.core.app.ApplicationProvider
+import io.mockk.every
+import io.mockk.mockk
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
@@ -45,6 +52,34 @@ class PdfRenderUtilsTest {
 
     assertTrue(result.isEmpty())
   }
+
+  @Test
+  fun downloadPdfToCache_succeeds() {
+    val server = MockWebServer()
+    server.enqueue(MockResponse().setResponseCode(200).setBody("%PDF-1.4 dummy"))
+    server.start()
+    val url = server.url("/doc.pdf").toString()
+
+    val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+    val file: File = downloadPdfToCache(ctx, url)
+
+    assertTrue(file.exists())
+    assertTrue(file.readBytes().isNotEmpty())
+    server.shutdown()
+  }
+
+  @Test
+  fun downloadPdfToCache_throws_onHttpError() {
+    val server = MockWebServer()
+    server.enqueue(MockResponse().setResponseCode(404))
+    server.start()
+    val url = server.url("/missing.pdf").toString()
+
+    val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+    assertThrows(IllegalStateException::class.java) { downloadPdfToCache(ctx, url) }
+    server.shutdown()
+  }
+
 
   // --------- fakes for tests ---------
   private class FakePage(override val width: Int, override val height: Int) : PageLike {
