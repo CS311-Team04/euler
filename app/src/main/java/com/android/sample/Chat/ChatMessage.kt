@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -105,17 +106,34 @@ fun ChatMessage(
     }
   } else {
     // AI: full-width plain text
+    val moodlePayload = remember(message.text) { parseMoodleOverviewPayload(message.text) }
+    val moodleContent = remember(moodlePayload) {
+      moodlePayload?.let { cleanMoodleMarkdown(it.content) }
+    }
+
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
       if (isStreaming && message.text.isEmpty()) {
         LeadingThinkingDot(color = aiText)
       } else {
         Column(modifier = Modifier.fillMaxWidth()) {
-          Text(
-              text = message.text,
-              color = aiText,
-              style = MaterialTheme.typography.bodyMedium,
-              lineHeight = 20.sp,
-              modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+          if (moodlePayload != null && moodleContent != null) {
+            Text(
+                text = moodleContent,
+                color = aiText,
+                style = MaterialTheme.typography.bodyMedium,
+                lineHeight = 20.sp,
+                modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+            Spacer(modifier = Modifier.height(8.dp))
+            MoodleSourceBadge(
+                metadata = moodlePayload.metadata, modifier = Modifier.testTag("chat_ai_moodle_badge"))
+          } else {
+            Text(
+                text = message.text,
+                color = aiText,
+                style = MaterialTheme.typography.bodyMedium,
+                lineHeight = 20.sp,
+                modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+          }
 
           if (audioState != null) {
             Spacer(modifier = Modifier.height(4.dp))
