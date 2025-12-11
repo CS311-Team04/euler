@@ -137,7 +137,7 @@ class ConversationRepositoryTest {
 
     val messages = deferred.await()
     assertEquals(1, messages.size)
-    assertEquals("Hi", messages.first().text)
+    assertEquals("Hi", messages.first().first.text)
 
     verify(registration).remove()
   }

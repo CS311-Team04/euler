@@ -289,7 +289,7 @@ class VoiceChatViewModelTest {
 
         runBlocking {
           whenever(repo.startNewConversation(any())).thenReturn("new-conv-id")
-          whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+          whenever(repo.appendMessage(any(), any(), any())).thenReturn("msg-id-1")
         }
 
         val viewModel =
@@ -320,7 +320,7 @@ class VoiceChatViewModelTest {
 
         runBlocking {
           whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-          whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+          whenever(repo.appendMessage(any(), any(), any())).thenReturn("msg-id-2")
         }
 
         val viewModel =
@@ -345,7 +345,7 @@ class VoiceChatViewModelTest {
 
         runBlocking {
           whenever(repo.startNewConversation(any())).thenReturn("conv-456")
-          whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+          whenever(repo.appendMessage(any(), any(), any())).thenReturn("msg-id-3")
         }
 
         val aiReply = "EPFL is a university in Switzerland"
@@ -394,7 +394,7 @@ class VoiceChatViewModelTest {
 
         runBlocking {
           whenever(repo.startNewConversation(any())).thenReturn("conv-789")
-          whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+          whenever(repo.appendMessage(any(), any(), any())).thenReturn("msg-id-4")
         }
 
         val viewModel =
@@ -427,7 +427,7 @@ class VoiceChatViewModelTest {
         // Test handleUserUtterance reuses existing conversation on subsequent messages
         val repo = mock<ConversationRepository>()
 
-        runBlocking { whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit) }
+        runBlocking { whenever(repo.appendMessage(any(), any(), any())).thenReturn("msg-id-5") }
 
         // Set existing conversation ID
         val existingConvId = "existing-conv-123"
@@ -543,7 +543,7 @@ class VoiceChatViewModelTest {
           whenever(repo.startNewConversation(any())).thenReturn("conv-id")
           whenever(repo.appendMessage(eq("conv-id"), eq("user"), eq("Test")))
               .thenThrow(RuntimeException("Persistence error"))
-          whenever(repo.appendMessage(eq("conv-id"), eq("assistant"), any())).thenReturn(Unit)
+          whenever(repo.appendMessage(eq("conv-id"), eq("assistant"), any())).thenReturn("msg-id-6")
         }
 
         val viewModel =
@@ -571,7 +571,7 @@ class VoiceChatViewModelTest {
 
         runBlocking {
           whenever(repo.startNewConversation(any())).thenReturn("conv-id")
-          whenever(repo.appendMessage(eq("conv-id"), eq("user"), eq("Test"))).thenReturn(Unit)
+          whenever(repo.appendMessage(eq("conv-id"), eq("user"), eq("Test"))).thenReturn("msg-id-7")
           whenever(repo.appendMessage(eq("conv-id"), eq("assistant"), eq("Reply")))
               .thenThrow(RuntimeException("Persistence error"))
         }
@@ -600,7 +600,7 @@ class VoiceChatViewModelTest {
 
         runBlocking {
           whenever(repo.startNewConversation(any())).thenReturn("conv-title-upgrade")
-          whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+          whenever(repo.appendMessage(any(), any(), any())).thenReturn("msg-id-8")
           whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
         }
 
@@ -642,7 +642,7 @@ class VoiceChatViewModelTest {
 
         runBlocking {
           whenever(repo.startNewConversation(any())).thenReturn("conv-title-fail")
-          whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+          whenever(repo.appendMessage(any(), any(), any())).thenReturn("msg-id-9")
         }
 
         val functions = mock<FirebaseFunctions>()

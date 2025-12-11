@@ -1,5 +1,6 @@
 package com.android.sample.llm
 
+import android.util.Log
 import com.android.sample.BuildConfig
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
@@ -325,7 +326,6 @@ class FirebaseFunctionsLlmClient(
       }
       return null
     }
->>>>>>> origin/main
 
     /**
      * Creates a region-scoped [FirebaseFunctions] instance and wires the local emulator when

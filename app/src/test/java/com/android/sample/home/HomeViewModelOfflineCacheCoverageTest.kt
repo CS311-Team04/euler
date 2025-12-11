@@ -421,7 +421,7 @@ class HomeViewModelOfflineCacheCoverageTest {
 
     // Need to mock conversation creation for signed-in user
     whenever(repo.startNewConversation(any())).thenReturn("new-conv-123")
-    whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+    whenever(repo.appendMessage(any(), any(), any())).thenReturn("msg-id-cache")
 
     val vm =
         HomeViewModel(llmClient, auth, repo, networkMonitor = networkMonitor, cacheRepo = cacheRepo)

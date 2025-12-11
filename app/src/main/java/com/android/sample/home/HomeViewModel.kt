@@ -32,6 +32,7 @@ import com.google.firebase.firestore.Query
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
 import java.io.IOException
+import java.time.Instant
 import java.util.UUID
 import kotlin.getValue
 import kotlinx.coroutines.CancellationException
@@ -54,7 +55,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.time.Instant
 
 /** Type of compact source indicator */
 enum class CompactSourceType {
@@ -93,8 +93,7 @@ class HomeViewModel(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
     private val repo: ConversationRepository =
         ConversationRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance()),
-    private val profileRepository: ProfileDataSource =
-        UserProfileRepository(),
+    private val profileRepository: ProfileDataSource = UserProfileRepository(),
     private val networkMonitor: NetworkConnectivityMonitor? = null,
     private val cacheRepo: CachedResponseRepository =
         CachedResponseRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance()),
@@ -458,7 +457,8 @@ class HomeViewModel(
                     finalMessages.addAll(firestoreMessages)
 
                     existingExtraCards.forEach { extraCard ->
-                      val originalIndex = currentState.messages.indexOfFirst { it.id == extraCard.id }
+                      val originalIndex =
+                          currentState.messages.indexOfFirst { it.id == extraCard.id }
                       if (originalIndex > 0) {
                         val precedingAssistant = currentState.messages[originalIndex - 1]
                         if (precedingAssistant.type == ChatType.AI &&
@@ -1127,10 +1127,7 @@ class HomeViewModel(
             }
 
             // Handle ED fetch intent detection first (takes precedence)
-            if (handleEdFetchIntent(
-                    reply, question, messageId,
-                    userMessageId = userMessageId
-                )) {
+            if (handleEdFetchIntent(reply, question, messageId, userMessageId = userMessageId)) {
               // Skip normal streaming; ED fetch flow takes over
               return@launch
             }
