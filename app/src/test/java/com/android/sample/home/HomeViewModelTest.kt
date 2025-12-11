@@ -8,6 +8,7 @@ import com.android.sample.conversations.Conversation
 import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.MessageDTO
 import com.android.sample.llm.BotReply
+import com.android.sample.llm.EdFetchIntent
 import com.android.sample.llm.EdIntent
 import com.android.sample.llm.FakeLlmClient
 import com.android.sample.llm.LlmClient
@@ -799,7 +800,114 @@ class HomeViewModelTest {
         assertNull(sourceCard!!.source?.url) // Schedule sources have no URL
         assertEquals("Your EPFL Schedule", sourceCard.source?.siteLabel)
         assertTrue(sourceCard.source?.isScheduleSource == true)
+        assertEquals(CompactSourceType.SCHEDULE, sourceCard.source?.compactType)
       }
+
+  @Test
+  fun sendMessage_guest_appends_food_source_card_when_llm_returns_food_type() = runBlocking {
+    val viewModel = HomeViewModel()
+    viewModel.setPrivateField(
+        "llmClient",
+        object : LlmClient {
+          override suspend fun generateReply(prompt: String): BotReply =
+              BotReply(
+                  "Aujourd'hui au Piano: Pasta 8.50 CHF",
+                  "https://www.epfl.ch/campus/restaurants",
+                  SourceType.FOOD,
+                  EdIntent())
+        })
+
+    viewModel.updateMessageDraft("Qu'est-ce qu'on mange aujourd'hui?")
+    viewModel.sendMessage()
+    dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+    viewModel.awaitStreamingCompletion()
+
+    val messages = viewModel.uiState.value.messages
+    val sourceCard = messages.lastOrNull { it.source != null }
+    assertNotNull("Expected a food source card message", sourceCard)
+    assertEquals("EPFL Restaurants", sourceCard!!.source?.siteLabel)
+    assertEquals("Retrieved from Pocket Campus", sourceCard.source?.title)
+    assertEquals(CompactSourceType.FOOD, sourceCard.source?.compactType)
+  }
+
+  @Test
+  fun sendMessage_guest_no_source_card_when_llm_returns_none_type() = runBlocking {
+    val viewModel = HomeViewModel()
+    viewModel.setPrivateField(
+        "llmClient",
+        object : LlmClient {
+          override suspend fun generateReply(prompt: String): BotReply =
+              BotReply(
+                  "I don't have specific information about that.",
+                  null,
+                  SourceType.NONE,
+                  EdIntent())
+        })
+
+    viewModel.updateMessageDraft("What's something random?")
+    viewModel.sendMessage()
+    dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+    viewModel.awaitStreamingCompletion()
+
+    val messages = viewModel.uiState.value.messages
+    val sourceCard = messages.lastOrNull { it.source != null }
+    assertNull("Should not have a source card for NONE type", sourceCard)
+  }
+
+  @Test
+  fun sendMessage_guest_no_source_card_when_rag_returns_null_url() = runBlocking {
+    val viewModel = HomeViewModel()
+    viewModel.setPrivateField(
+        "llmClient",
+        object : LlmClient {
+          override suspend fun generateReply(prompt: String): BotReply =
+              BotReply(
+                  "Based on my knowledge...",
+                  null, // No URL provided
+                  SourceType.RAG,
+                  EdIntent())
+        })
+
+    viewModel.updateMessageDraft("Tell me about EPFL")
+    viewModel.sendMessage()
+    dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+    viewModel.awaitStreamingCompletion()
+
+    val messages = viewModel.uiState.value.messages
+    val sourceCard = messages.lastOrNull { it.source != null }
+    assertNull("Should not have a source card when RAG has no URL", sourceCard)
+  }
+
+  @Test
+  fun sendMessage_guest_rag_source_card_has_compactType_NONE() = runBlocking {
+    val viewModel = HomeViewModel()
+    viewModel.setPrivateField(
+        "llmClient",
+        object : LlmClient {
+          override suspend fun generateReply(prompt: String): BotReply =
+              BotReply(
+                  "Here's information about projects.",
+                  "https://www.epfl.ch/education/projects",
+                  SourceType.RAG,
+                  EdIntent())
+        })
+
+    viewModel.updateMessageDraft("How to find projects?")
+    viewModel.sendMessage()
+    dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+    viewModel.awaitStreamingCompletion()
+
+    val messages = viewModel.uiState.value.messages
+    val sourceCard = messages.lastOrNull { it.source != null }
+    assertNotNull("Expected a RAG source card", sourceCard)
+    assertEquals(CompactSourceType.NONE, sourceCard!!.source?.compactType)
+    assertFalse(sourceCard.source?.isScheduleSource == true)
+    assertNotNull(sourceCard.source?.url)
+  }
 
   @Test
   fun sendMessage_failure_surfaces_error_message() = runBlocking {
@@ -1088,6 +1196,74 @@ class HomeViewModelTest {
         val title = method.invoke(viewModel, "https://example.com") as String
 
         assertEquals("example.com", title)
+      }
+
+  @Test
+  fun buildSiteLabel_handles_www_prefix() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel()
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildSiteLabel", String::class.java)
+        method.isAccessible = true
+
+        val label1 = method.invoke(viewModel, "https://www.epfl.ch/test") as String
+        val label2 = method.invoke(viewModel, "https://epfl.ch/test") as String
+
+        assertEquals("EPFL.ch Website", label1)
+        assertEquals("EPFL.ch Website", label2)
+      }
+
+  @Test
+  fun buildSiteLabel_handles_invalid_url() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel()
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildSiteLabel", String::class.java)
+        method.isAccessible = true
+
+        val label = method.invoke(viewModel, "not-a-url") as String
+
+        assertEquals(" Website", label) // Empty host results in empty string
+      }
+
+  @Test
+  fun buildFallbackTitle_handles_path_with_underscores() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel()
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildFallbackTitle", String::class.java)
+        method.isAccessible = true
+
+        val title = method.invoke(viewModel, "https://example.com/some_path_segment") as String
+
+        assertEquals("Some path segment", title)
+      }
+
+  @Test
+  fun buildFallbackTitle_handles_path_with_dashes() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel()
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildFallbackTitle", String::class.java)
+        method.isAccessible = true
+
+        val title = method.invoke(viewModel, "https://example.com/some-path-segment") as String
+
+        assertEquals("Some path segment", title)
+      }
+
+  @Test
+  fun buildFallbackTitle_handles_invalid_url() =
+      runTest(testDispatcher) {
+        val viewModel = HomeViewModel()
+        val method =
+            HomeViewModel::class.java.getDeclaredMethod("buildFallbackTitle", String::class.java)
+        method.isAccessible = true
+
+        val title = method.invoke(viewModel, "not-a-url") as String
+
+        // Uri.parse treats "not-a-url" as a path segment, so it gets transformed
+        assertEquals("Not a url", title)
       }
 
   // ============ Tests for handleSendMessageError (via sendMessage with auth) ============
@@ -2059,6 +2235,133 @@ class HomeViewModelTest {
     val postOnEd = state.pendingAction as PendingAction.PostOnEd
     assertEquals("", postOnEd.draftTitle) // Falls back to empty string
     assertEquals(question, postOnEd.draftBody) // Falls back to original question
+  }
+
+  @Test
+  fun homeViewModel_shows_debug_message_when_ed_fetch_intent_detected() = runTest {
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.setEdFetchIntentResponse(
+        reply = "Fetching ED question...", query = "show me this ED post about linear algebra")
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val repo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel = HomeViewModel(fakeLlm, auth, repo)
+
+    viewModel.updateMessageDraft("Montre moi le post ED sur l'algèbre linéaire")
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    val state = viewModel.uiState.value
+    val aiMessages = state.messages.filter { it.type == ChatType.AI }
+    assertTrue(
+        "Should have debug message when fetch intent detected",
+        aiMessages.any { it.text.contains("ED fetch intent detected (DEBUG)") })
+    assertNull("Should not have pendingAction when fetch intent detected", state.pendingAction)
+    assertFalse("Should not be sending after fetch intent", state.isSending)
+  }
+
+  @Test
+  fun homeViewModel_shows_debug_message_when_ed_fetch_intent_detected_without_query() = runTest {
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.setEdFetchIntentResponse(
+        reply = "Fetching ED question...", query = null) // No query provided
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val repo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel = HomeViewModel(fakeLlm, auth, repo)
+
+    val originalQuestion = "Affiche le post ED"
+    viewModel.updateMessageDraft(originalQuestion)
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    val state = viewModel.uiState.value
+    val aiMessages = state.messages.filter { it.type == ChatType.AI }
+    assertTrue(
+        "Should have debug message when fetch intent detected",
+        aiMessages.any { it.text.contains("ED fetch intent detected (DEBUG)") })
+    // When query is null, it should fallback to originalQuestion (tested in handleEdFetchIntent)
+  }
+
+  @Test
+  fun homeViewModel_does_not_show_debug_message_when_ed_fetch_intent_not_detected() = runTest {
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.nextReply = "Normal response"
+    fakeLlm.nextEdFetchIntent = EdFetchIntent(detected = false, query = null)
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val repo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel = HomeViewModel(fakeLlm, auth, repo)
+
+    viewModel.updateMessageDraft("What is EPFL?")
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    val state = viewModel.uiState.value
+    val aiMessages = state.messages.filter { it.type == ChatType.AI }
+    assertFalse(
+        "Should not have debug message when fetch intent not detected",
+        aiMessages.any { it.text.contains("ED fetch intent detected (DEBUG)") })
+  }
+
+  @Test
+  fun homeViewModel_fetch_intent_takes_precedence_over_post_intent() = runTest {
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.setEdFetchIntentResponse(reply = "Fetching...", query = "show this ED post")
+    fakeLlm.setEdIntentResponse(reply = "Posting...", intent = "post_question")
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val repo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel = HomeViewModel(fakeLlm, auth, repo)
+
+    viewModel.updateMessageDraft("Montre moi ce post ED")
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    val state = viewModel.uiState.value
+    // Fetch intent should be handled first, so no PostOnEd pendingAction should be created
+    assertNull(
+        "Should not have PostOnEd pendingAction when fetch intent detected", state.pendingAction)
+    val aiMessages = state.messages.filter { it.type == ChatType.AI }
+    assertTrue(
+        "Should show fetch debug message (fetch takes precedence)",
+        aiMessages.any { it.text.contains("ED fetch intent detected (DEBUG)") })
   }
 
   // ==================== Profile Context Tests ====================

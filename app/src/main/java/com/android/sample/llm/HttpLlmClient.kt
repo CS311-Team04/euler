@@ -165,7 +165,14 @@ internal fun parseBotReply(body: String, gson: Gson): BotReply {
           intent = edIntentType,
           formattedQuestion = edFormattedQuestion,
           formattedTitle = edFormattedTitle)
-  return BotReply(replyText, url, sourceType, edIntent)
+
+  val edFetchIntent =
+      com.android.sample.llm.EdFetchIntent(
+          detected = json.optBoolean(JSON_KEY_ED_FETCH_INTENT_DETECTED, false),
+          query = json.optString(JSON_KEY_ED_FETCH_QUERY, null),
+      )
+
+  return BotReply(replyText, url, sourceType, edIntent, edFetchIntent)
 }
 
 private fun JsonObject.getTrimmedString(key: String): String? {
@@ -184,6 +191,22 @@ private fun JsonObject.getBoolean(key: String): Boolean {
   return if (primitive.isBoolean) primitive.asBoolean else false
 }
 
+private fun JsonObject.optBoolean(key: String, defaultValue: Boolean): Boolean {
+  val element: JsonElement = get(key) ?: return defaultValue
+  if (element.isJsonNull || !element.isJsonPrimitive) return defaultValue
+  val primitive = element.asJsonPrimitive
+  return if (primitive.isBoolean) primitive.asBoolean else defaultValue
+}
+
+private fun JsonObject.optString(key: String, defaultValue: String?): String? {
+  val element: JsonElement = get(key) ?: return defaultValue
+  if (element.isJsonNull || !element.isJsonPrimitive) return defaultValue
+  val primitive = element.asJsonPrimitive
+  if (!primitive.isString) return defaultValue
+  val value = primitive.asString.trim()
+  return value.takeIf { it.isNotEmpty() } ?: defaultValue
+}
+
 private const val HEADER_CONTENT_TYPE = "Content-Type"
 private const val HEADER_AUTHORIZATION = "Authorization"
 private const val AUTH_SCHEME_BEARER = "Bearer"
@@ -199,5 +222,7 @@ private const val JSON_KEY_ED_INTENT_DETECTED = "ed_intent_detected"
 private const val JSON_KEY_ED_INTENT = "ed_intent"
 private const val JSON_KEY_ED_FORMATTED_QUESTION = "ed_formatted_question"
 private const val JSON_KEY_ED_FORMATTED_TITLE = "ed_formatted_title"
+private const val JSON_KEY_ED_FETCH_INTENT_DETECTED = "ed_fetch_intent_detected"
+private const val JSON_KEY_ED_FETCH_QUERY = "ed_fetch_query"
 // Standard localhost identifier - safe loopback address (RFC 5735)
 private const val LOCALHOST = "localhost"

@@ -2,12 +2,15 @@ package com.android.sample.home
 
 import android.net.Uri
 import android.util.Log
+import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.sample.BuildConfig
+import com.android.sample.Chat.ChatAttachment
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
+import com.android.sample.R
 import com.android.sample.conversations.AuthNotReadyException
 import com.android.sample.conversations.CachedResponseRepository
 import com.android.sample.conversations.ConversationRepository
@@ -47,12 +50,22 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
+/** Type of compact source indicator */
+enum class CompactSourceType {
+  NONE, // Full RAG card with Visit button
+  SCHEDULE, // 📅 schedule indicator
+  FOOD // 🍴 food/restaurant indicator
+}
+
 data class SourceMeta(
-    val siteLabel: String, // e.g. "EPFL.ch Website" or "Your Schedule"
-    val title: String, // e.g. "Projet de Semestre – Bachelor"
-    val url: String?, // null for schedule sources
+    val siteLabel: String? = null, // e.g. "EPFL.ch Website" or "Your Schedule"
+    @StringRes val siteLabelRes: Int? = null,
+    val title: String? = null, // e.g. "Projet de Semestre – Bachelor"
+    @StringRes val titleRes: Int? = null,
+    val url: String? = null, // null for schedule sources
     val retrievedAt: Long = System.currentTimeMillis(),
-    val isScheduleSource: Boolean = false // true if from user's EPFL schedule
+    val isScheduleSource: Boolean = false, // DEPRECATED: use compactType instead
+    val compactType: CompactSourceType = CompactSourceType.NONE // Type of compact indicator
 )
 /**
  * HomeViewModel
@@ -85,6 +98,11 @@ class HomeViewModel(
     private const val TAG = "HomeViewModel"
     private const val DEFAULT_USER_NAME = "Student"
     private const val ED_INTENT_POST_QUESTION = "post_question"
+    // Fallback English strings for non-Android contexts (e.g., unit tests)
+    private const val FALLBACK_SCHEDULE_LABEL = "Your EPFL Schedule"
+    private const val FALLBACK_SCHEDULE_TITLE = "Retrieved from your connected calendar"
+    private const val FALLBACK_FOOD_LABEL = "EPFL Restaurants"
+    private const val FALLBACK_FOOD_TITLE = "Retrieved from Pocket Campus"
 
     // Canonical suggestion questions (English) for offline cache
     // These must match the localization keys exactly for cache hits
@@ -368,16 +386,19 @@ class HomeViewModel(
                 _uiState.update { currentState ->
                   val firestoreMessages = msgs.map { it.toUi() }
 
-                  val existingSourceCards =
-                      currentState.messages.filter { it.source != null && it.text.isBlank() }
+                  // Preserve locally added cards (source cards, attachments) that are not in
+                  // Firestore
+                  val existingExtraCards =
+                      currentState.messages.filter {
+                        (it.source != null || it.attachment != null) && it.text.isBlank()
+                      }
 
                   val finalMessages = mutableListOf<ChatUIModel>()
 
                   finalMessages.addAll(firestoreMessages)
 
-                  existingSourceCards.forEach { sourceCard ->
-                    val originalIndex =
-                        currentState.messages.indexOfFirst { it.id == sourceCard.id }
+                  existingExtraCards.forEach { extraCard ->
+                    val originalIndex = currentState.messages.indexOfFirst { it.id == extraCard.id }
                     if (originalIndex > 0) {
 
                       val precedingAssistant = currentState.messages[originalIndex - 1]
@@ -390,18 +411,18 @@ class HomeViewModel(
                             }
                         if (firestoreIndex >= 0) {
 
-                          finalMessages.add(firestoreIndex + 1, sourceCard)
+                          finalMessages.add(firestoreIndex + 1, extraCard)
                         } else {
 
-                          finalMessages.add(sourceCard)
+                          finalMessages.add(extraCard)
                         }
                       } else {
 
-                        finalMessages.add(sourceCard)
+                        finalMessages.add(extraCard)
                       }
                     } else {
 
-                      finalMessages.add(sourceCard)
+                      finalMessages.add(extraCard)
                     }
                   }
 
@@ -978,6 +999,12 @@ class HomeViewModel(
                 TAG,
                 "startStreaming: received reply, length=${reply.reply.length}, edIntentDetected=${reply.edIntent.detected}, edIntent=${reply.edIntent.intent}")
 
+            // Handle ED fetch intent detection first (takes precedence)
+            if (handleEdFetchIntent(reply, question, messageId)) {
+              // Skip normal streaming; ED fetch flow takes over
+              return@launch
+            }
+
             // Handle ED intent detection - create PostOnEd pending action
             val handled = handleEdIntent(reply, question, messageId)
             if (handled) {
@@ -988,16 +1015,48 @@ class HomeViewModel(
             // simulate stream into the placeholder AI message
             simulateStreamingFromText(messageId, reply.reply)
 
+            // If backend returned a URL, surface it as an attachment card in the chat (keep user
+            // in-app)
+            reply.url?.let { pdfUrl ->
+              val attachment = ChatAttachment(url = pdfUrl)
+              _uiState.update { state ->
+                state.copy(
+                    messages =
+                        state.messages +
+                            ChatUIModel(
+                                id = UUID.randomUUID().toString(),
+                                text = "",
+                                timestamp = System.currentTimeMillis(),
+                                type = ChatType.AI,
+                                attachment = attachment),
+                    streamingSequence = state.streamingSequence + 1)
+              }
+            }
+
             // add optional source card based on source type
             val meta: SourceMeta? =
                 when (reply.sourceType) {
                   com.android.sample.llm.SourceType.SCHEDULE -> {
                     // Schedule source - show a small indicator
                     SourceMeta(
-                        siteLabel = "Your EPFL Schedule",
-                        title = "Retrieved from your connected calendar",
+                        siteLabel = FALLBACK_SCHEDULE_LABEL,
+                        siteLabelRes = R.string.source_label_epfl_schedule,
+                        title = FALLBACK_SCHEDULE_TITLE,
+                        titleRes = R.string.source_label_schedule_description,
                         url = null,
-                        isScheduleSource = true)
+                        isScheduleSource = true,
+                        compactType = CompactSourceType.SCHEDULE)
+                  }
+                  com.android.sample.llm.SourceType.FOOD -> {
+                    // Food source - show a small indicator
+                    SourceMeta(
+                        siteLabel = FALLBACK_FOOD_LABEL,
+                        siteLabelRes = R.string.source_label_epfl_restaurants,
+                        title = FALLBACK_FOOD_TITLE,
+                        titleRes = R.string.source_label_food_description,
+                        url = reply.url,
+                        isScheduleSource = true,
+                        compactType = CompactSourceType.FOOD)
                   }
                   com.android.sample.llm.SourceType.RAG -> {
                     // RAG source - show the web source card if URL exists
@@ -1006,7 +1065,8 @@ class HomeViewModel(
                           siteLabel = buildSiteLabel(url),
                           title = buildFallbackTitle(url),
                           url = url,
-                          isScheduleSource = false)
+                          isScheduleSource = false,
+                          compactType = CompactSourceType.NONE)
                     }
                   }
                   com.android.sample.llm.SourceType.NONE -> null
@@ -1470,6 +1530,47 @@ class HomeViewModel(
         }
     val txt = lines.joinToString("\n")
     return if (txt.isBlank()) null else txt.take(600)
+  }
+
+  /**
+   * Handles ED fetch intent detection from the LLM reply. If an ED fetch intent is detected, routes
+   * to the existing ED fetch flow.
+   *
+   * @param reply The BotReply from the LLM
+   * @param originalQuestion The original user question (used as fallback for fetch query)
+   * @param messageId The ID of the AI message being processed
+   * @return true if fetch intent was detected and handled, false otherwise
+   */
+  private fun handleEdFetchIntent(
+      reply: BotReply,
+      originalQuestion: String,
+      messageId: String
+  ): Boolean {
+    val fetchIntent = reply.edFetchIntent
+    if (!fetchIntent.detected) return false
+
+    val query = fetchIntent.query ?: originalQuestion
+
+    Log.d(TAG, "ED fetch intent detected with query: $query")
+
+    // Build a debug message to show in the chat
+    val debugMessage =
+        ChatUIModel(
+            id = UUID.randomUUID().toString(),
+            text = "🔎 ED fetch intent detected (DEBUG) – this is a test message.",
+            timestamp = System.currentTimeMillis(),
+            type = ChatType.AI)
+
+    _uiState.update { state ->
+      state.copy(
+          messages =
+              state.messages.filterNot { it.id == messageId && it.type == ChatType.AI } +
+                  debugMessage,
+          streamingMessageId = null,
+          isSending = false)
+    }
+
+    return true
   }
 
   /**

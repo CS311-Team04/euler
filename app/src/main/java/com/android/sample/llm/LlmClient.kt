@@ -1,6 +1,5 @@
 package com.android.sample.llm
 
-import android.util.Log
 import com.android.sample.BuildConfig
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
@@ -13,11 +12,13 @@ import kotlinx.coroutines.withTimeoutOrNull
  * Source type for the response
  * - "schedule": answer came from user's EPFL schedule
  * - "rag": answer came from RAG/web sources
+ * - "food": answer came from EPFL restaurant menus
  * - "none": no external source used
  */
 enum class SourceType {
   SCHEDULE,
   RAG,
+  FOOD,
   NONE;
 
   companion object {
@@ -25,6 +26,7 @@ enum class SourceType {
         when (s?.lowercase()) {
           "schedule" -> SCHEDULE
           "rag" -> RAG
+          "food" -> FOOD
           else -> NONE
         }
   }
@@ -46,18 +48,31 @@ data class EdIntent(
 )
 
 /**
+ * ED Discussion fetch intent information.
+ *
+ * @param detected Whether an ED Discussion fetch intent was detected
+ * @param query The query string to use for fetching (when detected is true)
+ */
+data class EdFetchIntent(
+    val detected: Boolean = false,
+    val query: String? = null,
+)
+
+/**
  * Response from the LLM backend.
  *
  * @param reply The text response from the LLM
  * @param url Optional URL source reference
  * @param sourceType The type of source used for the answer
  * @param edIntent ED Discussion intent information
+ * @param edFetchIntent ED Discussion fetch intent information
  */
 data class BotReply(
     val reply: String,
     val url: String?,
     val sourceType: SourceType = SourceType.NONE,
-    val edIntent: EdIntent = EdIntent()
+    val edIntent: EdIntent = EdIntent(),
+    val edFetchIntent: EdFetchIntent = EdFetchIntent()
 ) {
   // Backward compatibility properties
   @Deprecated("Use edIntent.detected instead", ReplaceWith("edIntent.detected"))
@@ -144,14 +159,9 @@ class FirebaseFunctionsLlmClient(
         val result = callFirebaseFunction(data)
 
         if (result == null) {
-          Log.w(TAG, "Function call returned null (timeout or cancelled)")
           return@withContext fallback?.generateReply(prompt, summary, transcript, profileContext)
               ?: throw IllegalStateException("LLM service unavailable: timeout or cancelled")
         }
-
-        Log.d(
-            TAG,
-            "Received response from $FUNCTION_NAME, data type: ${result.getData()?.javaClass?.simpleName}")
 
         val map =
             parseResponseMap(result)
@@ -159,13 +169,15 @@ class FirebaseFunctionsLlmClient(
                     prompt, summary, transcript, profileContext)
                     ?: throw IllegalStateException("Invalid LLM response payload: null data")
 
-        val replyText =
-            parseReplyText(map)
-                ?: return@withContext fallback?.generateReply(
-                    prompt, summary, transcript, profileContext)
-                    ?: throw IllegalStateException("Empty LLM reply")
+        val parsedReply = parseReplyText(map)
+        if (parsedReply == null) {
+          fallback?.let {
+            return@withContext it.generateReply(prompt, summary, transcript, profileContext)
+          }
+          return@withContext buildBotReply(map, "Voici le document demandé.")
+        }
 
-        buildBotReply(map, replyText)
+        return@withContext buildBotReply(map, parsedReply)
       }
 
   private fun buildRequestPayload(
@@ -178,18 +190,8 @@ class FirebaseFunctionsLlmClient(
         hashMapOf<String, Any>(KEY_QUESTION to prompt).apply {
           summary?.let { put(KEY_SUMMARY, it) }
           transcript?.let { put(KEY_TRANSCRIPT, it) }
-          profileContext?.let {
-            Log.d(
-                TAG,
-                "buildRequestPayload: including profileContext, length=${it.length}, preview=${it.take(100)}...")
-            put(KEY_PROFILE_CONTEXT, it)
-          } ?: Log.d(TAG, "buildRequestPayload: profileContext is null, not including in request")
+          profileContext?.let { put(KEY_PROFILE_CONTEXT, it) }
         }
-    // DEBUG: Log full payload structure (without full content to avoid spam)
-    Log.d(
-        TAG,
-        "buildRequestPayload: Payload structure - hasQuestion=${payload.containsKey(KEY_QUESTION)}, hasSummary=${payload.containsKey(KEY_SUMMARY)}, hasTranscript=${payload.containsKey(KEY_TRANSCRIPT)}, hasProfileContext=${payload.containsKey(KEY_PROFILE_CONTEXT)}")
-    Log.d(TAG, "buildRequestPayload: Payload keys: ${payload.keys.joinToString()}")
     return payload
   }
 
@@ -197,20 +199,12 @@ class FirebaseFunctionsLlmClient(
       data: HashMap<String, Any>
   ): com.google.firebase.functions.HttpsCallableResult? =
       try {
-        Log.d(
-            TAG,
-            "Calling $FUNCTION_NAME with data: question=${data[KEY_QUESTION]?.toString()?.take(50)}..., hasSummary=${data.containsKey(KEY_SUMMARY)}, hasTranscript=${data.containsKey(KEY_TRANSCRIPT)}, hasProfileContext=${data.containsKey(KEY_PROFILE_CONTEXT)}")
         withTimeoutOrNull(timeoutMillis) {
           functions.getHttpsCallable(FUNCTION_NAME).call(data).await()
         }
       } catch (e: FirebaseFunctionsException) {
-        Log.e(
-            TAG,
-            "Firebase Functions error: code=${e.code}, message=${e.message}, details=${e.details}",
-            e)
         throw e
       } catch (e: Exception) {
-        Log.e(TAG, "Error calling Firebase Function: ${e.javaClass.simpleName}", e)
         throw e
       }
 
@@ -221,7 +215,6 @@ class FirebaseFunctionsLlmClient(
       try {
         result.getData() as? Map<String, Any?>
       } catch (e: ClassCastException) {
-        Log.e(TAG, "Failed to cast response data to Map", e)
         null
       }
 
@@ -229,11 +222,8 @@ class FirebaseFunctionsLlmClient(
       try {
         (map[KEY_REPLY] as? String)?.takeIf { it.isNotBlank() }
       } catch (e: ClassCastException) {
-        Log.e(TAG, "Failed to cast reply to String", e)
         null
       }
-
-  private fun parsePrimaryUrl(map: Map<String, Any?>): String? = map[KEY_PRIMARY_URL] as? String
 
   private fun parseEdIntentDetected(map: Map<String, Any?>): Boolean =
       map[KEY_ED_INTENT_DETECTED] as? Boolean ?: false
@@ -249,15 +239,17 @@ class FirebaseFunctionsLlmClient(
   private fun parseEdFormattedTitle(map: Map<String, Any?>): String? =
       map[KEY_ED_FORMATTED_TITLE] as? String
 
+  private fun parseEdFetchIntentDetected(map: Map<String, Any?>): Boolean =
+      map[KEY_ED_FETCH_INTENT_DETECTED] as? Boolean ?: false
+
+  private fun parseEdFetchQuery(map: Map<String, Any?>): String? =
+      map[KEY_ED_FETCH_QUERY] as? String
+
   private fun buildBotReply(map: Map<String, Any?>, replyText: String): BotReply {
-    val url = parsePrimaryUrl(map)
+    val url = extractUrlFromLlmPayload(map)
     val sourceType = parseSourceType(map)
     val edIntentDetected = parseEdIntentDetected(map)
     val edIntentType = parseEdIntentType(map)
-
-    if (edIntentDetected) {
-      Log.d(TAG, "ED intent detected: $edIntentType")
-    }
 
     val edFormattedQuestion = parseEdFormattedQuestion(map)
     val edFormattedTitle = parseEdFormattedTitle(map)
@@ -267,7 +259,14 @@ class FirebaseFunctionsLlmClient(
             intent = edIntentType,
             formattedQuestion = edFormattedQuestion,
             formattedTitle = edFormattedTitle)
-    return BotReply(replyText, url, sourceType, edIntent)
+
+    val edFetchIntent =
+        EdFetchIntent(
+            detected = parseEdFetchIntentDetected(map),
+            query = parseEdFetchQuery(map),
+        )
+
+    return BotReply(replyText, url, sourceType, edIntent, edFetchIntent)
   }
 
   companion object {
@@ -289,6 +288,36 @@ class FirebaseFunctionsLlmClient(
     private const val KEY_ED_INTENT = "ed_intent"
     private const val KEY_ED_FORMATTED_QUESTION = "ed_formatted_question"
     private const val KEY_ED_FORMATTED_TITLE = "ed_formatted_title"
+    private const val KEY_ED_FETCH_INTENT_DETECTED = "ed_fetch_intent_detected"
+    private const val KEY_ED_FETCH_QUERY = "ed_fetch_query"
+
+    internal fun extractUrlFromLlmPayload(map: Map<String, Any?>): String? {
+      val direct =
+          (map[KEY_PRIMARY_URL] as? String)
+              ?: (map["primaryUrl"] as? String)
+              ?: (map["url"] as? String)
+      if (!direct.isNullOrBlank()) return direct
+
+      val moodleFile = map["moodle_file"]
+      if (moodleFile is Map<*, *>) {
+        val mfUrl =
+            (moodleFile["url"] as? String)
+                ?: (moodleFile["file_url"] as? String)
+                ?: (moodleFile["fileUrl"] as? String)
+        if (!mfUrl.isNullOrBlank()) return mfUrl
+      }
+
+      val sources = map["sources"]
+      if (sources is List<*>) {
+        sources.forEach { entry ->
+          if (entry is Map<*, *>) {
+            val candidate = entry["url"] as? String
+            if (!candidate.isNullOrBlank()) return candidate
+          }
+        }
+      }
+      return null
+    }
 
     /**
      * Creates a region-scoped [FirebaseFunctions] instance and wires the local emulator when

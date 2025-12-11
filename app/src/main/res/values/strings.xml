@@ -11,6 +11,8 @@
     <!-- Source Labels -->
     <string name="source_label_epfl_schedule">Your EPFL Schedule</string>
     <string name="source_label_schedule_description">Retrieved from your connected calendar</string>
+    <string name="source_label_epfl_restaurants">EPFL Restaurants</string>
+    <string name="source_label_food_description">Retrieved from Pocket Campus</string>
     
     <!-- ED Post Confirmation Modal -->
     <string name="ed_post_title_placeholder">Titre</string>
