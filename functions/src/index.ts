@@ -18,8 +18,16 @@ import {
   buildEdIntentPromptForApertus,
 } from "./edIntent";
 import { parseEdPostResponse } from "./edIntentParser";
-import { 
-  scrapeWeeklyMenu, 
+import { EdDiscussionClient } from "./connectors/ed/EdDiscussionClient";
+import {
+  parseEdSearchQuery,
+  buildEdSearchRequest,
+  normalizeEdThreads,
+  EdBrainError,
+  NormalizedEdPost,
+} from "./edSearchDomain";
+import {
+  scrapeWeeklyMenu,
   formatMenuForContext,
   findCheapestMeal,
   findVeggieMeals,
@@ -93,6 +101,228 @@ const edConnectorService = new EdConnectorService(
   "https://eu.edstem.org/api",
   ED_DEFAULT_COURSE_ID
 );
+
+/* =========================================================
+ *                ED BRAIN SEARCH (core)
+ * ======================================================= */
+
+type EdBrainSearchInput = {
+  query: string;
+  limit?: number;
+};
+
+type EdBrainSearchOutput = {
+  ok: boolean;
+  posts: NormalizedEdPost[];
+  filters: {
+    course?: string;
+    status?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    limit?: number;
+  };
+  error?: EdBrainError;
+};
+
+function isEdBrainError(result: any): result is EdBrainError {
+  return result && typeof result === "object" && "type" in result;
+}
+
+async function edBrainSearchCore(
+  uid: string,
+  input: EdBrainSearchInput
+): Promise<EdBrainSearchOutput> {
+  const query = (input.query || "").trim();
+  if (!query) {
+    return {
+      ok: false,
+      posts: [],
+      filters: {},
+      error: { type: "INVALID_QUERY", message: "Missing 'query'" },
+    };
+  }
+
+  // 1) Get the user's ED config
+  const config = await edConnectorRepository.getConfig(uid);
+  if (!config || !config.apiKeyEncrypted || !config.baseUrl) {
+    return {
+      ok: false,
+      posts: [],
+      filters: {},
+      error: {
+        type: "AUTH_ERROR",
+        message: "ED connector not configured for this user",
+      },
+    };
+  }
+
+  // 2) Decrypt the token
+  let apiToken: string;
+  try {
+    apiToken = decryptSecret(config.apiKeyEncrypted);
+  } catch (e) {
+    logger.error("edBrainSearch.decryptFailed", { uid, error: String(e) });
+    return {
+      ok: false,
+      posts: [],
+      filters: {},
+      error: {
+        type: "AUTH_ERROR",
+        message: "Failed to decrypt ED token",
+      },
+    };
+  }
+
+  const client = new EdDiscussionClient(config.baseUrl, apiToken);
+
+  // 3) Get the user's ED courses
+  let courses;
+  try {
+    const userInfo = await client.getUser();
+    courses = userInfo.courses.map((c) => c.course);
+  } catch (e: any) {
+    const msg = String(e?.message || e);
+    logger.error("edBrainSearch.fetchUserFailed", { uid, error: msg });
+
+    if (msg.includes("401") || msg.includes("403")) {
+      return {
+        ok: false,
+        posts: [],
+        filters: {},
+        error: {
+          type: "AUTH_ERROR",
+          message: "ED authentication failed",
+        },
+      };
+    }
+    if (msg.includes("429")) {
+      return {
+        ok: false,
+        posts: [],
+        filters: {},
+        error: {
+          type: "RATE_LIMIT",
+          message: "ED API rate limit reached",
+        },
+      };
+    }
+    return {
+      ok: false,
+      posts: [],
+      filters: {},
+      error: {
+        type: "NETWORK_ERROR",
+        message: "Failed to contact ED API",
+      },
+    };
+  }
+
+  // 4) Parse the natural language query
+  const parsed = parseEdSearchQuery(query);
+
+  // 5) Resolve the course + fetch options
+  const req = await buildEdSearchRequest(client, parsed, courses);
+  if (isEdBrainError(req)) {
+    return {
+      ok: false,
+      posts: [],
+      filters: {
+        status: "all", // Default, LLM would have set this if successful
+        dateFrom: parsed.dateFrom,
+        dateTo: parsed.dateTo,
+        limit: input.limit ?? 5, // Use input limit or default
+      },
+      error: req,
+    };
+  }
+
+  // Override limit if explicitly provided in input
+  if (input.limit != null) {
+    req.fetchOptions.limit = input.limit;
+  }
+
+  // 6) Fetch ED threads
+  let threads;
+  try {
+    threads = await client.fetchThreads(req.fetchOptions);
+  } catch (e: any) {
+    const msg = String(e?.message || e);
+    logger.error("edBrainSearch.fetchThreadsFailed", { uid, error: msg });
+
+    const filters = {
+      course: req.resolvedCourse.code || req.resolvedCourse.name,
+      status: req.fetchOptions.statusFilter || "all",
+      dateFrom: parsed.dateFrom,
+      dateTo: parsed.dateTo,
+      limit: req.fetchOptions.limit ?? 5,
+    };
+
+    if (msg.includes("401") || msg.includes("403")) {
+      return {
+        ok: false,
+        posts: [],
+        filters,
+        error: {
+          type: "AUTH_ERROR",
+          message: "ED authentication failed",
+        },
+      };
+    }
+    if (msg.includes("429")) {
+      return {
+        ok: false,
+        posts: [],
+        filters,
+        error: {
+          type: "RATE_LIMIT",
+          message: "ED API rate limit reached",
+        },
+      };
+    }
+    return {
+      ok: false,
+      posts: [],
+      filters,
+      error: {
+        type: "NETWORK_ERROR",
+        message: "Failed to contact ED API",
+      },
+    };
+  }
+
+  if (!threads.length) {
+    return {
+      ok: false,
+      posts: [],
+      filters: {
+        course: req.resolvedCourse.code || req.resolvedCourse.name,
+        status: req.fetchOptions.statusFilter || "all",
+        dateFrom: parsed.dateFrom,
+        dateTo: parsed.dateTo,
+        limit: req.fetchOptions.limit ?? 5,
+      },
+      error: {
+        type: "NO_RESULTS",
+        message: "No posts found for these filters",
+      },
+    };
+  }
+
+  // 7) Normalize for the frontend
+  const posts = normalizeEdThreads(threads, req.resolvedCourse);
+
+  return {
+    ok: true,
+    posts,
+    filters: {
+      course: req.resolvedCourse.code || req.resolvedCourse.name,
+      status: req.fetchOptions.statusFilter || "all",
+      dateFrom: parsed.dateFrom,
+      dateTo: parsed.dateTo,
+      limit: req.fetchOptions.limit ?? 5,
+    },
+  };
+}
 
 // Embeddings = Jina
 const EMBED_URL = withV1(process.env.EMBED_BASE_URL) + "/embeddings";
@@ -434,7 +664,7 @@ function isFoodRelatedQuestion(q: string): boolean {
   if (FOOD_DIET_QUERY.test(q)) return true;
   // Diet patterns with eating context
   if (FOOD_DIET_PATTERNS.test(q)) return true;
-  // Price patterns with eating context  
+  // Price patterns with eating context
   if (FOOD_PRICE_PATTERNS.test(q)) return true;
   // Weak patterns only if the question is clearly about eating (not just contains "menu" or "restaurant")
   // Must have at least 2 food-related words or a clear eating phrase
@@ -473,9 +703,10 @@ export async function answerWithRagCore({
   const trimmedSummary =
     summaryBudget > 0 ? (summary ?? "").toString().trim().slice(0, summaryBudget) : "";
   
+>>>>>>> origin/main
   // Check if this is a food-related question FIRST (before schedule/RAG)
   const isFoodQuestion = isFoodRelatedQuestion(q);
-  
+
   if (isFoodQuestion) {
     try {
       logger.info("answerWithRagCore.foodQuestion", { questionLen: q.length });
@@ -500,7 +731,7 @@ export async function answerWithRagCore({
       // Fall through to regular RAG if food query fails
     }
   }
-  
+
 
   // Check if this is a schedule-related question and fetch schedule context
   let scheduleContext = "";
@@ -955,10 +1186,39 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
 
     if (!question) throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
 
+<<<<<<< HEAD
+    // === ED Fetch Intent Detection (fast, regex-based) - CHECK FIRST ===
+    const edFetchIntentResult = detectFetchFromEdIntentCore(question);
+    logger.info("answerWithRagFn.edFetchIntentCheck", {
+      question: question.substring(0, 100),
+      detected: edFetchIntentResult.ed_fetch_intent_detected,
+      query: edFetchIntentResult.ed_fetch_query,
+    });
+    
+    if (edFetchIntentResult.ed_fetch_intent_detected) {
+      logger.info("answerWithRagFn.edFetchIntentDetected", {
+        query: edFetchIntentResult.ed_fetch_query,
+        questionLen: question.length,
+        originalQuestion: question,
+      });
+
+      return {
+        reply: "Recherche des posts ED Discussion...",
+        primary_url: null,
+        best_score: 0,
+        sources: [],
+        source_type: "none",
+        ed_fetch_intent_detected: true,
+        ed_fetch_query: edFetchIntentResult.ed_fetch_query || question,
+      };
+    }
+    // === End ED Fetch Intent Detection ===
+
+    // === ED Fetch Intent Detection (fast, regex-based) - check BEFORE post intent ===
     const fetchIntentResult = detectFetchFromEdIntentCore(question);
     const { ed_fetch_intent_detected, ed_fetch_query } = fetchIntentResult;
 
-    // === ED Intent Detection (fast, regex-based) ===
+    // === ED Post Intent Detection (fast, regex-based) ===
     const edIntentResult = detectPostToEdIntentCore(question);
     if (edIntentResult.ed_intent_detected && edIntentResult.ed_intent) {
       logger.info("answerWithRagFn.edIntentDetected", {
@@ -988,7 +1248,7 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
         ed_fetch_query,
       };
     }
-    // === End ED Intent Detection ===
+    // === End ED Post Intent Detection ===
 
     // === Moodle Intent Detection (fast, regex-based) ===
     // First layer: General detection - determines if this is a Moodle fetch request
@@ -1165,7 +1425,7 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
           // We use Promise.allSettled to search all courses simultaneously, then
           // check results in order and take the first match (maintains deterministic behavior)
           let foundInCourse: any = null;
-          
+
           const searchPromises = courses.map(async (course) => {
             const courseId = course.id; // Moodle returns 'id' field
             if (!courseId) {
@@ -1561,6 +1821,38 @@ export const edConnectorTestFn = europeFunctions.https.onCall(
       throw new functions.https.HttpsError(
         "internal",
         "Failed to test ED connector",
+        String(e?.message || e)
+      );
+    }
+  }
+);
+
+type EdBrainSearchCallableInput = {
+  query?: string;
+  limit?: number;
+};
+
+export const edBrainSearchFn = europeFunctions.https.onCall(
+  async (data: EdBrainSearchCallableInput, context) => {
+    const uid = requireAuth(context);
+
+    const query = String(data?.query || "").trim();
+    const limit =
+      typeof data?.limit === "number" && Number.isFinite(data.limit)
+        ? data.limit
+        : undefined;
+
+    try {
+      const result = await edBrainSearchCore(uid, { query, limit });
+      return result;
+    } catch (e: any) {
+      logger.error("edBrainSearchFn.failed", {
+        uid,
+        error: String(e),
+      });
+      throw new functions.https.HttpsError(
+        "internal",
+        "edBrainSearch failed",
         String(e?.message || e)
       );
     }
@@ -2321,17 +2613,17 @@ export const getEpflScheduleStatusFn = europeFunctions.https.onCall(async (_data
  *        EPFL FOOD MENUS (Web Scraping Integration)
  * ======================================================= */
 
-/** 
+/**
  * Sync weekly food menus from EPFL website
  * Stores in a global collection (not per-user since menus are the same for everyone)
  */
 export async function syncEpflFoodMenusCore(): Promise<{ success: boolean; mealCount: number; days: number }> {
   logger.info("syncEpflFoodMenus.starting");
-  
+
   const weeklyMenu = await scrapeWeeklyMenu();
-  
+
   const totalMeals = weeklyMenu.days.reduce((sum, day) => sum + day.meals.length, 0);
-  
+
   // Store in Firestore - global collection
   const menuRef = db.collection('epflMenus').doc(weeklyMenu.weekStart);
   await menuRef.set({
@@ -2351,13 +2643,13 @@ export async function syncEpflFoodMenusCore(): Promise<{ success: boolean; mealC
     lastSync: admin.firestore.FieldValue.serverTimestamp(),
     mealCount: totalMeals,
   });
-  
-  logger.info("syncEpflFoodMenus.success", { 
+
+  logger.info("syncEpflFoodMenus.success", {
     weekStart: weeklyMenu.weekStart,
     mealCount: totalMeals,
     days: weeklyMenu.days.length,
   });
-  
+
   return {
     success: true,
     mealCount: totalMeals,
@@ -2404,7 +2696,7 @@ function getTomorrowDateStr(): string {
 export async function getFoodContextCore(): Promise<string> {
   const weekStart = getCurrentWeekStart();
   const menuDoc = await db.collection('epflMenus').doc(weekStart).get();
-  
+
   if (!menuDoc.exists) {
     // Try to sync if no data exists
     try {
@@ -2419,7 +2711,7 @@ export async function getFoodContextCore(): Promise<string> {
     }
     return "Aucun menu disponible pour cette semaine. Les données n'ont pas encore été synchronisées.";
   }
-  
+
   const data = menuDoc.data() as any;
   return formatMenuForContext(data);
 }
@@ -2430,7 +2722,7 @@ export async function getFoodContextCore(): Promise<string> {
 export async function getMealsForDay(daySpecifier: "today" | "tomorrow" | string): Promise<DailyMenu | null> {
   const weekStart = getCurrentWeekStart();
   const menuDoc = await db.collection('epflMenus').doc(weekStart).get();
-  
+
   if (!menuDoc.exists) {
     // Try to sync
     try {
@@ -2441,9 +2733,9 @@ export async function getMealsForDay(daySpecifier: "today" | "tomorrow" | string
     const newDoc = await db.collection('epflMenus').doc(weekStart).get();
     if (!newDoc.exists) return null;
   }
-  
+
   const data = menuDoc.data() as any;
-  
+
   let targetDate: string;
   if (daySpecifier === "today") {
     targetDate = getTodayDateStr();
@@ -2452,10 +2744,10 @@ export async function getMealsForDay(daySpecifier: "today" | "tomorrow" | string
   } else {
     targetDate = daySpecifier;
   }
-  
+
   const dayData = data.days?.find((d: any) => d.date === targetDate);
   if (!dayData) return null;
-  
+
   return {
     date: dayData.date,
     dayName: dayData.dayName,
@@ -2472,7 +2764,7 @@ function detectDayFromQuestion(q: string): { dayIndex: number | null; dayLabel: 
   const zurichStr = today.toLocaleDateString('en-US', { timeZone: 'Europe/Zurich' });
   const zurichToday = new Date(zurichStr);
   const todayDayOfWeek = zurichToday.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-  
+
   // Day name mappings (French)
   const dayMappings: Array<{ patterns: string[]; dayOfWeek: number; label: string }> = [
     { patterns: ["lundi", "monday"], dayOfWeek: 1, label: "lundi" },
@@ -2481,7 +2773,7 @@ function detectDayFromQuestion(q: string): { dayIndex: number | null; dayLabel: 
     { patterns: ["jeudi", "thursday"], dayOfWeek: 4, label: "jeudi" },
     { patterns: ["vendredi", "friday"], dayOfWeek: 5, label: "vendredi" },
   ];
-  
+
   // Check for explicit day names first
   for (const { patterns, dayOfWeek, label } of dayMappings) {
     if (patterns.some(p => q.includes(p))) {
@@ -2489,7 +2781,7 @@ function detectDayFromQuestion(q: string): { dayIndex: number | null; dayLabel: 
       return { dayIndex: dayOfWeek - 1, dayLabel: label };
     }
   }
-  
+
   // Check for "demain" / "tomorrow"
   if (q.includes("demain") || q.includes("tomorrow")) {
     const tomorrowDayOfWeek = (todayDayOfWeek + 1) % 7;
@@ -2498,7 +2790,7 @@ function detectDayFromQuestion(q: string): { dayIndex: number | null; dayLabel: 
     }
     return { dayIndex: null, dayLabel: "demain" }; // Weekend
   }
-  
+
   // Default to today
   if (todayDayOfWeek >= 1 && todayDayOfWeek <= 5) {
     return { dayIndex: todayDayOfWeek - 1, dayLabel: "aujourd'hui" };
@@ -2518,7 +2810,7 @@ function extractMaxPrice(q: string): number | null {
     /<\s*(\d+(?:[.,]\d+)?)/,
     /max(?:imum)?\s+(\d+(?:[.,]\d+)?)/i,
   ];
-  
+
   for (const pattern of patterns) {
     const match = q.match(pattern);
     if (match) {
@@ -2544,14 +2836,14 @@ export async function answerFoodQuestionCore(question: string): Promise<{
   meals?: Meal[];
 }> {
   const q = question.toLowerCase();
-  
+
   // Determine which day the user is asking about
   const { dayIndex, dayLabel } = detectDayFromQuestion(q);
-  
+
   // Get the weekly menu
   const weekStart = getCurrentWeekStart();
   const menuDoc = await db.collection('epflMenus').doc(weekStart).get();
-  
+
   if (!menuDoc.exists) {
     try {
       await syncEpflFoodMenusCore();
@@ -2562,50 +2854,50 @@ export async function answerFoodQuestionCore(question: string): Promise<{
       };
     }
   }
-  
+
   const data = (await db.collection('epflMenus').doc(weekStart).get()).data() as any;
-  
+
   if (!data?.days || dayIndex === null || dayIndex >= data.days.length) {
     return {
       reply: `Je n'ai pas de données sur les menus pour ${dayLabel}. Les menus sont disponibles du lundi au vendredi.`,
       source_type: "food",
     };
   }
-  
+
   const dayData = data.days[dayIndex];
   const dailyMenu: DailyMenu = {
     date: dayData.date,
     dayName: dayData.dayName,
     meals: dayData.meals || [],
   };
-  
+
   if (dailyMenu.meals.length === 0) {
     return {
       reply: `Aucun menu disponible pour ${dayLabel} (${dailyMenu.date}).`,
       source_type: "food",
     };
   }
-  
+
   // Extract price filter if present
   const maxPrice = extractMaxPrice(q);
-  
+
   // Format day label with capitalization
   const formattedDayLabel = dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1);
-  
+
   // Check for specific restaurant query
-  const restaurantMatch = TARGET_RESTAURANTS.find(r => 
-    q.includes(r.toLowerCase()) || 
+  const restaurantMatch = TARGET_RESTAURANTS.find(r =>
+    q.includes(r.toLowerCase()) ||
     q.includes(r.toLowerCase().split("-")[0].trim()) ||
     (r === "Ornithorynque" && q.includes("orni")) ||
     (r === "Native-Restauration végétale - Bar à café" && q.includes("native"))
   );
-  
+
   if (restaurantMatch) {
     let meals = findMealsByRestaurant(dailyMenu, restaurantMatch);
     if (maxPrice !== null) {
       meals = filterMealsByPrice(meals, maxPrice);
     }
-    
+
     if (meals.length === 0) {
       const priceNote = maxPrice !== null ? ` à moins de ${maxPrice} CHF` : "";
       return {
@@ -2613,7 +2905,7 @@ export async function answerFoodQuestionCore(question: string): Promise<{
         source_type: "food",
       };
     }
-    
+
     const mealsList = meals.map(m => {
       const tags: string[] = [];
       if (m.isVegan) tags.push("🌱 vegan");
@@ -2622,7 +2914,7 @@ export async function answerFoodQuestionCore(question: string): Promise<{
       const tagStr = tags.length > 0 ? ` [${tags.join(", ")}]` : "";
       return `• ${m.name}${tagStr}${price}`;
     }).join("\n");
-    
+
     const priceNote = maxPrice !== null ? ` (< ${maxPrice} CHF)` : "";
     return {
       reply: `${formattedDayLabel} à ${restaurantMatch}${priceNote}:\n${mealsList}`,
@@ -2630,17 +2922,17 @@ export async function answerFoodQuestionCore(question: string): Promise<{
       meals,
     };
   }
-  
+
   // Check for vegetarian/vegan query
   const isVeganQuery = q.includes("vegan");
   const isVeggieQuery = q.includes("végé") || q.includes("veggie") || q.includes("végétarien") || isVeganQuery;
-  
+
   if (isVeggieQuery) {
     let veggieMeals = findVeggieMeals(dailyMenu, isVeganQuery);
     if (maxPrice !== null) {
       veggieMeals = filterMealsByPrice(veggieMeals, maxPrice);
     }
-    
+
     if (veggieMeals.length === 0) {
       const type = isVeganQuery ? "vegan" : "végétarien";
       const priceNote = maxPrice !== null ? ` à moins de ${maxPrice} CHF` : "";
@@ -2649,14 +2941,14 @@ export async function answerFoodQuestionCore(question: string): Promise<{
         source_type: "food",
       };
     }
-    
+
     const type = isVeganQuery ? "vegan" : "végétarien";
     const mealsList = veggieMeals.map(m => {
       const tag = m.isVegan ? "🌱" : "🥬";
       const price = m.studentPrice ? ` — ${m.studentPrice.toFixed(2)} CHF` : "";
       return `• ${tag} ${m.name} (${m.restaurant})${price}`;
     }).join("\n");
-    
+
     const priceNote = maxPrice !== null ? ` (< ${maxPrice} CHF)` : "";
     return {
       reply: `Plats ${type}s ${dayLabel}${priceNote}:\n${mealsList}`,
@@ -2664,21 +2956,21 @@ export async function answerFoodQuestionCore(question: string): Promise<{
       meals: veggieMeals,
     };
   }
-  
+
   // Check for price-based query (meals under X CHF)
   if (maxPrice !== null) {
     const affordableMeals = filterMealsByPrice(dailyMenu.meals, maxPrice);
-    
+
     if (affordableMeals.length === 0) {
       return {
         reply: `Aucun plat à moins de ${maxPrice} CHF trouvé pour ${dayLabel}.`,
         source_type: "food",
       };
     }
-    
+
     // Sort by price
     affordableMeals.sort((a, b) => (a.studentPrice ?? 999) - (b.studentPrice ?? 999));
-    
+
     const mealsList = affordableMeals.map(m => {
       const tags: string[] = [];
       if (m.isVegan) tags.push("🌱");
@@ -2686,14 +2978,14 @@ export async function answerFoodQuestionCore(question: string): Promise<{
       const tagStr = tags.length > 0 ? ` ${tags.join(" ")}` : "";
       return `• ${m.name}${tagStr} (${m.restaurant}) — ${m.studentPrice?.toFixed(2)} CHF`;
     }).join("\n");
-    
+
     return {
       reply: `Plats à moins de ${maxPrice} CHF ${dayLabel}:\n${mealsList}`,
       source_type: "food",
       meals: affordableMeals,
     };
   }
-  
+
   // Check for cheapest meal query (le moins cher)
   if (q.includes("moins cher") || q.includes("cheapest")) {
     const cheapest = findCheapestMeal(dailyMenu);
@@ -2703,26 +2995,26 @@ export async function answerFoodQuestionCore(question: string): Promise<{
         source_type: "food",
       };
     }
-    
+
     const tags: string[] = [];
     if (cheapest.isVegan) tags.push("🌱 vegan");
     else if (cheapest.isVegetarian) tags.push("🥬 végétarien");
     const tagStr = tags.length > 0 ? ` [${tags.join(", ")}]` : "";
-    
+
     return {
       reply: `Le plat le moins cher ${dayLabel} est "${cheapest.name}"${tagStr} à ${cheapest.restaurant} pour ${cheapest.studentPrice?.toFixed(2)} CHF (prix étudiant).`,
       source_type: "food",
       meals: [cheapest],
     };
   }
-  
+
   // General "what's to eat" query - summarize the day
   const byRestaurant = new Map<string, Meal[]>();
   for (const meal of dailyMenu.meals) {
     if (!byRestaurant.has(meal.restaurant)) byRestaurant.set(meal.restaurant, []);
     byRestaurant.get(meal.restaurant)!.push(meal);
   }
-  
+
   const lines: string[] = [`${formattedDayLabel} (${dailyMenu.date}):`];
   for (const [restaurant, meals] of byRestaurant) {
     lines.push(`\n🏪 ${restaurant}:`);
@@ -2735,7 +3027,7 @@ export async function answerFoodQuestionCore(question: string): Promise<{
       lines.push(`  • ${meal.name}${tagStr}${price}`);
     }
   }
-  
+
   return {
     reply: lines.join("\n"),
     source_type: "food",

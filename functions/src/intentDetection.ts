@@ -108,6 +108,20 @@ export const ED_INTENT_CONFIGS: IntentConfig[] = [
   {
     id: "fetch_question",
     matchPatterns: [
+<<<<<<< HEAD
+      // French patterns
+      /\b(montre|affiche|ouvre|récupère|montres? moi|affiches? moi|donne.?moi)\b.*\b(post|question)\b.*\b(ed|edstem|ed\s*discussion)/i,
+      /\b(post|question)\b.*\b(ed|edstem|ed\s*discussion)\b.*\b(montre|affiche|ouvre)/i,
+      // English patterns - most flexible: fetch + post + ed in any order
+      /\b(fetch|get|show|display|open|lookup|check)\b.*\b(post|question|thread|posts)\b.*\b(ed|edstem|ed\s*discussion)/i,
+      /\b(fetch|get|show|display|open|lookup|check)\b.*\b(ed|edstem|ed\s*discussion)\b.*\b(post|question|thread|posts)/i,
+      // Specific patterns for common phrasings - MUST BE BEFORE the lookahead pattern
+      /\bfetch\s+(post|posts)\s+(ed|edstem|ed\s*discussion)/i,
+      /\bfetch\s+(ed|edstem|ed\s*discussion)\s+(post|posts)/i,
+      /\bget\s+(post|posts)\s+(ed|edstem|ed\s*discussion)/i,
+      /\bget\s+(ed|edstem|ed\s*discussion)\s+(post|posts)/i,
+      /\bshow\s+(post|posts)\s+(ed|edstem|ed\s*discussion)/i,
+      /\bshow\s+(ed|edstem|ed\s*discussion)\s+(post|posts)/i,
       // Direct action verbs: show, open, display, fetch, get, find, search, retrieve, bring, see, view, read, lookup, check
       /\b(show|open|display|fetch|get|find|search|retrieve|bring|see|view|read|lookup|check)\b.*\b(ed|edstem|ed\s*discussion)\b.*\b(post|question|thread|discussion)/i,
       // Action verbs with "me": show me, get me, find me, give me, send me
@@ -118,6 +132,8 @@ export const ED_INTENT_CONFIGS: IntentConfig[] = [
       /\b(i\s+)?(want|need)\s+(to\s+)?(see|view|find|show|get|read|open)\b.*\b(ed|edstem|ed\s*discussion)\b.*\b(post|question|thread|discussion)/i,
       // "Can you/I show/see": Can you show me the ED post, Can I see this ED thread
       /\b(can\s+(you|i))\b.*\b(show|see|find|get|open|view|read)\b.*\b(ed|edstem|ed\s*discussion)\b.*\b(post|question|thread|discussion)/i,
+      // Most permissive: matches if all three keywords are present anywhere (put last as fallback)
+      /(?=.*\b(fetch|get|show|display|open|lookup|check)\b)(?=.*\b(post|posts|question|thread)\b)(?=.*\b(ed|edstem|ed\s*discussion)\b)/i,
     ],
     blockPatterns: ED_BLOCK_PATTERNS,
   },
