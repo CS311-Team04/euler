@@ -1020,42 +1020,23 @@ class HomeViewModel(
                         compactType = CompactSourceType.SCHEDULE)
                   }
                   com.android.sample.llm.SourceType.FOOD -> {
-                    // Food source - show a small indicator
-                    SourceMeta(
-                        siteLabel = FALLBACK_FOOD_LABEL,
-                        siteLabelRes = R.string.source_label_epfl_restaurants,
-                        title = FALLBACK_FOOD_TITLE,
-                        titleRes = R.string.source_label_food_description,
-                        url = reply.url,
-                        isScheduleSource = true,
-                        compactType = CompactSourceType.FOOD)
+                    // Hide food source card to keep answers compact
+                    null
                   }
                   com.android.sample.llm.SourceType.RAG -> {
-                    // RAG source - show the web source card if URL exists
-                    reply.url?.let { url ->
-                      SourceMeta(
-                          siteLabel = buildSiteLabel(url),
-                          title = buildFallbackTitle(url),
-                          url = url,
-                          isScheduleSource = false,
-                          compactType = CompactSourceType.NONE)
-                    }
+                    // Hide RAG source card to keep answers compact
+                    null
                   }
                   com.android.sample.llm.SourceType.NONE -> null
                 }
 
             meta?.let { sourceMeta ->
               _uiState.update { s ->
-                s.copy(
-                    messages =
-                        s.messages +
-                            ChatUIModel(
-                                id = UUID.randomUUID().toString(),
-                                text = "",
-                                timestamp = System.currentTimeMillis(),
-                                type = ChatType.AI,
-                                source = sourceMeta),
-                    streamingSequence = s.streamingSequence + 1)
+                val updated =
+                    s.messages.map { msg ->
+                      if (msg.id == messageId) msg.copy(source = sourceMeta) else msg
+                    }
+                s.copy(messages = updated, streamingSequence = s.streamingSequence + 1)
               }
             }
 

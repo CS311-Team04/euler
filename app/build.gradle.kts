@@ -289,6 +289,9 @@ dependencies {
     // Coil for image loading (Moodle logo, etc.)
     implementation(libs.coil.compose)
 
+    // Markdown rendering for chat messages
+    implementation(libs.markdownRendererM3)
+
     // DataStore for preferences
     implementation(libs.datastore.core)
     implementation(libs.datastore.preferences)

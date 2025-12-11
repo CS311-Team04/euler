@@ -25,22 +25,26 @@ import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.sample.ui.theme.EulerAudioButtonLoadingColor
 import com.android.sample.ui.theme.EulerAudioButtonTint
 import com.android.sample.ui.theme.EulerAudioButtonTintSemiTransparent
+import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.m3.markdownColor
+import com.mikepenz.markdown.m3.markdownTypography
 
 /**
  * Renders a single chat message as either:
@@ -75,6 +79,8 @@ fun ChatMessage(
     maxUserBubbleWidthFraction: Float = 0.78f
 ) {
   val isUser = message.type == ChatType.USER
+  val linkColor = MaterialTheme.colorScheme.primary
+  val mdTypography = markdownTypography()
 
   if (isUser) {
     // RIGHT-ALIGNED row; bubble wraps content (no fillMaxWidth on bubble or text)
@@ -90,16 +96,25 @@ fun ChatMessage(
             modifier =
                 Modifier.widthIn(max = maxBubbleWidth) // cap width
                     .testTag("chat_user_bubble")) {
-              Text(
-                  text = message.text,
-                  color = userBubbleText,
-                  style = MaterialTheme.typography.bodyMedium,
-                  lineHeight = 18.sp,
-                  textAlign = TextAlign.Start,
-                  // IMPORTANT: no fillMaxWidth here → wrap content
-                  modifier =
-                      Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
-                          .testTag("chat_user_text"))
+              val userMarkdownColors =
+                  markdownColor(
+                      text = userBubbleText,
+                      codeText = userBubbleText,
+                      linkText = linkColor)
+              CompositionLocalProvider(LocalContentColor provides userBubbleText) {
+                ProvideTextStyle(
+                    MaterialTheme.typography.bodyMedium.copy(
+                        color = userBubbleText, lineHeight = 18.sp)) {
+                      Markdown(
+                          content = message.text,
+                          colors = userMarkdownColors,
+                          typography = mdTypography,
+                          // IMPORTANT: no fillMaxWidth here → wrap content
+                          modifier =
+                              Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                                  .testTag("chat_user_text"))
+                    }
+              }
             }
       }
     }
@@ -110,12 +125,18 @@ fun ChatMessage(
         LeadingThinkingDot(color = aiText)
       } else {
         Column(modifier = Modifier.fillMaxWidth()) {
-          Text(
-              text = message.text,
-              color = aiText,
-              style = MaterialTheme.typography.bodyMedium,
-              lineHeight = 20.sp,
-              modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+          val aiMarkdownColors =
+              markdownColor(text = aiText, codeText = aiText, linkText = linkColor)
+          CompositionLocalProvider(LocalContentColor provides aiText) {
+            ProvideTextStyle(
+                MaterialTheme.typography.bodyMedium.copy(color = aiText, lineHeight = 20.sp)) {
+                  Markdown(
+                      content = message.text,
+                      colors = aiMarkdownColors,
+                      typography = mdTypography,
+                      modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+                }
+          }
 
           if (audioState != null) {
             Spacer(modifier = Modifier.height(4.dp))

@@ -451,6 +451,176 @@ function isFoodRelatedQuestion(q: string): boolean {
   return false;
 }
 
+type SourceLink = { title?: string | null; url?: string | null; score?: number };
+
+function normalizeMarkdownLines(body: string): string[] {
+  return body
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+}
+
+function bulletize(lines: string[], indent = ""): string[] {
+  return lines.map((l) => {
+    if (/^[-*]\s+/.test(l)) return `${indent}${l.replace(/^\*/,"-")}`;
+    if (/^\d+\.\s+/.test(l)) return `${indent}${l}`;
+    if (/^•\s*/.test(l)) return `${indent}- ${l.replace(/^•\s*/, "")}`;
+    return `${indent}- ${l}`;
+  });
+}
+
+export function formatGenericMarkdown(body: string, title = "Réponse"): string {
+  const lines = bulletize(normalizeMarkdownLines(body));
+  return [`**${title}**`, ...lines].join("\n");
+}
+
+export function formatScheduleMarkdown(body: string): string {
+  const lines = bulletize(normalizeMarkdownLines(body));
+  return ["**Emploi du temps**", ...lines].join("\n");
+}
+
+export function formatRagMarkdown(
+  body: string,
+  _sources?: SourceLink[],
+  _primaryUrl?: string | null
+): string {
+  return ["**Réponse**", ...bulletize(normalizeMarkdownLines(body))].join("\n");
+}
+
+function formatFoodHeading(title: string, subtitle?: string): string[] {
+  const lines = [`**${title}**`];
+  if (subtitle) lines.push(subtitle);
+  return lines;
+}
+
+export function formatFoodMarkdown(
+  title: string,
+  restaurants: Array<{ name: string; meals: string[] }>,
+  subtitle?: string
+): string {
+  const out: string[] = [...formatFoodHeading(title, subtitle)];
+  restaurants.forEach((rest) => {
+    out.push("", `*${rest.name}*`);
+    out.push(...bulletize(rest.meals));
+  });
+  return out.join("\n");
+}
+
+async function getScheduleData(uid: string): Promise<OptimizedSchedule | null> {
+  const userDoc = await db.collection('users').doc(uid).get();
+  const data = userDoc.data();
+  if (!data?.epflSchedule?.weeklySlots || !data?.epflSchedule?.finalExams) {
+    return null;
+  }
+  return {
+    weeklySlots: data.epflSchedule.weeklySlots,
+    finalExams: data.epflSchedule.finalExams,
+  };
+}
+
+function isExamQuestion(q: string): boolean {
+  return /\b(exam|examen|partiel|final)\b/i.test(q);
+}
+
+function extractCourseCodeFromQuestion(q: string): string | null {
+  const m = q.match(/\b([A-Z]{2,3}-?\d{2,3})\b/i);
+  return m ? m[1].toUpperCase().replace("-", "") : null;
+}
+
+function pickExamForQuestion(
+  question: string,
+  exams: FinalExam[]
+): FinalExam | null {
+  if (exams.length === 0) return null;
+  const qLower = question.toLowerCase();
+  const courseCodeQ = extractCourseCodeFromQuestion(question);
+
+  // Filter by course code if present in question
+  const filtered = courseCodeQ
+      ? exams.filter((e) => {
+          const code = (e.courseCode ?? "").toUpperCase().replace("-", "");
+          return code && code === courseCodeQ;
+        })
+      : exams;
+  const candidates = filtered.length > 0 ? filtered : exams;
+
+  const stop = new Set(["examen", "exam", "final", "partiel", "de", "le", "la", "l'", "un", "une", "du", "des"]);
+  const tokens = qLower
+    .replace(/[^a-z0-9àâçéèêëîïôûùüÿñæœ\s]/gi, " ")
+    .split(/\s+/)
+    .filter((t) => t.length > 2 && !stop.has(t));
+
+  // Score exams by token overlap on summary and courseCode
+  let best: { exam: FinalExam; score: number } | null = null;
+  for (const exam of candidates) {
+    const summary = (exam.summary ?? "").toLowerCase();
+    const code = (exam.courseCode ?? "").toLowerCase();
+    let score = 0;
+    for (const t of tokens) {
+      if (summary.includes(t)) score += 1.2;
+      if (code && code.includes(t)) score += 2;
+    }
+    // Prefer future exams if same score
+    const isFuture = exam.date && new Date(exam.date) >= new Date();
+    const tieBreaker = isFuture ? 0.1 : 0;
+    if (!best || score + tieBreaker > best.score) {
+      best = { exam, score: score + tieBreaker };
+    }
+  }
+
+  if (best && best.score > 0.5) return best.exam;
+
+  // No confident match: return null to avoid hallucination
+  return null;
+}
+
+function listUpcomingExamsMarkdown(exams: FinalExam[], limit = 3): string {
+  const upcoming = exams
+    .map((e) => ({ exam: e, date: new Date(e.date) }))
+    .filter((e) => !Number.isNaN(e.date.getTime()))
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+  if (upcoming.length === 0) return "Aucun examen à venir trouvé.";
+  const picked = upcoming.slice(0, limit).map((e) => e.exam);
+  const lines = picked.map((exam) => {
+    const dateObj = new Date(exam.date);
+    const dateStr = Number.isNaN(dateObj.getTime())
+        ? exam.date
+        : dateObj.toLocaleDateString("fr-CH", {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          });
+    const code = exam.courseCode ? ` (${exam.courseCode})` : "";
+    const time = exam.startTime && exam.endTime ? ` — ${exam.startTime}–${exam.endTime}` : "";
+    const loc = exam.location ? ` — ${exam.location}` : "";
+    return `- ${exam.summary}${code} — ${dateStr}${time}${loc}`;
+  });
+  return ["Aucun examen correspondant trouvé.", "Exams à venir :", ...lines].join("\n");
+}
+
+function formatExamMarkdown(exam: FinalExam): string {
+  const dateObj = new Date(exam.date);
+  const dateStr = Number.isNaN(dateObj.getTime())
+    ? exam.date
+    : dateObj.toLocaleDateString("fr-CH", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+  const line = [
+    `**${exam.summary ?? "Examen"}**`,
+    dateStr,
+    exam.startTime && exam.endTime ? `${exam.startTime}–${exam.endTime}` : null,
+    exam.location ? `Salle ${exam.location}` : null,
+  ]
+    .filter(Boolean)
+    .join(" — ");
+  return formatScheduleMarkdown(line);
+}
+
 export async function answerWithRagCore({
   question, topK, model, summary, recentTranscript, profileContext, uid, client,
 }: AnswerWithRagInput & { client?: OpenAI }) {
@@ -480,9 +650,12 @@ export async function answerWithRagCore({
   // Check if this is a schedule-related question and fetch schedule context
   let scheduleContext = "";
   const isScheduleQuestion = SCHEDULE_PATTERNS.test(q);
+  let scheduleData: OptimizedSchedule | null = null;
 
   if (isScheduleQuestion && uid) {
     try {
+      // Structured data for deterministic answers + string context for LLM
+      scheduleData = await getScheduleData(uid);
       scheduleContext = await getScheduleContextCore(uid);
       if (scheduleContext) {
         logger.info("answerWithRagCore.scheduleContext", {
@@ -493,6 +666,28 @@ export async function answerWithRagCore({
       }
     } catch (e) {
       logger.warn("answerWithRagCore.scheduleContextFailed", { error: String(e) });
+    }
+  }
+
+  // Deterministic schedule answer for exam questions when data exists
+  if (isScheduleQuestion && scheduleData?.finalExams?.length && isExamQuestion(q)) {
+    const match = pickExamForQuestion(q, scheduleData.finalExams);
+    if (match) {
+      return {
+        reply: formatExamMarkdown(match),
+        primary_url: null,
+        best_score: 1.0,
+        sources: [],
+        source_type: "schedule" as const,
+      };
+    } else {
+      return {
+        reply: formatScheduleMarkdown(listUpcomingExamsMarkdown(scheduleData.finalExams)),
+        primary_url: null,
+        best_score: 1.0,
+        sources: [],
+        source_type: "schedule" as const,
+      };
     }
   }
 
@@ -733,14 +928,26 @@ export async function answerWithRagCore({
     source_type = "rag";
   }
 
-  // Only expose a URL when using RAG (not schedule)
-  const primary_url = usedRag ? (chosen[0]?.url ?? null) : null;
+  // Only expose a URL when using RAG (not schedule); we hide for UI simplicity
+  const primary_url = usedRag ? null : null;
+
+  const formattedReply =
+    source_type === "schedule"
+      ? formatScheduleMarkdown(reply)
+      : source_type === "rag"
+          ? formatRagMarkdown(
+              reply,
+              usedRag
+                  ? chosen.map((c) => ({ title: c.title, url: c.url, score: c.score }))
+                  : [],
+              primary_url)
+          : formatGenericMarkdown(reply);
 
   return {
-    reply,
+    reply: formattedReply,
     primary_url,
     best_score: bestScore,
-    sources: usedRag ? chosen.map((c, i) => ({ idx: i + 1, title: c.title, url: c.url, score: c.score })) : [],
+    sources: usedRag ? [] : [],
     source_type, // "schedule", "rag", or "none"
   };
 }
@@ -2484,6 +2691,7 @@ export async function answerFoodQuestionCore(question: string): Promise<{
   
   // Determine which day the user is asking about
   const { dayIndex, dayLabel } = detectDayFromQuestion(q);
+  const formattedDayLabel = dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1);
   
   // Get the weekly menu
   const weekStart = getCurrentWeekStart();
@@ -2494,7 +2702,9 @@ export async function answerFoodQuestionCore(question: string): Promise<{
       await syncEpflFoodMenusCore();
     } catch (e) {
       return {
-        reply: `Je n'ai pas de données sur les menus. Veuillez réessayer plus tard.`,
+        reply: formatGenericMarkdown(
+          "Je n'ai pas de données sur les menus. Veuillez réessayer plus tard.",
+          "Menus"),
         source_type: "food",
       };
     }
@@ -2504,7 +2714,9 @@ export async function answerFoodQuestionCore(question: string): Promise<{
   
   if (!data?.days || dayIndex === null || dayIndex >= data.days.length) {
     return {
-      reply: `Je n'ai pas de données sur les menus pour ${dayLabel}. Les menus sont disponibles du lundi au vendredi.`,
+      reply: formatGenericMarkdown(
+          `Je n'ai pas de données sur les menus pour ${dayLabel}. Les menus sont disponibles du lundi au vendredi.`,
+          "Menus"),
       source_type: "food",
     };
   }
@@ -2518,16 +2730,15 @@ export async function answerFoodQuestionCore(question: string): Promise<{
   
   if (dailyMenu.meals.length === 0) {
     return {
-      reply: `Aucun menu disponible pour ${dayLabel} (${dailyMenu.date}).`,
+      reply: formatGenericMarkdown(
+          `Aucun menu disponible pour ${dayLabel} (${dailyMenu.date}).`,
+          "Menus"),
       source_type: "food",
     };
   }
   
   // Extract price filter if present
   const maxPrice = extractMaxPrice(q);
-  
-  // Format day label with capitalization
-  const formattedDayLabel = dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1);
   
   // Check for specific restaurant query
   const restaurantMatch = TARGET_RESTAURANTS.find(r => 
@@ -2546,7 +2757,9 @@ export async function answerFoodQuestionCore(question: string): Promise<{
     if (meals.length === 0) {
       const priceNote = maxPrice !== null ? ` à moins de ${maxPrice} CHF` : "";
       return {
-        reply: `Aucun plat trouvé${priceNote} pour ${restaurantMatch} ${dayLabel}.`,
+        reply: formatGenericMarkdown(
+          `Aucun plat trouvé${priceNote} pour ${restaurantMatch} ${dayLabel}.`,
+          `Menus ${formattedDayLabel}`),
         source_type: "food",
       };
     }
@@ -2555,14 +2768,16 @@ export async function answerFoodQuestionCore(question: string): Promise<{
       const tags: string[] = [];
       if (m.isVegan) tags.push("🌱 vegan");
       else if (m.isVegetarian) tags.push("🥬 végétarien");
-      const price = m.studentPrice ? ` — ${m.studentPrice.toFixed(2)} CHF` : "";
-      const tagStr = tags.length > 0 ? ` [${tags.join(", ")}]` : "";
-      return `• ${m.name}${tagStr}${price}`;
-    }).join("\n");
+      const pricePart = m.studentPrice ? ` _${m.studentPrice.toFixed(2)} CHF_` : "";
+      return `${tags.join(" ")} **${m.name}**${pricePart}`;
+    });
     
     const priceNote = maxPrice !== null ? ` (< ${maxPrice} CHF)` : "";
     return {
-      reply: `${formattedDayLabel} à ${restaurantMatch}${priceNote}:\n${mealsList}`,
+      reply: formatFoodMarkdown(
+        `Menus ${formattedDayLabel}`,
+        [{ name: restaurantMatch, meals: mealsList }],
+        priceNote ? `Budget ${priceNote.replace(/[()]/g, "")}` : undefined),
       source_type: "food",
       meals,
     };
@@ -2582,7 +2797,9 @@ export async function answerFoodQuestionCore(question: string): Promise<{
       const type = isVeganQuery ? "vegan" : "végétarien";
       const priceNote = maxPrice !== null ? ` à moins de ${maxPrice} CHF` : "";
       return {
-        reply: `Aucun plat ${type}${priceNote} trouvé pour ${dayLabel}.`,
+        reply: formatGenericMarkdown(
+          `Aucun plat ${type}${priceNote} trouvé pour ${dayLabel}.`,
+          `Menus ${formattedDayLabel}`),
         source_type: "food",
       };
     }
@@ -2590,13 +2807,16 @@ export async function answerFoodQuestionCore(question: string): Promise<{
     const type = isVeganQuery ? "vegan" : "végétarien";
     const mealsList = veggieMeals.map(m => {
       const tag = m.isVegan ? "🌱" : "🥬";
-      const price = m.studentPrice ? ` — ${m.studentPrice.toFixed(2)} CHF` : "";
-      return `• ${tag} ${m.name} (${m.restaurant})${price}`;
-    }).join("\n");
+      const pricePart = m.studentPrice ? ` _${m.studentPrice.toFixed(2)} CHF_` : "";
+      return `${tag} **${m.name}** (${m.restaurant})${pricePart}`;
+    });
     
     const priceNote = maxPrice !== null ? ` (< ${maxPrice} CHF)` : "";
     return {
-      reply: `Plats ${type}s ${dayLabel}${priceNote}:\n${mealsList}`,
+      reply: formatFoodMarkdown(
+        `Plats ${type}s — ${formattedDayLabel}`,
+        [{ name: "Sélection", meals: mealsList }],
+        priceNote ? `Budget ${priceNote.replace(/[()]/g, "")}` : undefined),
       source_type: "food",
       meals: veggieMeals,
     };
@@ -2608,7 +2828,9 @@ export async function answerFoodQuestionCore(question: string): Promise<{
     
     if (affordableMeals.length === 0) {
       return {
-        reply: `Aucun plat à moins de ${maxPrice} CHF trouvé pour ${dayLabel}.`,
+        reply: formatGenericMarkdown(
+          `Aucun plat à moins de ${maxPrice} CHF trouvé pour ${dayLabel}.`,
+          `Menus ${formattedDayLabel}`),
         source_type: "food",
       };
     }
@@ -2621,11 +2843,14 @@ export async function answerFoodQuestionCore(question: string): Promise<{
       if (m.isVegan) tags.push("🌱");
       else if (m.isVegetarian) tags.push("🥬");
       const tagStr = tags.length > 0 ? ` ${tags.join(" ")}` : "";
-      return `• ${m.name}${tagStr} (${m.restaurant}) — ${m.studentPrice?.toFixed(2)} CHF`;
-    }).join("\n");
+      const pricePart = m.studentPrice ? ` _${m.studentPrice?.toFixed(2)} CHF_` : "";
+      return `${tagStr.trim()} **${m.name}** (${m.restaurant})${pricePart}`;
+    });
     
     return {
-      reply: `Plats à moins de ${maxPrice} CHF ${dayLabel}:\n${mealsList}`,
+      reply: formatFoodMarkdown(
+        `Plats à moins de ${maxPrice} CHF — ${formattedDayLabel}`,
+        [{ name: "Sélection", meals: mealsList }]),
       source_type: "food",
       meals: affordableMeals,
     };
@@ -2636,7 +2861,9 @@ export async function answerFoodQuestionCore(question: string): Promise<{
     const cheapest = findCheapestMeal(dailyMenu);
     if (!cheapest) {
       return {
-        reply: `Pas de données de prix disponibles pour ${dayLabel}.`,
+        reply: formatGenericMarkdown(
+          `Pas de données de prix disponibles pour ${dayLabel}.`,
+          `Menus ${formattedDayLabel}`),
         source_type: "food",
       };
     }
@@ -2644,10 +2871,18 @@ export async function answerFoodQuestionCore(question: string): Promise<{
     const tags: string[] = [];
     if (cheapest.isVegan) tags.push("🌱 vegan");
     else if (cheapest.isVegetarian) tags.push("🥬 végétarien");
-    const tagStr = tags.length > 0 ? ` [${tags.join(", ")}]` : "";
     
     return {
-      reply: `Le plat le moins cher ${dayLabel} est "${cheapest.name}"${tagStr} à ${cheapest.restaurant} pour ${cheapest.studentPrice?.toFixed(2)} CHF (prix étudiant).`,
+      reply: formatFoodMarkdown(
+        `Plat le moins cher — ${formattedDayLabel}`,
+        [
+          {
+            name: cheapest.restaurant,
+            meals: [
+              `${tags.join(" ")} **${cheapest.name}** _${cheapest.studentPrice?.toFixed(2)} CHF_`
+            ],
+          },
+        ]),
       source_type: "food",
       meals: [cheapest],
     };
@@ -2667,14 +2902,26 @@ export async function answerFoodQuestionCore(question: string): Promise<{
       const tags: string[] = [];
       if (meal.isVegan) tags.push("🌱");
       else if (meal.isVegetarian) tags.push("🥬");
-      const price = meal.studentPrice ? ` — ${meal.studentPrice.toFixed(2)} CHF` : "";
-      const tagStr = tags.length > 0 ? ` ${tags.join(" ")}` : "";
-      lines.push(`  • ${meal.name}${tagStr}${price}`);
+      const pricePart = meal.studentPrice ? ` _${meal.studentPrice.toFixed(2)} CHF_` : "";
+      const tagStr = tags.length > 0 ? `${tags.join(" ")} ` : "";
+      lines.push(`  • ${tagStr}**${meal.name}**${pricePart}`);
     }
   }
   
   return {
-    reply: lines.join("\n"),
+    reply: formatFoodMarkdown(`Menus ${formattedDayLabel}`, [
+      ...Array.from(byRestaurant.entries()).map(([name, meals]) => {
+        const formattedMeals = meals.map((m) => {
+          const tags: string[] = [];
+          if (m.isVegan) tags.push("🌱");
+          else if (m.isVegetarian) tags.push("🥬");
+          const pricePart = m.studentPrice ? ` _${m.studentPrice.toFixed(2)} CHF_` : "";
+          const tagStr = tags.length > 0 ? `${tags.join(" ")} ` : "";
+          return `${tagStr}**${m.name}**${pricePart}`;
+        });
+        return { name, meals: formattedMeals };
+      })
+    ]),
     source_type: "food",
     meals: dailyMenu.meals,
   };
