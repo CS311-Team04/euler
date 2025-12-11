@@ -1,6 +1,7 @@
 // functions/src/edIntent.ts
 // Backwards-compatible wrapper around the new generic intent detection system
 
+import * as logger from "firebase-functions/logger";
 import {
   detectEdIntent,
   ED_INTENT_CONFIGS,
@@ -89,6 +90,18 @@ export function detectFetchFromEdIntentCore(
       ed_fetch_intent_detected: true,
       ed_fetch_query: question.trim(),
     };
+  }
+
+  // Debug: log if we're checking but not detecting
+  const lowerQuestion = question.toLowerCase();
+  if (lowerQuestion.includes("fetch") && lowerQuestion.includes("post") && lowerQuestion.includes("ed")) {
+    // This is a potential fetch request but wasn't detected - log for debugging
+    logger.warn("Potential fetch request not detected:", {
+      question,
+      detected: result.detected,
+      intentId: result.intentId,
+      matchedPattern: result.matchedPattern,
+    });
   }
 
   return {

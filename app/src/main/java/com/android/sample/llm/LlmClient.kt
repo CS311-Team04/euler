@@ -290,10 +290,17 @@ class FirebaseFunctionsLlmClient(
             formattedQuestion = edFormattedQuestion,
             formattedTitle = edFormattedTitle)
 
+    val edFetchDetected = parseEdFetchIntentDetected(map)
+    val edFetchQuery = parseEdFetchQuery(map)
+
+    if (edFetchDetected) {
+      Log.d(TAG, "Parsed ED fetch intent: detected=true, query=$edFetchQuery")
+    }
+
     val edFetchIntent =
         EdFetchIntent(
-            detected = parseEdFetchIntentDetected(map),
-            query = parseEdFetchQuery(map),
+            detected = edFetchDetected,
+            query = edFetchQuery,
         )
 
     return BotReply(replyText, url, sourceType, edIntent, edFetchIntent)
