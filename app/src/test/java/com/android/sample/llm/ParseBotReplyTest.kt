@@ -390,4 +390,152 @@ class ParseBotReplyTest {
         result.edFormattedQuestion)
     assertEquals("Question 5 Modstoch", result.edFormattedTitle)
   }
+
+  @Test
+  fun parseBotReply_parses_ed_fetch_intent_detected_true() {
+    val body =
+        """{"reply":"Response","ed_fetch_intent_detected":true,"ed_fetch_query":"show me this ED post"}"""
+    val result = parseBotReply(body, gson)
+
+    assertTrue(result.edFetchIntent.detected)
+    assertEquals("show me this ED post", result.edFetchIntent.query)
+  }
+
+  @Test
+  fun parseBotReply_parses_ed_fetch_intent_detected_false() {
+    val body = """{"reply":"Response","ed_fetch_intent_detected":false,"ed_fetch_query":null}"""
+    val result = parseBotReply(body, gson)
+
+    assertFalse(result.edFetchIntent.detected)
+    assertNull(result.edFetchIntent.query)
+  }
+
+  @Test
+  fun parseBotReply_defaults_ed_fetch_intent_when_missing() {
+    val body = """{"reply":"Response"}"""
+    val result = parseBotReply(body, gson)
+
+    assertFalse(result.edFetchIntent.detected)
+    assertNull(result.edFetchIntent.query)
+  }
+
+  @Test
+  fun parseBotReply_handles_ed_fetch_query_when_detected_true() {
+    val body =
+        """{"reply":"Response","ed_fetch_intent_detected":true,"ed_fetch_query":"fetch this ED question"}"""
+    val result = parseBotReply(body, gson)
+
+    assertTrue(result.edFetchIntent.detected)
+    assertEquals("fetch this ED question", result.edFetchIntent.query)
+  }
+
+  @Test
+  fun parseBotReply_handles_ed_fetch_query_null() {
+    val body = """{"reply":"Response","ed_fetch_intent_detected":true,"ed_fetch_query":null}"""
+    val result = parseBotReply(body, gson)
+
+    assertTrue(result.edFetchIntent.detected)
+    assertNull(result.edFetchIntent.query)
+  }
+
+  @Test
+  fun parseBotReply_handles_ed_fetch_query_empty_string() {
+    val body = """{"reply":"Response","ed_fetch_intent_detected":true,"ed_fetch_query":""}"""
+    val result = parseBotReply(body, gson)
+
+    assertTrue(result.edFetchIntent.detected)
+    assertNull("Empty string should be treated as null", result.edFetchIntent.query)
+  }
+
+  @Test
+  fun parseBotReply_handles_ed_fetch_query_whitespace() {
+    val body = """{"reply":"Response","ed_fetch_intent_detected":true,"ed_fetch_query":"   "}"""
+    val result = parseBotReply(body, gson)
+
+    assertTrue(result.edFetchIntent.detected)
+    assertNull("Whitespace-only should be treated as null", result.edFetchIntent.query)
+  }
+
+  @Test
+  fun parseBotReply_trims_ed_fetch_query() {
+    val body =
+        """{"reply":"Response","ed_fetch_intent_detected":true,"ed_fetch_query":"  Trimmed query  "}"""
+    val result = parseBotReply(body, gson)
+
+    assertTrue(result.edFetchIntent.detected)
+    assertEquals("Trimmed query", result.edFetchIntent.query)
+  }
+
+  @Test
+  fun parseBotReply_handles_invalid_ed_fetch_intent_detected_type() {
+    // Non-boolean ed_fetch_intent_detected should default to false
+    val body = """{"reply":"Response","ed_fetch_intent_detected":"not-a-boolean"}"""
+    val result = parseBotReply(body, gson)
+
+    assertFalse(result.edFetchIntent.detected)
+  }
+
+  @Test
+  fun parseBotReply_handles_invalid_ed_fetch_query_type() {
+    // Non-string ed_fetch_query should default to null
+    val body = """{"reply":"Response","ed_fetch_intent_detected":true,"ed_fetch_query":123}"""
+    val result = parseBotReply(body, gson)
+
+    assertTrue(result.edFetchIntent.detected)
+    assertNull("Non-string ed_fetch_query should be null", result.edFetchIntent.query)
+  }
+
+  @Test
+  fun parseBotReply_complete_response_with_fetch_intent() {
+    val body =
+        """{"reply":"Response","primary_url":"https://epfl.ch","ed_intent_detected":false,"ed_intent":null,"ed_fetch_intent_detected":true,"ed_fetch_query":"show me the ED post about linear algebra"}"""
+    val result = parseBotReply(body, gson)
+
+    assertEquals("Response", result.reply)
+    assertEquals("https://epfl.ch", result.url)
+    assertFalse(result.edIntentDetected)
+    assertTrue(result.edFetchIntent.detected)
+    assertEquals("show me the ED post about linear algebra", result.edFetchIntent.query)
+  }
+
+  @Test
+  fun parseBotReply_handles_ed_fetch_intent_detected_null() {
+    // null value should default to false
+    val body = """{"reply":"Response","ed_fetch_intent_detected":null}"""
+    val result = parseBotReply(body, gson)
+
+    assertFalse(result.edFetchIntent.detected)
+  }
+
+  @Test
+  fun parseBotReply_handles_ed_fetch_query_null_value() {
+    // null JSON value should default to null
+    val body = """{"reply":"Response","ed_fetch_intent_detected":true,"ed_fetch_query":null}"""
+    val result = parseBotReply(body, gson)
+
+    assertTrue(result.edFetchIntent.detected)
+    assertNull(result.edFetchIntent.query)
+  }
+
+  @Test
+  fun parseBotReply_handles_ed_fetch_query_non_string_type() {
+    // Non-string value (object) should default to null
+    val body =
+        """{"reply":"Response","ed_fetch_intent_detected":true,"ed_fetch_query":{"nested":"object"}}"""
+    val result = parseBotReply(body, gson)
+
+    assertTrue(result.edFetchIntent.detected)
+    assertNull("Non-string ed_fetch_query should default to null", result.edFetchIntent.query)
+  }
+
+  @Test
+  fun parseBotReply_handles_ed_fetch_intent_detected_non_boolean_type() {
+    // Non-boolean value (string) should default to false
+    val body = """{"reply":"Response","ed_fetch_intent_detected":"yes"}"""
+    val result = parseBotReply(body, gson)
+
+    assertFalse(
+        "Non-boolean ed_fetch_intent_detected should default to false",
+        result.edFetchIntent.detected)
+  }
 }

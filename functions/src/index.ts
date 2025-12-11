@@ -12,7 +12,11 @@ import admin from "firebase-admin";
 import { EdConnectorRepository } from "./connectors/ed/EdConnectorRepository";
 import { EdConnectorService } from "./connectors/ed/EdConnectorService";
 import { encryptSecret, decryptSecret } from "./security/secretCrypto";
-import { detectPostToEdIntentCore, buildEdIntentPromptForApertus } from "./edIntent";
+import {
+  detectPostToEdIntentCore,
+  detectFetchFromEdIntentCore,
+  buildEdIntentPromptForApertus,
+} from "./edIntent";
 import { parseEdPostResponse } from "./edIntentParser";
 import { 
   scrapeWeeklyMenu, 
@@ -951,6 +955,9 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
 
     if (!question) throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
 
+    const fetchIntentResult = detectFetchFromEdIntentCore(question);
+    const { ed_fetch_intent_detected, ed_fetch_query } = fetchIntentResult;
+
     // === ED Intent Detection (fast, regex-based) ===
     const edIntentResult = detectPostToEdIntentCore(question);
     if (edIntentResult.ed_intent_detected && edIntentResult.ed_intent) {
@@ -977,6 +984,8 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
         ed_intent: edIntentResult.ed_intent,
         ed_formatted_question: formattedQuestion,
         ed_formatted_title: formattedTitle,
+        ed_fetch_intent_detected,
+        ed_fetch_query,
       };
     }
     // === End ED Intent Detection ===
@@ -1333,6 +1342,10 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
       ...ragResult,
       ed_intent_detected: false,
       ed_intent: null,
+      ed_formatted_question: null,
+      ed_formatted_title: null,
+      ed_fetch_intent_detected,
+      ed_fetch_query,
       moodle_intent_detected: false,
       moodle_intent: null,
       moodle_file: null,
@@ -1389,6 +1402,9 @@ export const answerWithRagHttp = europeFunctions.https.onRequest(async (req: fun
     const body = req.body as AnswerWithRagInput;
     const question = String(body?.question || "").trim();
 
+    const fetchIntentResult = detectFetchFromEdIntentCore(question);
+    const { ed_fetch_intent_detected, ed_fetch_query } = fetchIntentResult;
+
     // === ED Intent Detection (fast, regex-based) ===
     const edIntentResult = detectPostToEdIntentCore(question);
     if (edIntentResult.ed_intent_detected && edIntentResult.ed_intent) {
@@ -1415,6 +1431,8 @@ export const answerWithRagHttp = europeFunctions.https.onRequest(async (req: fun
         ed_intent: edIntentResult.ed_intent,
         ed_formatted_question: formattedQuestion,
         ed_formatted_title: formattedTitle,
+        ed_fetch_intent_detected,
+        ed_fetch_query,
       });
       return;
     }
@@ -1425,6 +1443,10 @@ export const answerWithRagHttp = europeFunctions.https.onRequest(async (req: fun
       ...ragResult,
       ed_intent_detected: false,
       ed_intent: null,
+      ed_formatted_question: null,
+      ed_formatted_title: null,
+      ed_fetch_intent_detected,
+      ed_fetch_query,
       moodle_intent_detected: false,
       moodle_intent: null,
       moodle_file: null,

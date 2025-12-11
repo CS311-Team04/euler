@@ -8,6 +8,7 @@ import com.android.sample.conversations.Conversation
 import com.android.sample.conversations.ConversationRepository
 import com.android.sample.conversations.MessageDTO
 import com.android.sample.llm.BotReply
+import com.android.sample.llm.EdFetchIntent
 import com.android.sample.llm.EdIntent
 import com.android.sample.llm.FakeLlmClient
 import com.android.sample.llm.LlmClient
@@ -2234,6 +2235,133 @@ class HomeViewModelTest {
     val postOnEd = state.pendingAction as PendingAction.PostOnEd
     assertEquals("", postOnEd.draftTitle) // Falls back to empty string
     assertEquals(question, postOnEd.draftBody) // Falls back to original question
+  }
+
+  @Test
+  fun homeViewModel_shows_debug_message_when_ed_fetch_intent_detected() = runTest {
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.setEdFetchIntentResponse(
+        reply = "Fetching ED question...", query = "show me this ED post about linear algebra")
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val repo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel = HomeViewModel(fakeLlm, auth, repo)
+
+    viewModel.updateMessageDraft("Montre moi le post ED sur l'algèbre linéaire")
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    val state = viewModel.uiState.value
+    val aiMessages = state.messages.filter { it.type == ChatType.AI }
+    assertTrue(
+        "Should have debug message when fetch intent detected",
+        aiMessages.any { it.text.contains("ED fetch intent detected (DEBUG)") })
+    assertNull("Should not have pendingAction when fetch intent detected", state.pendingAction)
+    assertFalse("Should not be sending after fetch intent", state.isSending)
+  }
+
+  @Test
+  fun homeViewModel_shows_debug_message_when_ed_fetch_intent_detected_without_query() = runTest {
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.setEdFetchIntentResponse(
+        reply = "Fetching ED question...", query = null) // No query provided
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val repo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel = HomeViewModel(fakeLlm, auth, repo)
+
+    val originalQuestion = "Affiche le post ED"
+    viewModel.updateMessageDraft(originalQuestion)
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    val state = viewModel.uiState.value
+    val aiMessages = state.messages.filter { it.type == ChatType.AI }
+    assertTrue(
+        "Should have debug message when fetch intent detected",
+        aiMessages.any { it.text.contains("ED fetch intent detected (DEBUG)") })
+    // When query is null, it should fallback to originalQuestion (tested in handleEdFetchIntent)
+  }
+
+  @Test
+  fun homeViewModel_does_not_show_debug_message_when_ed_fetch_intent_not_detected() = runTest {
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.nextReply = "Normal response"
+    fakeLlm.nextEdFetchIntent = EdFetchIntent(detected = false, query = null)
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val repo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel = HomeViewModel(fakeLlm, auth, repo)
+
+    viewModel.updateMessageDraft("What is EPFL?")
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    val state = viewModel.uiState.value
+    val aiMessages = state.messages.filter { it.type == ChatType.AI }
+    assertFalse(
+        "Should not have debug message when fetch intent not detected",
+        aiMessages.any { it.text.contains("ED fetch intent detected (DEBUG)") })
+  }
+
+  @Test
+  fun homeViewModel_fetch_intent_takes_precedence_over_post_intent() = runTest {
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.setEdFetchIntentResponse(reply = "Fetching...", query = "show this ED post")
+    fakeLlm.setEdIntentResponse(reply = "Posting...", intent = "post_question")
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val repo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel = HomeViewModel(fakeLlm, auth, repo)
+
+    viewModel.updateMessageDraft("Montre moi ce post ED")
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    val state = viewModel.uiState.value
+    // Fetch intent should be handled first, so no PostOnEd pendingAction should be created
+    assertNull(
+        "Should not have PostOnEd pendingAction when fetch intent detected", state.pendingAction)
+    val aiMessages = state.messages.filter { it.type == ChatType.AI }
+    assertTrue(
+        "Should show fetch debug message (fetch takes precedence)",
+        aiMessages.any { it.text.contains("ED fetch intent detected (DEBUG)") })
   }
 
   // ==================== Profile Context Tests ====================

@@ -999,6 +999,12 @@ class HomeViewModel(
                 TAG,
                 "startStreaming: received reply, length=${reply.reply.length}, edIntentDetected=${reply.edIntent.detected}, edIntent=${reply.edIntent.intent}")
 
+            // Handle ED fetch intent detection first (takes precedence)
+            if (handleEdFetchIntent(reply, question, messageId)) {
+              // Skip normal streaming; ED fetch flow takes over
+              return@launch
+            }
+
             // Handle ED intent detection - create PostOnEd pending action
             val handled = handleEdIntent(reply, question, messageId)
             if (handled) {
@@ -1524,6 +1530,47 @@ class HomeViewModel(
         }
     val txt = lines.joinToString("\n")
     return if (txt.isBlank()) null else txt.take(600)
+  }
+
+  /**
+   * Handles ED fetch intent detection from the LLM reply. If an ED fetch intent is detected, routes
+   * to the existing ED fetch flow.
+   *
+   * @param reply The BotReply from the LLM
+   * @param originalQuestion The original user question (used as fallback for fetch query)
+   * @param messageId The ID of the AI message being processed
+   * @return true if fetch intent was detected and handled, false otherwise
+   */
+  private fun handleEdFetchIntent(
+      reply: BotReply,
+      originalQuestion: String,
+      messageId: String
+  ): Boolean {
+    val fetchIntent = reply.edFetchIntent
+    if (!fetchIntent.detected) return false
+
+    val query = fetchIntent.query ?: originalQuestion
+
+    Log.d(TAG, "ED fetch intent detected with query: $query")
+
+    // Build a debug message to show in the chat
+    val debugMessage =
+        ChatUIModel(
+            id = UUID.randomUUID().toString(),
+            text = "🔎 ED fetch intent detected (DEBUG) – this is a test message.",
+            timestamp = System.currentTimeMillis(),
+            type = ChatType.AI)
+
+    _uiState.update { state ->
+      state.copy(
+          messages =
+              state.messages.filterNot { it.id == messageId && it.type == ChatType.AI } +
+                  debugMessage,
+          streamingMessageId = null,
+          isSending = false)
+    }
+
+    return true
   }
 
   /**
