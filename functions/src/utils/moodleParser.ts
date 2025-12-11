@@ -173,6 +173,8 @@ export function parseMoodleHtmlToMarkdown(html: string): string {
 
   // === Final executive-summary pass ===
   const resourceHeader = /^\s*#{1,3}\s+.*\b(lecture|homework|solution|file|assignment|quiz)\b/i;
+  const protectedKeywords = /^(dates|📅|overview|résumé|vue d['’]ensemble)/i;
+  const redundantHeader = /^#{1,6}\s*(week|semaine|topic|section)\s*\d+\s*$/i;
   const finalLines: string[] = [];
 
   for (const rawLine of cleaned.split("\n")) {
@@ -180,9 +182,10 @@ export function parseMoodleHtmlToMarkdown(html: string): string {
     if (!trimmed) continue;
 
     // Remove resource headers (Lecture, Homework, etc.)
-    if (resourceHeader.test(trimmed)) {
-      continue;
-    }
+    if (resourceHeader.test(trimmed)) continue;
+
+    // Remove redundant headers like "## Week 2"
+    if (redundantHeader.test(trimmed)) continue;
 
     const isHeader = /^#{1,6}\s+/.test(trimmed);
     const isBullet = /^-\s+/.test(trimmed);
@@ -191,10 +194,9 @@ export function parseMoodleHtmlToMarkdown(html: string): string {
     // Work on content without bullet/header markers
     let content = trimmed.replace(/^(#+\s*|-+\s*)/, "").trim();
 
-    // Rule: cut after colon ONLY for bullet lines, except Dates/📅
+    // Smart truncation for bullets with protected exceptions
     if (isBullet) {
-      const startsWithDates = /^dates\b/i.test(content) || content.startsWith("📅");
-      if (!startsWithDates) {
+      if (!protectedKeywords.test(content)) {
         const colonIdx = content.indexOf(":");
         if (colonIdx !== -1) {
           content = content.slice(0, colonIdx).trim();
