@@ -113,8 +113,6 @@ type EdBrainSearchOutput = {
   filters: {
     course?: string;
     status?: string;
-    dateFrom?: string;
-    dateTo?: string;
     limit?: number;
   };
   error?: EdBrainError;
@@ -224,8 +222,6 @@ async function edBrainSearchCore(
       posts: [],
       filters: {
         status: "all", // Default, LLM would have set this if successful
-        dateFrom: parsed.dateFrom,
-        dateTo: parsed.dateTo,
         limit: input.limit ?? 5, // Use input limit or default
       },
       error: req,
@@ -248,8 +244,6 @@ async function edBrainSearchCore(
     const filters = {
       course: req.resolvedCourse.code || req.resolvedCourse.name,
       status: req.fetchOptions.statusFilter || "all",
-      dateFrom: parsed.dateFrom,
-      dateTo: parsed.dateTo,
       limit: req.fetchOptions.limit ?? 5,
     };
 
@@ -293,8 +287,6 @@ async function edBrainSearchCore(
       filters: {
         course: req.resolvedCourse.code || req.resolvedCourse.name,
         status: req.fetchOptions.statusFilter || "all",
-        dateFrom: parsed.dateFrom,
-        dateTo: parsed.dateTo,
         limit: req.fetchOptions.limit ?? 5,
       },
       error: {
@@ -313,8 +305,6 @@ async function edBrainSearchCore(
     filters: {
       course: req.resolvedCourse.code || req.resolvedCourse.name,
       status: req.fetchOptions.statusFilter || "all",
-      dateFrom: parsed.dateFrom,
-      dateTo: parsed.dateTo,
       limit: req.fetchOptions.limit ?? 5,
     },
   };

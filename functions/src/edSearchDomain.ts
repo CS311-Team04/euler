@@ -36,10 +36,6 @@ export interface EdSearchParsedQuery {
 
   /** High-level status filter (unanswered, unread, resolved, etc.) */
   status?: EdPostStatusFilter;
-
-  /** Date range (ISO) to filter on ED side */
-  dateFrom?: string;
-  dateTo?: string;
 }
 
 /**
@@ -83,12 +79,10 @@ function normalize(str: string): string {
 
 /**
  * Parses natural language query into structured EdSearchParsedQuery.
- * Extracts course query and date range.
+ * Extracts course query.
  * Note: status and limit are now handled by the LLM router.
  */
 export function parseEdSearchQuery(text: string): EdSearchParsedQuery {
-  const lower = text.toLowerCase();
-
   // ===== Course =====
   // 1) First, try a code like COM-301, CS-202, etc. (case-insensitive)
   let courseQuery: string | undefined;
@@ -138,26 +132,9 @@ export function parseEdSearchQuery(text: string): EdSearchParsedQuery {
     }
   }
 
-  // Dates (MVP)
-  let dateFrom: string | undefined;
-  let dateTo: string | undefined;
-  const now = new Date();
-
-  if (lower.includes("yesterday") || lower.includes("hier")) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - 1);
-    dateFrom = d.toISOString();
-    dateTo = d.toISOString();
-  } else if (lower.includes("today") || lower.includes("aujourd'hui")) {
-    dateFrom = now.toISOString();
-    dateTo = now.toISOString();
-  }
-
   return {
     originalQuery: text,
     courseQuery,
-    dateFrom,
-    dateTo,
   };
 }
 
