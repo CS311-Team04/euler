@@ -49,5 +49,6 @@ data class Conversation(
 data class MessageDTO(
     val role: String = "",
     val text: String = "",
-    val createdAt: Timestamp? = null
+    val createdAt: Timestamp? = null,
+    val edPanel: Map<String, Any?>? = null
 )

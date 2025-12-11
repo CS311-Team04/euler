@@ -2,6 +2,7 @@ package com.android.sample.conversations
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.*
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.toObject
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -44,6 +45,10 @@ class ConversationRepository(private val auth: FirebaseAuth, private val db: Fir
   /** `.../conversations/{conversationId}/messages` collection reference. */
   private fun msgCol(conversationId: String) =
       convCol().document(conversationId).collection("messages")
+
+  /** `.../conversations/{conversationId}/edPanels` collection reference. */
+  private fun edPanelCol(conversationId: String) =
+      convCol().document(conversationId).collection("edPanels")
 
   /**
    * Creates a new conversation document and returns its ID.
@@ -149,6 +154,24 @@ class ConversationRepository(private val auth: FirebaseAuth, private val db: Fir
   }
 
   /**
+   * Appends an ED panel snapshot as a message (for persistence under existing rules).
+   *
+   * The panel is stored under the "edPanel" field of the message document.
+   */
+  suspend fun appendEdPanelMessage(conversationId: String, panel: EdPanelDTO) {
+    val convRef = convCol().document(conversationId)
+    val msgRef = msgCol(conversationId).document()
+    val now = FieldValue.serverTimestamp()
+    val data =
+        mapOf("role" to "assistant", "text" to "", "createdAt" to now, "edPanel" to panel.toMap())
+    db.runBatch { b ->
+          b.set(msgRef, data, SetOptions.merge())
+          b.update(convRef, mapOf("updatedAt" to now))
+        }
+        .await()
+  }
+
+  /**
    * Deletes a conversation in a single batch.
    *
    * Notes:
@@ -180,4 +203,77 @@ class ConversationRepository(private val auth: FirebaseAuth, private val db: Fir
         .update(mapOf("title" to title, "updatedAt" to FieldValue.serverTimestamp()))
         .await()
   }
+
+  /**
+   * Real-time stream of ED panels for a conversation, ordered by creation time.
+   *
+   * @param conversationId Target conversation ID.
+   */
+  fun edPanelsFlow(conversationId: String): Flow<List<EdPanelDTO>> = callbackFlow {
+    val reg =
+        edPanelCol(conversationId)
+            .orderBy("createdAt", Query.Direction.ASCENDING)
+            .addSnapshotListener { s, e ->
+              if (e != null) {
+                close(e)
+              } else {
+                val items =
+                    s?.documents?.mapNotNull { it.toObject<EdPanelDTO>()?.copy(id = it.id) }
+                        ?: emptyList()
+                trySend(items)
+              }
+            }
+    awaitClose { reg.remove() }
+  }
+
+  /**
+   * Upsert a single ED panel document under the conversation.
+   *
+   * @param conversationId Parent conversation ID.
+   * @param panel ED panel payload (id is used as the document ID).
+   */
+  suspend fun upsertEdPanel(conversationId: String, panel: EdPanelDTO) {
+    val doc =
+        edPanelCol(conversationId)
+            .document(panel.id.ifBlank { throw IllegalArgumentException("panel.id required") })
+    val now = FieldValue.serverTimestamp()
+    val data =
+        mapOf(
+            "query" to panel.query,
+            "messageId" to panel.messageId,
+            "stage" to panel.stage,
+            "filters" to panel.filters,
+            "posts" to panel.posts,
+            "refinementHints" to panel.refinementHints,
+            "error" to panel.error,
+            "lastUpdated" to panel.lastUpdated,
+            "createdAt" to (panel.createdAt ?: now))
+    doc.set(data, SetOptions.merge()).await()
+  }
 }
+
+data class EdPanelDTO(
+    val id: String = "",
+    val query: String = "",
+    val messageId: String = "",
+    val stage: String = "IDLE",
+    val filters: Map<String, Any?> = emptyMap(),
+    val posts: List<Map<String, Any?>> = emptyList(),
+    val refinementHints: List<String> = emptyList(),
+    val error: Map<String, Any?>? = null,
+    val lastUpdated: com.google.firebase.Timestamp? = null,
+    val createdAt: com.google.firebase.Timestamp? = null
+)
+
+fun EdPanelDTO.toMap(): Map<String, Any?> =
+    mapOf(
+        "id" to id,
+        "query" to query,
+        "messageId" to messageId,
+        "stage" to stage,
+        "filters" to filters,
+        "posts" to posts,
+        "refinementHints" to refinementHints,
+        "error" to error,
+        "lastUpdated" to lastUpdated,
+        "createdAt" to createdAt)
