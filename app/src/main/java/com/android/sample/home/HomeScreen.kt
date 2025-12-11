@@ -942,7 +942,8 @@ private fun startPdfDownload(context: Context, attachment: ChatAttachment) {
 internal fun PdfViewerDialog(
     url: String,
     onDismiss: () -> Unit,
-    testBitmaps: List<ImageBitmap>? = null
+    testBitmaps: List<ImageBitmap>? = null,
+    testForceLoading: Boolean = false
 ) {
   var loadFailed by remember { mutableStateOf(false) }
   var isLoading by remember { mutableStateOf(true) }
@@ -966,6 +967,12 @@ internal fun PdfViewerDialog(
   }
 
   LaunchedEffect(url, testBitmaps) {
+    if (testForceLoading) {
+      isLoading = true
+      loadFailed = false
+      pageBitmaps = emptyList()
+      return@LaunchedEffect
+    }
     if (testBitmaps != null) {
       pageBitmaps = testBitmaps
       isLoading = false

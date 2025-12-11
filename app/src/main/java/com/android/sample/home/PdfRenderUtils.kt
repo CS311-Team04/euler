@@ -57,8 +57,13 @@ internal class PdfRendererAdapter(
   override fun openPage(index: Int): PageLike = pageProvider(index)
 
   companion object {
+    internal fun from(
+        pageCountProvider: () -> Int,
+        pageProvider: (Int) -> PageLike
+    ): PdfRendererAdapter = PdfRendererAdapter(pageCountProvider, pageProvider)
+
     fun from(renderer: PdfRenderer): PdfRendererAdapter =
-        PdfRendererAdapter(
+        from(
             pageCountProvider = { renderer.pageCount },
             pageProvider = { index ->
               val page = renderer.openPage(index)

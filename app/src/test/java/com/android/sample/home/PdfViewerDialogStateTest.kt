@@ -41,4 +41,16 @@ class PdfViewerDialogStateTest {
     composeRule.waitForIdle()
     composeRule.onNodeWithTag("pdf_page_1", useUnmergedTree = true).assertIsDisplayed()
   }
+
+  @Test
+  fun pdfViewer_showsLoadingStateWhenForced() {
+    composeRule.setContent {
+      PdfViewerDialog(url = "https://example.com/doc.pdf", onDismiss = {}, testForceLoading = true)
+    }
+    composeRule.waitForIdle()
+    composeRule.onNodeWithText("Chargement du PDF...", useUnmergedTree = true).assertIsDisplayed()
+    composeRule
+        .onNodeWithText("Ouvrir dans une autre app", useUnmergedTree = true)
+        .assertIsDisplayed()
+  }
 }

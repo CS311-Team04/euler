@@ -15,7 +15,9 @@ data class ChatAttachment(
   companion object {
     fun deriveTitleFromUrl(url: String): String {
       val last = runCatching { Uri.parse(url).lastPathSegment }.getOrNull().orEmpty()
-      return last.ifBlank { "document.pdf" }
+      if (last.isNotBlank()) return last
+      val slash = url.substringAfterLast('/', "")
+      return slash.ifBlank { "document.pdf" }
     }
   }
 }

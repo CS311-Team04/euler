@@ -116,6 +116,33 @@ class PdfRenderUtilsTest {
     assertTrue(bitmaps.isEmpty())
   }
 
+  @Test
+  fun pdfRendererAdapter_fromFactory_rendersAndCloses() {
+    var closed = false
+    var rendered = false
+    val page =
+        object : PageLike {
+          override val width: Int = 5
+          override val height: Int = 6
+
+          override fun renderTo(bitmap: Bitmap) {
+            rendered = true
+          }
+
+          override fun close() {
+            closed = true
+          }
+        }
+
+    val adapter = PdfRendererAdapter.from(pageCountProvider = { 1 }, pageProvider = { page })
+
+    val bitmaps = renderAllPagesToBitmaps(adapter)
+
+    assertEquals(1, bitmaps.size)
+    assertTrue(rendered)
+    assertTrue(closed)
+  }
+
   // --------- fakes for tests ---------
   private class FakePage(override val width: Int, override val height: Int) : PageLike {
     override fun renderTo(bitmap: Bitmap) {
