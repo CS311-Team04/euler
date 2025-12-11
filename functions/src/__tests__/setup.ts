@@ -2,7 +2,8 @@
 import { jest } from '@jest/globals';
 
 // Set default timeout
-jest.setTimeout(10000);
+// Integration tests hit emulators and may need extra time
+jest.setTimeout(30000);
 
 // Mock environment variables for all tests
 process.env.OPENAI_API_KEY = 'test-openai-key';
