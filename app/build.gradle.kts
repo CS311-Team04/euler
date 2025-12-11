@@ -3,6 +3,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsKotlinAndroid)
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
     id("jacoco")
     id("org.sonarqube")
     alias(libs.plugins.ktfmt)
@@ -285,6 +286,7 @@ dependencies {
     // Networking for HTTP clients (LLM access, etc.)
     implementation(libs.okhttp)
     implementation(libs.gson)
+    implementation(libs.kotlinx.serialization.json)
 
     // Coil for image loading (Moodle logo, etc.)
     implementation(libs.coil.compose)

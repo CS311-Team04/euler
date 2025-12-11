@@ -7,15 +7,11 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -26,9 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.VolumeUp
-import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.PictureAsPdf
-import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,24 +31,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.android.sample.R
-import com.android.sample.settings.connectors.ConnectorsDimensions as Dimens
-import com.android.sample.ui.theme.DarkSurfaceVariant
 import com.android.sample.ui.theme.EulerAudioButtonLoadingColor
 import com.android.sample.ui.theme.EulerAudioButtonTint
 import com.android.sample.ui.theme.EulerAudioButtonTintSemiTransparent
-import com.android.sample.ui.theme.MoodleOrange
 
 /**
  * Renders a single chat message as either:
@@ -87,9 +73,7 @@ fun ChatMessage(
     userBubbleBg: Color = Color(0xFF2B2B2B),
     userBubbleText: Color = Color.White,
     aiText: Color = Color(0xFFEDEDED),
-    maxUserBubbleWidthFraction: Float = 0.78f,
-    onOpenAttachment: (ChatAttachment) -> Unit = {},
-    onDownloadAttachment: (ChatAttachment) -> Unit = {}
+    maxUserBubbleWidthFraction: Float = 0.78f
 ) {
   val isUser = message.type == ChatType.USER
 
@@ -122,17 +106,34 @@ fun ChatMessage(
     }
   } else {
     // AI: full-width plain text
+    val moodlePayload = remember(message.text) { parseMoodleOverviewPayload(message.text) }
+    val moodleContent = remember(moodlePayload) {
+      moodlePayload?.let { cleanMoodleMarkdown(it.content) }
+    }
+
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
       if (isStreaming && message.text.isEmpty()) {
         LeadingThinkingDot(color = aiText)
       } else {
         Column(modifier = Modifier.fillMaxWidth()) {
-          Text(
-              text = message.text,
-              color = aiText,
-              style = MaterialTheme.typography.bodyMedium,
-              lineHeight = 20.sp,
-              modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+          if (moodlePayload != null && moodleContent != null) {
+            Text(
+                text = moodleContent,
+                color = aiText,
+                style = MaterialTheme.typography.bodyMedium,
+                lineHeight = 20.sp,
+                modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+            Spacer(modifier = Modifier.height(8.dp))
+            MoodleSourceBadge(
+                metadata = moodlePayload.metadata, modifier = Modifier.testTag("chat_ai_moodle_badge"))
+          } else {
+            Text(
+                text = message.text,
+                color = aiText,
+                style = MaterialTheme.typography.bodyMedium,
+                lineHeight = 20.sp,
+                modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+          }
 
           if (audioState != null) {
             Spacer(modifier = Modifier.height(4.dp))
@@ -143,14 +144,6 @@ fun ChatMessage(
                   AudioPlaybackButton(
                       state = audioState, tint = EulerAudioButtonTintSemiTransparent)
                 }
-          }
-
-          message.attachment?.let { attachment ->
-            Spacer(modifier = Modifier.height(10.dp))
-            AttachmentCard(
-                attachment = attachment,
-                onOpen = { onOpenAttachment(attachment) },
-                onDownload = { onDownloadAttachment(attachment) })
           }
         }
       }
@@ -219,91 +212,4 @@ private fun AudioPlaybackButton(
       }
     }
   }
-}
-
-@Composable
-private fun AttachmentCard(
-    attachment: ChatAttachment,
-    onOpen: () -> Unit,
-    onDownload: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-  val bg = DarkSurfaceVariant
-  val accent = MoodleOrange
-  val borderStroke = BorderStroke(Dimens.CardBorderWidth, accent)
-  val cardPadding = Dimens.ScreenContentSpacing + Dimens.CardTitleSubtitleSpacer
-  Surface(
-      shape = RoundedCornerShape(Dimens.CardCornerRadius),
-      color = bg,
-      border = borderStroke,
-      modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(cardPadding),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimens.CardTitleSubtitleSpacer)) {
-              Surface(
-                  shape = RoundedCornerShape(Dimens.LogoCornerRadius),
-                  color = DarkSurfaceVariant,
-                  modifier = Modifier.size(Dimens.LogoSize)) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                      Image(
-                          painter = painterResource(id = R.drawable.moodle_logo),
-                          contentDescription = "Moodle",
-                          modifier =
-                              Modifier.fillMaxSize()
-                                  .clip(RoundedCornerShape(Dimens.LogoCornerRadius)),
-                          contentScale = ContentScale.Crop)
-                    }
-                  }
-
-              Column(
-                  modifier = Modifier.weight(1f),
-                  verticalArrangement = Arrangement.spacedBy(Dimens.CardTitleSubtitleSpacer)) {
-                    Text(
-                        text = attachment.title.ifBlank { "Document PDF" },
-                        color = MaterialTheme.colorScheme.onBackground,
-                        style =
-                            MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.SemiBold, fontSize = 15.sp))
-                    Surface(
-                        color = accent.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(Dimens.ButtonCornerRadius)) {
-                          Row(
-                              modifier =
-                                  Modifier.padding(
-                                      horizontal = Dimens.LogoPadding,
-                                      vertical = Dimens.LogoPadding / 2),
-                              verticalAlignment = Alignment.CenterVertically,
-                              horizontalArrangement =
-                                  Arrangement.spacedBy(Dimens.CardTitleSubtitleSpacer)) {
-                                Icon(
-                                    imageVector = Icons.Outlined.PictureAsPdf,
-                                    contentDescription = "PDF",
-                                    tint = accent,
-                                    modifier = Modifier.size(16.dp))
-                                Text("PDF", color = accent, fontSize = 12.sp)
-                              }
-                        }
-                  }
-
-              Row(horizontalArrangement = Arrangement.spacedBy(Dimens.CardTitleSubtitleSpacer)) {
-                IconButton(
-                    onClick = onOpen, modifier = Modifier.size(Dimens.TopBarIconButtonSize)) {
-                      Icon(
-                          imageVector = Icons.Outlined.Visibility,
-                          contentDescription = "Open PDF",
-                          tint = MaterialTheme.colorScheme.onBackground,
-                          modifier = Modifier.size(22.dp))
-                    }
-                IconButton(
-                    onClick = onDownload, modifier = Modifier.size(Dimens.TopBarIconButtonSize)) {
-                      Icon(
-                          imageVector = Icons.Outlined.Download,
-                          contentDescription = "Download PDF",
-                          tint = MaterialTheme.colorScheme.onBackground,
-                          modifier = Modifier.size(22.dp))
-                    }
-              }
-            }
-      }
 }
