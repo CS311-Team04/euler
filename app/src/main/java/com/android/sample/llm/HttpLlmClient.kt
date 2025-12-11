@@ -169,7 +169,7 @@ internal fun parseBotReply(body: String, gson: Gson): BotReply {
   val edFetchIntent =
       com.android.sample.llm.EdFetchIntent(
           detected = json.optBoolean(JSON_KEY_ED_FETCH_INTENT_DETECTED, false),
-          query = json.optString(JSON_KEY_ED_FETCH_QUERY, null),
+          query = json.optString(JSON_KEY_ED_FETCH_QUERY, null)?.takeIf { it.isNotBlank() },
       )
 
   return BotReply(replyText, url, sourceType, edIntent, edFetchIntent)

@@ -41,13 +41,16 @@ data class Conversation(
  * - role : String ("user" | "assistant") — drives bubble alignment/styling in UI
  * - text : String (full message content)
  * - createdAt : Timestamp (server timestamp for ordering and time labels)
+ * - edCardId : String? (optional ID of associated EdCard stored in edCards subcollection)
  *
  * Notes:
  * - Keep this DTO minimal for efficient real-time updates.
  * - Use `orderBy("createdAt", ASC)` when streaming a conversation.
+ * - EdCard is stored in messages/{messageId}/edCards/{edCardId} subcollection.
  */
 data class MessageDTO(
     val role: String = "",
     val text: String = "",
-    val createdAt: Timestamp? = null
+    val createdAt: Timestamp? = null,
+    val edCardId: String? = null
 )
