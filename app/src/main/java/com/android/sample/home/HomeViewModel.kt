@@ -7,6 +7,7 @@ import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.sample.BuildConfig
+import com.android.sample.Chat.ChatAttachment
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
 import com.android.sample.R
@@ -385,16 +386,19 @@ class HomeViewModel(
                 _uiState.update { currentState ->
                   val firestoreMessages = msgs.map { it.toUi() }
 
-                  val existingSourceCards =
-                      currentState.messages.filter { it.source != null && it.text.isBlank() }
+                  // Preserve locally added cards (source cards, attachments) that are not in
+                  // Firestore
+                  val existingExtraCards =
+                      currentState.messages.filter {
+                        (it.source != null || it.attachment != null) && it.text.isBlank()
+                      }
 
                   val finalMessages = mutableListOf<ChatUIModel>()
 
                   finalMessages.addAll(firestoreMessages)
 
-                  existingSourceCards.forEach { sourceCard ->
-                    val originalIndex =
-                        currentState.messages.indexOfFirst { it.id == sourceCard.id }
+                  existingExtraCards.forEach { extraCard ->
+                    val originalIndex = currentState.messages.indexOfFirst { it.id == extraCard.id }
                     if (originalIndex > 0) {
 
                       val precedingAssistant = currentState.messages[originalIndex - 1]
@@ -407,18 +411,18 @@ class HomeViewModel(
                             }
                         if (firestoreIndex >= 0) {
 
-                          finalMessages.add(firestoreIndex + 1, sourceCard)
+                          finalMessages.add(firestoreIndex + 1, extraCard)
                         } else {
 
-                          finalMessages.add(sourceCard)
+                          finalMessages.add(extraCard)
                         }
                       } else {
 
-                        finalMessages.add(sourceCard)
+                        finalMessages.add(extraCard)
                       }
                     } else {
 
-                      finalMessages.add(sourceCard)
+                      finalMessages.add(extraCard)
                     }
                   }
 
@@ -1004,6 +1008,24 @@ class HomeViewModel(
 
             // simulate stream into the placeholder AI message
             simulateStreamingFromText(messageId, reply.reply)
+
+            // If backend returned a URL, surface it as an attachment card in the chat (keep user
+            // in-app)
+            reply.url?.let { pdfUrl ->
+              val attachment = ChatAttachment(url = pdfUrl)
+              _uiState.update { state ->
+                state.copy(
+                    messages =
+                        state.messages +
+                            ChatUIModel(
+                                id = UUID.randomUUID().toString(),
+                                text = "",
+                                timestamp = System.currentTimeMillis(),
+                                type = ChatType.AI,
+                                attachment = attachment),
+                    streamingSequence = state.streamingSequence + 1)
+              }
+            }
 
             // add optional source card based on source type
             val meta: SourceMeta? =
