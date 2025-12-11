@@ -30,5 +30,6 @@ data class ChatUIModel(
     val timestamp: Long,
     val type: ChatType,
     val isThinking: Boolean = false,
-    val source: SourceMeta? = null
+    val source: SourceMeta? = null,
+    val attachment: ChatAttachment? = null
 )

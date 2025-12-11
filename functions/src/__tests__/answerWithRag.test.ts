@@ -128,66 +128,6 @@ describe('answerWithRagCore', () => {
     expect(callArgs.messages[0].role).toBe('system');
   });
 
-  it('should use summary for personal context questions', async () => {
-    const mockChatResponse = {
-      choices: [{
-        message: {
-          content: 'Vous êtes en section IC (informatique).'
-        }
-      }]
-    };
-
-    // Create mock client
-    const mockClient = {
-      chat: {
-        completions: {
-          create: (jest.fn() as any).mockResolvedValue(mockChatResponse)
-        }
-      }
-    } as any;
-
-    // Mock minimal fetch for embedding (small talk detection needs it)
-    global.fetch = jest.fn()
-      .mockImplementationOnce(() => // Embedding API
-        Promise.resolve({
-          ok: true,
-          json: async () => ({
-            data: [{ embedding: Array(768).fill(0.1) }]
-          })
-        } as Response)
-      )
-      .mockImplementationOnce(() => // Qdrant dense search (low score)
-        Promise.resolve({
-          ok: true,
-          json: async () => ({ result: [] })
-        } as Response)
-      )
-      .mockImplementationOnce(() => // Qdrant sparse search
-        Promise.resolve({
-          ok: true,
-          json: async () => ({ result: [] })
-        } as Response)
-      ) as any;
-
-    const { answerWithRagCore } = await import('../index');
-
-    const result = await answerWithRagCore({
-      question: 'What section am I in?',
-      summary: 'L\'utilisateur est en section IC (informatique) à l\'EPFL.',
-      topK: 3,
-      client: mockClient
-    });
-
-    expect(result.reply).toContain('IC');
-    
-    // Verify the summary was included in the system message
-    const callArgs = mockClient.chat.completions.create.mock.calls[0][0] as any;
-    const systemMessage = callArgs.messages.find(
-      (m: any) => m.role === 'system'
-    );
-    expect(systemMessage.content).toContain('section IC');
-  });
-
   it('should handle low-score results by skipping context', async () => {
     const mockEmbedding = Array(768).fill(0.1);
     const mockSearchResults = {

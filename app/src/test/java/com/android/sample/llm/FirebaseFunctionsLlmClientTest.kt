@@ -66,10 +66,14 @@ class FirebaseFunctionsLlmClientTest {
     client.generateReply("Ping")
   }
 
-  @Test(expected = IllegalStateException::class)
-  fun generateReply_no_fallback_throws_on_empty_reply() = runTest {
+  @Test
+  fun generateReply_no_fallback_returns_default_on_empty_reply() = runTest {
     val client = clientWithResult(mapOf("reply" to ""), fallback = null)
-    client.generateReply("Ping")
+
+    val result = client.generateReply("Ping")
+
+    assertEquals("Voici le document demandé.", result.reply)
+    assertNull(result.url)
   }
 
   @Test
