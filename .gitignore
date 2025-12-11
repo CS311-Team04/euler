@@ -33,3 +33,7 @@ firebase-debug.*.log
 
 # Node lockfiles (managed locally, not tracked)
 package-lock.json
+
+# Firebase Functions build output (generated files, should not be committed)
+functions/lib/
+functions/package.json
