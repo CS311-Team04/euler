@@ -66,34 +66,52 @@ export function detectIntent(
 /**
  * Block patterns - questions ABOUT ED (not action intents)
  * These patterns prevent false positives when users ask about ED itself
+ * Supports both French and English
  */
 const ED_BLOCK_PATTERNS: RegExp[] = [
+  // French patterns
   /\b(c['']?est\s+quoi|qu['']?est[- ]ce\s+que?)\b.*\bed\b/i,
   /\bcomment\s+(marche|fonctionne|utiliser?)\b.*\bed\b/i,
   /\b(où|ou)\s+(trouver?|est)\b.*\bed\b/i,
   /\bexplique[rz]?\b.*\bed\b/i,
+  // English patterns
+  /\bwhat\s+is\b.*\bed\b/i,
+  /\bhow\s+(does|do|to)\s+(use|work)\b.*\bed\b/i,
+  /\bwhere\s+(is|can\s+i\s+find)\b.*\bed\b/i,
+  /\bexplain\b.*\bed\b/i,
+  /\btell\s+me\s+about\b.*\bed\b/i,
 ];
 
 /**
  * Block patterns - questions ABOUT Moodle (not action intents)
  * These patterns prevent false positives when users ask about Moodle itself
+ * Supports both French and English
  */
 const MOODLE_BLOCK_PATTERNS: RegExp[] = [
+  // French patterns
   /\b(c['']?est\s+quoi|qu['']?est[- ]ce\s+que?)\b.{0,50}\bmoodle\b/i,
   /\bcomment\s+(marche|fonctionne|utiliser?)\b.{0,50}\bmoodle\b/i,
   /\b(où|ou)\s+(trouver?|est)\b.{0,50}\bmoodle\b/i,
   /\bexplique[rz]?\b.{0,50}\bmoodle\b/i,
+  // English patterns
+  /\bwhat\s+is\b.{0,50}\bmoodle\b/i,
+  /\bhow\s+(does|do|to)\s+(use|work)\b.{0,50}\bmoodle\b/i,
+  /\bwhere\s+(is|can\s+i\s+find)\b.{0,50}\bmoodle\b/i,
+  /\bexplain\b.{0,50}\bmoodle\b/i,
+  /\btell\s+me\s+about\b.{0,50}\bmoodle\b/i,
 ];
 
 /**
  * Registry of all ED intents
  * ADD NEW FUNCTIONS HERE
+ * Supports both French and English patterns
  */
 export const ED_INTENT_CONFIGS: IntentConfig[] = [
   // ===== POST TO ED =====
   {
     id: "post_question",
     matchPatterns: [
+      // French patterns
       /\b(post[eé]?[rz]?|publi[eé]?[rz]?)\b.*\b(sur|à|a)\s+(ed|edstem|ed\s*discussion)/i,
       /\b(met[st]?[rz]?|mettre|ajoute[rz]?)\b.*\b(sur|à|a)\s+(ed|edstem|ed\s*discussion)/i,
       /\b(envoie[rz]?|envoyer)\b.*\b(sur|à|a)\s+(ed|edstem|ed\s*discussion)/i,
@@ -101,6 +119,16 @@ export const ED_INTENT_CONFIGS: IntentConfig[] = [
       /\bpartage[rz]?\b.*\b(sur|à|a)\s+(ed|edstem|ed\s*discussion)/i,
       /\b(cr[ée]{1,2}[rz]?|faire?|fais)\b.*\b(post|thread|discussion|sujet)\b.*\b(sur|à|a)\s+(ed|edstem)/i,
       /\b(je\s+(veux|voudrais|souhaite)|peux[- ]tu|tu\s+peux)\b.*\b(post[eé]?[rz]?|publi[eé]?[rz]?)\b.*\b(sur|à|a)\s+(ed|edstem)/i,
+      // English patterns
+      /\b(post|publish|share|send)\b.*\b(on|to)\s+(ed|edstem|ed\s*discussion)/i,
+      /\b(put|add|submit)\b.*\b(on|to)\s+(ed|edstem|ed\s*discussion)/i,
+      /\b(ask|create)\b.*\b(on|to)\s+(ed|edstem|ed\s*discussion)/i,
+      /\b(make|create|start)\b.*\b(a\s+)?(post|thread|discussion|question)\b.*\b(on|to)\s+(ed|edstem)/i,
+      /\b(can\s+you|could\s+you|please)\b.*\b(post|publish|share|send)\b.*\b(on|to)\s+(ed|edstem)/i,
+      /\b(i\s+(want|need|would\s+like))\s+(to\s+)?(post|publish|share|send)\b.*\b(on|to)\s+(ed|edstem)/i,
+      // Direct "post this on ED" style
+      /\bpost\s+this\b.*\b(on|to)\s+(ed|edstem)/i,
+      /\bshare\s+this\b.*\b(on|to)\s+(ed|edstem)/i,
     ],
     blockPatterns: ED_BLOCK_PATTERNS,
   },
