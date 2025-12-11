@@ -1548,17 +1548,6 @@ class HomeViewModel(
           isSending = false)
     }
 
-    // TODO: reuse the existing ED fetch flow.
-    // Find the repository / data source already used to fetch ED questions
-    // (for example the one used when user manually selects an ED question)
-    // and call it here with `query`.
-    //
-    // Example (adapt this to actual code):
-    // edQuestionRepository.fetchQuestion(query)
-    //
-    // For now, we display a debug message and prevent normal RAG flow.
-    // Remove the debug message and implement the actual fetch once ready.
-
     return true
   }
 
