@@ -19,9 +19,13 @@ import com.android.sample.conversations.MessageDTO
 import com.android.sample.llm.BotReply
 import com.android.sample.llm.FirebaseFunctionsLlmClient
 import com.android.sample.llm.LlmClient
+import com.android.sample.llm.SourceType
+import com.android.sample.network.AndroidNetworkConnectivityMonitor
 import com.android.sample.network.NetworkConnectivityMonitor
+import com.android.sample.profile.ProfileDataSource
 import com.android.sample.profile.UserProfile
 import com.android.sample.profile.UserProfileRepository
+import com.android.sample.settings.Localization
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -50,6 +54,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.time.Instant
 
 /** Type of compact source indicator */
 enum class CompactSourceType {
@@ -88,7 +93,7 @@ class HomeViewModel(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
     private val repo: ConversationRepository =
         ConversationRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance()),
-    private val profileRepository: com.android.sample.profile.ProfileDataSource =
+    private val profileRepository: ProfileDataSource =
         UserProfileRepository(),
     private val networkMonitor: NetworkConnectivityMonitor? = null,
     private val cacheRepo: CachedResponseRepository =
@@ -134,7 +139,7 @@ class HomeViewModel(
       val trimmed = localizedText.trim()
       // Check if this is a known suggestion by looking at all localized variants
       for ((key, canonical) in SUGGESTION_KEY_TO_CANONICAL) {
-        val localized = com.android.sample.settings.Localization.t(key)
+        val localized = Localization.t(key)
         if (localized.equals(trimmed, ignoreCase = true)) {
           return canonical
         }
@@ -159,8 +164,8 @@ class HomeViewModel(
   // private val auth: FirebaseAuth = FirebaseAuth.getInstance()
   private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
   private var isInLocalNewChat = false
-  private var conversationsJob: kotlinx.coroutines.Job? = null
-  private var messagesJob: kotlinx.coroutines.Job? = null
+  private var conversationsJob: Job? = null
+  private var messagesJob: Job? = null
   private var lastUid: String? = null
 
   private val _uiState =
@@ -1122,7 +1127,10 @@ class HomeViewModel(
             }
 
             // Handle ED fetch intent detection first (takes precedence)
-            if (handleEdFetchIntent(reply, question, messageId)) {
+            if (handleEdFetchIntent(
+                    reply, question, messageId,
+                    userMessageId = userMessageId
+                )) {
               // Skip normal streaming; ED fetch flow takes over
               return@launch
             }
@@ -1158,7 +1166,7 @@ class HomeViewModel(
             // add optional source card based on source type
             val meta: SourceMeta? =
                 when (reply.sourceType) {
-                  com.android.sample.llm.SourceType.SCHEDULE -> {
+                  SourceType.SCHEDULE -> {
                     // Schedule source - show a small indicator
                     SourceMeta(
                         siteLabel = FALLBACK_SCHEDULE_LABEL,
@@ -1169,7 +1177,7 @@ class HomeViewModel(
                         isScheduleSource = true,
                         compactType = CompactSourceType.SCHEDULE)
                   }
-                  com.android.sample.llm.SourceType.FOOD -> {
+                  SourceType.FOOD -> {
                     // Food source - show a small indicator
                     SourceMeta(
                         siteLabel = FALLBACK_FOOD_LABEL,
@@ -1180,7 +1188,7 @@ class HomeViewModel(
                         isScheduleSource = true,
                         compactType = CompactSourceType.FOOD)
                   }
-                  com.android.sample.llm.SourceType.RAG -> {
+                  SourceType.RAG -> {
                     // RAG source - show the web source card if URL exists
                     reply.url?.let { url ->
                       SourceMeta(
@@ -1191,7 +1199,7 @@ class HomeViewModel(
                           compactType = CompactSourceType.NONE)
                     }
                   }
-                  com.android.sample.llm.SourceType.NONE -> null
+                  SourceType.NONE -> null
                 }
 
             meta?.let { sourceMeta ->
@@ -1479,7 +1487,7 @@ class HomeViewModel(
     activeStreamJob = null
     networkMonitorJob?.cancel()
     networkMonitorJob = null
-    (networkMonitor as? com.android.sample.network.AndroidNetworkConnectivityMonitor)?.unregister()
+    (networkMonitor as? AndroidNetworkConnectivityMonitor)?.unregister()
   }
 
   /**
@@ -1666,7 +1674,6 @@ class HomeViewModel(
   private fun handleEdFetchIntent(
       reply: BotReply,
       originalQuestion: String,
-<<<<<<< HEAD
       messageId: String,
       userMessageId: String?
   ): Boolean {
@@ -1692,7 +1699,6 @@ class HomeViewModel(
           isSending = false)
     }
 
-<<<<<<< HEAD
     // Use userMessageId if provided, otherwise find the last user message
     val targetUserMessageId =
         userMessageId ?: _uiState.value.messages.lastOrNull { it.type == ChatType.USER }?.id
@@ -1925,7 +1931,7 @@ class HomeViewModel(
       is String -> {
         // Try to parse ISO date string
         try {
-          java.time.Instant.parse(dateValue).toEpochMilli()
+          Instant.parse(dateValue).toEpochMilli()
         } catch (e: Exception) {
           System.currentTimeMillis()
         }
