@@ -2,6 +2,8 @@ package com.android.sample.home
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
 import java.io.File
 import java.io.FileOutputStream
@@ -24,12 +26,11 @@ internal fun downloadPdfToCache(context: Context, url: String): File {
 
 /** Renders the given page index to a Bitmap. Caller is responsible for closing the page. */
 internal fun renderPageToBitmap(renderer: PdfRenderer, pageIndex: Int): Bitmap? =
-    renderPageToBitmap(PdfRendererAdapter(renderer), pageIndex)
+    renderPageToBitmap(PdfRendererAdapter.from(renderer), pageIndex)
 
 /** Renders all pages to bitmaps. Caller should close renderer separately if needed. */
-internal fun renderAllPagesToBitmaps(renderer: PdfRenderer): List<Bitmap> {
-  return renderAllPagesToBitmaps(PdfRendererAdapter(renderer))
-}
+internal fun renderAllPagesToBitmaps(renderer: PdfRenderer): List<Bitmap> =
+    renderAllPagesToBitmaps(PdfRendererAdapter.from(renderer))
 
 // ---- Test-friendly abstractions ----
 
@@ -46,22 +47,32 @@ internal interface RendererLike {
   fun openPage(index: Int): PageLike
 }
 
-private class PdfRendererAdapter(private val renderer: PdfRenderer) : RendererLike {
+internal class PdfRendererAdapter(
+    private val pageCountProvider: () -> Int,
+    private val pageProvider: (Int) -> PageLike
+) : RendererLike {
   override val pageCount: Int
-    get() = renderer.pageCount
+    get() = pageCountProvider()
 
-  override fun openPage(index: Int): PageLike {
-    val page = renderer.openPage(index)
-    return object : PageLike {
-      override val width: Int = page.width
-      override val height: Int = page.height
+  override fun openPage(index: Int): PageLike = pageProvider(index)
 
-      override fun renderTo(bitmap: Bitmap) {
-        page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-      }
+  companion object {
+    fun from(renderer: PdfRenderer): PdfRendererAdapter =
+        PdfRendererAdapter(
+            pageCountProvider = { renderer.pageCount },
+            pageProvider = { index ->
+              val page = renderer.openPage(index)
+              object : PageLike {
+                override val width: Int = page.width
+                override val height: Int = page.height
 
-      override fun close() = page.close()
-    }
+                override fun renderTo(bitmap: Bitmap) {
+                  page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                }
+
+                override fun close() = page.close()
+              }
+            })
   }
 }
 
@@ -81,6 +92,8 @@ private fun renderPageToBitmap(renderer: RendererLike, pageIndex: Int): Bitmap? 
     val width = page.width * 2
     val height = page.height * 2
     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    // Ensure a bright background so PDFs with transparent pages render readably on dark themes.
+    Canvas(bitmap).drawColor(Color.WHITE)
     page.renderTo(bitmap)
     return bitmap
   }

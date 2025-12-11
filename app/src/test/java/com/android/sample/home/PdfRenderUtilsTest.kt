@@ -78,6 +78,44 @@ class PdfRenderUtilsTest {
     server.shutdown()
   }
 
+  @Test
+  fun renderAllPagesToBitmaps_withAdapterProviders_rendersAndClosesPage() {
+    var renderCalled = false
+    var closeCalled = false
+    val page =
+        object : PageLike {
+          override val width: Int = 10
+          override val height: Int = 20
+
+          override fun renderTo(bitmap: Bitmap) {
+            renderCalled = true
+          }
+
+          override fun close() {
+            closeCalled = true
+          }
+        }
+
+    val adapter = PdfRendererAdapter(pageCountProvider = { 1 }, pageProvider = { page })
+
+    val bitmaps = renderAllPagesToBitmaps(adapter)
+
+    assertEquals(1, bitmaps.size)
+    assertTrue(bitmaps[0].width == 20 && bitmaps[0].height == 40)
+    assertTrue(renderCalled)
+    assertTrue(closeCalled)
+  }
+
+  @Test
+  fun renderPageToBitmaps_withAdapterProviders_handlesOutOfBounds() {
+    val adapter =
+        PdfRendererAdapter(pageCountProvider = { 0 }, pageProvider = { throw AssertionError() })
+
+    val bitmaps = renderAllPagesToBitmaps(adapter)
+
+    assertTrue(bitmaps.isEmpty())
+  }
+
   // --------- fakes for tests ---------
   private class FakePage(override val width: Int, override val height: Int) : PageLike {
     override fun renderTo(bitmap: Bitmap) {

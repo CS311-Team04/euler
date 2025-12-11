@@ -605,61 +605,10 @@ fun HomeScreen(
       exit = fadeOut(tween(150)),
       modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-          val bg: Color
-          val icon: ImageVector
-          val title: String
-          val subtitle: String
-          when (val result = edPostResult) {
-            is EdPostResult.Published -> {
-              bg = MaterialTheme.colorScheme.surfaceVariant
-              icon = Icons.Default.CheckCircle
-              title = stringResource(R.string.ed_post_published_title)
-              subtitle = stringResource(R.string.ed_post_published_subtitle)
-            }
-            is EdPostResult.Cancelled -> {
-              bg = MaterialTheme.colorScheme.surfaceVariant
-              icon = Icons.Default.Close
-              title = stringResource(R.string.ed_post_cancelled_title)
-              subtitle = stringResource(R.string.ed_post_cancelled_subtitle)
-            }
-            is EdPostResult.Failed -> {
-              bg = MaterialTheme.colorScheme.errorContainer
-              icon = Icons.Default.Error
-              title = stringResource(R.string.ed_post_failed_title)
-              subtitle = result.message
-            }
-            else -> {
-              bg = MaterialTheme.colorScheme.surface
-              icon = Icons.Default.Check
-              title = ""
-              subtitle = ""
-            }
+          val result = edPostResult
+          if (result != null) {
+            EdPostResultBanner(result = result, onDismiss = { viewModel.clearEdPostResult() })
           }
-
-          Surface(
-              tonalElevation = EdPostDimensions.ResultCardElevation,
-              shape = RoundedCornerShape(EdPostDimensions.ResultCardCornerRadius),
-              color = bg,
-              modifier = Modifier.padding(EdPostDimensions.ResultCardPadding)) {
-                Row(
-                    modifier = Modifier.padding(EdPostDimensions.ResultCardPadding),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement =
-                        Arrangement.spacedBy(EdPostDimensions.ResultCardRowSpacing)) {
-                      Icon(icon, contentDescription = null)
-                      Column(modifier = Modifier.weight(1f)) {
-                        Text(text = title, fontWeight = FontWeight.Bold)
-                        if (subtitle.isNotBlank()) {
-                          Text(text = subtitle, style = MaterialTheme.typography.bodyMedium)
-                        }
-                      }
-                      IconButton(onClick = { viewModel.clearEdPostResult() }) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = stringResource(R.string.dismiss))
-                      }
-                    }
-              }
         }
       }
 }
@@ -696,6 +645,62 @@ internal fun TopRightPanelPlaceholder(onDismiss: () -> Unit, onDeleteClick: () -
         onDismiss()
       },
       modifier = Modifier.testTag("menu_delete"))
+}
+
+@Composable
+internal fun EdPostResultBanner(result: EdPostResult, onDismiss: () -> Unit = {}) {
+  val bg: Color
+  val icon: ImageVector
+  val title: String
+  val subtitle: String
+  when (result) {
+    is EdPostResult.Published -> {
+      bg = MaterialTheme.colorScheme.surfaceVariant
+      icon = Icons.Default.CheckCircle
+      title = stringResource(R.string.ed_post_published_title)
+      subtitle = stringResource(R.string.ed_post_published_subtitle)
+    }
+    is EdPostResult.Cancelled -> {
+      bg = MaterialTheme.colorScheme.surfaceVariant
+      icon = Icons.Default.Close
+      title = stringResource(R.string.ed_post_cancelled_title)
+      subtitle = stringResource(R.string.ed_post_cancelled_subtitle)
+    }
+    is EdPostResult.Failed -> {
+      bg = MaterialTheme.colorScheme.errorContainer
+      icon = Icons.Default.Error
+      title = stringResource(R.string.ed_post_failed_title)
+      subtitle = result.message
+    }
+    else -> {
+      bg = MaterialTheme.colorScheme.surface
+      icon = Icons.Default.Check
+      title = ""
+      subtitle = ""
+    }
+  }
+
+  Surface(
+      tonalElevation = EdPostDimensions.ResultCardElevation,
+      shape = RoundedCornerShape(EdPostDimensions.ResultCardCornerRadius),
+      color = bg,
+      modifier = Modifier.padding(EdPostDimensions.ResultCardPadding)) {
+        Row(
+            modifier = Modifier.padding(EdPostDimensions.ResultCardPadding),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(EdPostDimensions.ResultCardRowSpacing)) {
+              Icon(icon, contentDescription = null)
+              Column(modifier = Modifier.weight(1f)) {
+                Text(text = title, fontWeight = FontWeight.Bold)
+                if (subtitle.isNotBlank()) {
+                  Text(text = subtitle, style = MaterialTheme.typography.bodyMedium)
+                }
+              }
+              IconButton(onClick = onDismiss) {
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.dismiss))
+              }
+            }
+      }
 }
 
 /** Delete menu item that turns red on hover/press. */
@@ -964,7 +969,7 @@ internal fun PdfViewerDialog(
     if (testBitmaps != null) {
       pageBitmaps = testBitmaps
       isLoading = false
-      loadFailed = false
+      loadFailed = testBitmaps.isEmpty()
       return@LaunchedEffect
     }
     isLoading = true
@@ -1024,7 +1029,7 @@ internal fun PdfViewerDialog(
             }
             if (loadFailed) {
               Column(
-                  modifier = Modifier.fillMaxSize().padding(16.dp),
+                  modifier = Modifier.fillMaxSize().padding(16.dp).testTag("pdf_error"),
                   verticalArrangement = Arrangement.Center,
                   horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
@@ -1040,7 +1045,10 @@ internal fun PdfViewerDialog(
                   androidx.compose.foundation.Image(
                       bitmap = bmp,
                       contentDescription = "PDF page ${idx + 1}",
-                      modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                      modifier =
+                          Modifier.fillMaxWidth()
+                              .padding(vertical = 8.dp)
+                              .testTag("pdf_page_${idx + 1}"),
                       contentScale = ContentScale.FillWidth)
                 }
               }
