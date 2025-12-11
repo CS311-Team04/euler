@@ -29,6 +29,15 @@ class PdfRenderUtilsTest {
   }
 
   @Test
+  fun renderAllPagesToBitmaps_returnsEmpty_whenNoPages() {
+    val renderer = FakeRenderer(emptyList())
+
+    val bitmaps = renderAllPagesToBitmaps(renderer)
+
+    assertTrue(bitmaps.isEmpty())
+  }
+
+  @Test
   fun renderPageToBitmap_returnsNull_whenOutOfBounds() {
     val renderer = FakeRenderer(emptyList())
 

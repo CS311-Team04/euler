@@ -30,4 +30,14 @@ class PdfViewerDialogTest {
     composeRule.onNodeWithContentDescription("PDF page 1").assertIsDisplayed()
     composeRule.onNodeWithContentDescription("PDF page 2").assertIsDisplayed()
   }
+
+  @Test
+  fun pdfViewer_showsNoPages_whenBitmapListEmpty() {
+    composeRule.setContent {
+      PdfViewerDialog(
+          url = "https://example.com/doc.pdf", onDismiss = {}, testBitmaps = emptyList())
+    }
+
+    // Should not crash; nothing to assert when no pages.
+  }
 }

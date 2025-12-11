@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,7 +29,6 @@ import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,9 +50,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.sample.R
+import com.android.sample.settings.connectors.ConnectorsDimensions as Dimens
+import com.android.sample.ui.theme.DarkSurfaceVariant
 import com.android.sample.ui.theme.EulerAudioButtonLoadingColor
 import com.android.sample.ui.theme.EulerAudioButtonTint
 import com.android.sample.ui.theme.EulerAudioButtonTintSemiTransparent
+import com.android.sample.ui.theme.MoodleOrange
 
 /**
  * Renders a single chat message as either:
@@ -225,72 +228,81 @@ private fun AttachmentCard(
     onDownload: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-  val bg = Color(0xFF121212)
-  val border = Color(0xFF2A2A2A)
-  val accent = Color(0xFFE65100)
+  val bg = DarkSurfaceVariant
+  val accent = MoodleOrange
+  val borderStroke = BorderStroke(Dimens.CardBorderWidth, accent)
+  val cardPadding = Dimens.ScreenContentSpacing + Dimens.CardTitleSubtitleSpacer
   Surface(
-      shape = RoundedCornerShape(16.dp),
+      shape = RoundedCornerShape(Dimens.CardCornerRadius),
       color = bg,
-      border =
-          ButtonDefaults.outlinedButtonBorder.copy(
-              width = 1.dp, brush = androidx.compose.ui.graphics.SolidColor(border)),
+      border = borderStroke,
       modifier = modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(cardPadding),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            horizontalArrangement = Arrangement.spacedBy(Dimens.CardTitleSubtitleSpacer)) {
               Surface(
-                  shape = RoundedCornerShape(12.dp),
-                  color = Color(0xFF1F1F1F),
-                  modifier = Modifier.size(52.dp)) {
+                  shape = RoundedCornerShape(Dimens.LogoCornerRadius),
+                  color = DarkSurfaceVariant,
+                  modifier = Modifier.size(Dimens.LogoSize)) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                       Image(
                           painter = painterResource(id = R.drawable.moodle_logo),
                           contentDescription = "Moodle",
-                          modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
+                          modifier =
+                              Modifier.fillMaxSize()
+                                  .clip(RoundedCornerShape(Dimens.LogoCornerRadius)),
                           contentScale = ContentScale.Crop)
                     }
                   }
 
               Column(
                   modifier = Modifier.weight(1f),
-                  verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                  verticalArrangement = Arrangement.spacedBy(Dimens.CardTitleSubtitleSpacer)) {
                     Text(
                         text = attachment.title.ifBlank { "Document PDF" },
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onBackground,
                         style =
                             MaterialTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.SemiBold, fontSize = 15.sp))
-                    Surface(color = accent.copy(alpha = 0.15f), shape = RoundedCornerShape(8.dp)) {
-                      Row(
-                          modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                          verticalAlignment = Alignment.CenterVertically,
-                          horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Icon(
-                                imageVector = Icons.Outlined.PictureAsPdf,
-                                contentDescription = "PDF",
-                                tint = accent,
-                                modifier = Modifier.size(16.dp))
-                            Text("PDF", color = accent, fontSize = 12.sp)
-                          }
-                    }
+                    Surface(
+                        color = accent.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(Dimens.ButtonCornerRadius)) {
+                          Row(
+                              modifier =
+                                  Modifier.padding(
+                                      horizontal = Dimens.LogoPadding,
+                                      vertical = Dimens.LogoPadding / 2),
+                              verticalAlignment = Alignment.CenterVertically,
+                              horizontalArrangement =
+                                  Arrangement.spacedBy(Dimens.CardTitleSubtitleSpacer)) {
+                                Icon(
+                                    imageVector = Icons.Outlined.PictureAsPdf,
+                                    contentDescription = "PDF",
+                                    tint = accent,
+                                    modifier = Modifier.size(16.dp))
+                                Text("PDF", color = accent, fontSize = 12.sp)
+                              }
+                        }
                   }
 
-              Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                IconButton(onClick = onOpen, modifier = Modifier.size(40.dp)) {
-                  Icon(
-                      imageVector = Icons.Outlined.Visibility,
-                      contentDescription = "Open PDF",
-                      tint = Color.White,
-                      modifier = Modifier.size(22.dp))
-                }
-                IconButton(onClick = onDownload, modifier = Modifier.size(40.dp)) {
-                  Icon(
-                      imageVector = Icons.Outlined.Download,
-                      contentDescription = "Download PDF",
-                      tint = Color.White,
-                      modifier = Modifier.size(22.dp))
-                }
+              Row(horizontalArrangement = Arrangement.spacedBy(Dimens.CardTitleSubtitleSpacer)) {
+                IconButton(
+                    onClick = onOpen, modifier = Modifier.size(Dimens.TopBarIconButtonSize)) {
+                      Icon(
+                          imageVector = Icons.Outlined.Visibility,
+                          contentDescription = "Open PDF",
+                          tint = MaterialTheme.colorScheme.onBackground,
+                          modifier = Modifier.size(22.dp))
+                    }
+                IconButton(
+                    onClick = onDownload, modifier = Modifier.size(Dimens.TopBarIconButtonSize)) {
+                      Icon(
+                          imageVector = Icons.Outlined.Download,
+                          contentDescription = "Download PDF",
+                          tint = MaterialTheme.colorScheme.onBackground,
+                          modifier = Modifier.size(22.dp))
+                    }
               }
             }
       }
