@@ -61,6 +61,42 @@ export function buildEdIntentPromptForApertus(
   return promptBuilder(question);
 }
 
+/**
+ * Result of ED fetch intent detection.
+ */
+export interface EdFetchIntentDetectionResult {
+  /** Whether an ED fetch intent was detected */
+  ed_fetch_intent_detected: boolean;
+  /** The query string to use for fetching (null if not detected) */
+  ed_fetch_query: string | null;
+}
+
+/**
+ * Core detection function for ED fetch intent.
+ * Uses the generic detection system under the hood.
+ *
+ * @param question - The user's question/message
+ * @returns Detection result with fetch query if detected
+ */
+export function detectFetchFromEdIntentCore(
+  question: string,
+): EdFetchIntentDetectionResult {
+  const result = detectEdIntent(question);
+
+  // Check if the detected intent is "fetch_question"
+  if (result.detected && result.intentId === "fetch_question") {
+    return {
+      ed_fetch_intent_detected: true,
+      ed_fetch_query: question.trim(),
+    };
+  }
+
+  return {
+    ed_fetch_intent_detected: false,
+    ed_fetch_query: null,
+  };
+}
+
 // Re-export for convenience
 export { ED_INTENT_CONFIGS, detectEdIntent };
 export { parseEdPostResponse } from "./edIntentParser";

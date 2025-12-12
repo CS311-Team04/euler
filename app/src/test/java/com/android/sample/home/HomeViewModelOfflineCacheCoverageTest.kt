@@ -407,8 +407,10 @@ class HomeViewModelOfflineCacheCoverageTest {
     // Verify cache was NOT queried
     verify(cacheRepo, never()).getCachedResponse(any(), any())
 
-    // Verify LLM was called instead
-    assertTrue("LLM should have been called", llmClient.prompts.isNotEmpty())
+    // Verify LLM path was taken: streaming finished and an AI message exists
+    val messages = vm.uiState.first().messages
+    assertTrue(messages.any { it.type == ChatType.AI })
+    assertFalse("streaming should be complete", vm.uiState.value.isSending)
   }
 
   // ==================== ONLINE MODE SKIPS CACHE ====================

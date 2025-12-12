@@ -7,12 +7,13 @@ class FakeLlmClient : LlmClient {
   var nextUrl: String? = null
   var nextSourceType: SourceType = SourceType.NONE
   var nextEdIntent: EdIntent = EdIntent()
+  var nextEdFetchIntent: EdFetchIntent = EdFetchIntent()
   var failure: Throwable? = null
 
   override suspend fun generateReply(prompt: String): BotReply {
     prompts += prompt
     failure?.let { throw it }
-    return BotReply(nextReply, nextUrl, nextSourceType, nextEdIntent)
+    return BotReply(nextReply, nextUrl, nextSourceType, nextEdIntent, nextEdFetchIntent)
   }
 
   /** Configure the fake to return an ED intent response */
@@ -37,12 +38,19 @@ class FakeLlmClient : LlmClient {
             formattedTitle = formattedTitle)
   }
 
+  /** Configure the fake to return an ED fetch intent response */
+  fun setEdFetchIntentResponse(reply: String, query: String? = null) {
+    nextReply = reply
+    nextEdFetchIntent = EdFetchIntent(detected = true, query = query)
+  }
+
   /** Reset to default non-ED response */
   fun resetToDefault() {
     nextReply = "test-reply"
     nextUrl = null
     nextSourceType = SourceType.NONE
     nextEdIntent = EdIntent()
+    nextEdFetchIntent = EdFetchIntent()
     failure = null
   }
 }

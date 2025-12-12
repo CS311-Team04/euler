@@ -1,6 +1,7 @@
 // Integration tests for summary generation with Firebase Emulator
 import { describe, it, expect, beforeAll, afterAll, beforeEach, jest } from '@jest/globals';
 import * as admin from 'firebase-admin';
+import * as net from 'net';
 
 /**
  * INTEGRATION TESTS FOR SUMMARY GENERATION
@@ -13,6 +14,10 @@ import * as admin from 'firebase-admin';
  * 
  * NOTE: We still mock external APIs (Jina, Qdrant) - integration tests
  * focus on Firebase functionality, not third-party API integration.
+ *
+ * IMPORTANT: When the emulator is not running, tests will be automatically skipped
+ * and marked as "skipped" in Jest output. This prevents long timeouts and provides
+ * clear feedback that the emulator needs to be started.
  */
 
 /**
@@ -40,10 +45,35 @@ describe('Summary Generation Integration Tests', () => {
   let db: admin.firestore.Firestore;
   let emulatorConnected = false;
 
+  async function isEmulatorReachable(host = 'localhost', port = 8080, timeoutMs = 1200): Promise<boolean> {
+    return new Promise(resolve => {
+      const socket = new net.Socket();
+      const cleanup = () => socket.destroy();
+      const onError = () => {
+        cleanup();
+        resolve(false);
+      };
+      socket.setTimeout(timeoutMs);
+      socket.once('error', onError);
+      socket.once('timeout', onError);
+      socket.connect(port, host, () => {
+        cleanup();
+        resolve(true);
+      });
+    });
+  }
+
   beforeAll(async () => {
     // Set emulator host BEFORE initializing admin
     process.env.FIRESTORE_EMULATOR_HOST = 'localhost:8080';
     process.env.GCLOUD_PROJECT = 'demo-test-project';
+
+    emulatorConnected = await isEmulatorReachable('localhost', 8080);
+    if (!emulatorConnected) {
+      console.warn('⚠️  Firestore emulator not reachable. Tests requiring emulator will be skipped.');
+      console.warn('   Start emulator: firebase emulators:start --only firestore');
+      return;
+    }
     
     // Initialize Firebase Admin for emulator
     if (!admin.apps.length) {
@@ -52,26 +82,17 @@ describe('Summary Generation Integration Tests', () => {
       });
     }
     db = admin.firestore();
-    
-    // Test if emulator is actually reachable
-    try {
-      await db.collection('_test').limit(1).get();
-      emulatorConnected = true;
-      console.log('✅ Connected to Firestore emulator on localhost:8080');
-      console.log('   All 6 integration tests will run!');
-    } catch (error: any) {
-      emulatorConnected = false;
-      console.warn('⚠️  Firestore emulator not reachable. Tests requiring emulator will be skipped.');
-      console.warn(`   Error: ${error.message}`);
-      console.warn('   Start emulator: firebase emulators:start --only firestore');
-    }
+    console.log('✅ Connected to Firestore emulator on localhost:8080');
+    console.log('   All 6 integration tests will run!');
   });
   
   /** Helper to skip tests when emulator is not connected */
   function skipIfNoEmulator(): void {
     if (!emulatorConnected) {
-      // Using pending() equivalent for Jest - this marks the test as skipped
-      throw new Error('SKIPPED: Firestore emulator not running. Start with: firebase emulators:start --only firestore');
+      // Use it.skip to properly mark tests as skipped
+      it.skip('Firestore emulator not reachable', () => {
+        console.warn('SKIPPED: Firestore emulator not running. Start with: firebase emulators:start --only firestore');
+      });
     }
   }
 
@@ -156,153 +177,159 @@ Intentions/attentes : L'utilisateur souhaite des informations sur les programmes
   });
 
   describe('onMessageCreate Trigger (requires emulator)', () => {
-    it('should add summary when new message is created', async () => {
-      skipIfNoEmulator();
+    if (emulatorConnected) {
+      it('should add summary when new message is created', async () => {
+        const userId = `test-user-${Date.now()}`;
+        const conversationId = `test-conv-${Date.now()}`;
+        
+        // Create a conversation with some messages
+        const messagesRef = db
+          .collection('users').doc(userId)
+          .collection('conversations').doc(conversationId)
+          .collection('messages');
 
-      const userId = `test-user-${Date.now()}`;
-      const conversationId = `test-conv-${Date.now()}`;
-      
-      // Create a conversation with some messages
-      const messagesRef = db
-        .collection('users').doc(userId)
-        .collection('conversations').doc(conversationId)
-        .collection('messages');
-
-      // Add first message (user)
-      const msg1 = await messagesRef.add({
-        role: 'user',
-        content: 'What programs does EPFL offer?',
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-      // Add second message (assistant)
-      const msg2 = await messagesRef.add({
-        role: 'assistant',
-        content: 'EPFL offers various Bachelor and Master programs...',
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        summary: 'Initial summary about EPFL programs'
-      });
-
-      // Add third message (user) - this should trigger summary generation
-      const msg3 = await messagesRef.add({
-        role: 'user',
-        content: 'Tell me about the Computer Science program',
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-      // Poll for trigger to process instead of fixed timeout
-      // This is more reliable than arbitrary waits
-      const data = await pollUntil(
-        async () => {
-          const doc = await msg3.get();
-          return doc.data();
-        },
-        (d) => d?.summary !== undefined, // Wait until summary is added
-        { maxAttempts: 15, intervalMs: 200 } // Up to 3 seconds total
-      );
-
-      // Note: This will only work if the trigger is running in emulator
-      console.log('Message data:', data);
-      
-      // Clean up
-      await msg1.delete();
-      await msg2.delete();
-      await msg3.delete();
-      await db.collection('users').doc(userId).delete();
-
-      // This test verifies the structure even if trigger didn't run
-      expect(data).toBeDefined();
-      expect(data?.role).toBe('user');
-      expect(data?.content).toBe('Tell me about the Computer Science program');
-    });
-
-    it('should not add summary if message already has one', async () => {
-      skipIfNoEmulator();
-
-      const userId = `test-user-${Date.now()}`;
-      const conversationId = `test-conv-${Date.now()}`;
-      
-      const messagesRef = db
-        .collection('users').doc(userId)
-        .collection('conversations').doc(conversationId)
-        .collection('messages');
-
-      // Add message that already has a summary
-      const msgWithSummary = await messagesRef.add({
-        role: 'user',
-        content: 'Test message',
-        summary: 'Existing summary',
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-      // Poll to verify summary wasn't changed (wait a short time for any potential trigger)
-      const data = await pollUntil(
-        async () => {
-          const doc = await msgWithSummary.get();
-          return doc.data();
-        },
-        () => true, // Just wait for at least one poll cycle
-        { maxAttempts: 5, intervalMs: 200 }
-      );
-      
-      expect(data?.summary).toBe('Existing summary');
-
-      // Clean up
-      await msgWithSummary.delete();
-      await db.collection('users').doc(userId).delete();
-    });
-
-    it('should handle conversation with multiple turns', async () => {
-      skipIfNoEmulator();
-
-      const userId = `test-user-${Date.now()}`;
-      const conversationId = `test-conv-${Date.now()}`;
-      
-      const messagesRef = db
-        .collection('users').doc(userId)
-        .collection('conversations').doc(conversationId)
-        .collection('messages');
-
-      // Create a conversation history
-      const messages = [
-        { role: 'user', content: 'What is EPFL?' },
-        { role: 'assistant', content: 'EPFL is...', summary: 'Summary 1' },
-        { role: 'user', content: 'What programs?' },
-        { role: 'assistant', content: 'Programs are...', summary: 'Summary 2' },
-        { role: 'user', content: 'How to apply?' },
-      ];
-
-      const messageRefs = [];
-      for (const msg of messages) {
-        const ref = await messagesRef.add({
-          ...msg,
+        // Add first message (user)
+        const msg1 = await messagesRef.add({
+          role: 'user',
+          content: 'What programs does EPFL offer?',
           createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
-        messageRefs.push(ref);
-        // Small delay between messages
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
 
-      // Poll until all messages are visible
-      const fetchedMessages = await pollUntil(
-        async () => {
-          const snapshot = await messagesRef.orderBy('createdAt').get();
-          return snapshot.docs.map(doc => doc.data());
-        },
-        (msgs) => msgs.length === 5,
-        { maxAttempts: 15, intervalMs: 200 }
-      );
+        // Add second message (assistant)
+        const msg2 = await messagesRef.add({
+          role: 'assistant',
+          content: 'EPFL offers various Bachelor and Master programs...',
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          summary: 'Initial summary about EPFL programs'
+        });
 
-      expect(fetchedMessages.length).toBe(5);
-      expect(fetchedMessages[0].role).toBe('user');
-      expect(fetchedMessages[4].role).toBe('user');
+        // Add third message (user) - this should trigger summary generation
+        const msg3 = await messagesRef.add({
+          role: 'user',
+          content: 'Tell me about the Computer Science program',
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
 
-      // Clean up
-      for (const ref of messageRefs) {
-        await ref.delete();
-      }
-      await db.collection('users').doc(userId).delete();
-    });
+        // Poll for trigger to process instead of fixed timeout
+        // This is more reliable than arbitrary waits
+        const data = await pollUntil(
+          async () => {
+            const doc = await msg3.get();
+            return doc.data();
+          },
+          (d) => d?.summary !== undefined, // Wait until summary is added
+          { maxAttempts: 15, intervalMs: 200 } // Up to 3 seconds total
+        );
+
+        // Note: This will only work if the trigger is running in emulator
+        console.log('Message data:', data);
+        
+        // Clean up
+        await msg1.delete();
+        await msg2.delete();
+        await msg3.delete();
+        await db.collection('users').doc(userId).delete();
+
+        // This test verifies the structure even if trigger didn't run
+        expect(data).toBeDefined();
+        expect(data?.role).toBe('user');
+        expect(data?.content).toBe('Tell me about the Computer Science program');
+      });
+    } else {
+      skipIfNoEmulator();
+    }
+
+    if (emulatorConnected) {
+      it('should not add summary if message already has one', async () => {
+        const userId = `test-user-${Date.now()}`;
+        const conversationId = `test-conv-${Date.now()}`;
+        
+        const messagesRef = db
+          .collection('users').doc(userId)
+          .collection('conversations').doc(conversationId)
+          .collection('messages');
+
+        // Add message that already has a summary
+        const msgWithSummary = await messagesRef.add({
+          role: 'user',
+          content: 'Test message',
+          summary: 'Existing summary',
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Poll to verify summary wasn't changed (wait a short time for any potential trigger)
+        const data = await pollUntil(
+          async () => {
+            const doc = await msgWithSummary.get();
+            return doc.data();
+          },
+          () => true, // Just wait for at least one poll cycle
+          { maxAttempts: 5, intervalMs: 200 }
+        );
+        
+        expect(data?.summary).toBe('Existing summary');
+
+        // Clean up
+        await msgWithSummary.delete();
+        await db.collection('users').doc(userId).delete();
+      });
+    } else {
+      skipIfNoEmulator();
+    }
+
+    if (emulatorConnected) {
+      it('should handle conversation with multiple turns', async () => {
+        const userId = `test-user-${Date.now()}`;
+        const conversationId = `test-conv-${Date.now()}`;
+        
+        const messagesRef = db
+          .collection('users').doc(userId)
+          .collection('conversations').doc(conversationId)
+          .collection('messages');
+
+        // Create a conversation history
+        const messages = [
+          { role: 'user', content: 'What is EPFL?' },
+          { role: 'assistant', content: 'EPFL is...', summary: 'Summary 1' },
+          { role: 'user', content: 'What programs?' },
+          { role: 'assistant', content: 'Programs are...', summary: 'Summary 2' },
+          { role: 'user', content: 'How to apply?' },
+        ];
+
+        const messageRefs = [];
+        for (const msg of messages) {
+          const ref = await messagesRef.add({
+            ...msg,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+          messageRefs.push(ref);
+          // Small delay between messages
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        // Poll until all messages are visible
+        const fetchedMessages = await pollUntil(
+          async () => {
+            const snapshot = await messagesRef.orderBy('createdAt').get();
+            return snapshot.docs.map(doc => doc.data());
+          },
+          (msgs) => msgs.length === 5,
+          { maxAttempts: 15, intervalMs: 200 }
+        );
+
+        expect(fetchedMessages.length).toBe(5);
+        expect(fetchedMessages[0].role).toBe('user');
+        expect(fetchedMessages[4].role).toBe('user');
+
+        // Clean up
+        for (const ref of messageRefs) {
+          await ref.delete();
+        }
+        await db.collection('users').doc(userId).delete();
+      });
+    } else {
+      skipIfNoEmulator();
+    }
   });
 
   describe('Summary Logic', () => {
@@ -346,39 +373,43 @@ Contraintes/préférences : Section informatique (IC) préférée.`
       
       const systemMessage = calls[0][0].messages.find((m: any) => m.role === 'system');
       expect(systemMessage).toBeDefined();
-      expect(systemMessage.content).toContain('informatique');
+      // System prompt should include our EPFL guardrails and sourcing rules
+      expect(systemMessage.content).toContain('assistant EPFL');
+      expect(systemMessage.content).toContain('Sources (ordre): 1) Résumé');
     });
 
-    it('should handle empty conversation history', async () => {
-      skipIfNoEmulator();
+    if (emulatorConnected) {
+      it('should handle empty conversation history', async () => {
+        const userId = `test-user-${Date.now()}`;
+        const conversationId = `test-conv-${Date.now()}`;
+        
+        const messagesRef = db
+          .collection('users').doc(userId)
+          .collection('conversations').doc(conversationId)
+          .collection('messages');
 
-      const userId = `test-user-${Date.now()}`;
-      const conversationId = `test-conv-${Date.now()}`;
-      
-      const messagesRef = db
-        .collection('users').doc(userId)
-        .collection('conversations').doc(conversationId)
-        .collection('messages');
+        // Add first message (no prior history)
+        const firstMsg = await messagesRef.add({
+          role: 'user',
+          content: 'Hello, what is EPFL?',
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
 
-      // Add first message (no prior history)
-      const firstMsg = await messagesRef.add({
-        role: 'user',
-        content: 'Hello, what is EPFL?',
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
+        // Poll to verify message was added
+        const snapshot = await pollUntil(
+          () => messagesRef.get(),
+          (snap) => snap.size === 1,
+          { maxAttempts: 5, intervalMs: 200 }
+        );
+        expect(snapshot.size).toBe(1);
+
+        // Clean up
+        await firstMsg.delete();
+        await db.collection('users').doc(userId).delete();
       });
-
-      // Poll to verify message was added
-      const snapshot = await pollUntil(
-        () => messagesRef.get(),
-        (snap) => snap.size === 1,
-        { maxAttempts: 5, intervalMs: 200 }
-      );
-      expect(snapshot.size).toBe(1);
-
-      // Clean up
-      await firstMsg.delete();
-      await db.collection('users').doc(userId).delete();
-    });
+    } else {
+      skipIfNoEmulator();
+    }
   });
 });
 

@@ -66,10 +66,14 @@ class FirebaseFunctionsLlmClientTest {
     client.generateReply("Ping")
   }
 
-  @Test(expected = IllegalStateException::class)
-  fun generateReply_no_fallback_throws_on_empty_reply() = runTest {
+  @Test
+  fun generateReply_no_fallback_returns_default_on_empty_reply() = runTest {
     val client = clientWithResult(mapOf("reply" to ""), fallback = null)
-    client.generateReply("Ping")
+
+    val result = client.generateReply("Ping")
+
+    assertEquals("Voici le document demandé.", result.reply)
+    assertNull(result.url)
   }
 
   @Test
@@ -167,7 +171,7 @@ class FirebaseFunctionsLlmClientTest {
 
     override suspend fun generateReply(prompt: String): BotReply {
       prompts += prompt
-      return BotReply(reply, null, SourceType.NONE, EdIntent())
+      return BotReply(reply, null, SourceType.NONE, EdIntent(), EdFetchIntent())
     }
   }
 
@@ -235,5 +239,98 @@ class FirebaseFunctionsLlmClientTest {
 
     assertEquals(reply, result.reply)
     assertEquals(SourceType.FOOD, result.sourceType)
+  }
+
+  // ==================== ED FETCH INTENT TESTS ====================
+
+  @Test
+  fun generateReply_parses_ed_fetch_intent_detected_true() = runTest {
+    val reply = "Fetching ED question..."
+    val client =
+        clientWithResult(
+            mapOf(
+                "reply" to reply,
+                "ed_fetch_intent_detected" to true,
+                "ed_fetch_query" to "show me this ED post"))
+
+    val result = client.generateReply("show me this ED post")
+
+    assertEquals(reply, result.reply)
+    assertTrue(result.edFetchIntent.detected)
+    assertEquals("show me this ED post", result.edFetchIntent.query)
+  }
+
+  @Test
+  fun generateReply_parses_ed_fetch_intent_detected_false() = runTest {
+    val reply = "Normal response"
+    val client =
+        clientWithResult(
+            mapOf("reply" to reply, "ed_fetch_intent_detected" to false, "ed_fetch_query" to null))
+
+    val result = client.generateReply("what is EPFL?")
+
+    assertEquals(reply, result.reply)
+    assertFalse(result.edFetchIntent.detected)
+    assertNull(result.edFetchIntent.query)
+  }
+
+  @Test
+  fun generateReply_defaults_ed_fetch_intent_when_missing() = runTest {
+    val reply = "Response without ED fetch fields"
+    val client = clientWithResult(mapOf("reply" to reply))
+
+    val result = client.generateReply("Hello")
+
+    assertEquals(reply, result.reply)
+    assertFalse(result.edFetchIntent.detected)
+    assertNull(result.edFetchIntent.query)
+  }
+
+  @Test
+  fun generateReply_handles_invalid_ed_fetch_intent_types() = runTest {
+    val reply = "Response"
+    val client =
+        clientWithResult(
+            mapOf(
+                "reply" to reply,
+                "ed_fetch_intent_detected" to "not-a-boolean",
+                "ed_fetch_query" to 123))
+
+    val result = client.generateReply("test")
+
+    assertEquals(reply, result.reply)
+    assertFalse(result.edFetchIntent.detected) // Should default to false
+    assertNull(result.edFetchIntent.query) // Should default to null
+  }
+
+  @Test
+  fun generateReply_handles_ed_fetch_query_when_detected() = runTest {
+    val reply = "Fetching..."
+    val client =
+        clientWithResult(
+            mapOf(
+                "reply" to reply,
+                "ed_fetch_intent_detected" to true,
+                "ed_fetch_query" to "fetch this ED question about calculus"))
+
+    val result = client.generateReply("fetch this ED question")
+
+    assertEquals(reply, result.reply)
+    assertTrue(result.edFetchIntent.detected)
+    assertEquals("fetch this ED question about calculus", result.edFetchIntent.query)
+  }
+
+  @Test
+  fun generateReply_handles_ed_fetch_query_null() = runTest {
+    val reply = "Response"
+    val client =
+        clientWithResult(
+            mapOf("reply" to reply, "ed_fetch_intent_detected" to true, "ed_fetch_query" to null))
+
+    val result = client.generateReply("test")
+
+    assertEquals(reply, result.reply)
+    assertTrue(result.edFetchIntent.detected)
+    assertNull(result.edFetchIntent.query)
   }
 }

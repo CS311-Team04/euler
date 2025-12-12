@@ -7,6 +7,7 @@ import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.sample.BuildConfig
+import com.android.sample.Chat.ChatAttachment
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
 import com.android.sample.R
@@ -385,16 +386,19 @@ class HomeViewModel(
                 _uiState.update { currentState ->
                   val firestoreMessages = msgs.map { it.toUi() }
 
-                  val existingSourceCards =
-                      currentState.messages.filter { it.source != null && it.text.isBlank() }
+                  // Preserve locally added cards (source cards, attachments) that are not in
+                  // Firestore
+                  val existingExtraCards =
+                      currentState.messages.filter {
+                        (it.source != null || it.attachment != null) && it.text.isBlank()
+                      }
 
                   val finalMessages = mutableListOf<ChatUIModel>()
 
                   finalMessages.addAll(firestoreMessages)
 
-                  existingSourceCards.forEach { sourceCard ->
-                    val originalIndex =
-                        currentState.messages.indexOfFirst { it.id == sourceCard.id }
+                  existingExtraCards.forEach { extraCard ->
+                    val originalIndex = currentState.messages.indexOfFirst { it.id == extraCard.id }
                     if (originalIndex > 0) {
 
                       val precedingAssistant = currentState.messages[originalIndex - 1]
@@ -407,18 +411,18 @@ class HomeViewModel(
                             }
                         if (firestoreIndex >= 0) {
 
-                          finalMessages.add(firestoreIndex + 1, sourceCard)
+                          finalMessages.add(firestoreIndex + 1, extraCard)
                         } else {
 
-                          finalMessages.add(sourceCard)
+                          finalMessages.add(extraCard)
                         }
                       } else {
 
-                        finalMessages.add(sourceCard)
+                        finalMessages.add(extraCard)
                       }
                     } else {
 
-                      finalMessages.add(sourceCard)
+                      finalMessages.add(extraCard)
                     }
                   }
 
@@ -995,6 +999,12 @@ class HomeViewModel(
                 TAG,
                 "startStreaming: received reply, length=${reply.reply.length}, edIntentDetected=${reply.edIntent.detected}, edIntent=${reply.edIntent.intent}")
 
+            // Handle ED fetch intent detection first (takes precedence)
+            if (handleEdFetchIntent(reply, question, messageId)) {
+              // Skip normal streaming; ED fetch flow takes over
+              return@launch
+            }
+
             // Handle ED intent detection - create PostOnEd pending action
             val handled = handleEdIntent(reply, question, messageId)
             if (handled) {
@@ -1004,6 +1014,24 @@ class HomeViewModel(
 
             // simulate stream into the placeholder AI message
             simulateStreamingFromText(messageId, reply.reply)
+
+            // If backend returned a URL, surface it as an attachment card in the chat (keep user
+            // in-app)
+            reply.url?.let { pdfUrl ->
+              val attachment = ChatAttachment(url = pdfUrl)
+              _uiState.update { state ->
+                state.copy(
+                    messages =
+                        state.messages +
+                            ChatUIModel(
+                                id = UUID.randomUUID().toString(),
+                                text = "",
+                                timestamp = System.currentTimeMillis(),
+                                type = ChatType.AI,
+                                attachment = attachment),
+                    streamingSequence = state.streamingSequence + 1)
+              }
+            }
 
             // add optional source card based on source type
             val meta: SourceMeta? =
@@ -1502,6 +1530,47 @@ class HomeViewModel(
         }
     val txt = lines.joinToString("\n")
     return if (txt.isBlank()) null else txt.take(600)
+  }
+
+  /**
+   * Handles ED fetch intent detection from the LLM reply. If an ED fetch intent is detected, routes
+   * to the existing ED fetch flow.
+   *
+   * @param reply The BotReply from the LLM
+   * @param originalQuestion The original user question (used as fallback for fetch query)
+   * @param messageId The ID of the AI message being processed
+   * @return true if fetch intent was detected and handled, false otherwise
+   */
+  private fun handleEdFetchIntent(
+      reply: BotReply,
+      originalQuestion: String,
+      messageId: String
+  ): Boolean {
+    val fetchIntent = reply.edFetchIntent
+    if (!fetchIntent.detected) return false
+
+    val query = fetchIntent.query ?: originalQuestion
+
+    Log.d(TAG, "ED fetch intent detected with query: $query")
+
+    // Build a debug message to show in the chat
+    val debugMessage =
+        ChatUIModel(
+            id = UUID.randomUUID().toString(),
+            text = "🔎 ED fetch intent detected (DEBUG) – this is a test message.",
+            timestamp = System.currentTimeMillis(),
+            type = ChatType.AI)
+
+    _uiState.update { state ->
+      state.copy(
+          messages =
+              state.messages.filterNot { it.id == messageId && it.type == ChatType.AI } +
+                  debugMessage,
+          streamingMessageId = null,
+          isSending = false)
+    }
+
+    return true
   }
 
   /**

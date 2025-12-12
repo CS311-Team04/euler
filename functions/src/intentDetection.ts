@@ -132,8 +132,23 @@ export const ED_INTENT_CONFIGS: IntentConfig[] = [
     ],
     blockPatterns: ED_BLOCK_PATTERNS,
   },
-    // ===== PLACEHOLDER: FETCH ED POSTS =====
-
+  // ===== FETCH ED POSTS =====
+  {
+    id: "fetch_question",
+    matchPatterns: [
+      // Direct action verbs: show, open, display, fetch, get, find, search, retrieve, bring, see, view, read, lookup, check
+      /\b(show|open|display|fetch|get|find|search|retrieve|bring|see|view|read|lookup|check)\b.*\b(ed|edstem|ed\s*discussion)\b.*\b(post|question|thread|discussion)/i,
+      // Action verbs with "me": show me, get me, find me, give me, send me
+      /\b(show|get|find|give|send)\s+me\b.*\b(ed|edstem|ed\s*discussion)\b.*\b(post|question|thread|discussion)/i,
+      // "this/that" patterns: open/show this/that ED post
+      /\b(open|show|get|find|view|read)\b.*\b(this|that)\b.*\b(ed|edstem|ed\s*discussion)\b.*\b(post|question|thread|discussion)/i,
+      // "I want/need to see/view/find": I want to see the ED post
+      /\b(i\s+)?(want|need)\s+(to\s+)?(see|view|find|show|get|read|open)\b.*\b(ed|edstem|ed\s*discussion)\b.*\b(post|question|thread|discussion)/i,
+      // "Can you/I show/see": Can you show me the ED post, Can I see this ED thread
+      /\b(can\s+(you|i))\b.*\b(show|see|find|get|open|view|read)\b.*\b(ed|edstem|ed\s*discussion)\b.*\b(post|question|thread|discussion)/i,
+    ],
+    blockPatterns: ED_BLOCK_PATTERNS,
+  },
 ];
 
 /**
