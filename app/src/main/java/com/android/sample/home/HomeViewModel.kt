@@ -398,45 +398,49 @@ class HomeViewModel(
                 _uiState.update { currentState ->
                   val firestoreMessages = msgs.map { it.toUi() }
 
-                  // Preserve locally added cards (source cards, attachments) that are not in
-                  // Firestore
-                  val existingExtraCards =
-                      currentState.messages.filter {
-                        (it.source != null || it.attachment != null) && it.text.isBlank()
-                      }
+                  // Detect if we're switching conversations or syncing the same one
+                  // by checking if there's any text overlap between local and Firestore messages
+                  val firestoreTexts =
+                      firestoreMessages
+                          .mapNotNull { it.text.takeIf { t -> t.isNotBlank() } }
+                          .toSet()
+                  val localTexts =
+                      currentState.messages
+                          .mapNotNull { it.text.takeIf { t -> t.isNotBlank() } }
+                          .toSet()
+                  val isSameConversation = firestoreTexts.any { it in localTexts }
 
-                  val finalMessages = mutableListOf<ChatUIModel>()
-
-                  finalMessages.addAll(firestoreMessages)
-
-                  existingExtraCards.forEach { extraCard ->
-                    val originalIndex = currentState.messages.indexOfFirst { it.id == extraCard.id }
-                    if (originalIndex > 0) {
-
-                      val precedingAssistant = currentState.messages[originalIndex - 1]
-                      if (precedingAssistant.type == ChatType.AI &&
-                          precedingAssistant.text.isNotBlank()) {
-
-                        val firestoreIndex =
-                            finalMessages.indexOfFirst {
-                              it.type == ChatType.AI && it.text == precedingAssistant.text
-                            }
-                        if (firestoreIndex >= 0) {
-
-                          finalMessages.add(firestoreIndex + 1, extraCard)
-                        } else {
-
-                          finalMessages.add(extraCard)
-                        }
-                      } else {
-
-                        finalMessages.add(extraCard)
-                      }
-                    } else {
-
-                      finalMessages.add(extraCard)
-                    }
+                  if (!isSameConversation) {
+                    // Switching conversations - don't preserve local source/attachment
+                    return@update currentState.copy(messages = firestoreMessages)
                   }
+
+                  // Same conversation - preserve source/attachment from local state
+                  val localSourceByText =
+                      currentState.messages
+                          .filter { it.type == ChatType.AI && it.source != null }
+                          .associateBy { it.text }
+                  val localAttachmentByText =
+                      currentState.messages
+                          .filter { it.type == ChatType.AI && it.attachment != null }
+                          .associateBy { it.text }
+
+                  val finalMessages =
+                      firestoreMessages.map { msg ->
+                        if (msg.type == ChatType.AI) {
+                          val localSource = localSourceByText[msg.text]?.source
+                          val localAttachment = localAttachmentByText[msg.text]?.attachment
+                          if (localSource != null || localAttachment != null) {
+                            msg.copy(
+                                source = localSource ?: msg.source,
+                                attachment = localAttachment ?: msg.attachment)
+                          } else {
+                            msg
+                          }
+                        } else {
+                          msg
+                        }
+                      }
 
                   currentState.copy(messages = finalMessages)
                 }
@@ -1025,31 +1029,14 @@ class HomeViewModel(
             // simulate stream into the placeholder AI message
             simulateStreamingFromText(messageId, reply.reply)
 
-            // If backend returned a URL, surface it as an attachment card in the chat (keep user
-            // in-app)
-            reply.url
-                ?.takeIf { isPdfUrl(it) }
-                ?.let { pdfUrl ->
-                  val attachment = ChatAttachment(url = pdfUrl)
-                  _uiState.update { state ->
-                    state.copy(
-                        messages =
-                            state.messages +
-                                ChatUIModel(
-                                    id = UUID.randomUUID().toString(),
-                                    text = "",
-                                    timestamp = System.currentTimeMillis(),
-                                    type = ChatType.AI,
-                                    attachment = attachment),
-                        streamingSequence = state.streamingSequence + 1)
-                  }
-                }
+            // Build attachment if backend returned a PDF URL
+            val attachment: ChatAttachment? =
+                reply.url?.takeIf { isPdfUrl(it) }?.let { pdfUrl -> ChatAttachment(url = pdfUrl) }
 
-            // add optional source card based on source type
-            val meta: SourceMeta? =
+            // Build optional source card based on source type
+            val sourceMeta: SourceMeta? =
                 when (reply.sourceType) {
                   com.android.sample.llm.SourceType.SCHEDULE -> {
-                    // Schedule source - show a small indicator
                     SourceMeta(
                         siteLabel = FALLBACK_SCHEDULE_LABEL,
                         siteLabelRes = R.string.source_label_epfl_schedule,
@@ -1060,7 +1047,6 @@ class HomeViewModel(
                         compactType = CompactSourceType.SCHEDULE)
                   }
                   com.android.sample.llm.SourceType.FOOD -> {
-                    // Food source - show a small indicator
                     SourceMeta(
                         siteLabel = FALLBACK_FOOD_LABEL,
                         siteLabelRes = R.string.source_label_epfl_restaurants,
@@ -1071,7 +1057,6 @@ class HomeViewModel(
                         compactType = CompactSourceType.FOOD)
                   }
                   com.android.sample.llm.SourceType.RAG -> {
-                    // RAG source - show the web source card if URL exists
                     reply.url?.let { url ->
                       SourceMeta(
                           siteLabel = buildSiteLabel(url),
@@ -1084,18 +1069,21 @@ class HomeViewModel(
                   com.android.sample.llm.SourceType.NONE -> null
                 }
 
-            meta?.let { sourceMeta ->
-              _uiState.update { s ->
-                s.copy(
-                    messages =
-                        s.messages +
-                            ChatUIModel(
-                                id = UUID.randomUUID().toString(),
-                                text = "",
-                                timestamp = System.currentTimeMillis(),
-                                type = ChatType.AI,
-                                source = sourceMeta),
-                    streamingSequence = s.streamingSequence + 1)
+            // Update the existing AI message with attachment and/or source (instead of creating new
+            // messages)
+            if (attachment != null || sourceMeta != null) {
+              _uiState.update { state ->
+                val updated =
+                    state.messages.map { msg ->
+                      if (msg.id == messageId) {
+                        msg.copy(
+                            attachment = attachment ?: msg.attachment,
+                            source = sourceMeta ?: msg.source)
+                      } else {
+                        msg
+                      }
+                    }
+                state.copy(messages = updated, streamingSequence = state.streamingSequence + 1)
               }
             }
 
