@@ -52,7 +52,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.sample.R
 import com.android.sample.settings.connectors.ConnectorsDimensions as Dimens
-import com.android.sample.ui.theme.DarkSurfaceVariant
 import com.android.sample.ui.theme.EulerAudioButtonLoadingColor
 import com.android.sample.ui.theme.EulerAudioButtonTint
 import com.android.sample.ui.theme.EulerAudioButtonTintSemiTransparent
@@ -285,7 +284,8 @@ private fun AttachmentCard(
     onDownload: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-  val bg = DarkSurfaceVariant
+  val colorScheme = MaterialTheme.colorScheme
+  val bg = colorScheme.surfaceVariant
   val accent = MoodleOrange
   val borderStroke = BorderStroke(Dimens.CardBorderWidth, accent)
   val cardPadding = Dimens.ScreenContentSpacing + Dimens.CardTitleSubtitleSpacer
@@ -300,7 +300,7 @@ private fun AttachmentCard(
             horizontalArrangement = Arrangement.spacedBy(Dimens.CardTitleSubtitleSpacer)) {
               Surface(
                   shape = RoundedCornerShape(Dimens.LogoCornerRadius),
-                  color = DarkSurfaceVariant,
+                  color = colorScheme.surfaceVariant,
                   modifier = Modifier.size(Dimens.LogoSize)) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                       Image(
