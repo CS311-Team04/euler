@@ -236,6 +236,8 @@ class HomeViewModelOfflineCacheCoverageTest {
 
     val vm =
         HomeViewModel(llmClient, auth, repo, networkMonitor = networkMonitor, cacheRepo = cacheRepo)
+    // Avoid messagesFlow() wiping local messages by keeping a non-null conversation id
+    vm.editState { it.copy(currentConversationId = "conv-offline") }
 
     // Go offline
     networkMonitor.setOnline(false)
@@ -668,6 +670,8 @@ class HomeViewModelOfflineCacheCoverageTest {
 
     val vm =
         HomeViewModel(llmClient, auth, repo, networkMonitor = networkMonitor, cacheRepo = cacheRepo)
+    // Prevent flowOf(emptyList()) from clearing local optimistic messages
+    vm.editState { it.copy(currentConversationId = "conv-offline") }
 
     // Network monitor says offline
     networkMonitor.setOnline(false)

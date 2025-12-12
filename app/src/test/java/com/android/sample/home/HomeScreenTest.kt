@@ -1517,4 +1517,77 @@ class HomeScreenComposeInteractionsTest {
     composeRule.onNodeWithText("Card Two").assertIsDisplayed()
     composeRule.onNodeWithText("Card Three").assertIsDisplayed()
   }
+
+  @Test
+  fun timeline_associates_edPostsCards_with_messages_and_sorts_correctly() {
+    val msg1 = ChatUIModel(id = "m1", text = "Q1", timestamp = 100, type = ChatType.USER)
+    val msg2 = ChatUIModel(id = "m2", text = "A1", timestamp = 200, type = ChatType.AI)
+    val edCard1 =
+        EdPostCard(
+            id = "ec1", title = "Post", body = "", status = EdPostStatus.Published, createdAt = 150)
+    val edPostsCard1 =
+        EdPostsCard(
+            id = "epc1",
+            messageId = "m2",
+            query = "",
+            posts = emptyList(),
+            filters = EdIntentFilters(),
+            stage = EdPostsStage.SUCCESS,
+            errorMessage = null,
+            createdAt = 210)
+
+    val msgItems = listOf(msg1, msg2).map { TimelineItem.MessageItem(it, it.timestamp) }
+    val cardItems = listOf(edCard1).map { TimelineItem.CardItem(it, it.createdAt) }
+    val edPostsCardsByMessage = listOf(edPostsCard1).associateBy { it.messageId }
+
+    val timelineItems = mutableListOf<TimelineItem>()
+    msgItems.forEach { msgItem ->
+      timelineItems.add(msgItem)
+      edPostsCardsByMessage[msgItem.message.id]?.let { epc ->
+        timelineItems.add(
+            TimelineItem.PostsCardItem(epc, maxOf(msgItem.timestamp + 1, epc.createdAt)))
+      }
+    }
+    timelineItems.addAll(cardItems)
+    val sorted = timelineItems.sortedBy { it.timestamp }
+
+    assertEquals(4, sorted.size)
+    assertTrue(sorted[0] is TimelineItem.MessageItem && sorted[0].key == "m1")
+    assertTrue(sorted[1] is TimelineItem.CardItem && sorted[1].key == "ec1")
+    assertTrue(sorted[2] is TimelineItem.MessageItem && sorted[2].key == "m2")
+    assertTrue(sorted[3] is TimelineItem.PostsCardItem && sorted[3].key == "epc1")
+  }
+
+  @Test
+  fun timeline_places_edPostsCard_after_message_even_if_timestamps_equal() {
+    val msg = ChatUIModel(id = "m1", text = "Q", timestamp = 100, type = ChatType.USER)
+    val edPostsCard =
+        EdPostsCard(
+            id = "epc1",
+            messageId = "m1",
+            query = "",
+            posts = emptyList(),
+            filters = EdIntentFilters(),
+            stage = EdPostsStage.SUCCESS,
+            errorMessage = null,
+            createdAt = 100)
+
+    val msgItems = listOf(TimelineItem.MessageItem(msg, msg.timestamp))
+    val edPostsCardsByMessage = mapOf("m1" to edPostsCard)
+    val timelineItems = mutableListOf<TimelineItem>()
+
+    msgItems.forEach { msgItem ->
+      timelineItems.add(msgItem)
+      edPostsCardsByMessage[msgItem.message.id]?.let { epc ->
+        val cardTimestamp = maxOf(msgItem.timestamp + 1, epc.createdAt)
+        timelineItems.add(TimelineItem.PostsCardItem(epc, cardTimestamp))
+      }
+    }
+
+    val sorted = timelineItems.sortedBy { it.timestamp }
+    assertEquals(2, sorted.size)
+    assertEquals("m1", sorted[0].key)
+    assertEquals("epc1", sorted[1].key)
+    assertEquals(101, sorted[1].timestamp) // Should be msg + 1
+  }
 }

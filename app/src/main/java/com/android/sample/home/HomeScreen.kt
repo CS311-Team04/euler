@@ -96,7 +96,7 @@ object HomeTags {
   const val TopRightMenu = "home_topright_menu"
 }
 
-private sealed class TimelineItem {
+internal sealed class TimelineItem {
   abstract val timestamp: Long
   abstract val key: String
 
