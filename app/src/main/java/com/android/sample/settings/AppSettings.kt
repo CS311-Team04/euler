@@ -120,4 +120,19 @@ object AppSettings {
     scope = CoroutineScope(Dispatchers.IO)
     initializationJob = null
   }
+
+  /**
+   * Test-only helper to clear state and avoid reusing DataStore between tests. Resets in-memory
+   * settings and drops the DataStore reference so a fresh instance can be created in the next test.
+   */
+  internal fun clearForTests() {
+    initializationJob?.cancel()
+    scope.cancel()
+    dataStore = null
+    _languageState.value = Language.EN
+    _appearanceState.value = AppearanceMode.SYSTEM
+    // recreate scope with current dispatcher
+    scope = CoroutineScope(dispatcher)
+    initializationJob = null
+  }
 }

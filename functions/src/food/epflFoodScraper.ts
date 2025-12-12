@@ -274,13 +274,20 @@ export async function scrapeWeeklyMenu(): Promise<WeeklyMenu> {
 export function formatMenuForContext(weeklyMenu: WeeklyMenu): string {
   const lines: string[] = [];
   
-  lines.push("🍽️ MENUS DES RESTAURANTS EPFL (semaine courante)");
+  lines.push("🍽️ EPFL RESTAURANT MENUS (current week)");
   lines.push("Restaurants: Alpine, Arcadie, Esplanade, Native, Ornithorynque, Piano\n");
+  
+  // English day name mapping for context
+  const dayNameMap: Record<string, string> = {
+    "lundi": "Monday", "mardi": "Tuesday", "mercredi": "Wednesday",
+    "jeudi": "Thursday", "vendredi": "Friday", "samedi": "Saturday", "dimanche": "Sunday"
+  };
   
   for (const day of weeklyMenu.days) {
     if (day.meals.length === 0) continue;
     
-    const capitalizedDay = day.dayName.charAt(0).toUpperCase() + day.dayName.slice(1);
+    const englishDayName = dayNameMap[day.dayName.toLowerCase()] || day.dayName;
+    const capitalizedDay = englishDayName.charAt(0).toUpperCase() + englishDayName.slice(1);
     lines.push(`📅 ${capitalizedDay} (${day.date}):`);
     
     // Group by restaurant
@@ -296,11 +303,11 @@ export function formatMenuForContext(weeklyMenu: WeeklyMenu): string {
       for (const meal of meals) {
         const tags: string[] = [];
         if (meal.isVegan) tags.push("🌱 vegan");
-        else if (meal.isVegetarian) tags.push("🥬 végétarien");
+        else if (meal.isVegetarian) tags.push("🥬 vegetarian");
         
         const price = meal.studentPrice 
           ? `${meal.studentPrice.toFixed(2)} CHF` 
-          : "prix non disponible";
+          : "price not available";
         
         const tagStr = tags.length > 0 ? ` [${tags.join(", ")}]` : "";
         lines.push(`    • ${meal.name}${tagStr} — ${price}`);

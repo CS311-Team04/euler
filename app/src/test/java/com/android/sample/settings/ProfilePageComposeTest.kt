@@ -177,8 +177,7 @@ class ProfilePageComposeTest {
 
   @Test
   fun `back button is displayed`() = runTest {
-    var backClicked = false
-    composeRule.setContent { MaterialTheme { ProfilePage(onBackClick = { backClicked = true }) } }
+    composeRule.setContent { MaterialTheme { ProfilePage() } }
     composeRule.waitForIdle()
     advanceUntilIdle()
 

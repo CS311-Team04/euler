@@ -19,15 +19,20 @@ import com.android.sample.conversations.MessageDTO
 import com.android.sample.llm.BotReply
 import com.android.sample.llm.FirebaseFunctionsLlmClient
 import com.android.sample.llm.LlmClient
+import com.android.sample.llm.SourceType
+import com.android.sample.network.AndroidNetworkConnectivityMonitor
 import com.android.sample.network.NetworkConnectivityMonitor
+import com.android.sample.profile.ProfileDataSource
 import com.android.sample.profile.UserProfile
 import com.android.sample.profile.UserProfileRepository
+import com.android.sample.settings.Localization
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
 import java.io.IOException
+import java.time.Instant
 import java.util.UUID
 import kotlin.getValue
 import kotlinx.coroutines.CancellationException
@@ -35,6 +40,9 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -43,6 +51,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -103,8 +112,7 @@ class HomeViewModel(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
     private val repo: ConversationRepository =
         ConversationRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance()),
-    private val profileRepository: com.android.sample.profile.ProfileDataSource =
-        UserProfileRepository(),
+    private val profileRepository: ProfileDataSource = UserProfileRepository(),
     private val networkMonitor: NetworkConnectivityMonitor? = null,
     private val cacheRepo: CachedResponseRepository =
         CachedResponseRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance()),
@@ -149,7 +157,7 @@ class HomeViewModel(
       val trimmed = localizedText.trim()
       // Check if this is a known suggestion by looking at all localized variants
       for ((key, canonical) in SUGGESTION_KEY_TO_CANONICAL) {
-        val localized = com.android.sample.settings.Localization.t(key)
+        val localized = Localization.t(key)
         if (localized.equals(trimmed, ignoreCase = true)) {
           return canonical
         }
@@ -174,8 +182,8 @@ class HomeViewModel(
   // private val auth: FirebaseAuth = FirebaseAuth.getInstance()
   private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
   private var isInLocalNewChat = false
-  private var conversationsJob: kotlinx.coroutines.Job? = null
-  private var messagesJob: kotlinx.coroutines.Job? = null
+  private var conversationsJob: Job? = null
+  private var messagesJob: Job? = null
   private var lastUid: String? = null
 
   private val _uiState =
@@ -381,13 +389,14 @@ class HomeViewModel(
     // 2) Messages for the selected conversation (flatMapLatest strategy)
     messagesJob?.cancel()
     messagesJob =
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
           uiState
               .map { it.currentConversationId }
               .distinctUntilChanged()
               .flatMapLatest { cid ->
                 if (cid == null) flowOf(emptyList()) else repo.messagesFlow(cid)
               }
+              .flowOn(Dispatchers.IO)
               .collect { msgs ->
                 val streamingId = _uiState.value.streamingMessageId
                 if (streamingId != null) {
@@ -395,54 +404,85 @@ class HomeViewModel(
                   return@collect
                 }
 
-                _uiState.update { currentState ->
-                  val firestoreMessages = msgs.map { it.toUi() }
+                val conversationId = _uiState.value.currentConversationId
+                // Load all EdCards (both EdPostCard and EdPostsCard) before updating state
+                val loadedEdCards = mutableListOf<EdPostCard>()
+                val loadedEdPostsCards = mutableListOf<EdPostsCard>()
 
-                  // Detect if we're switching conversations or syncing the same one
-                  // by checking if there's any text overlap between local and Firestore messages
-                  val firestoreTexts =
-                      firestoreMessages
-                          .mapNotNull { it.text.takeIf { t -> t.isNotBlank() } }
-                          .toSet()
-                  val localTexts =
-                      currentState.messages
-                          .mapNotNull { it.text.takeIf { t -> t.isNotBlank() } }
-                          .toSet()
-                  val isSameConversation = firestoreTexts.any { it in localTexts }
+                if (conversationId != null && !isGuest()) {
+                  val (newEdCards, newEdPostsCards) =
+                      loadEdCardsForMessages(conversationId, msgs, repo = repo)
+                  loadedEdCards.addAll(newEdCards)
+                  loadedEdPostsCards.addAll(newEdPostsCards)
+                }
 
-                  if (!isSameConversation) {
-                    // Switching conversations - don't preserve local source/attachment
-                    return@update currentState.copy(messages = firestoreMessages)
-                  }
+                withContext(Dispatchers.Main) {
+                  _uiState.update { currentState ->
+                    // Merge loaded EdCards with existing ones (avoid duplicates)
+                    val allEdCards =
+                        (currentState.edPostCards + loadedEdCards)
+                            .distinctBy { it.id }
+                            .sortedBy { it.createdAt }
 
-                  // Same conversation - preserve source/attachment from local state
-                  val localSourceByText =
-                      currentState.messages
-                          .filter { it.type == ChatType.AI && it.source != null }
-                          .associateBy { it.text }
-                  val localAttachmentByText =
-                      currentState.messages
-                          .filter { it.type == ChatType.AI && it.attachment != null }
-                          .associateBy { it.text }
+                    // Merge loaded EdPostsCards with existing ones (avoid duplicates)
+                    val allEdPostsCards =
+                        (currentState.edPostsCards + loadedEdPostsCards)
+                            .distinctBy { it.id }
+                            .sortedBy { it.createdAt }
 
-                  val finalMessages =
-                      firestoreMessages.map { msg ->
-                        if (msg.type == ChatType.AI) {
-                          val localSource = localSourceByText[msg.text]?.source
-                          val localAttachment = localAttachmentByText[msg.text]?.attachment
-                          if (localSource != null || localAttachment != null) {
-                            msg.copy(
-                                source = localSource ?: msg.source,
-                                attachment = localAttachment ?: msg.attachment)
+                    val firestoreMessages = msgs.map { (dto, messageId) -> dto.toUi(messageId) }
+
+                    // Detect if we're switching conversations or syncing the same one
+                    val firestoreTexts =
+                        firestoreMessages
+                            .mapNotNull { it.text.takeIf { t -> t.isNotBlank() } }
+                            .toSet()
+                    val localTexts =
+                        currentState.messages
+                            .mapNotNull { it.text.takeIf { t -> t.isNotBlank() } }
+                            .toSet()
+                    val isSameConversation = firestoreTexts.any { it in localTexts }
+
+                    if (!isSameConversation) {
+                      // Switching conversations - don't preserve local source/attachment
+                      return@update currentState.copy(
+                          messages = firestoreMessages,
+                          edPostCards = allEdCards,
+                          edPostsCards = allEdPostsCards)
+                    }
+
+                    // Same conversation - preserve source/attachment from local state
+                    val localSourceByText =
+                        currentState.messages
+                            .filter { it.type == ChatType.AI && it.source != null }
+                            .associateBy { it.text }
+                    val localAttachmentByText =
+                        currentState.messages
+                            .filter { it.type == ChatType.AI && it.attachment != null }
+                            .associateBy { it.text }
+
+                    val finalMessages =
+                        firestoreMessages.map { msg ->
+                          if (msg.type == ChatType.AI) {
+                            val localSource = localSourceByText[msg.text]?.source
+                            val localAttachment = localAttachmentByText[msg.text]?.attachment
+                            if (localSource != null || localAttachment != null) {
+                              msg.copy(
+                                  source = localSource ?: msg.source,
+                                  attachment = localAttachment ?: msg.attachment)
+                            } else {
+                              msg
+                            }
                           } else {
                             msg
                           }
-                        } else {
-                          msg
                         }
-                      }
 
-                  currentState.copy(messages = finalMessages)
+                    currentState.copy(
+                        messages = finalMessages,
+                        edPostCards = allEdCards,
+                        edPostsCards = allEdPostsCards)
+                  }
                 }
               }
         }
@@ -644,18 +684,35 @@ class HomeViewModel(
       try {
         edPostDataSource.publish(sanitizedTitle, sanitizedBody)
         val now = System.currentTimeMillis()
+        val edCardId = UUID.randomUUID().toString()
+        val edCard =
+            EdPostCard(
+                id = edCardId,
+                title = sanitizedTitle,
+                body = sanitizedBody,
+                status = EdPostStatus.Published,
+                createdAt = now)
+
+        // Save EdCard to Firebase and associate with message
+        val pending = _uiState.value.pendingAction as? PendingAction.PostOnEd
+        val messageId = pending?.messageId
+        val conversationId = _uiState.value.currentConversationId
+
+        if (messageId != null && conversationId != null && !isGuest()) {
+          try {
+            repo.saveEdCard(conversationId, messageId, edCard)
+            Log.d(TAG, "publishEdPost: EdCard saved to Firebase, messageId=$messageId")
+          } catch (e: Exception) {
+            Log.e(TAG, "publishEdPost: Failed to save EdCard to Firebase", e)
+            // Continue anyway - EdCard is in local state
+          }
+        }
+
         _uiState.update {
           it.copy(
               pendingAction = null,
               edPostResult = EdPostResult.Published(sanitizedTitle, sanitizedBody),
-              edPostCards =
-                  it.edPostCards +
-                      EdPostCard(
-                          id = UUID.randomUUID().toString(),
-                          title = sanitizedTitle,
-                          body = sanitizedBody,
-                          status = EdPostStatus.Published,
-                          createdAt = now),
+              edPostCards = it.edPostCards + edCard,
               isPostingToEd = false)
         }
       } catch (e: Exception) {
@@ -684,18 +741,36 @@ class HomeViewModel(
     val pending = _uiState.value.pendingAction as? PendingAction.PostOnEd
     val title = pending?.draftTitle ?: ""
     val body = pending?.draftBody ?: ""
+    val edCardId = UUID.randomUUID().toString()
+    val edCard =
+        EdPostCard(
+            id = edCardId,
+            title = title,
+            body = body,
+            status = EdPostStatus.Cancelled,
+            createdAt = now)
+
+    // Save EdCard to Firebase and associate with message
+    val messageId = pending?.messageId
+    val conversationId = _uiState.value.currentConversationId
+
+    if (messageId != null && conversationId != null && !isGuest()) {
+      viewModelScope.launch(exceptionHandler) {
+        try {
+          repo.saveEdCard(conversationId, messageId, edCard)
+          Log.d(TAG, "cancelEdPost: EdCard saved to Firebase, messageId=$messageId")
+        } catch (e: Exception) {
+          Log.e(TAG, "cancelEdPost: Failed to save EdCard to Firebase", e)
+          // Continue anyway - EdCard is in local state
+        }
+      }
+    }
+
     _uiState.update {
       it.copy(
           pendingAction = null,
           edPostResult = EdPostResult.Cancelled,
-          edPostCards =
-              it.edPostCards +
-                  EdPostCard(
-                      id = UUID.randomUUID().toString(),
-                      title = title,
-                      body = body,
-                      status = EdPostStatus.Cancelled,
-                      createdAt = now),
+          edPostCards = it.edPostCards + edCard,
           isSending = false,
           streamingMessageId = null,
           isPostingToEd = false)
@@ -785,7 +860,7 @@ class HomeViewModel(
             type = ChatType.AI,
             isThinking = true)
 
-    // UI optimiste : on ajoute user + placeholder, on vide l'input, on marque l'état de streaming
+    // Optimistic UI: add user + placeholder, clear input, mark streaming state
     _uiState.update { st ->
       st.copy(
           messages = st.messages + userMsg + placeholder,
@@ -814,6 +889,7 @@ class HomeViewModel(
               Log.d(TAG, "sendMessage: found cached response in local Firestore cache, using it")
               // Use cached response
               simulateStreamingFromText(aiMessageId, cachedResponse)
+              clearStreamingState(aiMessageId)
 
               // Persist to conversation if we have one
               val cid = _uiState.value.currentConversationId
@@ -860,7 +936,8 @@ class HomeViewModel(
               conversationId = null,
               summary = null,
               transcript = null,
-              profileContext = profileContext)
+              profileContext = profileContext,
+              userMessageFirestoreId = null)
           return@launch
         }
 
@@ -873,7 +950,7 @@ class HomeViewModel(
                   _uiState.update { it.copy(currentConversationId = newId) }
                   isInLocalNewChat = false
 
-                  // Upgrade du titre en arrière-plan (UNE fois)
+                  // Upgrade title in background (ONE time)
                   launch {
                     try {
                       val good = ConversationTitleFormatter.fetchTitle(functions, msg, TAG)
@@ -888,13 +965,28 @@ class HomeViewModel(
                 }
 
         isInLocalNewChat = false
-        // Persister immédiatement le message USER côté repo
-        try {
-          repo.appendMessage(cid, "user", msg)
-        } catch (e: Exception) {
-          Log.e(TAG, "Failed to persist user message: ${e.message}", e)
-          handleSendMessageError(e, aiMessageId)
-          return@launch
+        // Persist USER message to repo immediately
+        // Store the Firestore message ID for potential use in EdCard association
+        val userMessageFirestoreId =
+            try {
+              repo.appendMessage(cid, "user", msg)
+            } catch (e: Exception) {
+              Log.e(TAG, "Failed to persist user message: ${e.message}", e)
+              handleSendMessageError(e, aiMessageId)
+              return@launch
+            }
+
+        // Update the local user message ID with the Firestore ID
+        _uiState.update { state ->
+          state.copy(
+              messages =
+                  state.messages.map { message ->
+                    if (message.id == userMsg.id && message.type == ChatType.USER) {
+                      message.copy(id = userMessageFirestoreId)
+                    } else {
+                      message
+                    }
+                  })
         }
 
         // ---------- Firestore + RAG (from second snippet) ----------
@@ -906,7 +998,7 @@ class HomeViewModel(
         val uid = auth.currentUser?.uid
         val conversationId = cid // unify naming
 
-        // Récupérer le résumé précédent (rolling summary) si disponible
+        // Retrieve previous rolling summary if available
         val summary: String? =
             if (uid != null && conversationId != null) {
               val prior = fetchPriorSummary(uid, conversationId, userMsg.id)
@@ -918,7 +1010,7 @@ class HomeViewModel(
               prior
             } else null
 
-        // Construire un transcript récent si nécessaire
+        // Build a recent transcript if needed
         val recentTranscript: String? =
             if (uid != null && conversationId != null) {
               buildRecentTranscript(uid, conversationId, userMsg.id)
@@ -927,7 +1019,7 @@ class HomeViewModel(
         // Resolve profile (loads if not already in state)
         val currentProfile = resolveProfile()
 
-        // Construire le contexte du profil utilisateur
+        // Build the user profile context
         val profileContext = buildProfileContext(currentProfile)
         Log.d(
             TAG,
@@ -940,9 +1032,10 @@ class HomeViewModel(
             conversationId = conversationId,
             summary = summary,
             transcript = recentTranscript,
-            profileContext = profileContext)
+            profileContext = profileContext,
+            userMessageFirestoreId = userMessageFirestoreId)
       } catch (_: AuthNotReadyException) {
-        // L'auth n'est pas prête : côté UI, on signale une erreur de streaming / envoi
+        // Auth not ready: signal streaming/send error in UI
         try {
           setStreamingError(aiMessageId, AuthNotReadyException())
           clearStreamingState(aiMessageId)
@@ -959,7 +1052,7 @@ class HomeViewModel(
         Log.e(TAG, "Unexpected error sending message", t)
         handleSendMessageError(t, aiMessageId)
       } finally {
-        // Toujours arrêter l'indicateur global d'envoi
+        // Always stop the global sending indicator
         try {
           _uiState.update { it.copy(isSending = false) }
         } catch (ex: Exception) {
@@ -975,7 +1068,8 @@ class HomeViewModel(
       conversationId: String?,
       summary: String?,
       transcript: String?,
-      profileContext: String?
+      profileContext: String?,
+      userMessageFirestoreId: String? = null
   ) {
     activeStreamJob?.cancel()
     userCancelledStream = false
@@ -1013,11 +1107,23 @@ class HomeViewModel(
                 }
             Log.d(
                 TAG,
-                "startStreaming: received reply, length=${reply.reply.length}, edIntentDetected=${reply.edIntent.detected}, edIntent=${reply.edIntent.intent}")
+                "startStreaming: received reply, length=${reply.reply.length}, edIntentDetected=${reply.edIntent.detected}, edIntent=${reply.edIntent.intent}, edFetchIntentDetected=${reply.edFetchIntent.detected}, edFetchQuery=${reply.edFetchIntent.query}")
 
-            // Handle ED fetch intent detection first (short-circuits normal streaming)
-            val fetchHandled = handleEdFetchIntent(reply, question, messageId)
-            if (fetchHandled) return@launch
+            // Handle ED fetch intent detection first (takes precedence)
+            // Use the Firestore ID if provided, otherwise find the last USER message in the current
+            // state
+            val userMessageId =
+                userMessageFirestoreId
+                    ?: _uiState.value.messages.lastOrNull { it.type == ChatType.USER }?.id
+            if (handleEdFetchIntent(reply, question, messageId, userMessageId)) {
+              Log.d(TAG, "startStreaming: ED fetch intent handled, skipping normal streaming")
+              // Skip normal streaming; ED fetch flow takes over
+              return@launch
+            } else {
+              Log.d(
+                  TAG,
+                  "startStreaming: No ED fetch intent detected, continuing with normal streaming")
+            }
 
             // Handle ED intent detection - create PostOnEd pending action
             val postHandled = handleEdIntent(reply, question, messageId)
@@ -1036,7 +1142,8 @@ class HomeViewModel(
             // Build optional source card based on source type
             val sourceMeta: SourceMeta? =
                 when (reply.sourceType) {
-                  com.android.sample.llm.SourceType.SCHEDULE -> {
+                  SourceType.SCHEDULE -> {
+                    // Schedule source - show a small indicator
                     SourceMeta(
                         siteLabel = FALLBACK_SCHEDULE_LABEL,
                         siteLabelRes = R.string.source_label_epfl_schedule,
@@ -1046,7 +1153,8 @@ class HomeViewModel(
                         isScheduleSource = true,
                         compactType = CompactSourceType.SCHEDULE)
                   }
-                  com.android.sample.llm.SourceType.FOOD -> {
+                  SourceType.FOOD -> {
+                    // Food source - show a small indicator
                     SourceMeta(
                         siteLabel = FALLBACK_FOOD_LABEL,
                         siteLabelRes = R.string.source_label_epfl_restaurants,
@@ -1056,7 +1164,8 @@ class HomeViewModel(
                         isScheduleSource = true,
                         compactType = CompactSourceType.FOOD)
                   }
-                  com.android.sample.llm.SourceType.RAG -> {
+                  SourceType.RAG -> {
+                    // RAG source - show the web source card if URL exists
                     reply.url?.let { url ->
                       SourceMeta(
                           siteLabel = buildSiteLabel(url),
@@ -1066,7 +1175,7 @@ class HomeViewModel(
                           compactType = CompactSourceType.NONE)
                     }
                   }
-                  com.android.sample.llm.SourceType.NONE -> null
+                  SourceType.NONE -> null
                 }
 
             // Update the existing AI message with attachment and/or source (instead of creating new
@@ -1357,9 +1466,9 @@ class HomeViewModel(
   // ============ BACKEND CHAT ============
 
   // mapping MessageDTO -> UI
-  private fun MessageDTO.toUi(): ChatUIModel =
+  private fun MessageDTO.toUi(messageId: String): ChatUIModel =
       ChatUIModel(
-          id = UUID.randomUUID().toString(),
+          id = messageId, // Use Firestore document ID for stable message IDs
           text = this.text,
           timestamp = this.createdAt?.toDate()?.time ?: System.currentTimeMillis(),
           type = if (this.role == "user") ChatType.USER else ChatType.AI)
@@ -1379,7 +1488,7 @@ class HomeViewModel(
     activeStreamJob = null
     networkMonitorJob?.cancel()
     networkMonitorJob = null
-    (networkMonitor as? com.android.sample.network.AndroidNetworkConnectivityMonitor)?.unregister()
+    (networkMonitor as? AndroidNetworkConnectivityMonitor)?.unregister()
   }
 
   /**
@@ -1398,6 +1507,45 @@ class HomeViewModel(
     ref.set(data).await()
     conversationId = newId
     return newId
+  }
+
+  @VisibleForTesting
+  internal suspend fun loadEdCardsForMessages(
+      conversationId: String,
+      msgs: List<Pair<MessageDTO, String>>,
+      repo: ConversationRepository = this.repo
+  ): Pair<List<EdPostCard>, List<EdPostsCard>> = coroutineScope {
+    val results =
+        msgs
+            .mapNotNull { (dto, messageId) ->
+              val edCardId = dto.edCardId ?: return@mapNotNull null
+              async { loadSingleEdCard(conversationId, messageId, edCardId, repo) }
+            }
+            .awaitAll()
+
+    val loadedEdCards = results.mapNotNull { it.first }
+    val loadedEdPostsCards = results.mapNotNull { it.second }
+    loadedEdCards to loadedEdPostsCards
+  }
+
+  private suspend fun loadSingleEdCard(
+      conversationId: String,
+      messageId: String,
+      edCardId: String,
+      repo: ConversationRepository
+  ): Pair<EdPostCard?, EdPostsCard?> {
+    val edPostsCard =
+        runCatching { repo.loadEdPostsCard(conversationId, messageId, edCardId) }.getOrNull()
+    if (edPostsCard != null) return null to edPostsCard
+
+    val edCard =
+        runCatching { repo.loadEdCard(conversationId, messageId, edCardId) }
+            .onFailure {
+              Log.w(TAG, "Failed to load EdCard for message $messageId, edCardId=$edCardId", it)
+            }
+            .getOrNull()
+
+    return edCard to null
   }
 
   /**
@@ -1555,6 +1703,206 @@ class HomeViewModel(
   }
 
   /**
+   * Handles ED fetch intent detection from the LLM reply. If an ED fetch intent is detected, routes
+   * to the existing ED fetch flow.
+   *
+   * @param reply The BotReply from the LLM
+   * @param originalQuestion The original user question (used as fallback for fetch query)
+   * @param messageId The ID of the AI message being processed
+   * @return true if fetch intent was detected and handled, false otherwise
+   */
+  private fun handleEdFetchIntent(
+      reply: BotReply,
+      originalQuestion: String,
+      messageId: String,
+      userMessageId: String?
+  ): Boolean {
+    val fetchIntent = reply.edFetchIntent
+    Log.d(
+        TAG,
+        "handleEdFetchIntent: checking intent, detected=${fetchIntent.detected}, query=${fetchIntent.query}, originalQuestion=$originalQuestion")
+
+    if (!fetchIntent.detected) {
+      Log.d(TAG, "handleEdFetchIntent: No fetch intent detected, returning false")
+      return false
+    }
+
+    val query = fetchIntent.query ?: originalQuestion
+    clearStreamingPlaceholder(messageId)
+
+    val targetUserMessageId = targetUserMessageId(userMessageId)
+    if (targetUserMessageId == null) return false
+
+    val loadingCard = buildLoadingEdPostsCard(query, targetUserMessageId)
+    val conversationId = _uiState.value.currentConversationId
+
+    viewModelScope.launch(exceptionHandler) {
+      addLoadingEdPostsCard(conversationId, targetUserMessageId, loadingCard)
+      fetchAndUpdateEdPostsCard(conversationId, targetUserMessageId, loadingCard, query)
+    }
+
+    return true
+  }
+
+  private fun clearStreamingPlaceholder(messageId: String) {
+    _uiState.update { state ->
+      state.copy(
+          messages = state.messages.filterNot { it.id == messageId && it.type == ChatType.AI },
+          streamingMessageId = null,
+          isSending = false)
+    }
+  }
+
+  private fun targetUserMessageId(userMessageId: String?): String? {
+    val target =
+        userMessageId ?: _uiState.value.messages.lastOrNull { it.type == ChatType.USER }?.id
+    if (target == null) {
+      Log.w(TAG, "handleEdFetchIntent: No user message ID found, cannot associate EdCard")
+    }
+    return target
+  }
+
+  private fun buildLoadingEdPostsCard(query: String, userMessageId: String): EdPostsCard {
+    val now = System.currentTimeMillis() + 100 // ensure after user message
+    val edPostsCardId = UUID.randomUUID().toString()
+    return EdPostsCard(
+        id = edPostsCardId,
+        messageId = userMessageId,
+        query = query,
+        posts = emptyList(),
+        filters = EdIntentFilters(),
+        stage = EdPostsStage.LOADING,
+        errorMessage = null,
+        createdAt = now)
+  }
+
+  private suspend fun addLoadingEdPostsCard(
+      conversationId: String?,
+      userMessageId: String,
+      loadingCard: EdPostsCard
+  ) {
+    val cardId = loadingCard.id
+    if (conversationId != null && !isGuest()) {
+      runCatching { repo.saveEdPostsCard(conversationId, userMessageId, loadingCard) }
+          .onFailure {
+            Log.e(
+                TAG,
+                "handleEdFetchIntent: Failed to save loading EdPostsCard to Firebase, will retry when message is loaded",
+                it)
+          }
+    }
+    _uiState.update { state ->
+      state.copy(edPostsCards = state.edPostsCards.filterNot { it.id == cardId } + loadingCard)
+    }
+  }
+
+  private suspend fun fetchAndUpdateEdPostsCard(
+      conversationId: String?,
+      userMessageId: String,
+      loadingCard: EdPostsCard,
+      query: String
+  ) {
+    val result =
+        runCatching { edPostDataSource.fetchPosts(query) }
+            .getOrElse { throwable ->
+              val errorMessage =
+                  (throwable as? FirebaseFunctionsException)?.details as? String
+                      ?: throwable.message
+                      ?: "Failed to fetch posts"
+              val errorCard =
+                  loadingCard.copy(
+                      stage = EdPostsStage.ERROR,
+                      errorMessage = errorMessage,
+                      posts = emptyList(),
+                      filters = EdIntentFilters())
+              persistAndUpdateEdPostsCard(conversationId, userMessageId, errorCard)
+              return
+            }
+
+    val posts =
+        if (result.ok && result.posts.isNotEmpty()) {
+          result.posts.map { normalizedPost ->
+            EdPost(
+                title = normalizedPost.title,
+                content = normalizedPost.contentMarkdown.ifEmpty { normalizedPost.snippet },
+                date = parseDate(normalizedPost.createdAt),
+                author = normalizedPost.author.ifEmpty { "Unknown" },
+                url = normalizedPost.url)
+          }
+        } else {
+          emptyList()
+        }
+
+    val filters = EdIntentFilters(course = result.filters.course)
+    val finalStage =
+        when {
+          !result.ok && result.error != null -> EdPostsStage.ERROR
+          posts.isEmpty() -> EdPostsStage.EMPTY
+          else -> EdPostsStage.SUCCESS
+        }
+    val updatedCard =
+        loadingCard.copy(
+            posts = posts,
+            filters = filters,
+            stage = finalStage,
+            errorMessage = result.error?.message)
+
+    persistAndUpdateEdPostsCard(conversationId, userMessageId, updatedCard)
+  }
+
+  private suspend fun persistAndUpdateEdPostsCard(
+      conversationId: String?,
+      userMessageId: String,
+      card: EdPostsCard
+  ) {
+    if (conversationId != null && !isGuest()) {
+      runCatching { repo.saveEdPostsCard(conversationId, userMessageId, card) }
+          .onFailure {
+            Log.e(TAG, "handleEdFetchIntent: Failed to update EdPostsCard in Firebase", it)
+          }
+    }
+    _uiState.update { state ->
+      state.copy(edPostsCards = state.edPostsCards.filterNot { it.id == card.id } + card)
+    }
+  }
+
+  private fun parseEdPostsFromResponse(data: Map<*, *>): List<EdPost> {
+    val posts = data["posts"] as? List<*> ?: return emptyList()
+    return posts.mapNotNull { postData ->
+      if (postData is Map<*, *>) {
+        try {
+          EdPost(
+              title = (postData["title"] as? String) ?: "",
+              content = (postData["content"] as? String) ?: (postData["snippet"] as? String) ?: "",
+              date = parseDate(postData["createdAt"]),
+              author = (postData["author"] as? String) ?: "Unknown",
+              url = (postData["url"] as? String) ?: "")
+        } catch (e: Exception) {
+          Log.e(TAG, "Failed to parse ED post", e)
+          null
+        }
+      } else {
+        null
+      }
+    }
+  }
+
+  private fun parseDate(dateValue: Any?): Long {
+    return when (dateValue) {
+      is String -> {
+        // Try to parse ISO date string
+        try {
+          Instant.parse(dateValue).toEpochMilli()
+        } catch (e: Exception) {
+          System.currentTimeMillis()
+        }
+      }
+      is Number -> dateValue.toLong() * 1000 // Assume seconds, convert to milliseconds
+      else -> System.currentTimeMillis()
+    }
+  }
+
+  /**
    * Handles ED intent detection from the LLM reply. If a post_question intent is detected, creates
    * a PostOnEd pending action.
    *
@@ -1574,7 +1922,10 @@ class HomeViewModel(
       _uiState.update { state ->
         state.copy(
             pendingAction =
-                PendingAction.PostOnEd(draftTitle = formattedTitle, draftBody = formattedQuestion),
+                PendingAction.PostOnEd(
+                    draftTitle = formattedTitle,
+                    draftBody = formattedQuestion,
+                    messageId = messageId),
             messages = state.messages.filterNot { it.id == messageId && it.type == ChatType.AI },
             streamingMessageId = null,
             isSending = false)

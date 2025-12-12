@@ -1,5 +1,6 @@
 package com.android.sample.llm
 
+import android.util.Log
 import com.android.sample.BuildConfig
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
@@ -174,7 +175,7 @@ class FirebaseFunctionsLlmClient(
           fallback?.let {
             return@withContext it.generateReply(prompt, summary, transcript, profileContext)
           }
-          return@withContext buildBotReply(map, "Voici le document demandé.")
+          return@withContext buildBotReply(map, "Here is the requested document.")
         }
 
         return@withContext buildBotReply(map, parsedReply)
@@ -260,10 +261,17 @@ class FirebaseFunctionsLlmClient(
             formattedQuestion = edFormattedQuestion,
             formattedTitle = edFormattedTitle)
 
+    val edFetchDetected = parseEdFetchIntentDetected(map)
+    val edFetchQuery = parseEdFetchQuery(map)
+
+    if (edFetchDetected) {
+      Log.d(TAG, "Parsed ED fetch intent: detected=true, query=$edFetchQuery")
+    }
+
     val edFetchIntent =
         EdFetchIntent(
-            detected = parseEdFetchIntentDetected(map),
-            query = parseEdFetchQuery(map),
+            detected = edFetchDetected,
+            query = edFetchQuery,
         )
 
     return BotReply(replyText, url, sourceType, edIntent, edFetchIntent)

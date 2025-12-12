@@ -18,6 +18,14 @@ import {
   buildEdIntentPromptForApertus,
 } from "./edIntent";
 import { parseEdPostResponse } from "./edIntentParser";
+import { EdDiscussionClient } from "./connectors/ed/EdDiscussionClient";
+import {
+  parseEdSearchQuery,
+  buildEdSearchRequest,
+  normalizeEdThreads,
+  EdBrainError,
+  NormalizedEdPost,
+} from "./edSearchDomain";
 import { 
   scrapeWeeklyMenu, 
   formatMenuForContext,
@@ -30,6 +38,8 @@ import {
 } from "./food/epflFoodScraper";
 import { detectMoodleFileFetchIntentCore, extractFileInfo } from "./moodleIntent";
 import { MoodleClient } from "./connectors/moodle/MoodleClient";
+import { detectCourseIntent } from "./utils/intentParser";
+import { resolveGetWeeklyOverview } from "./tools/courseTools";
 
 
 const europeFunctions = functions.region("europe-west6");
@@ -94,6 +104,218 @@ const edConnectorService = new EdConnectorService(
   ED_DEFAULT_COURSE_ID
 );
 
+/* =========================================================
+ *                ED BRAIN SEARCH (core)
+ * ======================================================= */
+
+type EdBrainSearchInput = {
+  query: string;
+  limit?: number;
+};
+
+type EdBrainSearchOutput = {
+  ok: boolean;
+  posts: NormalizedEdPost[];
+  filters: {
+    course?: string;
+    status?: string;
+    limit?: number;
+  };
+  error?: EdBrainError;
+};
+
+function isEdBrainError(result: any): result is EdBrainError {
+  return result && typeof result === "object" && "type" in result;
+}
+
+async function edBrainSearchCore(
+  uid: string,
+  input: EdBrainSearchInput
+): Promise<EdBrainSearchOutput> {
+  const query = (input.query || "").trim();
+  if (!query) {
+    return {
+      ok: false,
+      posts: [],
+      filters: {},
+      error: { type: "INVALID_QUERY", message: "Missing 'query'" },
+    };
+  }
+
+  // 1) Get the user's ED config
+  const config = await edConnectorRepository.getConfig(uid);
+  if (!config || !config.apiKeyEncrypted || !config.baseUrl) {
+    return {
+      ok: false,
+      posts: [],
+      filters: {},
+      error: {
+        type: "AUTH_ERROR",
+        message: "ED connector not configured for this user",
+      },
+    };
+  }
+
+  // 2) Decrypt the token
+  let apiToken: string;
+  try {
+    apiToken = decryptSecret(config.apiKeyEncrypted);
+  } catch (e) {
+    logger.error("edBrainSearch.decryptFailed", { uid, error: String(e) });
+    return {
+      ok: false,
+      posts: [],
+      filters: {},
+      error: {
+        type: "AUTH_ERROR",
+        message: "Failed to decrypt ED token",
+      },
+    };
+  }
+
+  const client = new EdDiscussionClient(config.baseUrl, apiToken);
+
+  // 3) Get the user's ED courses
+  let courses;
+  try {
+    const userInfo = await client.getUser();
+    courses = userInfo.courses.map((c) => c.course);
+  } catch (e: any) {
+    const msg = String(e?.message || e);
+    logger.error("edBrainSearch.fetchUserFailed", { uid, error: msg });
+
+    if (msg.includes("401") || msg.includes("403")) {
+      return {
+        ok: false,
+        posts: [],
+        filters: {},
+        error: {
+          type: "AUTH_ERROR",
+          message: "ED authentication failed",
+        },
+      };
+    }
+    if (msg.includes("429")) {
+      return {
+        ok: false,
+        posts: [],
+        filters: {},
+        error: {
+          type: "RATE_LIMIT",
+          message: "ED API rate limit reached",
+        },
+      };
+    }
+    return {
+      ok: false,
+      posts: [],
+      filters: {},
+      error: {
+        type: "NETWORK_ERROR",
+        message: "Failed to contact ED API",
+      },
+    };
+  }
+
+  // 4) Parse the natural language query
+  const parsed = parseEdSearchQuery(query);
+
+  // 5) Resolve the course + fetch options
+  const req = await buildEdSearchRequest(client, parsed, courses);
+  if (isEdBrainError(req)) {
+    return {
+      ok: false,
+      posts: [],
+      filters: {
+        status: "all", // Default, LLM would have set this if successful
+        limit: input.limit ?? 5, // Use input limit or default
+      },
+      error: req,
+    };
+  }
+
+  // Override limit if explicitly provided in input
+  if (input.limit != null) {
+    req.fetchOptions.limit = input.limit;
+  }
+
+  // 6) Fetch ED threads
+  let threads;
+  try {
+    threads = await client.fetchThreads(req.fetchOptions);
+  } catch (e: any) {
+    const msg = String(e?.message || e);
+    logger.error("edBrainSearch.fetchThreadsFailed", { uid, error: msg });
+
+    const filters = {
+      course: req.resolvedCourse.code || req.resolvedCourse.name,
+      status: req.fetchOptions.statusFilter || "all",
+      limit: req.fetchOptions.limit ?? 5,
+    };
+
+    if (msg.includes("401") || msg.includes("403")) {
+      return {
+        ok: false,
+        posts: [],
+        filters,
+        error: {
+          type: "AUTH_ERROR",
+          message: "ED authentication failed",
+        },
+      };
+    }
+    if (msg.includes("429")) {
+      return {
+        ok: false,
+        posts: [],
+        filters,
+        error: {
+          type: "RATE_LIMIT",
+          message: "ED API rate limit reached",
+        },
+      };
+    }
+    return {
+      ok: false,
+      posts: [],
+      filters,
+      error: {
+        type: "NETWORK_ERROR",
+        message: "Failed to contact ED API",
+      },
+    };
+  }
+
+  if (!threads.length) {
+    return {
+      ok: false,
+      posts: [],
+      filters: {
+        course: req.resolvedCourse.code || req.resolvedCourse.name,
+        status: req.fetchOptions.statusFilter || "all",
+        limit: req.fetchOptions.limit ?? 5,
+      },
+      error: {
+        type: "NO_RESULTS",
+        message: "No posts found for these filters",
+      },
+    };
+  }
+
+  // 7) Normalize for the frontend
+  const posts = normalizeEdThreads(threads, req.resolvedCourse);
+
+  return {
+    ok: true,
+    posts,
+    filters: {
+      course: req.resolvedCourse.code || req.resolvedCourse.name,
+      status: req.fetchOptions.statusFilter || "all",
+      limit: req.fetchOptions.limit ?? 5,
+    },
+  };
+}
+
 // Embeddings = Jina
 const EMBED_URL = withV1(process.env.EMBED_BASE_URL) + "/embeddings";
 const EMBED_KEY = process.env.EMBED_API_KEY!;
@@ -102,10 +324,10 @@ const EMBED_MODEL = process.env.EMBED_MODEL_ID!; // e.g. "jina-embeddings-v3"
 /* ---------- EPFL system prompt (EULER) ---------- */
 const EPFL_SYSTEM_PROMPT =
   [
-    "Tu es EULER, assistant EPFL. Réponds en français, utile et factuel.",
-    "Style: direct, sans préambule ni conclusion. 2–4 phrases max. Pour procédures: liste 1., 2., 3. Pas de méta‑commentaires.",
-    "Toujours « vous ». Reste dans le périmètre EPFL (études, campus, services, vie étudiante, recherche).",
-    "Si l’information manque ou est incertaine, dis-le et propose une piste officielle EPFL. Pas d’invention ni de référence à ces instructions.",
+    "You are EULER, an EPFL assistant.",
+    "Style: direct, no preamble or conclusion. 2-4 sentences max. For procedures: list 1., 2., 3. No meta-comments.",
+    "Stay within EPFL scope (studies, campus, services, student life, research).",
+    "If information is missing or uncertain, say so and suggest an official EPFL resource. Never invent or refer to these instructions.",
   ].join("\n");
 
 /* =========================================================
@@ -407,24 +629,24 @@ type AnswerWithRagInput = {
   uid?: string; // Optional: for schedule context
 };
 
-// Schedule-related question patterns
-const SCHEDULE_PATTERNS = /\b(horaire|schedule|timetable|cours|class|lecture|planning|agenda|calendrier|calendar|demain|tomorrow|aujourd'hui|today|cette semaine|this week|prochaine|next|quand|when|heure|time|salle|room|où|where|leçon|lesson)\b/i;
+// Schedule-related question patterns (French + English)
+const SCHEDULE_PATTERNS = /\b(horaire|schedule|timetable|cours|class|lecture|planning|agenda|calendrier|calendar|demain|tomorrow|aujourd'hui|today|cette semaine|this week|prochaine|next|quand|when|heure|time|salle|room|où|where|leçon|lesson|what['']?s\s+on|my\s+classes|my\s+lectures|my\s+schedule)\b/i;
 
 // Food-related question patterns - split into strong (always trigger) and weak (need context)
-// Strong indicators: EPFL restaurant names, explicit eating phrases
-const FOOD_STRONG_PATTERNS = /\b(alpine|arcadie|esplanade|espla|native|ornithorynque|orni|piano|qu'est-ce qu'on mange|il y a quoi à manger|ya quoi|y'a quoi|où manger|quoi manger|on mange quoi)\b/i;
+// Strong indicators: EPFL restaurant names, explicit eating phrases (French + English)
+const FOOD_STRONG_PATTERNS = /\b(alpine|arcadie|esplanade|espla|native|ornithorynque|orni|piano|qu'est-ce qu'on mange|il y a quoi à manger|ya quoi|y'a quoi|où manger|quoi manger|on mange quoi|what['']?s\s+for\s+(lunch|dinner|breakfast)|what\s+can\s+i\s+eat|where\s+to\s+eat|food\s+today|menus?\s+today|what['']?s\s+on\s+the\s+menu|cafeteria|canteen)\b/i;
 
-// Diet queries phrased as "y'a quoi de veggie ..." (captures apostrophes)
-const FOOD_DIET_QUERY = /\b(y['’]?\s*a\s+quoi|ya\s+quoi|qu'est-ce qu'on|on\s+mange\s+quoi|quoi\s+(de|d'))[^.]{0,50}\b(végétarien|végé|veggie|vegan)\b/i;
+// Diet queries phrased as "y'a quoi de veggie ..." (captures apostrophes) + English equivalents
+const FOOD_DIET_QUERY = /\b(y['']?\s*a\s+quoi|ya\s+quoi|qu'est-ce qu'on|on\s+mange\s+quoi|quoi\s+(de|d')|what['']?s|is\s+there|are\s+there|any)[^.]{0,50}\b(végétarien|végé|veggie|vegan|vegetarian|plant[- ]based)\b/i;
 
-// Weak indicators: only trigger if combined with food context words
-const FOOD_WEAK_PATTERNS = /\b(manger|menu|plat|repas|resto|restaurant|nourriture|déjeuner|dîner|cantine|cafétéria)\b/i;
+// Weak indicators: only trigger if combined with food context words (French + English)
+const FOOD_WEAK_PATTERNS = /\b(manger|menu|plat|repas|resto|restaurant|nourriture|déjeuner|dîner|cantine|cafétéria|eat|eating|lunch|dinner|breakfast|meal|meals|food|cafeteria|canteen|dish|dishes)\b/i;
 
-// Diet-related patterns: trigger only with eating/restaurant context
-const FOOD_DIET_PATTERNS = /\b(végétarien|végé|veggie|vegan)\b.*\b(manger|plat|resto|restaurant|menu|repas|cantine|midi|soir|déjeuner|dîner)\b|\b(manger|plat|resto|restaurant|menu|repas|cantine|midi|soir|déjeuner|dîner)\b.*\b(végétarien|végé|veggie|vegan)\b/i;
+// Diet-related patterns: trigger only with eating/restaurant context (French + English)
+const FOOD_DIET_PATTERNS = /\b(végétarien|végé|veggie|vegan|vegetarian|plant[- ]based)\b.*\b(manger|plat|resto|restaurant|menu|repas|cantine|midi|soir|déjeuner|dîner|eat|lunch|dinner|meal|food|cafeteria|canteen)\b|\b(manger|plat|resto|restaurant|menu|repas|cantine|midi|soir|déjeuner|dîner|eat|lunch|dinner|meal|food|cafeteria|canteen)\b.*\b(végétarien|végé|veggie|vegan|vegetarian|plant[- ]based)\b/i;
 
-// Price patterns: only for food when combined with eating context
-const FOOD_PRICE_PATTERNS = /\b(moins cher|cheapest|pas cher|prix)\b.*\b(manger|plat|resto|restaurant|menu|repas|midi|soir|déjeuner|dîner|cantine)\b|\b(manger|plat|resto|restaurant|menu|repas|midi|soir|déjeuner|dîner|cantine)\b.*\b(moins cher|cheapest|pas cher|prix)\b/i;
+// Price patterns: only for food when combined with eating context (French + English)
+const FOOD_PRICE_PATTERNS = /\b(moins cher|cheapest|pas cher|prix|cheap|under|less\s+than|affordable|budget)\b.*\b(manger|plat|resto|restaurant|menu|repas|midi|soir|déjeuner|dîner|cantine|eat|lunch|dinner|meal|food|cafeteria)\b|\b(manger|plat|resto|restaurant|menu|repas|midi|soir|déjeuner|dîner|cantine|eat|lunch|dinner|meal|food|cafeteria)\b.*\b(moins cher|cheapest|pas cher|prix|cheap|under|less\s+than|affordable|budget)\b/i;
 
 /** Check if question is food-related using refined patterns */
 function isFoodRelatedQuestion(q: string): boolean {
@@ -437,9 +659,9 @@ function isFoodRelatedQuestion(q: string): boolean {
   // Price patterns with eating context  
   if (FOOD_PRICE_PATTERNS.test(q)) return true;
   // Weak patterns only if the question is clearly about eating (not just contains "menu" or "restaurant")
-  // Must have at least 2 food-related words or a clear eating phrase
+  // Must have at least 2 food-related words or a clear eating phrase (French + English)
   if (FOOD_WEAK_PATTERNS.test(q)) {
-    const foodWords = q.toLowerCase().match(/\b(manger|menu|plat|repas|resto|restaurant|nourriture|déjeuner|dîner|cantine|cafétéria|midi|soir|aujourd'hui|demain)\b/gi);
+    const foodWords = q.toLowerCase().match(/\b(manger|menu|plat|repas|resto|restaurant|nourriture|déjeuner|dîner|cantine|cafétéria|midi|soir|aujourd'hui|demain|eat|eating|lunch|dinner|breakfast|meal|food|cafeteria|canteen|today|tomorrow)\b/gi);
     return (foodWords?.length ?? 0) >= 2;
   }
   return false;
@@ -540,7 +762,7 @@ export async function answerWithRagCore({
       const routerResp = await routerClient.chat.completions.create({
         model: routerModel,
         messages: [
-          { role: "system", content: "Réécris la question suivante en version courte et explicite pour une recherche documentaire EPFL. Ne réponds pas; renvoie uniquement la question reformulée. Pas de politesse ni de meta." },
+          { role: "system", content: "Rewrite the following question into a short, explicit version for EPFL document search. Do not answer; return only the reformulated question. No pleasantries or meta." },
           { role: "user", content: q },
         ],
         temperature: 0,
@@ -624,9 +846,23 @@ export async function answerWithRagCore({
   // Fast path: schedule questions with schedule context -> minimal prompt, no RAG
   if (isScheduleQuestion && scheduleContext) {
     const tFastPromptStart = Date.now();
+    
+    // Extract today's day info for explicit prompting
+    const nowForPrompt = new Date();
+    const zurichDayStr = nowForPrompt.toLocaleString('en-US', { timeZone: 'Europe/Zurich', weekday: 'long' });
+    const zurichDateStr = nowForPrompt.toLocaleDateString('en-GB', { 
+      timeZone: 'Europe/Zurich', 
+      weekday: 'long', 
+      day: 'numeric', 
+      month: 'long',
+      year: 'numeric'
+    });
+    
     const fastPrompt = [
-      "Réponds à la question d'horaire en utilisant uniquement l'emploi du temps fourni. Réponse brève, liste si nécessaire.",
-      `Emploi du temps:\n${scheduleContext}`,
+      `CRITICAL: Today is ${zurichDateStr}. When the user asks about "today", answer with ${zurichDayStr}'s schedule ONLY.`,
+      "Answer the schedule question using only the provided timetable. Brief response, list if needed.",
+      "IMPORTANT: For exam/final questions, ALWAYS include the FULL DATE (day, date, month, year) and time in your answer.",
+      `Timetable:\n${scheduleContext}`,
       `Question: ${question}`,
     ].join("\n\n");
     timePromptMs = Date.now() - tFastPromptStart;
@@ -636,7 +872,7 @@ export async function answerWithRagCore({
     const fastChat = await fastClient.chat.completions.create({
       model: finalModel,
       messages: [
-        { role: "system", content: "Tu réponds uniquement avec l'emploi du temps fourni. Pas de RAG. Réponse concise en français." },
+        { role: "system", content: `You answer schedule questions. TODAY IS ${zurichDayStr.toUpperCase()}. When user asks about "today", look for ${zurichDayStr} in the timetable. For EXAMS/FINALS: ALWAYS include the FULL DATE (weekday + day + month + year) and time. Be concise but complete for dates.` },
         { role: "user", content: fastPrompt },
       ],
       temperature: finalTemperature,
@@ -669,24 +905,24 @@ export async function answerWithRagCore({
   let finalRagsContext = context;
   // Build schedule-specific instructions if schedule context is present
   const scheduleInstructions = scheduleContext
-    ? "Horaire: répondre uniquement avec l'emploi du temps fourni. Réponse en liste concise."
+    ? "Schedule: answer only using the provided timetable. Concise list response."
     : "";
 
   const sourcePriorityLine =
-    "Sources: Résumé > Fenêtre récente > Contexte RAG (ignorer RAG pour les questions d'horaire).";
+    "Sources priority: Summary > Recent window > RAG context (ignore RAG for schedule questions).";
 
   const tPromptStart = Date.now();
   const prompt = [
-    "Réponds brièvement en français, sans intro ni conclusion.",
-    "Format: étapes -> liste numérotée courte; sinon 2–4 phrases courtes avec retours à la ligne. Toujours « vous ». Pas de méta-commentaires.",
+    "Respond briefly, no intro or conclusion.",
+    "Format: steps -> short numbered list; otherwise 2-4 short sentences with line breaks. No meta-comments.",
     sourcePriorityLine,
     scheduleInstructions,
-    trimmedSummary ? `Résumé conversationnel (ne pas afficher tel quel):\n${trimmedSummary}\n` : "",
-    trimmedTranscript ? `Fenêtre récente (ne pas afficher):\n${trimmedTranscript}\n` : "",
-    scheduleContext ? `Emploi du temps de l'utilisateur (à utiliser uniquement pour les questions d'horaire):\n${scheduleContext}\n` : "",
-    (finalRagsContext && !scheduleContext) ? `Contexte RAG:\n${finalRagsContext}\n` : "",
+    trimmedSummary ? `Conversation summary (do not display as-is):\n${trimmedSummary}\n` : "",
+    trimmedTranscript ? `Recent window (do not display):\n${trimmedTranscript}\n` : "",
+    scheduleContext ? `User timetable (use only for schedule questions):\n${scheduleContext}\n` : "",
+    (finalRagsContext && !scheduleContext) ? `RAG context:\n${finalRagsContext}\n` : "",
     `Question: ${question}`,
-    !scheduleContext ? "Si l'information n'est pas fournie, dis que vous ne savez pas." : "",
+    !scheduleContext ? "If information is not provided, say you don't know." : "",
   ].filter(Boolean).join("\n\n");
 
   logger.info("answerWithRagCore.context", {
@@ -706,9 +942,9 @@ export async function answerWithRagCore({
 
   const summaryUsageRules =
     [
-      "Sources (ordre): 1) Résumé, 2) Fenêtre récente, 3) Contexte RAG.",
-      "Questions d'emploi du temps: utiliser uniquement l'emploi du temps fourni.",
-      "Si une info manque ou est incertaine: le dire et proposer une source EPFL fiable.",
+      "Sources (priority): 1) Summary, 2) Recent window, 3) RAG context.",
+      "Schedule questions: use only the provided timetable.",
+      "If info is missing or uncertain: say so and suggest a reliable EPFL source.",
     ].join("\n");
 
   const profileContextSection = ""; // personal/profile handling removed
@@ -717,13 +953,13 @@ export async function answerWithRagCore({
     EPFL_SYSTEM_PROMPT,
     summaryUsageRules,
     trimmedSummary
-      ? "Résumé conversationnel à prendre en compte (ne pas afficher tel quel):\n" + trimmedSummary
+      ? "Conversation summary to consider (do not display as-is):\n" + trimmedSummary
       : "",
     trimmedTranscript
-      ? "Fenêtre récente (ne pas afficher; utile pour les références immédiates):\n" + trimmedTranscript
+      ? "Recent window (do not display; useful for immediate references):\n" + trimmedTranscript
       : "",
     scheduleContext
-      ? "Emploi du temps EPFL de l'utilisateur (utiliser pour questions d'horaire, cours, salles):\n" + scheduleContext
+      ? "User EPFL schedule (use for questions about schedule, courses, rooms):\n" + scheduleContext
       : "",
     profileContextSection,
   ]
@@ -814,14 +1050,14 @@ async function buildRollingSummary({
   // Keep inputs short and deterministic
   const sys =
     [
-      "Tu maintiens un résumé cumulatif et exploitable d'une conversation (utilisateur ↔ assistant).",
-      "Objectif: capturer uniquement ce qui aide la suite de l'échange (sujet, intentions, contraintes, décisions).",
-      "Interdits: pas de généralités hors conversation, pas de sources, pas d'URL, pas de politesse.",
-      "Exigences:",
-      "- Écris en français, concis et factuel.",
-      "- Commence par: « Jusqu'ici, nous avons parlé de : » puis 2–5 puces brèves.",
-      "- Ajoute ensuite (si présent) : « Intentions/attentes : … », « Contraintes/préférences : … », « Points en suspens : … ».",
-      "- Longueur: ≤ 10 lignes. Pas de verbatim; reformule.",
+      "You maintain a cumulative, actionable summary of a conversation (user ↔ assistant).",
+      "Objective: capture only what helps continue the exchange (topic, intentions, constraints, decisions).",
+      "Forbidden: no general statements outside the conversation, no sources, no URLs, no pleasantries.",
+      "Requirements:",
+      "- Write concisely and factually in English.",
+      "- Start with: 'So far, we have discussed:' then 2-5 brief bullet points.",
+      "- Add if present: 'Intentions/expectations: ...', 'Constraints/preferences: ...', 'Open questions: ...'.",
+      "- Length: ≤ 10 lines. No verbatim quotes; rephrase.",
     ].join("\n");
 
   const parts: Array<{ role: "system" | "user" | "assistant"; content: string }> = [];
@@ -829,24 +1065,24 @@ async function buildRollingSummary({
   if (priorSummary) {
     parts.push({
       role: "user",
-      content: `Résumé précédent:\n${clampText(priorSummary, 800)}`,
+      content: `Previous summary:\n${clampText(priorSummary, 800)}`,
     });
   }
   // Include the last few turns for recency; cap to ~8 turns to be safe
   const turns = recentTurns.slice(-8);
   const recentStr = turns
-    .map((t) => (t.role === "user" ? `Utilisateur: ${t.content}` : `Assistant: ${t.content}`))
+    .map((t) => (t.role === "user" ? `User: ${t.content}` : `Assistant: ${t.content}`))
     .join("\n");
   parts.push({
     role: "user",
-    content: `Nouveaux échanges (à intégrer sans tout réécrire):\n${clampText(recentStr, 1500)}`,
+    content: `New exchanges (integrate without rewriting everything):\n${clampText(recentStr, 1500)}`,
   });
   parts.push({
     role: "user",
     content: [
-      "Produit le nouveau résumé cumulatif au format demandé.",
-      "Utilise des puces pour la première section, puis des lignes courtes pour le reste.",
-      "N'invente pas. Évite les détails triviaux et toute explication de méthode.",
+      "Produce the new cumulative summary in the requested format.",
+      "Use bullet points for the first section, then short lines for the rest.",
+      "Do not invent. Avoid trivial details and any method explanations.",
     ].join("\n"),
   });
 
@@ -955,6 +1191,78 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
 
     if (!question) throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
 
+  // === Deterministic Moodle course intent (regex) ===
+  const courseIntent = detectCourseIntent(question);
+  if (courseIntent) {
+    logger.info("answerWithRagFn.courseIntentDetected", {
+      type: courseIntent.type,
+      course: courseIntent.course,
+      week: courseIntent.week ?? null,
+      uid,
+    });
+
+    if (!uid) {
+      return {
+        reply: "Vous devez être connecté pour accéder à Moodle. Merci de vous authentifier.",
+        primary_url: null,
+        best_score: 0,
+        sources: [],
+        ed_intent_detected: false,
+        ed_intent: null,
+        moodle_intent_detected: true,
+        moodle_intent: { type: "course_overview" },
+        moodle_file: null,
+      };
+    }
+
+    try {
+      const overview = await resolveGetWeeklyOverview(
+        {
+          courseName: courseIntent.course,
+          weekNumber: courseIntent.type === "specific_week" ? courseIntent.week : undefined,
+        },
+        {
+          uid,
+          decrypt: decryptSecret,
+          db,
+          moodleRepo,
+        }
+      );
+
+      return {
+        reply: overview,
+        primary_url: null,
+        best_score: 0,
+        sources: [],
+        ed_intent_detected: false,
+        ed_intent: null,
+        moodle_intent_detected: true,
+        moodle_intent: { type: "course_overview" },
+        moodle_file: null,
+      };
+    } catch (e: any) {
+      logger.error("answerWithRagFn.courseIntentFailed", {
+        error: String(e),
+        message: e?.message,
+        stack: e?.stack,
+        course: courseIntent.course,
+        week: courseIntent.week ?? null,
+        uid,
+      });
+      return {
+        reply: `Impossible de récupérer le récapitulatif Moodle pour "${courseIntent.course}": ${e?.message || "erreur inconnue"}`,
+        primary_url: null,
+        best_score: 0,
+        sources: [],
+        ed_intent_detected: false,
+        ed_intent: null,
+        moodle_intent_detected: true,
+        moodle_intent: { type: "course_overview" },
+        moodle_file: null,
+      };
+    }
+  }
+  // === End deterministic Moodle course intent ===
     const fetchIntentResult = detectFetchFromEdIntentCore(question);
     const { ed_fetch_intent_detected, ed_fetch_query } = fetchIntentResult;
 
@@ -993,6 +1301,9 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
     // === Moodle Intent Detection (fast, regex-based) ===
     // First layer: General detection - determines if this is a Moodle fetch request
     const moodleIntentResult = detectMoodleFileFetchIntentCore(question);
+    // Detect if user is writing in English for response language (moved outside try block for catch access)
+    const isEnglishMoodle = /\b(get|fetch|download|show|display|retrieve|homework|lecture|solution|from|the|my|please|can\s+you|i\s+want|i\s+need)\b/i.test(question);
+    
     if (moodleIntentResult.moodle_intent_detected && moodleIntentResult.moodle_intent && uid) {
       logger.info("answerWithRagFn.moodleIntentDetected", {
         intent: moodleIntentResult.moodle_intent,
@@ -1005,7 +1316,9 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
         const moodleConfig = await moodleService.getStatus(uid);
         if (moodleConfig.status !== "connected" || !moodleConfig.baseUrl || !moodleConfig.tokenEncrypted) {
           return {
-            reply: "Vous n'êtes pas connecté à Moodle. Veuillez vous connecter dans les paramètres.",
+            reply: isEnglishMoodle
+              ? "You're not connected to Moodle. Please connect in the settings."
+              : "Vous n'êtes pas connecté à Moodle. Veuillez vous connecter dans les paramètres.",
             primary_url: null,
             best_score: 0,
             sources: [],
@@ -1019,7 +1332,9 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
         const fileInfo = extractFileInfo(question);
         if (!fileInfo) {
           return {
-            reply: "Je n'ai pas pu identifier le type de fichier demandé. Veuillez préciser (ex: \"Lecture 5\", \"Homework 3\", \"Solution devoir 2\", \"Homework from week 7\").",
+            reply: isEnglishMoodle
+              ? "I couldn't identify the requested file type. Please specify (e.g., \"Lecture 5\", \"Homework 3\", \"Homework solution 2\")."
+              : "Je n'ai pas pu identifier le type de fichier demandé. Veuillez préciser (ex: \"Lecture 5\", \"Homework 3\", \"Solution devoir 2\").",
             primary_url: null,
             best_score: 0,
             sources: [],
@@ -1049,7 +1364,9 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
             tokenEncryptedLength: moodleConfig.tokenEncrypted?.length || 0,
           });
           return {
-            reply: "Erreur lors du décryptage du token Moodle. Veuillez vous reconnecter à Moodle dans les paramètres.",
+            reply: isEnglishMoodle
+              ? "Error decrypting Moodle token. Please reconnect to Moodle in the settings."
+              : "Erreur lors du décryptage du token Moodle. Veuillez vous reconnecter à Moodle dans les paramètres.",
             primary_url: null,
             best_score: 0,
             sources: [],
@@ -1078,7 +1395,9 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
           const targetCourse = await client.findCourseByName(fileInfo.courseName);
           if (!targetCourse) {
             return {
-              reply: `Je n'ai pas trouvé le cours "${fileInfo.courseName}" dans vos cours Moodle.`,
+              reply: isEnglishMoodle
+                ? `I couldn't find the course "${fileInfo.courseName}" in your Moodle courses.`
+                : `Je n'ai pas trouvé le cours "${fileInfo.courseName}" dans vos cours Moodle.`,
               primary_url: null,
               best_score: 0,
               sources: [],
@@ -1097,7 +1416,9 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
               availableFields: Object.keys(targetCourse),
             });
             return {
-              reply: `Erreur: Impossible de trouver l'ID du cours "${fileInfo.courseName}".`,
+              reply: isEnglishMoodle
+                ? `Error: Could not find the course ID for "${fileInfo.courseName}".`
+                : `Erreur: Impossible de trouver l'ID du cours "${fileInfo.courseName}".`,
               primary_url: null,
               best_score: 0,
               sources: [],
@@ -1116,7 +1437,9 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
               courseIdNum,
             });
             return {
-              reply: `Erreur: ID de cours invalide pour "${fileInfo.courseName}".`,
+              reply: isEnglishMoodle
+                ? `Error: Invalid course ID for "${fileInfo.courseName}".`
+                : `Erreur: ID de cours invalide pour "${fileInfo.courseName}".`,
               primary_url: null,
               best_score: 0,
               sources: [],
@@ -1151,7 +1474,9 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
           const courses = await client.getEnrolledCourses();
           if (courses.length === 0) {
             return {
-              reply: "Aucun cours trouvé dans votre Moodle.",
+              reply: isEnglishMoodle
+                ? "No courses found in your Moodle."
+                : "Aucun cours trouvé dans votre Moodle.",
               primary_url: null,
               best_score: 0,
               sources: [],
@@ -1220,13 +1545,20 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
         }
 
         if (!foundFile) {
-          const fileTypeNames: Record<string, string> = {
+          const fileTypeNamesFr: Record<string, string> = {
             "lecture": "cours",
             "homework": "devoir",
             "homework_solution": "solution de devoir",
           };
+          const fileTypeNamesEn: Record<string, string> = {
+            "lecture": "lecture",
+            "homework": "homework",
+            "homework_solution": "homework solution",
+          };
           return {
-            reply: `Je n'ai pas trouvé ${fileTypeNames[fileInfo.fileType]} ${fileInfo.fileNumber} dans vos cours Moodle.`,
+            reply: isEnglishMoodle
+              ? `I couldn't find ${fileTypeNamesEn[fileInfo.fileType]} ${fileInfo.fileNumber} in your Moodle courses.`
+              : `Je n'ai pas trouvé ${fileTypeNamesFr[fileInfo.fileType]} ${fileInfo.fileNumber} dans vos cours Moodle.`,
             primary_url: null,
             best_score: 0,
             sources: [],
@@ -1248,8 +1580,10 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
           courseDisplayName = fileInfo.courseName;
         }
 
-        // Empty reply - card will show all details
-        let replyText = ``;
+        // Reply text (keep short; card shows details)
+        let replyText = isEnglishMoodle
+          ? "Here is the requested file."
+          : "Voici le document demandé.";
 
         const moodleFileResponse = {
           url: downloadUrl,
@@ -1293,7 +1627,9 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
           week: fileInfoForLog?.week,
         });
         return {
-          reply: `Erreur lors de la récupération du fichier Moodle : ${e.message || "erreur inconnue"}`,
+          reply: isEnglishMoodle
+            ? `Error retrieving file from Moodle: ${e.message || "unknown error"}`
+            : `Erreur lors de la récupération du fichier Moodle : ${e.message || "erreur inconnue"}`,
           primary_url: null,
           best_score: 0,
           sources: [],
@@ -1567,6 +1903,38 @@ export const edConnectorTestFn = europeFunctions.https.onCall(
   }
 );
 
+type EdBrainSearchCallableInput = {
+  query?: string;
+  limit?: number;
+};
+
+export const edBrainSearchFn = europeFunctions.https.onCall(
+  async (data: EdBrainSearchCallableInput, context) => {
+    const uid = requireAuth(context);
+
+    const query = String(data?.query || "").trim();
+    const limit =
+      typeof data?.limit === "number" && Number.isFinite(data.limit)
+        ? data.limit
+        : undefined;
+
+    try {
+      const result = await edBrainSearchCore(uid, { query, limit });
+      return result;
+    } catch (e: any) {
+      logger.error("edBrainSearchFn.failed", {
+        uid,
+        error: String(e),
+      });
+      throw new functions.https.HttpsError(
+        "internal",
+        "edBrainSearch failed",
+        String(e?.message || e)
+      );
+    }
+  }
+);
+
 type EdConnectorPostCallableInput = {
   title?: string;
   body?: string;
@@ -1823,8 +2191,8 @@ interface OptimizedSchedule {
   semesterEnd?: string;
 }
 
-/** Pattern to detect final exams */
-const EXAM_PATTERN = /\b(written|exam|examen|écrit|final)\b/i;
+/** Pattern to detect final exams (written or oral) */
+const EXAM_PATTERN = /\b(written|oral|exam|examen|écrit|final|midterm|test)\b/i;
 
 /** Extract course code from summary (e.g., "COM-300" from description) */
 function extractCourseCode(description?: string): string | undefined {
@@ -1852,13 +2220,13 @@ function parseICSOptimized(icsText: string): OptimizedSchedule {
       const colonIdx = line.indexOf(':');
       if (colonIdx === -1) continue;
 
-      let key = line.slice(0, colonIdx);
+      const fullKey = line.slice(0, colonIdx);
       const value = line.slice(colonIdx + 1);
 
-      const semicolonIdx = key.indexOf(';');
-      if (semicolonIdx !== -1) {
-        key = key.slice(0, semicolonIdx);
-      }
+      // Check if the key has parameters (like TZID)
+      const semicolonIdx = fullKey.indexOf(';');
+      const key = semicolonIdx !== -1 ? fullKey.slice(0, semicolonIdx) : fullKey;
+      const hasSwissTZ = fullKey.includes('TZID=Europe/Zurich');
 
       switch (key) {
         case 'UID':
@@ -1874,10 +2242,10 @@ function parseICSOptimized(icsText: string): OptimizedSchedule {
           currentEvent.description = value.replace(/\\,/g, ',').replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
           break;
         case 'DTSTART':
-          currentEvent.dtstart = parseICSDate(value);
+          currentEvent.dtstart = parseICSDate(value, hasSwissTZ);
           break;
         case 'DTEND':
-          currentEvent.dtend = parseICSDate(value);
+          currentEvent.dtend = parseICSDate(value, hasSwissTZ);
           break;
         case 'RRULE':
           currentEvent.rrule = value;
@@ -1889,10 +2257,30 @@ function parseICSOptimized(icsText: string): OptimizedSchedule {
   // Separate regular classes from exams
   const regularClasses: ScheduleEvent[] = [];
   const examEvents: ScheduleEvent[] = [];
+  
+  const now = new Date();
+  const fourWeeksFromNow = new Date(now.getTime() + 28 * 24 * 60 * 60 * 1000);
 
   for (const event of allEvents) {
-    if (EXAM_PATTERN.test(event.summary)) {
+    const eventDate = new Date(event.dtstart);
+    const eventEnd = new Date(event.dtend);
+    const durationHours = (eventEnd.getTime() - eventDate.getTime()) / (1000 * 60 * 60);
+    
+    // Treat as exam if:
+    // 1. Summary contains exam-related words (written, oral, exam, etc.)
+    // 2. OR event is far in the future (>4 weeks) with long duration (>3 hours) - likely an exam slot
+    const isExamByPattern = EXAM_PATTERN.test(event.summary);
+    const isExamByDateAndDuration = eventDate > fourWeeksFromNow && durationHours > 3;
+    
+    if (isExamByPattern || isExamByDateAndDuration) {
       examEvents.push(event);
+      logger.info("parseICSOptimized.examDetected", {
+        summary: event.summary,
+        date: event.dtstart,
+        byPattern: isExamByPattern,
+        byDateDuration: isExamByDateAndDuration,
+        durationHours,
+      });
     } else {
       regularClasses.push(event);
     }
@@ -1906,9 +2294,23 @@ function parseICSOptimized(icsText: string): OptimizedSchedule {
   for (const event of regularClasses) {
     const start = new Date(event.dtstart);
     const end = new Date(event.dtend);
-    const dayOfWeek = start.getDay();
-    const startTime = `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`;
-    const endTime = `${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`;
+    
+    // Get day of week in Swiss timezone
+    const dayOfWeek = getZurichDayOfWeek(start);
+    
+    // Get times in Swiss timezone (HH:MM format)
+    const startTime = start.toLocaleTimeString('en-GB', { 
+      timeZone: 'Europe/Zurich', 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      hour12: false 
+    });
+    const endTime = end.toLocaleTimeString('en-GB', { 
+      timeZone: 'Europe/Zurich', 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      hour12: false 
+    });
 
     // Create unique key for deduplication
     const key = `${dayOfWeek}-${startTime}-${event.summary}`;
@@ -1945,9 +2347,23 @@ function parseICSOptimized(icsText: string): OptimizedSchedule {
   for (const event of examEvents) {
     const start = new Date(event.dtstart);
     const end = new Date(event.dtend);
-    const dateStr = start.toISOString().split('T')[0];
-    const startTime = `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`;
-    const endTime = `${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`;
+    
+    // Get date in Swiss timezone (YYYY-MM-DD format)
+    const dateStr = start.toLocaleDateString('en-CA', { timeZone: 'Europe/Zurich' });
+    
+    // Get times in Swiss timezone (HH:MM format)
+    const startTime = start.toLocaleTimeString('en-GB', { 
+      timeZone: 'Europe/Zurich', 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      hour12: false 
+    });
+    const endTime = end.toLocaleTimeString('en-GB', { 
+      timeZone: 'Europe/Zurich', 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      hour12: false 
+    });
     const courseCode = extractCourseCode(event.description);
 
     // Dedupe by summary (one exam per course)
@@ -1978,18 +2394,35 @@ function parseICSOptimized(icsText: string): OptimizedSchedule {
   return { weeklySlots, finalExams };
 }
 
-/** Convert ICS date format to ISO string */
-function parseICSDate(icsDate: string): string {
+/** Convert ICS date format to ISO string with proper timezone handling */
+function parseICSDate(icsDate: string, isSwissTime: boolean = false): string {
   // Handle formats: 20251127T081500Z or 20251127T081500 or 20251127
+  const isUTC = icsDate.endsWith('Z');
   const clean = icsDate.replace('Z', '');
+  
   if (clean.length === 8) {
     // Date only: YYYYMMDD
-    return `${clean.slice(0, 4)}-${clean.slice(4, 6)}-${clean.slice(6, 8)}T00:00:00`;
+    const dateStr = `${clean.slice(0, 4)}-${clean.slice(4, 6)}-${clean.slice(6, 8)}T00:00:00`;
+    // If Swiss time, add timezone offset; if UTC, add Z; otherwise no suffix
+    return isSwissTime ? dateStr + '+01:00' : (isUTC ? dateStr + 'Z' : dateStr);
   }
+  
   // DateTime: YYYYMMDDTHHMMSS
   const datePart = clean.slice(0, 8);
   const timePart = clean.slice(9, 15);
-  return `${datePart.slice(0, 4)}-${datePart.slice(4, 6)}-${datePart.slice(6, 8)}T${timePart.slice(0, 2)}:${timePart.slice(2, 4)}:${timePart.slice(4, 6)}`;
+  const isoString = `${datePart.slice(0, 4)}-${datePart.slice(4, 6)}-${datePart.slice(6, 8)}T${timePart.slice(0, 2)}:${timePart.slice(2, 4)}:${timePart.slice(4, 6)}`;
+  
+  // If already in Swiss time (TZID=Europe/Zurich), add timezone offset
+  // CET (+01:00) in winter, CEST (+02:00) in summer
+  if (isSwissTime) {
+    const month = parseInt(datePart.slice(4, 6));
+    // DST in Switzerland: approximately April to September
+    const isDST = month >= 4 && month <= 9;
+    return isoString + (isDST ? '+02:00' : '+01:00');
+  }
+  
+  // If originally UTC, add Z suffix
+  return isUTC ? isoString + 'Z' : isoString;
 }
 
 /** Format optimized schedule for LLM context */
@@ -1998,7 +2431,7 @@ function formatOptimizedScheduleForContext(schedule: OptimizedSchedule): string 
 
   // Weekly schedule template
   if (schedule.weeklySlots.length > 0) {
-    lines.push("📚 EMPLOI DU TEMPS HEBDOMADAIRE (chaque semaine):");
+    lines.push("📚 WEEKLY TIMETABLE (every week):");
 
     let currentDay = '';
     for (const slot of schedule.weeklySlots) {
@@ -2012,25 +2445,29 @@ function formatOptimizedScheduleForContext(schedule: OptimizedSchedule): string 
     }
   }
 
-  // Final exams - format with COURSE NAME FIRST for better model matching
+  // Final exams - format with COURSE NAME FIRST and FULL DATE for better model matching
   if (schedule.finalExams.length > 0) {
-    lines.push("\n\n📝 EXAMENS FINAUX (dates des examens écrits):");
+    lines.push("\n\n📝 FINAL EXAMS (written exam dates):");
+    lines.push("IMPORTANT: Always include the FULL DATE when answering about exams.\n");
     for (const exam of schedule.finalExams) {
-      const dateObj = new Date(exam.date);
-      const dateStr = dateObj.toLocaleDateString('fr-CH', {
+      // Parse date carefully - exam.date is in YYYY-MM-DD format
+      // Add time to avoid timezone issues: treat as noon in Zurich
+      const dateObj = new Date(exam.date + 'T12:00:00');
+      const dateStr = dateObj.toLocaleDateString('en-GB', {
+        timeZone: 'Europe/Zurich',
         weekday: 'long',
         day: 'numeric',
         month: 'long',
         year: 'numeric'
       });
-      const loc = exam.location ? ` en salle ${exam.location}` : '';
-      // Put course name FIRST for better LLM matching
+      const loc = exam.location ? ` in room ${exam.location}` : '';
+      // Put course name FIRST, then FULL DATE with time
       lines.push(`  • ${exam.summary}: ${dateStr}, ${exam.startTime}–${exam.endTime}${loc}`);
     }
   }
 
   if (lines.length === 0) {
-    return "Aucun cours ou examen trouvé.";
+    return "No classes or exams found.";
   }
 
   return lines.join('\n');
@@ -2076,7 +2513,7 @@ function generateScheduleForDateRange(schedule: OptimizedSchedule, startDate: Da
     const examsToday = schedule.finalExams.filter(e => e.date === zurichDateParts);
 
     if (slots.length > 0 || examsToday.length > 0) {
-      const dayLabel = current.toLocaleDateString('fr-CH', {
+      const dayLabel = current.toLocaleDateString('en-GB', {
         timeZone: 'Europe/Zurich',
         weekday: 'long',
         day: 'numeric',
@@ -2100,7 +2537,7 @@ function generateScheduleForDateRange(schedule: OptimizedSchedule, startDate: Da
     current.setDate(current.getDate() + 1);
   }
 
-  return lines.length > 0 ? lines.join('\n') : "Aucun cours prévu sur cette période.";
+  return lines.length > 0 ? lines.join('\n') : "No classes scheduled for this period.";
 }
 
 /** Sync user's EPFL schedule from ICS URL */
@@ -2172,6 +2609,17 @@ export async function syncEpflScheduleCore(uid: string, { icsUrl }: SyncSchedule
     uid,
     weeklySlots: schedule.weeklySlots.length,
     finalExams: schedule.finalExams.length,
+    // Log each slot's day for debugging
+    slotDetails: schedule.weeklySlots.map(s => ({
+      dayOfWeek: s.dayOfWeek,
+      dayName: s.dayName,
+      time: s.startTime,
+      summary: s.summary.substring(0, 30),
+    })),
+    examDetails: schedule.finalExams.map(e => ({
+      date: e.date,
+      summary: e.summary.substring(0, 30),
+    })),
   });
 
   // Store OPTIMIZED structure in Firestore (much smaller!)
@@ -2222,15 +2670,72 @@ export async function getScheduleContextCore(uid: string): Promise<string> {
     // Use Zurich timezone for "now"
     const now = getZurichDate();
     const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    
+    // Get today's info in Swiss timezone
+    const todayStr = now.toLocaleDateString('en-US', {
+      timeZone: 'Europe/Zurich',
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+    const todayDayOfWeek = getZurichDayOfWeek(now);
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
     const lines: string[] = [];
+    
+    // CRITICAL: Put today's schedule FIRST and prominently
+    lines.push(`🚨 TODAY IS: ${todayStr} (${dayNames[todayDayOfWeek]})`);
+    lines.push(`When the user asks about "today", answer with ${dayNames[todayDayOfWeek]}'s classes ONLY.\n`);
+    
+    // Show TODAY's classes first (most important)
+    const todaySlots = schedule.weeklySlots.filter(s => s.dayOfWeek === todayDayOfWeek);
+    if (todaySlots.length > 0) {
+      lines.push(`📅 TODAY'S CLASSES (${dayNames[todayDayOfWeek]}):`);
+      for (const slot of todaySlots) {
+        const loc = slot.location ? ` @ ${slot.location}` : '';
+        const code = slot.courseCode ? ` (${slot.courseCode})` : '';
+        lines.push(`  • ${slot.startTime}–${slot.endTime}: ${slot.summary}${code}${loc}`);
+      }
+      lines.push("");
+    } else {
+      lines.push(`📅 TODAY (${dayNames[todayDayOfWeek]}): No classes scheduled.\n`);
+    }
 
-    // Weekly template (always useful)
+    // Show EXAMS prominently with FULL DATES (critical for exam questions)
+    if (schedule.finalExams.length > 0) {
+      lines.push(`\n🎓 YOUR FINAL EXAMS (ALWAYS include full date in answers):`);
+      for (const exam of schedule.finalExams) {
+        // Parse date carefully - exam.date is in YYYY-MM-DD format
+        const dateObj = new Date(exam.date + 'T12:00:00');
+        const fullDateStr = dateObj.toLocaleDateString('en-GB', {
+          timeZone: 'Europe/Zurich',
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        });
+        const loc = exam.location ? ` in room ${exam.location}` : '';
+        lines.push(`  • ${exam.summary}: ${fullDateStr}, ${exam.startTime}–${exam.endTime}${loc}`);
+      }
+      lines.push("");
+    }
+
+    // Then show the full weekly template
     lines.push(formatOptimizedScheduleForContext(schedule));
 
     // Also show specific dates for the next 7 days
-    lines.push("\n\n📆 CETTE SEMAINE (dates spécifiques):");
+    lines.push("\n\n📆 THIS WEEK (specific dates):");
     lines.push(generateScheduleForDateRange(schedule, now, nextWeek));
+    
+    // Log for debugging
+    logger.info("getScheduleContextCore.todayInfo", {
+      uid,
+      todayStr,
+      todayDayOfWeek,
+      dayName: dayNames[todayDayOfWeek],
+      weeklySlotDays: schedule.weeklySlots.map(s => ({ day: s.dayOfWeek, name: s.dayName, summary: s.summary })),
+    });
 
     return lines.join('\n');
   }
@@ -2238,7 +2743,7 @@ export async function getScheduleContextCore(uid: string): Promise<string> {
   // Fallback for old format (legacy)
   if (data.epflSchedule.events && data.epflSchedule.events.length > 0) {
     // Old format - just show a message to re-sync
-    return "Emploi du temps disponible. Pour de meilleures performances, reconnectez votre calendrier EPFL Campus.";
+    return "Schedule available. For better performance, please reconnect your EPFL Campus calendar.";
   }
 
   return "";
@@ -2417,7 +2922,7 @@ export async function getFoodContextCore(): Promise<string> {
     } catch (e) {
       logger.warn("getFoodContext.syncFailed", { error: String(e) });
     }
-    return "Aucun menu disponible pour cette semaine. Les données n'ont pas encore été synchronisées.";
+    return "No menu available for this week. Data has not been synced yet.";
   }
   
   const data = menuDoc.data() as any;
@@ -2465,28 +2970,31 @@ export async function getMealsForDay(daySpecifier: "today" | "tomorrow" | string
 
 /**
  * Detect which day the user is asking about from their question
- * Returns: { dayIndex: 0-4 for Mon-Fri, dayLabel: French label }
+ * Returns: { dayIndex: 0-4 for Mon-Fri, dayLabel: localized label, isEnglish: language flag }
  */
-function detectDayFromQuestion(q: string): { dayIndex: number | null; dayLabel: string } {
+function detectDayFromQuestion(q: string): { dayIndex: number | null; dayLabel: string; isEnglish: boolean } {
   const today = new Date();
   const zurichStr = today.toLocaleDateString('en-US', { timeZone: 'Europe/Zurich' });
   const zurichToday = new Date(zurichStr);
   const todayDayOfWeek = zurichToday.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
   
-  // Day name mappings (French)
-  const dayMappings: Array<{ patterns: string[]; dayOfWeek: number; label: string }> = [
-    { patterns: ["lundi", "monday"], dayOfWeek: 1, label: "lundi" },
-    { patterns: ["mardi", "tuesday"], dayOfWeek: 2, label: "mardi" },
-    { patterns: ["mercredi", "wednesday"], dayOfWeek: 3, label: "mercredi" },
-    { patterns: ["jeudi", "thursday"], dayOfWeek: 4, label: "jeudi" },
-    { patterns: ["vendredi", "friday"], dayOfWeek: 5, label: "vendredi" },
+  // Detect language - check for English patterns
+  const isEnglish = /\b(what['']?s|lunch|dinner|breakfast|today|tomorrow|monday|tuesday|wednesday|thursday|friday|meal|food|cafeteria|canteen|eat|cheap|vegetarian|vegan)\b/i.test(q);
+  
+  // Day name mappings (French and English)
+  const dayMappings: Array<{ patterns: string[]; dayOfWeek: number; labelFr: string; labelEn: string }> = [
+    { patterns: ["lundi", "monday"], dayOfWeek: 1, labelFr: "lundi", labelEn: "Monday" },
+    { patterns: ["mardi", "tuesday"], dayOfWeek: 2, labelFr: "mardi", labelEn: "Tuesday" },
+    { patterns: ["mercredi", "wednesday"], dayOfWeek: 3, labelFr: "mercredi", labelEn: "Wednesday" },
+    { patterns: ["jeudi", "thursday"], dayOfWeek: 4, labelFr: "jeudi", labelEn: "Thursday" },
+    { patterns: ["vendredi", "friday"], dayOfWeek: 5, labelFr: "vendredi", labelEn: "Friday" },
   ];
   
   // Check for explicit day names first
-  for (const { patterns, dayOfWeek, label } of dayMappings) {
+  for (const { patterns, dayOfWeek, labelFr, labelEn } of dayMappings) {
     if (patterns.some(p => q.includes(p))) {
       // Calculate index (0=Mon, 4=Fri)
-      return { dayIndex: dayOfWeek - 1, dayLabel: label };
+      return { dayIndex: dayOfWeek - 1, dayLabel: isEnglish ? labelEn : labelFr, isEnglish };
     }
   }
   
@@ -2494,16 +3002,16 @@ function detectDayFromQuestion(q: string): { dayIndex: number | null; dayLabel: 
   if (q.includes("demain") || q.includes("tomorrow")) {
     const tomorrowDayOfWeek = (todayDayOfWeek + 1) % 7;
     if (tomorrowDayOfWeek >= 1 && tomorrowDayOfWeek <= 5) {
-      return { dayIndex: tomorrowDayOfWeek - 1, dayLabel: "demain" };
+      return { dayIndex: tomorrowDayOfWeek - 1, dayLabel: isEnglish ? "tomorrow" : "demain", isEnglish };
     }
-    return { dayIndex: null, dayLabel: "demain" }; // Weekend
+    return { dayIndex: null, dayLabel: isEnglish ? "tomorrow" : "demain", isEnglish }; // Weekend
   }
   
   // Default to today
   if (todayDayOfWeek >= 1 && todayDayOfWeek <= 5) {
-    return { dayIndex: todayDayOfWeek - 1, dayLabel: "aujourd'hui" };
+    return { dayIndex: todayDayOfWeek - 1, dayLabel: isEnglish ? "today" : "aujourd'hui", isEnglish };
   }
-  return { dayIndex: null, dayLabel: "aujourd'hui" }; // Weekend
+  return { dayIndex: null, dayLabel: isEnglish ? "today" : "aujourd'hui", isEnglish }; // Weekend
 }
 
 /**
@@ -2537,6 +3045,7 @@ function filterMealsByPrice(meals: Meal[], maxPrice: number): Meal[] {
 
 /**
  * Answer a food-related question using the food data
+ * Responds in the same language the user uses (French or English)
  */
 export async function answerFoodQuestionCore(question: string): Promise<{
   reply: string;
@@ -2545,8 +3054,8 @@ export async function answerFoodQuestionCore(question: string): Promise<{
 }> {
   const q = question.toLowerCase();
   
-  // Determine which day the user is asking about
-  const { dayIndex, dayLabel } = detectDayFromQuestion(q);
+  // Determine which day the user is asking about (includes language detection)
+  const { dayIndex, dayLabel, isEnglish } = detectDayFromQuestion(q);
   
   // Get the weekly menu
   const weekStart = getCurrentWeekStart();
@@ -2557,7 +3066,9 @@ export async function answerFoodQuestionCore(question: string): Promise<{
       await syncEpflFoodMenusCore();
     } catch (e) {
       return {
-        reply: `Je n'ai pas de données sur les menus. Veuillez réessayer plus tard.`,
+        reply: isEnglish 
+          ? `I don't have menu data. Please try again later.`
+          : `Je n'ai pas de données sur les menus. Veuillez réessayer plus tard.`,
         source_type: "food",
       };
     }
@@ -2567,7 +3078,9 @@ export async function answerFoodQuestionCore(question: string): Promise<{
   
   if (!data?.days || dayIndex === null || dayIndex >= data.days.length) {
     return {
-      reply: `Je n'ai pas de données sur les menus pour ${dayLabel}. Les menus sont disponibles du lundi au vendredi.`,
+      reply: isEnglish
+        ? `I don't have menu data for ${dayLabel}. Menus are available Monday through Friday.`
+        : `Je n'ai pas de données sur les menus pour ${dayLabel}. Les menus sont disponibles du lundi au vendredi.`,
       source_type: "food",
     };
   }
@@ -2581,7 +3094,9 @@ export async function answerFoodQuestionCore(question: string): Promise<{
   
   if (dailyMenu.meals.length === 0) {
     return {
-      reply: `Aucun menu disponible pour ${dayLabel} (${dailyMenu.date}).`,
+      reply: isEnglish
+        ? `No menu available for ${dayLabel} (${dailyMenu.date}).`
+        : `Aucun menu disponible pour ${dayLabel} (${dailyMenu.date}).`,
       source_type: "food",
     };
   }
@@ -2607,17 +3122,21 @@ export async function answerFoodQuestionCore(question: string): Promise<{
     }
     
     if (meals.length === 0) {
-      const priceNote = maxPrice !== null ? ` à moins de ${maxPrice} CHF` : "";
+      const priceNote = maxPrice !== null 
+        ? (isEnglish ? ` under ${maxPrice} CHF` : ` à moins de ${maxPrice} CHF`)
+        : "";
       return {
-        reply: `Aucun plat trouvé${priceNote} pour ${restaurantMatch} ${dayLabel}.`,
+        reply: isEnglish
+          ? `No dishes found${priceNote} at ${restaurantMatch} ${dayLabel}.`
+          : `Aucun plat trouvé${priceNote} pour ${restaurantMatch} ${dayLabel}.`,
         source_type: "food",
       };
     }
     
     const mealsList = meals.map(m => {
       const tags: string[] = [];
-      if (m.isVegan) tags.push("🌱 vegan");
-      else if (m.isVegetarian) tags.push("🥬 végétarien");
+      if (m.isVegan) tags.push(isEnglish ? "🌱 vegan" : "🌱 vegan");
+      else if (m.isVegetarian) tags.push(isEnglish ? "🥬 vegetarian" : "🥬 végétarien");
       const price = m.studentPrice ? ` — ${m.studentPrice.toFixed(2)} CHF` : "";
       const tagStr = tags.length > 0 ? ` [${tags.join(", ")}]` : "";
       return `• ${m.name}${tagStr}${price}`;
@@ -2625,7 +3144,9 @@ export async function answerFoodQuestionCore(question: string): Promise<{
     
     const priceNote = maxPrice !== null ? ` (< ${maxPrice} CHF)` : "";
     return {
-      reply: `${formattedDayLabel} à ${restaurantMatch}${priceNote}:\n${mealsList}`,
+      reply: isEnglish
+        ? `${formattedDayLabel} at ${restaurantMatch}${priceNote}:\n${mealsList}`
+        : `${formattedDayLabel} à ${restaurantMatch}${priceNote}:\n${mealsList}`,
       source_type: "food",
       meals,
     };
@@ -2633,7 +3154,7 @@ export async function answerFoodQuestionCore(question: string): Promise<{
   
   // Check for vegetarian/vegan query
   const isVeganQuery = q.includes("vegan");
-  const isVeggieQuery = q.includes("végé") || q.includes("veggie") || q.includes("végétarien") || isVeganQuery;
+  const isVeggieQuery = q.includes("végé") || q.includes("veggie") || q.includes("végétarien") || q.includes("vegetarian") || isVeganQuery;
   
   if (isVeggieQuery) {
     let veggieMeals = findVeggieMeals(dailyMenu, isVeganQuery);
@@ -2642,15 +3163,19 @@ export async function answerFoodQuestionCore(question: string): Promise<{
     }
     
     if (veggieMeals.length === 0) {
-      const type = isVeganQuery ? "vegan" : "végétarien";
-      const priceNote = maxPrice !== null ? ` à moins de ${maxPrice} CHF` : "";
+      const type = isVeganQuery ? "vegan" : (isEnglish ? "vegetarian" : "végétarien");
+      const priceNote = maxPrice !== null 
+        ? (isEnglish ? ` under ${maxPrice} CHF` : ` à moins de ${maxPrice} CHF`)
+        : "";
       return {
-        reply: `Aucun plat ${type}${priceNote} trouvé pour ${dayLabel}.`,
+        reply: isEnglish
+          ? `No ${type} dishes${priceNote} found for ${dayLabel}.`
+          : `Aucun plat ${type}${priceNote} trouvé pour ${dayLabel}.`,
         source_type: "food",
       };
     }
     
-    const type = isVeganQuery ? "vegan" : "végétarien";
+    const type = isVeganQuery ? "vegan" : (isEnglish ? "vegetarian" : "végétarien");
     const mealsList = veggieMeals.map(m => {
       const tag = m.isVegan ? "🌱" : "🥬";
       const price = m.studentPrice ? ` — ${m.studentPrice.toFixed(2)} CHF` : "";
@@ -2659,7 +3184,9 @@ export async function answerFoodQuestionCore(question: string): Promise<{
     
     const priceNote = maxPrice !== null ? ` (< ${maxPrice} CHF)` : "";
     return {
-      reply: `Plats ${type}s ${dayLabel}${priceNote}:\n${mealsList}`,
+      reply: isEnglish
+        ? `${type.charAt(0).toUpperCase() + type.slice(1)} dishes ${dayLabel}${priceNote}:\n${mealsList}`
+        : `Plats ${type}s ${dayLabel}${priceNote}:\n${mealsList}`,
       source_type: "food",
       meals: veggieMeals,
     };
@@ -2671,7 +3198,9 @@ export async function answerFoodQuestionCore(question: string): Promise<{
     
     if (affordableMeals.length === 0) {
       return {
-        reply: `Aucun plat à moins de ${maxPrice} CHF trouvé pour ${dayLabel}.`,
+        reply: isEnglish
+          ? `No dishes under ${maxPrice} CHF found for ${dayLabel}.`
+          : `Aucun plat à moins de ${maxPrice} CHF trouvé pour ${dayLabel}.`,
         source_type: "food",
       };
     }
@@ -2688,29 +3217,35 @@ export async function answerFoodQuestionCore(question: string): Promise<{
     }).join("\n");
     
     return {
-      reply: `Plats à moins de ${maxPrice} CHF ${dayLabel}:\n${mealsList}`,
+      reply: isEnglish
+        ? `Dishes under ${maxPrice} CHF ${dayLabel}:\n${mealsList}`
+        : `Plats à moins de ${maxPrice} CHF ${dayLabel}:\n${mealsList}`,
       source_type: "food",
       meals: affordableMeals,
     };
   }
   
   // Check for cheapest meal query (le moins cher)
-  if (q.includes("moins cher") || q.includes("cheapest")) {
+  if (q.includes("moins cher") || q.includes("cheapest") || q.includes("cheap")) {
     const cheapest = findCheapestMeal(dailyMenu);
     if (!cheapest) {
       return {
-        reply: `Pas de données de prix disponibles pour ${dayLabel}.`,
+        reply: isEnglish
+          ? `No price data available for ${dayLabel}.`
+          : `Pas de données de prix disponibles pour ${dayLabel}.`,
         source_type: "food",
       };
     }
     
     const tags: string[] = [];
-    if (cheapest.isVegan) tags.push("🌱 vegan");
-    else if (cheapest.isVegetarian) tags.push("🥬 végétarien");
+    if (cheapest.isVegan) tags.push(isEnglish ? "🌱 vegan" : "🌱 vegan");
+    else if (cheapest.isVegetarian) tags.push(isEnglish ? "🥬 vegetarian" : "🥬 végétarien");
     const tagStr = tags.length > 0 ? ` [${tags.join(", ")}]` : "";
     
     return {
-      reply: `Le plat le moins cher ${dayLabel} est "${cheapest.name}"${tagStr} à ${cheapest.restaurant} pour ${cheapest.studentPrice?.toFixed(2)} CHF (prix étudiant).`,
+      reply: isEnglish
+        ? `The cheapest dish ${dayLabel} is "${cheapest.name}"${tagStr} at ${cheapest.restaurant} for ${cheapest.studentPrice?.toFixed(2)} CHF (student price).`
+        : `Le plat le moins cher ${dayLabel} est "${cheapest.name}"${tagStr} à ${cheapest.restaurant} pour ${cheapest.studentPrice?.toFixed(2)} CHF (prix étudiant).`,
       source_type: "food",
       meals: [cheapest],
     };
