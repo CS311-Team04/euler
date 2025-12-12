@@ -462,11 +462,13 @@ class HomeViewModelOfflineCacheCoverageTest {
   @Test
   fun `sendMessage uses parameter over draft when offline`() = runTest {
     val cachedResponse = "Cached response for parameter"
-    whenever(cacheRepo.getCachedResponse(eq("parameter message"), eq(true)))
-        .thenReturn(cachedResponse)
+    whenever(cacheRepo.getCachedResponse(any(), eq(true))).thenReturn(cachedResponse)
 
     val vm =
         HomeViewModel(llmClient, auth, repo, networkMonitor = networkMonitor, cacheRepo = cacheRepo)
+
+    // Set a conversation ID to prevent messages from being cleared
+    vm.editState { it.copy(currentConversationId = "test-conv") }
 
     networkMonitor.setOnline(false)
     delay(100)
@@ -477,7 +479,7 @@ class HomeViewModelOfflineCacheCoverageTest {
     vm.awaitStreamingCompletion()
 
     // Verify parameter was used, not draft
-    verify(cacheRepo).getCachedResponse("parameter message", true)
+    verify(cacheRepo).getCachedResponse(eq("parameter message"), eq(true))
     val messages = vm.uiState.first().messages
     assertTrue(
         "Should have user message with parameter",
