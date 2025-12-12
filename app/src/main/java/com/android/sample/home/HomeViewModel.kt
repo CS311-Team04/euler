@@ -57,6 +57,22 @@ enum class CompactSourceType {
   FOOD // 🍴 food/restaurant indicator
 }
 
+private fun FirebaseFunctions.maybeUseEmulator(): FirebaseFunctions = apply {
+  if (BuildConfig.USE_FUNCTIONS_EMULATOR && isRunningOnEmulator()) {
+    useEmulator(BuildConfig.FUNCTIONS_HOST, BuildConfig.FUNCTIONS_PORT)
+  }
+}
+
+private fun isRunningOnEmulator(): Boolean {
+  val fingerprint = android.os.Build.FINGERPRINT.lowercase()
+  val model = android.os.Build.MODEL.lowercase()
+  return fingerprint.contains("generic") ||
+      fingerprint.startsWith("unknown") ||
+      model.contains("google_sdk") ||
+      model.contains("emulator") ||
+      model.contains("android sdk built for x86")
+}
+
 data class SourceMeta(
     val siteLabel: String? = null, // e.g. "EPFL.ch Website" or "Your Schedule"
     @StringRes val siteLabelRes: Int? = null,
@@ -180,15 +196,11 @@ class HomeViewModel(
   val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
   /**
-   * Firebase Functions handle for the chat backend. Uses local emulator when configured via
-   * BuildConfig flags.
+   * Firebase Functions handle for the chat backend. Uses local emulator only on Android emulators
+   * when explicitly enabled via BuildConfig.
    */
   private val functions: FirebaseFunctions by lazy {
-    FirebaseFunctions.getInstance(BuildConfig.FUNCTIONS_REGION).apply {
-      if (BuildConfig.USE_FUNCTIONS_EMULATOR) {
-        useEmulator(BuildConfig.FUNCTIONS_HOST, BuildConfig.FUNCTIONS_PORT)
-      }
-    }
+    FirebaseFunctions.getInstance(BuildConfig.FUNCTIONS_REGION).maybeUseEmulator()
   }
 
   private val edPostDataSource: EdPostRemoteDataSource by lazy {
@@ -999,9 +1011,13 @@ class HomeViewModel(
                 TAG,
                 "startStreaming: received reply, length=${reply.reply.length}, edIntentDetected=${reply.edIntent.detected}, edIntent=${reply.edIntent.intent}")
 
+            // Handle ED fetch intent detection first (short-circuits normal streaming)
+            val fetchHandled = handleEdFetchIntent(reply, question, messageId)
+            if (fetchHandled) return@launch
+
             // Handle ED intent detection - create PostOnEd pending action
-            val handled = handleEdIntent(reply, question, messageId)
-            if (handled) {
+            val postHandled = handleEdIntent(reply, question, messageId)
+            if (postHandled) {
               // Skip normal streaming; ED flow takes over
               return@launch
             }
@@ -1578,5 +1594,44 @@ class HomeViewModel(
       return true
     }
     return false
+  }
+
+  /**
+   * Handles ED fetch intent detection from the LLM reply. If an ED fetch intent is detected, routes
+   * to the existing ED fetch flow. Currently surfaces a debug message to keep the UX responsive
+   * until the full fetch flow is wired.
+   *
+   * @param reply The BotReply from the LLM
+   * @param originalQuestion The original user question (used as fallback for fetch query)
+   * @param messageId The ID of the AI message being processed
+   * @return true if fetch intent was detected and handled, false otherwise
+   */
+  private fun handleEdFetchIntent(
+      reply: BotReply,
+      originalQuestion: String,
+      messageId: String
+  ): Boolean {
+    val fetchIntent = reply.edFetchIntent
+    if (!fetchIntent.detected) return false
+
+    val query = fetchIntent.query ?: originalQuestion
+    Log.d(TAG, "ED fetch intent detected with query: $query")
+
+    // Temporary UX: surface a debug message so we visibly react to the intent.
+    val debugMessage =
+        ChatUIModel(
+            id = UUID.randomUUID().toString(),
+            text = "🔍 ED fetch intent detected (DEBUG) – this is a test message.",
+            timestamp = System.currentTimeMillis(),
+            type = ChatType.AI)
+
+    _uiState.update { state ->
+      state.copy(
+          messages = state.messages + debugMessage,
+          streamingSequence = state.streamingSequence + 1,
+          streamingMessageId = null,
+          isSending = false)
+    }
+    return true
   }
 }
