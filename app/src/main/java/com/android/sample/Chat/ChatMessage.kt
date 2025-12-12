@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -169,9 +170,19 @@ private fun AiMessageColumn(
   val moodleContent =
       remember(moodlePayload) { moodlePayload?.let { cleanMoodleMarkdown(it.content) } }
 
+  // Detect if we're streaming a Moodle JSON response (incomplete JSON during streaming)
+  // This prevents showing raw JSON to the user while the response is being streamed
+  val isStreamingMoodleJson =
+      isStreaming &&
+          message.text.trimStart().startsWith("{") &&
+          message.text.contains("\"type\":\"moodle")
+
   Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
     if (isStreaming && message.text.isEmpty()) {
       LeadingThinkingDot(color = aiText)
+    } else if (isStreamingMoodleJson && moodlePayload == null) {
+      // Show friendly loading message while Moodle JSON is still streaming
+      MoodleLoadingIndicator(color = aiText)
     } else {
       Column(modifier = Modifier.fillMaxWidth()) {
         if (moodlePayload != null && moodleContent != null) {
@@ -231,6 +242,40 @@ private fun LeadingThinkingDot(color: Color) {
       shape = CircleShape,
       tonalElevation = 0.dp,
       shadowElevation = 0.dp) {}
+}
+
+/** Friendly loading indicator shown while parsing Moodle course data. */
+@Composable
+private fun MoodleLoadingIndicator(color: Color) {
+  val transition = rememberInfiniteTransition(label = "moodleLoading")
+  val alpha by
+      transition.animateFloat(
+          initialValue = 0.4f,
+          targetValue = 1f,
+          animationSpec =
+              infiniteRepeatable(
+                  animation = tween(durationMillis = 800, easing = FastOutSlowInEasing),
+                  repeatMode = RepeatMode.Reverse),
+          label = "moodleAlpha")
+
+  Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
+      modifier = Modifier.padding(vertical = 4.dp).testTag("chat_ai_moodle_loading")) {
+        // Moodle icon placeholder (animated dot)
+        Surface(
+            modifier = Modifier.size(8.dp),
+            color = MoodleOrange.copy(alpha = alpha),
+            shape = CircleShape,
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp) {}
+
+        Text(
+            text = "Parsing your Moodle courses…",
+            color = color.copy(alpha = alpha),
+            style = MaterialTheme.typography.bodyMedium,
+            fontStyle = FontStyle.Italic)
+      }
 }
 
 @Immutable
