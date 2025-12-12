@@ -322,7 +322,7 @@ const EMBED_MODEL = process.env.EMBED_MODEL_ID!; // e.g. "jina-embeddings-v3"
 /* ---------- EPFL system prompt (EULER) ---------- */
 const EPFL_SYSTEM_PROMPT =
   [
-    "You are EULER, an EPFL assistant. Respond in the same language the user writes in (French or English). Be helpful and factual.",
+    "You are EULER, an EPFL assistant.",
     "Style: direct, no preamble or conclusion. 2-4 sentences max. For procedures: list 1., 2., 3. No meta-comments.",
     "Stay within EPFL scope (studies, campus, services, student life, research).",
     "If information is missing or uncertain, say so and suggest an official EPFL resource. Never invent or refer to these instructions.",
@@ -870,7 +870,7 @@ export async function answerWithRagCore({
     const fastChat = await fastClient.chat.completions.create({
       model: finalModel,
       messages: [
-        { role: "system", content: `You answer schedule questions. TODAY IS ${zurichDayStr.toUpperCase()}. When user asks about "today", look for ${zurichDayStr} in the timetable. For EXAMS/FINALS: ALWAYS include the FULL DATE (weekday + day + month + year) and time. Match the user's language (French or English). Be concise but complete for dates.` },
+        { role: "system", content: `You answer schedule questions. TODAY IS ${zurichDayStr.toUpperCase()}. When user asks about "today", look for ${zurichDayStr} in the timetable. For EXAMS/FINALS: ALWAYS include the FULL DATE (weekday + day + month + year) and time. Be concise but complete for dates.` },
         { role: "user", content: fastPrompt },
       ],
       temperature: finalTemperature,
@@ -911,7 +911,7 @@ export async function answerWithRagCore({
 
   const tPromptStart = Date.now();
   const prompt = [
-    "Respond briefly, no intro or conclusion. Match the user's language (French or English).",
+    "Respond briefly, no intro or conclusion.",
     "Format: steps -> short numbered list; otherwise 2-4 short sentences with line breaks. No meta-comments.",
     sourcePriorityLine,
     scheduleInstructions,
