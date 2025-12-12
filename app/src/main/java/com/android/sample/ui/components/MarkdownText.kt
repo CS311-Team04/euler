@@ -72,30 +72,29 @@ object MarkdownStyles {
 }
 
 /**
- * A composable that renders Markdown text with EULER's styling. Uses the compose-richtext library
- * for parsing and rendering markdown.
+ * Full-featured Markdown renderer using the compose-richtext library.
+ *
+ * **When to use:** Use this for AI chat responses and any content that may contain complex
+ * markdown structures like lists, code blocks, tables, or nested formatting.
  *
  * Supports:
  * - **Bold** and *italic* text
- * - `inline code` and code blocks
+ * - `inline code` and fenced code blocks (```)
  * - [Links](url)
- * - Lists (ordered and unordered)
+ * - Lists (ordered and unordered, including nested)
  * - Headers (##, ###, etc.)
- * - Blockquotes
+ * - Blockquotes (>)
  * - Tables
- * - Horizontal rules
+ * - Horizontal rules (---)
  *
  * @param markdown The markdown text to render
  * @param modifier Modifier for the component
- * @param textColor The base text color (defaults to theme's onBackground)
- * @param style The text style to use as base
+ * @see SimpleMarkdownText For lightweight inline formatting only
  */
 @Composable
 fun MarkdownText(
     markdown: String,
     modifier: Modifier = Modifier,
-    textColor: Color = MaterialTheme.colorScheme.onBackground,
-    style: TextStyle = MaterialTheme.typography.bodyMedium,
 ) {
   // Use default rich text style - the library handles styling internally
   val richTextStyle = remember { RichTextStyle().resolveDefaults() }
@@ -104,8 +103,29 @@ fun MarkdownText(
 }
 
 /**
- * Simplified markdown text renderer for basic formatting. Use this for simpler cases where full
- * markdown parsing isn't needed. Handles: bold, italic, inline code, links
+ * Lightweight markdown renderer for basic inline formatting only.
+ *
+ * **When to use:** Use this for simple UI text that only needs basic inline formatting (bold,
+ * italic, code, links). This is more performant than [MarkdownText] but does NOT support:
+ * - Lists (bullet points or numbered)
+ * - Code blocks (fenced ```)
+ * - Headers
+ * - Blockquotes
+ * - Tables
+ *
+ * **Typical use cases:**
+ * - Tooltips or short descriptions with **bold** emphasis
+ * - Labels with `inline code` snippets
+ * - Short text with [clickable links](url)
+ *
+ * For full markdown support (AI responses, rich content), use [MarkdownText] instead.
+ *
+ * @param text The text with simple markdown formatting
+ * @param modifier Modifier for the component
+ * @param textColor The text color
+ * @param style The base text style
+ * @param lineHeight Line height for the text
+ * @see MarkdownText For full markdown support including lists, code blocks, tables
  */
 @Composable
 fun SimpleMarkdownText(

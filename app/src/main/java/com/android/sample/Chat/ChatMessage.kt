@@ -178,7 +178,6 @@ private fun AiMessageColumn(
           // Use MarkdownText for Moodle content to render rich formatting
           MarkdownText(
               markdown = moodleContent,
-              textColor = aiText,
               modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
           Spacer(modifier = Modifier.height(8.dp))
           MoodleSourceBadge(
@@ -188,7 +187,6 @@ private fun AiMessageColumn(
           // Use MarkdownText for AI messages to render rich formatting
           MarkdownText(
               markdown = message.text,
-              textColor = aiText,
               modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
         }
 
