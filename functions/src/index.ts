@@ -38,6 +38,8 @@ import {
 } from "./food/epflFoodScraper";
 import { detectMoodleFileFetchIntentCore, extractFileInfo } from "./moodleIntent";
 import { MoodleClient } from "./connectors/moodle/MoodleClient";
+import { detectCourseIntent } from "./utils/intentParser";
+import { resolveGetWeeklyOverview } from "./tools/courseTools";
 
 
 const europeFunctions = functions.region("europe-west6");
@@ -1175,6 +1177,78 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
 
     if (!question) throw new functions.https.HttpsError("invalid-argument", "Missing 'question'");
 
+  // === Deterministic Moodle course intent (regex) ===
+  const courseIntent = detectCourseIntent(question);
+  if (courseIntent) {
+    logger.info("answerWithRagFn.courseIntentDetected", {
+      type: courseIntent.type,
+      course: courseIntent.course,
+      week: courseIntent.week ?? null,
+      uid,
+    });
+
+    if (!uid) {
+      return {
+        reply: "Vous devez être connecté pour accéder à Moodle. Merci de vous authentifier.",
+        primary_url: null,
+        best_score: 0,
+        sources: [],
+        ed_intent_detected: false,
+        ed_intent: null,
+        moodle_intent_detected: true,
+        moodle_intent: { type: "course_overview" },
+        moodle_file: null,
+      };
+    }
+
+    try {
+      const overview = await resolveGetWeeklyOverview(
+        {
+          courseName: courseIntent.course,
+          weekNumber: courseIntent.type === "specific_week" ? courseIntent.week : undefined,
+        },
+        {
+          uid,
+          decrypt: decryptSecret,
+          db,
+          moodleRepo,
+        }
+      );
+
+      return {
+        reply: overview,
+        primary_url: null,
+        best_score: 0,
+        sources: [],
+        ed_intent_detected: false,
+        ed_intent: null,
+        moodle_intent_detected: true,
+        moodle_intent: { type: "course_overview" },
+        moodle_file: null,
+      };
+    } catch (e: any) {
+      logger.error("answerWithRagFn.courseIntentFailed", {
+        error: String(e),
+        message: e?.message,
+        stack: e?.stack,
+        course: courseIntent.course,
+        week: courseIntent.week ?? null,
+        uid,
+      });
+      return {
+        reply: `Impossible de récupérer le récapitulatif Moodle pour "${courseIntent.course}": ${e?.message || "erreur inconnue"}`,
+        primary_url: null,
+        best_score: 0,
+        sources: [],
+        ed_intent_detected: false,
+        ed_intent: null,
+        moodle_intent_detected: true,
+        moodle_intent: { type: "course_overview" },
+        moodle_file: null,
+      };
+    }
+  }
+  // === End deterministic Moodle course intent ===
     const fetchIntentResult = detectFetchFromEdIntentCore(question);
     const { ed_fetch_intent_detected, ed_fetch_query } = fetchIntentResult;
 
