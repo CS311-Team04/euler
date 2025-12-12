@@ -262,7 +262,7 @@ function extractSectionHtml(section: any): string {
  * 
  * Flow:
  * 1. Check Firestore cache at `courses/{courseId}/weeks/{currentWeekId}`
- * 2. If cache miss or stale (>1 week), scrape Moodle
+ * 2. If cache miss or stale (>4 hours), scrape Moodle
  * 3. Parse HTML to Markdown
  * 4. Update cache
  * 5. Return markdown
