@@ -104,6 +104,10 @@ val MoodleYellow = Color(0xFFFFC107)
 val MoodleGray1 = Color(0xFF757575)
 val MoodleGray2 = Color(0xFF9E9E9E)
 
+// Moodle badge colors
+val MoodleOrangeLight = Color(0xFFFFF3E0) // Light Orange background
+val MoodleOrangeDark = Color(0xFFEF6C00) // Dark Orange for text/icon
+
 // Moodle Login UI colors (matching official Moodle login page)
 val MoodleLoginBackground = Color(0xFFECECEC) // Light gray background
 val MoodleLoginCardBackground = Color(0xFFFFFFFF) // White card

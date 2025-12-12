@@ -16,12 +16,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-
-private val MoodleOrangeLight = Color(0xFFFFF3E0) // Light Orange background
-private val MoodleOrangeDark = Color(0xFFEF6C00) // Dark Orange for text/icon
+import com.android.sample.ui.theme.Dimensions
+import com.android.sample.ui.theme.MoodleOrangeDark
+import com.android.sample.ui.theme.MoodleOrangeLight
 
 @Composable
 fun MoodleSourceBadge(metadata: MoodleMetadata, modifier: Modifier = Modifier) {
@@ -30,21 +28,24 @@ fun MoodleSourceBadge(metadata: MoodleMetadata, modifier: Modifier = Modifier) {
   val secondaryColor = MoodleOrangeDark.copy(alpha = 0.85f)
 
   Surface(
-      shape = RoundedCornerShape(12.dp),
+      shape = RoundedCornerShape(Dimensions.BadgeCornerRadius),
       color = badgeColor,
       tonalElevation = 0.dp,
       shadowElevation = 0.dp,
       modifier = modifier) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            horizontalArrangement = Arrangement.spacedBy(Dimensions.BadgeContentSpacing),
+            modifier =
+                Modifier.padding(
+                    horizontal = Dimensions.BadgePaddingHorizontal,
+                    vertical = Dimensions.BadgePaddingVertical)) {
               Icon(
                   imageVector = Icons.Outlined.School,
                   contentDescription = "Moodle Overview",
                   tint = onBadgeColor)
 
-              Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+              Column(verticalArrangement = Arrangement.spacedBy(Dimensions.TextVerticalSpacing)) {
                 Text(
                     text = "Moodle Overview • ${metadata.weekLabel}",
                     style = MaterialTheme.typography.labelLarge,
@@ -57,5 +58,5 @@ fun MoodleSourceBadge(metadata: MoodleMetadata, modifier: Modifier = Modifier) {
               }
             }
       }
-  Spacer(modifier = Modifier.height(4.dp))
+  Spacer(modifier = Modifier.height(Dimensions.BadgeSpacerHeight))
 }
