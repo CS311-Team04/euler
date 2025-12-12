@@ -293,6 +293,9 @@ dependencies {
     implementation(libs.datastore.core)
     implementation(libs.datastore.preferences)
 
+    // Markdown rendering for chat messages
+    implementation(libs.richtext.commonmark)
+    implementation(libs.richtext.ui.material3)
 }
 
 // JaCoCo configuration with Java 17 compatibility

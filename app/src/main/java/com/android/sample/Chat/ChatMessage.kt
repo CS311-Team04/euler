@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.sample.R
 import com.android.sample.settings.connectors.ConnectorsDimensions as Dimens
+import com.android.sample.ui.components.MarkdownText
 import com.android.sample.ui.theme.DarkSurfaceVariant
 import com.android.sample.ui.theme.EulerAudioButtonLoadingColor
 import com.android.sample.ui.theme.EulerAudioButtonTint
@@ -121,18 +122,18 @@ fun ChatMessage(
       }
     }
   } else {
-    // AI: full-width plain text
+    // AI: full-width markdown-rendered text
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
       if (isStreaming && message.text.isEmpty()) {
         LeadingThinkingDot(color = aiText)
       } else {
         Column(modifier = Modifier.fillMaxWidth()) {
-          Text(
-              text = message.text,
-              color = aiText,
-              style = MaterialTheme.typography.bodyMedium,
-              lineHeight = 20.sp,
-              modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+          // Use MarkdownText for AI messages to render rich formatting
+          MarkdownText(
+              markdown = message.text,
+              textColor = aiText,
+              modifier = Modifier.fillMaxWidth().testTag("chat_ai_text")
+          )
 
           if (audioState != null) {
             Spacer(modifier = Modifier.height(4.dp))
