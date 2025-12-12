@@ -65,6 +65,44 @@ describe("detectPostToEdIntentCore", () => {
       // "edstem" variations
       { input: "post sur edstem", expectedIntent: "post_question" },
       { input: "publie sur ed discussion", expectedIntent: "post_question" },
+      
+      // === ENGLISH PATTERNS ===
+      // Basic "post on ed" patterns
+      { input: "post on ed", expectedIntent: "post_question" },
+      { input: "post this on ED", expectedIntent: "post_question" },
+      { input: "publish on ed", expectedIntent: "post_question" },
+      { input: "share on ed", expectedIntent: "post_question" },
+      { input: "send to ed", expectedIntent: "post_question" },
+      
+      // "put/add/submit" patterns
+      { input: "put this on ed", expectedIntent: "post_question" },
+      { input: "add to ed", expectedIntent: "post_question" },
+      { input: "submit to ed", expectedIntent: "post_question" },
+      
+      // "ask/create" patterns
+      { input: "ask on ed", expectedIntent: "post_question" },
+      { input: "create a post on ed", expectedIntent: "post_question" },
+      { input: "make a thread on ed", expectedIntent: "post_question" },
+      { input: "start a discussion on ed", expectedIntent: "post_question" },
+      
+      // "can you/please" patterns
+      { input: "can you post this on ed", expectedIntent: "post_question" },
+      { input: "could you share on ed", expectedIntent: "post_question" },
+      { input: "please post on ed", expectedIntent: "post_question" },
+      
+      // "I want/need" patterns
+      { input: "I want to post on ed", expectedIntent: "post_question" },
+      { input: "I need to share this on ed", expectedIntent: "post_question" },
+      { input: "I would like to publish on ed", expectedIntent: "post_question" },
+      
+      // With context/sentences (English)
+      { input: "I have a math question, please post it on ed", expectedIntent: "post_question" },
+      { input: "Could you share this on ED Discussion?", expectedIntent: "post_question" },
+      { input: "Post this question about homework on edstem", expectedIntent: "post_question" },
+      
+      // "share this on ED" direct patterns
+      { input: "share this on ED", expectedIntent: "post_question" },
+      { input: "post this to edstem", expectedIntent: "post_question" },
     ];
 
     test.each(positiveTestCases)(
@@ -130,6 +168,15 @@ describe("detectPostToEdIntentCore", () => {
       "poster une affiche",
       "publier un article",
       "poste de travail",
+      
+      // English questions ABOUT ED (should NOT trigger post intent)
+      "what is ED?",
+      "how does ED work?",
+      "how to use ed?",
+      "where is ED?",
+      "where can I find ED?",
+      "explain ED to me",
+      "tell me about ED",
     ];
 
     test.each(negativeTestCases)(
@@ -169,16 +216,16 @@ describe("detectPostToEdIntentCore", () => {
 
 describe("buildEdIntentPromptForApertus", () => {
   it("should build prompt with user question", () => {
-    const prompt = buildEdIntentPromptForApertus("poste ma question sur ed");
-    expect(prompt).toContain("L'utilisateur souhaite poster une question sur ED Discussion");
-    expect(prompt).toContain("poste ma question sur ed");
-    expect(prompt).toContain("NE DIS PAS que la fonctionnalité n'est pas disponible");
+    const prompt = buildEdIntentPromptForApertus("post my question on ed");
+    expect(prompt).toContain("The user wants to post a question on ED Discussion");
+    expect(prompt).toContain("post my question on ed");
+    expect(prompt).toContain("DO NOT say that the feature is not available");
   });
 
   it("should include formatting instructions", () => {
     const prompt = buildEdIntentPromptForApertus("test");
     expect(prompt).toContain("FORMATTED_QUESTION");
     expect(prompt).toContain("FORMATTED_TITLE");
-    expect(prompt).toContain("formules de politesse");
+    expect(prompt).toContain("polite phrases");
   });
 });
