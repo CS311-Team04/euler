@@ -66,6 +66,22 @@ enum class CompactSourceType {
   FOOD // 🍴 food/restaurant indicator
 }
 
+private fun FirebaseFunctions.maybeUseEmulator(): FirebaseFunctions = apply {
+  if (BuildConfig.USE_FUNCTIONS_EMULATOR && isRunningOnEmulator()) {
+    useEmulator(BuildConfig.FUNCTIONS_HOST, BuildConfig.FUNCTIONS_PORT)
+  }
+}
+
+private fun isRunningOnEmulator(): Boolean {
+  val fingerprint = android.os.Build.FINGERPRINT.lowercase()
+  val model = android.os.Build.MODEL.lowercase()
+  return fingerprint.contains("generic") ||
+      fingerprint.startsWith("unknown") ||
+      model.contains("google_sdk") ||
+      model.contains("emulator") ||
+      model.contains("android sdk built for x86")
+}
+
 data class SourceMeta(
     val siteLabel: String? = null, // e.g. "EPFL.ch Website" or "Your Schedule"
     @StringRes val siteLabelRes: Int? = null,
@@ -188,15 +204,11 @@ class HomeViewModel(
   val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
   /**
-   * Firebase Functions handle for the chat backend. Uses local emulator when configured via
-   * BuildConfig flags.
+   * Firebase Functions handle for the chat backend. Uses local emulator only on Android emulators
+   * when explicitly enabled via BuildConfig.
    */
   private val functions: FirebaseFunctions by lazy {
-    FirebaseFunctions.getInstance(BuildConfig.FUNCTIONS_REGION).apply {
-      if (BuildConfig.USE_FUNCTIONS_EMULATOR) {
-        useEmulator(BuildConfig.FUNCTIONS_HOST, BuildConfig.FUNCTIONS_PORT)
-      }
-    }
+    FirebaseFunctions.getInstance(BuildConfig.FUNCTIONS_REGION).maybeUseEmulator()
   }
 
   private val edPostDataSource: EdPostRemoteDataSource by lazy {
@@ -418,42 +430,53 @@ class HomeViewModel(
                             .distinctBy { it.id }
                             .sortedBy { it.createdAt }
 
-                    // Preserve locally added cards (source cards, attachments) that are not in
-                    // Firestore
-                    val existingExtraCards =
-                        currentState.messages.filter {
-                          (it.source != null || it.attachment != null) && it.text.isBlank()
-                        }
-
                     val firestoreMessages = msgs.map { (dto, messageId) -> dto.toUi(messageId) }
 
-                    val finalMessages = mutableListOf<ChatUIModel>()
+                    // Detect if we're switching conversations or syncing the same one
+                    val firestoreTexts =
+                        firestoreMessages
+                            .mapNotNull { it.text.takeIf { t -> t.isNotBlank() } }
+                            .toSet()
+                    val localTexts =
+                        currentState.messages
+                            .mapNotNull { it.text.takeIf { t -> t.isNotBlank() } }
+                            .toSet()
+                    val isSameConversation = firestoreTexts.any { it in localTexts }
 
-                    finalMessages.addAll(firestoreMessages)
-
-                    existingExtraCards.forEach { extraCard ->
-                      val originalIndex =
-                          currentState.messages.indexOfFirst { it.id == extraCard.id }
-                      if (originalIndex > 0) {
-                        val precedingAssistant = currentState.messages[originalIndex - 1]
-                        if (precedingAssistant.type == ChatType.AI &&
-                            precedingAssistant.text.isNotBlank()) {
-                          val firestoreIndex =
-                              finalMessages.indexOfFirst {
-                                it.type == ChatType.AI && it.text == precedingAssistant.text
-                              }
-                          if (firestoreIndex >= 0) {
-                            finalMessages.add(firestoreIndex + 1, extraCard)
-                          } else {
-                            finalMessages.add(extraCard)
-                          }
-                        } else {
-                          finalMessages.add(extraCard)
-                        }
-                      } else {
-                        finalMessages.add(extraCard)
-                      }
+                    if (!isSameConversation) {
+                      // Switching conversations - don't preserve local source/attachment
+                      return@update currentState.copy(
+                          messages = firestoreMessages,
+                          edPostCards = allEdCards,
+                          edPostsCards = allEdPostsCards)
                     }
+
+                    // Same conversation - preserve source/attachment from local state
+                    val localSourceByText =
+                        currentState.messages
+                            .filter { it.type == ChatType.AI && it.source != null }
+                            .associateBy { it.text }
+                    val localAttachmentByText =
+                        currentState.messages
+                            .filter { it.type == ChatType.AI && it.attachment != null }
+                            .associateBy { it.text }
+
+                    val finalMessages =
+                        firestoreMessages.map { msg ->
+                          if (msg.type == ChatType.AI) {
+                            val localSource = localSourceByText[msg.text]?.source
+                            val localAttachment = localAttachmentByText[msg.text]?.attachment
+                            if (localSource != null || localAttachment != null) {
+                              msg.copy(
+                                  source = localSource ?: msg.source,
+                                  attachment = localAttachment ?: msg.attachment)
+                            } else {
+                              msg
+                            }
+                          } else {
+                            msg
+                          }
+                        }
 
                     currentState.copy(
                         messages = finalMessages,
@@ -1102,15 +1125,9 @@ class HomeViewModel(
                   "startStreaming: No ED fetch intent detected, continuing with normal streaming")
             }
 
-            // Handle ED fetch intent detection first (takes precedence)
-            if (handleEdFetchIntent(reply, question, messageId, userMessageId = userMessageId)) {
-              // Skip normal streaming; ED fetch flow takes over
-              return@launch
-            }
-
             // Handle ED intent detection - create PostOnEd pending action
-            val handled = handleEdIntent(reply, question, messageId)
-            if (handled) {
+            val postHandled = handleEdIntent(reply, question, messageId)
+            if (postHandled) {
               // Skip normal streaming; ED flow takes over
               return@launch
             }
@@ -1118,26 +1135,12 @@ class HomeViewModel(
             // simulate stream into the placeholder AI message
             simulateStreamingFromText(messageId, reply.reply)
 
-            // If backend returned a URL, surface it as an attachment card in the chat (keep user
-            // in-app)
-            reply.url?.let { pdfUrl ->
-              val attachment = ChatAttachment(url = pdfUrl)
-              _uiState.update { state ->
-                state.copy(
-                    messages =
-                        state.messages +
-                            ChatUIModel(
-                                id = UUID.randomUUID().toString(),
-                                text = "",
-                                timestamp = System.currentTimeMillis(),
-                                type = ChatType.AI,
-                                attachment = attachment),
-                    streamingSequence = state.streamingSequence + 1)
-              }
-            }
+            // Build attachment if backend returned a PDF URL
+            val attachment: ChatAttachment? =
+                reply.url?.takeIf { isPdfUrl(it) }?.let { pdfUrl -> ChatAttachment(url = pdfUrl) }
 
-            // add optional source card based on source type
-            val meta: SourceMeta? =
+            // Build optional source card based on source type
+            val sourceMeta: SourceMeta? =
                 when (reply.sourceType) {
                   SourceType.SCHEDULE -> {
                     // Schedule source - show a small indicator
@@ -1175,18 +1178,21 @@ class HomeViewModel(
                   SourceType.NONE -> null
                 }
 
-            meta?.let { sourceMeta ->
-              _uiState.update { s ->
-                s.copy(
-                    messages =
-                        s.messages +
-                            ChatUIModel(
-                                id = UUID.randomUUID().toString(),
-                                text = "",
-                                timestamp = System.currentTimeMillis(),
-                                type = ChatType.AI,
-                                source = sourceMeta),
-                    streamingSequence = s.streamingSequence + 1)
+            // Update the existing AI message with attachment and/or source (instead of creating new
+            // messages)
+            if (attachment != null || sourceMeta != null) {
+              _uiState.update { state ->
+                val updated =
+                    state.messages.map { msg ->
+                      if (msg.id == messageId) {
+                        msg.copy(
+                            attachment = attachment ?: msg.attachment,
+                            source = sourceMeta ?: msg.source)
+                      } else {
+                        msg
+                      }
+                    }
+                state.copy(messages = updated, streamingSequence = state.streamingSequence + 1)
               }
             }
 
@@ -1266,6 +1272,28 @@ class HomeViewModel(
   internal suspend fun simulateStreamingForTest(messageId: String, fullText: String) {
     simulateStreamingFromText(messageId, fullText)
     clearStreamingState(messageId)
+  }
+
+  internal fun isPdfUrl(url: String): Boolean {
+    val normalized = url.lowercase()
+    val uri = runCatching { Uri.parse(url) }.getOrNull()
+
+    // Strip query/fragment and check path
+    val path = (uri?.path ?: url).lowercase()
+    val pathTrimmed = path.substringBefore('#').substringBefore('?')
+    if (pathTrimmed.endsWith(".pdf") || pathTrimmed.contains(".pdf")) return true
+
+    // Check path segments just in case (e.g., tokenized paths)
+    val segments = uri?.pathSegments.orEmpty().map { it.lowercase() }
+    if (segments.any { it.endsWith(".pdf") || it.contains(".pdf") }) return true
+
+    // Check query parameter values (some backends return ?file=xxx.pdf)
+    val queryValues =
+        uri?.queryParameterNames?.mapNotNull { key -> uri.getQueryParameter(key)?.lowercase() }
+            ?: emptyList()
+    if (queryValues.any { it.contains(".pdf") }) return true
+
+    return normalized.contains(".pdf")
   }
 
   private suspend fun appendStreamingChunk(messageId: String, chunk: String) =

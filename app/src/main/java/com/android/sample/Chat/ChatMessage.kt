@@ -331,7 +331,8 @@ private fun AttachmentCard(
     onDownload: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-  val bg = DarkSurfaceVariant
+  val colorScheme = MaterialTheme.colorScheme
+  val bg = colorScheme.surfaceVariant
   val accent = MoodleOrange
   val borderStroke = BorderStroke(Dimens.CardBorderWidth, accent)
   val cardPadding = Dimens.ScreenContentSpacing + Dimens.CardTitleSubtitleSpacer
@@ -346,7 +347,7 @@ private fun AttachmentCard(
             horizontalArrangement = Arrangement.spacedBy(Dimens.CardTitleSubtitleSpacer)) {
               Surface(
                   shape = RoundedCornerShape(Dimens.LogoCornerRadius),
-                  color = DarkSurfaceVariant,
+                  color = colorScheme.surfaceVariant,
                   modifier = Modifier.size(Dimens.LogoSize)) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                       Image(
