@@ -6,7 +6,6 @@ import com.android.sample.Chat.ChatType
 import com.android.sample.conversations.CachedResponseRepository
 import com.android.sample.conversations.Conversation
 import com.android.sample.conversations.ConversationRepository
-import com.android.sample.conversations.MessageDTO
 import com.android.sample.llm.FakeLlmClient
 import com.android.sample.network.FakeNetworkConnectivityMonitor
 import com.android.sample.util.MainDispatcherRule
@@ -16,8 +15,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -96,9 +95,9 @@ class HomeViewModelOfflineCacheCoverageTest {
     whenever(user.uid).thenReturn("test-uid")
 
     // Mock repository flows for signed-in users (no emissions to avoid clearing local UI)
-    whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
-    whenever(repo.messagesFlow(any()))
-        .thenReturn(MutableSharedFlow<List<Pair<MessageDTO, String>>>(replay = 0))
+    // Use emptyFlow() for conversations to prevent auto-selection logic from running
+    whenever(repo.conversationsFlow()).thenReturn(emptyFlow())
+    whenever(repo.messagesFlow(any())).thenReturn(emptyFlow())
 
     networkMonitor = FakeNetworkConnectivityMonitor(initialOnline = true)
   }
@@ -246,11 +245,19 @@ class HomeViewModelOfflineCacheCoverageTest {
     advanceUntilIdle()
     vm.awaitStreamingCompletion()
 
+    // Additional wait to ensure error handling completes
+    delay(200)
+    advanceUntilIdle()
+
     // Verify error message is shown
     val messages = vm.uiState.first().messages
-    assertTrue("Should have user message", messages.any { it.type == ChatType.USER })
+    assertTrue(
+        "Should have user message, got ${messages.size} messages: ${messages.map { "${it.type}: ${it.text.take(50)}" }}",
+        messages.any { it.type == ChatType.USER })
     val aiMessage = messages.find { it.type == ChatType.AI }
-    assertNotNull("Should have AI message", aiMessage)
+    assertNotNull(
+        "Should have AI message with error, got ${messages.size} messages: ${messages.map { "${it.type}: ${it.text.take(50)}" }}",
+        aiMessage)
   }
 
   @Test
@@ -530,9 +537,9 @@ class HomeViewModelOfflineCacheCoverageTest {
     advanceUntilIdle()
     vm.awaitStreamingCompletion()
 
-    // Verify sending completes
+    // Verify sending completes (isSending should be false)
     val state = vm.uiState.first()
-    assertTrue("Should have messages", state.messages.isNotEmpty())
+    assertFalse("isSending should be false after completion", state.isSending)
   }
 
   @Test

@@ -2063,6 +2063,7 @@ class HomeViewModelTest {
             sourceCards.size >= 2)
 
         // Find indices of AI messages and source cards
+        @Suppress("UNUSED_VARIABLE")
         val aiMessages = finalMessages.filter { it.type == ChatType.AI && it.text.isNotBlank() }
         val ai1Index = finalMessages.indexOfFirst { it.type == ChatType.AI && it.text == aiText1 }
         val source1Index = finalMessages.indexOfFirst { it.source?.url == sourceMeta1.url }
