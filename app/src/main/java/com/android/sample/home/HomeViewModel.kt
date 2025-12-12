@@ -1011,21 +1011,23 @@ class HomeViewModel(
 
             // If backend returned a URL, surface it as an attachment card in the chat (keep user
             // in-app)
-            reply.url?.takeIf { isPdfUrl(it) }?.let { pdfUrl ->
-              val attachment = ChatAttachment(url = pdfUrl)
-              _uiState.update { state ->
-                state.copy(
-                    messages =
-                        state.messages +
-                            ChatUIModel(
-                                id = UUID.randomUUID().toString(),
-                                text = "",
-                                timestamp = System.currentTimeMillis(),
-                                type = ChatType.AI,
-                                attachment = attachment),
-                    streamingSequence = state.streamingSequence + 1)
-              }
-            }
+            reply.url
+                ?.takeIf { isPdfUrl(it) }
+                ?.let { pdfUrl ->
+                  val attachment = ChatAttachment(url = pdfUrl)
+                  _uiState.update { state ->
+                    state.copy(
+                        messages =
+                            state.messages +
+                                ChatUIModel(
+                                    id = UUID.randomUUID().toString(),
+                                    text = "",
+                                    timestamp = System.currentTimeMillis(),
+                                    type = ChatType.AI,
+                                    attachment = attachment),
+                        streamingSequence = state.streamingSequence + 1)
+                  }
+                }
 
             // add optional source card based on source type
             val meta: SourceMeta? =

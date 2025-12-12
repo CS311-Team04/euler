@@ -18,5 +18,3 @@ class HomeViewModelPdfDetectionTest {
     assertFalse(vm.isPdfUrl("https://example.com/page.html?token=abc123"))
   }
 }
-
-
