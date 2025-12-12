@@ -2349,7 +2349,7 @@ class HomeViewModelTest {
 
     val viewModel = HomeViewModel(fakeLlm, auth, repo)
 
-    viewModel.updateMessageDraft("Montre moi ce post ED")
+    viewModel.updateMessageDraft("show this ED post")
     viewModel.sendMessage()
 
     advanceUntilIdle()
