@@ -149,6 +149,7 @@ class ConversationRepositoryTest {
     whenever(conversationsCollection.document("conv-x")).thenReturn(conversationDocument)
     whenever(conversationDocument.collection("messages")).thenReturn(messagesCollection)
     whenever(messagesCollection.document()).thenReturn(msgDocument)
+    whenever(msgDocument.id).thenReturn("msg-id")
 
     doAnswer { invocation ->
           val lambda = invocation.arguments[0]

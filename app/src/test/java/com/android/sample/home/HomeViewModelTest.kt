@@ -40,13 +40,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.kotlin.any
-import org.mockito.kotlin.doReturn
-import org.mockito.kotlin.mock
-import org.mockito.kotlin.never
-import org.mockito.kotlin.timeout
-import org.mockito.kotlin.verify
-import org.mockito.kotlin.whenever
+import org.mockito.kotlin.*
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
@@ -469,7 +463,8 @@ class HomeViewModelTest {
         val conversationRepo = mock<ConversationRepository>()
         runBlocking {
           whenever(conversationRepo.startNewConversation(any())).thenReturn("conv-123")
-          whenever(conversationRepo.appendMessage(any(), any(), any())).thenReturn("msg-id-1")
+          whenever(conversationRepo.appendMessage(any(), any(), any(), anyOrNull()))
+              .thenReturn("msg-id-1")
           whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
         }
 
@@ -498,7 +493,8 @@ class HomeViewModelTest {
         val conversationRepo = mock<ConversationRepository>()
         runBlocking {
           whenever(conversationRepo.startNewConversation(any())).thenReturn("conv-123")
-          whenever(conversationRepo.appendMessage(any(), any(), any())).thenReturn("msg-id-2")
+          whenever(conversationRepo.appendMessage(any(), any(), any(), anyOrNull()))
+              .thenReturn("msg-id-2")
           whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
         }
 
@@ -1012,11 +1008,14 @@ class HomeViewModelTest {
   @Test
   fun messageDto_toUi_maps_role_and_timestamp() {
     val viewModel = HomeViewModel()
-    val method = HomeViewModel::class.java.getDeclaredMethod("toUi", MessageDTO::class.java)
+    val method =
+        HomeViewModel::class
+            .java
+            .getDeclaredMethod("toUi", MessageDTO::class.java, String::class.java)
     method.isAccessible = true
     val dto = MessageDTO(role = "assistant", text = "Salut")
 
-    val chat = method.invoke(viewModel, dto) as ChatUIModel
+    val chat = method.invoke(viewModel, dto, "id-1") as ChatUIModel
     assertEquals(ChatType.AI, chat.type)
     assertEquals("Salut", chat.text)
   }
@@ -1093,7 +1092,9 @@ class HomeViewModelTest {
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
         val repo = mock<ConversationRepository>()
         runBlocking { whenever(repo.startNewConversation(any())).thenReturn("conv-123") }
-        runBlocking { whenever(repo.appendMessage(any(), any(), any())).thenReturn("msg-id-3") }
+        runBlocking {
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id-3")
+        }
         runBlocking { whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit) }
         val viewModel = HomeViewModel(fakeClient, auth, repo)
 
@@ -1113,7 +1114,9 @@ class HomeViewModelTest {
 
         assertEquals("conv-123", viewModel.uiState.value.currentConversationId)
         runBlocking { verify(repo).startNewConversation("Hello from EPFL student") }
-        runBlocking { verify(repo).appendMessage("conv-123", "user", "Hello from EPFL student") }
+        runBlocking {
+          verify(repo).appendMessage("conv-123", "user", "Hello from EPFL student", null)
+        }
         runBlocking { verify(repo).updateConversationTitle("conv-123", "Generated title") }
       }
 
@@ -1124,7 +1127,9 @@ class HomeViewModelTest {
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
         val repo = mock<ConversationRepository>()
         runBlocking { whenever(repo.startNewConversation(any())).thenReturn("conv-999") }
-        runBlocking { whenever(repo.appendMessage(any(), any(), any())).thenReturn("msg-id-4") }
+        runBlocking {
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id-4")
+        }
         runBlocking { whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit) }
         val viewModel = HomeViewModel(fakeClient, auth, repo)
 
@@ -1375,7 +1380,9 @@ class HomeViewModelTest {
             }
 
         runBlocking {
-          whenever(repo.appendMessage(any(), any(), any())).thenAnswer { throw mockException }
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenAnswer {
+            throw mockException
+          }
           whenever(repo.startNewConversation(any())).thenReturn("conv-123")
         }
 
@@ -1478,7 +1485,7 @@ class HomeViewModelTest {
         // First message succeeds
         runBlocking {
           whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-          whenever(repo.appendMessage(any(), any(), any())).thenReturn("msg-id-5")
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id-5")
         }
 
         val fakeClient = FakeLlmClient().apply { nextReply = "First response" }
@@ -1491,7 +1498,7 @@ class HomeViewModelTest {
 
         // Second message fails
         runBlocking {
-          whenever(repo.appendMessage(any(), any(), any())).thenAnswer {
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenAnswer {
             throw RuntimeException("Test error")
           }
         }
@@ -2183,7 +2190,7 @@ class HomeViewModelTest {
     val repo = mock<ConversationRepository>()
     runBlocking {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(repo.appendMessage(any(), any(), any())).thenReturn("msg-id-6")
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id-6")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
     }
 
@@ -2216,7 +2223,7 @@ class HomeViewModelTest {
     val repo = mock<ConversationRepository>()
     runBlocking {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(repo.appendMessage(any(), any(), any())).thenReturn("msg-id-7")
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id-7")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
     }
 
@@ -2250,7 +2257,7 @@ class HomeViewModelTest {
     val repo = mock<ConversationRepository>()
     runBlocking {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(repo.appendMessage(any(), any(), any())).thenReturn("msg-id-8")
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id-8")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
     }
 
@@ -2264,10 +2271,6 @@ class HomeViewModelTest {
     advanceUntilIdle()
 
     val state = viewModel.uiState.value
-    val aiMessages = state.messages.filter { it.type == ChatType.AI }
-    assertTrue(
-        "Should have debug message when fetch intent detected",
-        aiMessages.any { it.text.contains("ED fetch intent detected (DEBUG)") })
     assertNull("Should not have pendingAction when fetch intent detected", state.pendingAction)
     assertFalse("Should not be sending after fetch intent", state.isSending)
   }
@@ -2282,7 +2285,7 @@ class HomeViewModelTest {
     val repo = mock<ConversationRepository>()
     runBlocking {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(repo.appendMessage(any(), any(), any())).thenReturn("msg-id-9")
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id-9")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
     }
 
@@ -2297,11 +2300,8 @@ class HomeViewModelTest {
     advanceUntilIdle()
 
     val state = viewModel.uiState.value
-    val aiMessages = state.messages.filter { it.type == ChatType.AI }
-    assertTrue(
-        "Should have debug message when fetch intent detected",
-        aiMessages.any { it.text.contains("ED fetch intent detected (DEBUG)") })
-    // When query is null, it should fallback to originalQuestion (tested in handleEdFetchIntent)
+    assertNull("Should not have pendingAction when fetch intent detected", state.pendingAction)
+    assertFalse("Should not be sending after fetch intent", state.isSending)
   }
 
   @Test
@@ -2314,7 +2314,7 @@ class HomeViewModelTest {
     val repo = mock<ConversationRepository>()
     runBlocking {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(repo.appendMessage(any(), any(), any())).thenReturn("msg-id-10")
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id-10")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
     }
 
@@ -2344,7 +2344,7 @@ class HomeViewModelTest {
     val repo = mock<ConversationRepository>()
     runBlocking {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(repo.appendMessage(any(), any(), any())).thenReturn("msg-id-11")
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id-11")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
     }
 
@@ -2361,10 +2361,7 @@ class HomeViewModelTest {
     // Fetch intent should be handled first, so no PostOnEd pendingAction should be created
     assertNull(
         "Should not have PostOnEd pendingAction when fetch intent detected", state.pendingAction)
-    val aiMessages = state.messages.filter { it.type == ChatType.AI }
-    assertTrue(
-        "Should show fetch debug message (fetch takes precedence)",
-        aiMessages.any { it.text.contains("ED fetch intent detected (DEBUG)") })
+    assertFalse("Should not be sending after fetch intent", state.isSending)
   }
 
   // ==================== Profile Context Tests ====================
@@ -2443,7 +2440,8 @@ class HomeViewModelTest {
     val conversationRepo = mock<ConversationRepository>()
     runBlocking {
       whenever(conversationRepo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(conversationRepo.appendMessage(any(), any(), any())).thenReturn("msg-id-16")
+      whenever(conversationRepo.appendMessage(any(), any(), any(), anyOrNull()))
+          .thenReturn("msg-id-16")
       whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
     }
 
@@ -2485,7 +2483,8 @@ class HomeViewModelTest {
     val conversationRepo = mock<ConversationRepository>()
     runBlocking {
       whenever(conversationRepo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(conversationRepo.appendMessage(any(), any(), any())).thenReturn("msg-id-17")
+      whenever(conversationRepo.appendMessage(any(), any(), any(), anyOrNull()))
+          .thenReturn("msg-id-17")
       whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
     }
 

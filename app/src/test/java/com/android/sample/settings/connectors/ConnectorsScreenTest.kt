@@ -39,10 +39,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ConnectorsScreenTest {
 
   @get:Rule val composeRule = createComposeRule()
@@ -61,6 +63,7 @@ class ConnectorsScreenTest {
               .build())
     }
     Dispatchers.setMain(testDispatcher)
+    AppSettings.clearForTests()
     AnimationConfig.disableAnimations = true
     TestFlags.fakeEmail = ""
     AppSettings.setLanguage(Language.EN)
@@ -69,6 +72,7 @@ class ConnectorsScreenTest {
   @After
   fun teardown() {
     Dispatchers.resetMain()
+    AppSettings.clearForTests()
     AnimationConfig.disableAnimations = false
     TestFlags.fakeEmail = null
   }
