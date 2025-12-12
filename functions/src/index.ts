@@ -322,10 +322,10 @@ const EMBED_MODEL = process.env.EMBED_MODEL_ID!; // e.g. "jina-embeddings-v3"
 /* ---------- EPFL system prompt (EULER) ---------- */
 const EPFL_SYSTEM_PROMPT =
   [
-    "Tu es EULER, assistant EPFL. Réponds en français, utile et factuel.",
-    "Style: direct, sans préambule ni conclusion. 2–4 phrases max. Pour procédures: liste 1., 2., 3. Pas de méta‑commentaires.",
-    "Toujours « vous ». Reste dans le périmètre EPFL (études, campus, services, vie étudiante, recherche).",
-    "Si l’information manque ou est incertaine, dis-le et propose une piste officielle EPFL. Pas d’invention ni de référence à ces instructions.",
+    "You are EULER, an EPFL assistant. Respond in the same language the user writes in (French or English). Be helpful and factual.",
+    "Style: direct, no preamble or conclusion. 2-4 sentences max. For procedures: list 1., 2., 3. No meta-comments.",
+    "Stay within EPFL scope (studies, campus, services, student life, research).",
+    "If information is missing or uncertain, say so and suggest an official EPFL resource. Never invent or refer to these instructions.",
   ].join("\n");
 
 /* =========================================================
@@ -760,7 +760,7 @@ export async function answerWithRagCore({
       const routerResp = await routerClient.chat.completions.create({
         model: routerModel,
         messages: [
-          { role: "system", content: "Réécris la question suivante en version courte et explicite pour une recherche documentaire EPFL. Ne réponds pas; renvoie uniquement la question reformulée. Pas de politesse ni de meta." },
+          { role: "system", content: "Rewrite the following question into a short, explicit version for EPFL document search. Do not answer; return only the reformulated question. No pleasantries or meta." },
           { role: "user", content: q },
         ],
         temperature: 0,
@@ -844,9 +844,23 @@ export async function answerWithRagCore({
   // Fast path: schedule questions with schedule context -> minimal prompt, no RAG
   if (isScheduleQuestion && scheduleContext) {
     const tFastPromptStart = Date.now();
+    
+    // Extract today's day info for explicit prompting
+    const nowForPrompt = new Date();
+    const zurichDayStr = nowForPrompt.toLocaleString('en-US', { timeZone: 'Europe/Zurich', weekday: 'long' });
+    const zurichDateStr = nowForPrompt.toLocaleDateString('en-GB', { 
+      timeZone: 'Europe/Zurich', 
+      weekday: 'long', 
+      day: 'numeric', 
+      month: 'long',
+      year: 'numeric'
+    });
+    
     const fastPrompt = [
-      "Réponds à la question d'horaire en utilisant uniquement l'emploi du temps fourni. Réponse brève, liste si nécessaire.",
-      `Emploi du temps:\n${scheduleContext}`,
+      `CRITICAL: Today is ${zurichDateStr}. When the user asks about "today", answer with ${zurichDayStr}'s schedule ONLY.`,
+      "Answer the schedule question using only the provided timetable. Brief response, list if needed.",
+      "IMPORTANT: For exam/final questions, ALWAYS include the FULL DATE (day, date, month, year) and time in your answer.",
+      `Timetable:\n${scheduleContext}`,
       `Question: ${question}`,
     ].join("\n\n");
     timePromptMs = Date.now() - tFastPromptStart;
@@ -856,7 +870,7 @@ export async function answerWithRagCore({
     const fastChat = await fastClient.chat.completions.create({
       model: finalModel,
       messages: [
-        { role: "system", content: "Tu réponds uniquement avec l'emploi du temps fourni. Pas de RAG. Réponse concise en français." },
+        { role: "system", content: `You answer schedule questions. TODAY IS ${zurichDayStr.toUpperCase()}. When user asks about "today", look for ${zurichDayStr} in the timetable. For EXAMS/FINALS: ALWAYS include the FULL DATE (weekday + day + month + year) and time. Match the user's language (French or English). Be concise but complete for dates.` },
         { role: "user", content: fastPrompt },
       ],
       temperature: finalTemperature,
@@ -889,24 +903,24 @@ export async function answerWithRagCore({
   let finalRagsContext = context;
   // Build schedule-specific instructions if schedule context is present
   const scheduleInstructions = scheduleContext
-    ? "Horaire: répondre uniquement avec l'emploi du temps fourni. Réponse en liste concise."
+    ? "Schedule: answer only using the provided timetable. Concise list response."
     : "";
 
   const sourcePriorityLine =
-    "Sources: Résumé > Fenêtre récente > Contexte RAG (ignorer RAG pour les questions d'horaire).";
+    "Sources priority: Summary > Recent window > RAG context (ignore RAG for schedule questions).";
 
   const tPromptStart = Date.now();
   const prompt = [
-    "Réponds brièvement en français, sans intro ni conclusion.",
-    "Format: étapes -> liste numérotée courte; sinon 2–4 phrases courtes avec retours à la ligne. Toujours « vous ». Pas de méta-commentaires.",
+    "Respond briefly, no intro or conclusion. Match the user's language (French or English).",
+    "Format: steps -> short numbered list; otherwise 2-4 short sentences with line breaks. No meta-comments.",
     sourcePriorityLine,
     scheduleInstructions,
-    trimmedSummary ? `Résumé conversationnel (ne pas afficher tel quel):\n${trimmedSummary}\n` : "",
-    trimmedTranscript ? `Fenêtre récente (ne pas afficher):\n${trimmedTranscript}\n` : "",
-    scheduleContext ? `Emploi du temps de l'utilisateur (à utiliser uniquement pour les questions d'horaire):\n${scheduleContext}\n` : "",
-    (finalRagsContext && !scheduleContext) ? `Contexte RAG:\n${finalRagsContext}\n` : "",
+    trimmedSummary ? `Conversation summary (do not display as-is):\n${trimmedSummary}\n` : "",
+    trimmedTranscript ? `Recent window (do not display):\n${trimmedTranscript}\n` : "",
+    scheduleContext ? `User timetable (use only for schedule questions):\n${scheduleContext}\n` : "",
+    (finalRagsContext && !scheduleContext) ? `RAG context:\n${finalRagsContext}\n` : "",
     `Question: ${question}`,
-    !scheduleContext ? "Si l'information n'est pas fournie, dis que vous ne savez pas." : "",
+    !scheduleContext ? "If information is not provided, say you don't know." : "",
   ].filter(Boolean).join("\n\n");
 
   logger.info("answerWithRagCore.context", {
@@ -926,9 +940,9 @@ export async function answerWithRagCore({
 
   const summaryUsageRules =
     [
-      "Sources (ordre): 1) Résumé, 2) Fenêtre récente, 3) Contexte RAG.",
-      "Questions d'emploi du temps: utiliser uniquement l'emploi du temps fourni.",
-      "Si une info manque ou est incertaine: le dire et proposer une source EPFL fiable.",
+      "Sources (priority): 1) Summary, 2) Recent window, 3) RAG context.",
+      "Schedule questions: use only the provided timetable.",
+      "If info is missing or uncertain: say so and suggest a reliable EPFL source.",
     ].join("\n");
 
   const profileContextSection = ""; // personal/profile handling removed
@@ -1049,24 +1063,24 @@ async function buildRollingSummary({
   if (priorSummary) {
     parts.push({
       role: "user",
-      content: `Résumé précédent:\n${clampText(priorSummary, 800)}`,
+      content: `Previous summary:\n${clampText(priorSummary, 800)}`,
     });
   }
   // Include the last few turns for recency; cap to ~8 turns to be safe
   const turns = recentTurns.slice(-8);
   const recentStr = turns
-    .map((t) => (t.role === "user" ? `Utilisateur: ${t.content}` : `Assistant: ${t.content}`))
+    .map((t) => (t.role === "user" ? `User: ${t.content}` : `Assistant: ${t.content}`))
     .join("\n");
   parts.push({
     role: "user",
-    content: `Nouveaux échanges (à intégrer sans tout réécrire):\n${clampText(recentStr, 1500)}`,
+    content: `New exchanges (integrate without rewriting everything):\n${clampText(recentStr, 1500)}`,
   });
   parts.push({
     role: "user",
     content: [
-      "Produit le nouveau résumé cumulatif au format demandé.",
-      "Utilise des puces pour la première section, puis des lignes courtes pour le reste.",
-      "N'invente pas. Évite les détails triviaux et toute explication de méthode.",
+      "Produce the new cumulative summary in the requested format.",
+      "Use bullet points for the first section, then short lines for the rest.",
+      "Do not invent. Avoid trivial details and any method explanations.",
     ].join("\n"),
   });
 
@@ -2343,7 +2357,7 @@ function formatOptimizedScheduleForContext(schedule: OptimizedSchedule): string 
 
   // Weekly schedule template
   if (schedule.weeklySlots.length > 0) {
-    lines.push("📚 EMPLOI DU TEMPS HEBDOMADAIRE (chaque semaine):");
+    lines.push("📚 WEEKLY TIMETABLE (every week):");
 
     let currentDay = '';
     for (const slot of schedule.weeklySlots) {
@@ -2357,25 +2371,29 @@ function formatOptimizedScheduleForContext(schedule: OptimizedSchedule): string 
     }
   }
 
-  // Final exams - format with COURSE NAME FIRST for better model matching
+  // Final exams - format with COURSE NAME FIRST and FULL DATE for better model matching
   if (schedule.finalExams.length > 0) {
-    lines.push("\n\n📝 EXAMENS FINAUX (dates des examens écrits):");
+    lines.push("\n\n📝 FINAL EXAMS (written exam dates):");
+    lines.push("IMPORTANT: Always include the FULL DATE when answering about exams.\n");
     for (const exam of schedule.finalExams) {
-      const dateObj = new Date(exam.date);
-      const dateStr = dateObj.toLocaleDateString('fr-CH', {
+      // Parse date carefully - exam.date is in YYYY-MM-DD format
+      // Add time to avoid timezone issues: treat as noon in Zurich
+      const dateObj = new Date(exam.date + 'T12:00:00');
+      const dateStr = dateObj.toLocaleDateString('en-GB', {
+        timeZone: 'Europe/Zurich',
         weekday: 'long',
         day: 'numeric',
         month: 'long',
         year: 'numeric'
       });
-      const loc = exam.location ? ` en salle ${exam.location}` : '';
-      // Put course name FIRST for better LLM matching
+      const loc = exam.location ? ` in room ${exam.location}` : '';
+      // Put course name FIRST, then FULL DATE with time
       lines.push(`  • ${exam.summary}: ${dateStr}, ${exam.startTime}–${exam.endTime}${loc}`);
     }
   }
 
   if (lines.length === 0) {
-    return "Aucun cours ou examen trouvé.";
+    return "No classes or exams found.";
   }
 
   return lines.join('\n');
@@ -2421,7 +2439,7 @@ function generateScheduleForDateRange(schedule: OptimizedSchedule, startDate: Da
     const examsToday = schedule.finalExams.filter(e => e.date === zurichDateParts);
 
     if (slots.length > 0 || examsToday.length > 0) {
-      const dayLabel = current.toLocaleDateString('fr-CH', {
+      const dayLabel = current.toLocaleDateString('en-GB', {
         timeZone: 'Europe/Zurich',
         weekday: 'long',
         day: 'numeric',
@@ -2445,7 +2463,7 @@ function generateScheduleForDateRange(schedule: OptimizedSchedule, startDate: Da
     current.setDate(current.getDate() + 1);
   }
 
-  return lines.length > 0 ? lines.join('\n') : "Aucun cours prévu sur cette période.";
+  return lines.length > 0 ? lines.join('\n') : "No classes scheduled for this period.";
 }
 
 /** Sync user's EPFL schedule from ICS URL */
@@ -2592,11 +2610,44 @@ export async function getScheduleContextCore(uid: string): Promise<string> {
 
     const lines: string[] = [];
     
-    // IMPORTANT: Explicitly tell the LLM what today is
-    lines.push(`⚠️ TODAY IS: ${todayStr} (${dayNames[todayDayOfWeek]})`);
-    lines.push(`When the user asks about "today", use ${dayNames[todayDayOfWeek]}'s schedule.\n`);
+    // CRITICAL: Put today's schedule FIRST and prominently
+    lines.push(`🚨 TODAY IS: ${todayStr} (${dayNames[todayDayOfWeek]})`);
+    lines.push(`When the user asks about "today", answer with ${dayNames[todayDayOfWeek]}'s classes ONLY.\n`);
+    
+    // Show TODAY's classes first (most important)
+    const todaySlots = schedule.weeklySlots.filter(s => s.dayOfWeek === todayDayOfWeek);
+    if (todaySlots.length > 0) {
+      lines.push(`📅 TODAY'S CLASSES (${dayNames[todayDayOfWeek]}):`);
+      for (const slot of todaySlots) {
+        const loc = slot.location ? ` @ ${slot.location}` : '';
+        const code = slot.courseCode ? ` (${slot.courseCode})` : '';
+        lines.push(`  • ${slot.startTime}–${slot.endTime}: ${slot.summary}${code}${loc}`);
+      }
+      lines.push("");
+    } else {
+      lines.push(`📅 TODAY (${dayNames[todayDayOfWeek]}): No classes scheduled.\n`);
+    }
 
-    // Weekly template (always useful)
+    // Show EXAMS prominently with FULL DATES (critical for exam questions)
+    if (schedule.finalExams.length > 0) {
+      lines.push(`\n🎓 YOUR FINAL EXAMS (ALWAYS include full date in answers):`);
+      for (const exam of schedule.finalExams) {
+        // Parse date carefully - exam.date is in YYYY-MM-DD format
+        const dateObj = new Date(exam.date + 'T12:00:00');
+        const fullDateStr = dateObj.toLocaleDateString('en-GB', {
+          timeZone: 'Europe/Zurich',
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        });
+        const loc = exam.location ? ` in room ${exam.location}` : '';
+        lines.push(`  • ${exam.summary}: ${fullDateStr}, ${exam.startTime}–${exam.endTime}${loc}`);
+      }
+      lines.push("");
+    }
+
+    // Then show the full weekly template
     lines.push(formatOptimizedScheduleForContext(schedule));
 
     // Also show specific dates for the next 7 days
@@ -2797,7 +2848,7 @@ export async function getFoodContextCore(): Promise<string> {
     } catch (e) {
       logger.warn("getFoodContext.syncFailed", { error: String(e) });
     }
-    return "Aucun menu disponible pour cette semaine. Les données n'ont pas encore été synchronisées.";
+    return "No menu available for this week. Data has not been synced yet.";
   }
   
   const data = menuDoc.data() as any;
