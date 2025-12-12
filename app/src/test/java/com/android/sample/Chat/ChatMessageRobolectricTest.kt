@@ -45,4 +45,3 @@ class ChatMessageRobolectricTest {
     composeRule.onNodeWithTag("chat_ai_moodle_badge").assertIsDisplayed()
   }
 }
-

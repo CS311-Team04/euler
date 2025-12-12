@@ -34,4 +34,3 @@ class MoodleBadgeRobolectricTest {
     composeRule.onNodeWithContentDescription("Moodle Overview").assertIsDisplayed()
   }
 }
-
