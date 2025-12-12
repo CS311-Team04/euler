@@ -74,8 +74,8 @@ object MarkdownStyles {
 /**
  * Full-featured Markdown renderer using the compose-richtext library.
  *
- * **When to use:** Use this for AI chat responses and any content that may contain complex
- * markdown structures like lists, code blocks, tables, or nested formatting.
+ * **When to use:** Use this for AI chat responses and any content that may contain complex markdown
+ * structures like lists, code blocks, tables, or nested formatting.
  *
  * Supports:
  * - **Bold** and *italic* text

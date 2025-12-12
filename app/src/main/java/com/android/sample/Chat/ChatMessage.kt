@@ -194,8 +194,7 @@ private fun AiMessageColumn(
         if (moodlePayload != null && moodleContent != null) {
           // Use MarkdownText for Moodle content to render rich formatting
           MarkdownText(
-              markdown = moodleContent,
-              modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+              markdown = moodleContent, modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
           Spacer(modifier = Modifier.height(8.dp))
           MoodleSourceBadge(
               metadata = moodlePayload.metadata,
@@ -203,8 +202,7 @@ private fun AiMessageColumn(
         } else {
           // Use MarkdownText for AI messages to render rich formatting
           MarkdownText(
-              markdown = message.text,
-              modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+              markdown = message.text, modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
         }
 
         if (audioState != null) {
