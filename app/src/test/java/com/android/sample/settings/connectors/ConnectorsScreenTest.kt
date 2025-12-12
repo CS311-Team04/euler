@@ -61,6 +61,7 @@ class ConnectorsScreenTest {
               .build())
     }
     Dispatchers.setMain(testDispatcher)
+    AppSettings.clearForTests()
     AnimationConfig.disableAnimations = true
     TestFlags.fakeEmail = ""
     AppSettings.setLanguage(Language.EN)
@@ -69,6 +70,7 @@ class ConnectorsScreenTest {
   @After
   fun teardown() {
     Dispatchers.resetMain()
+    AppSettings.clearForTests()
     AnimationConfig.disableAnimations = false
     TestFlags.fakeEmail = null
   }

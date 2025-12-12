@@ -72,7 +72,7 @@ class FirebaseFunctionsLlmClientTest {
 
     val result = client.generateReply("Ping")
 
-    assertEquals("Voici le document demandé.", result.reply)
+    assertEquals("Here is the requested document.", result.reply)
     assertNull(result.url)
   }
 

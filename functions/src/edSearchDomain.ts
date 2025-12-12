@@ -20,9 +20,9 @@ export type EdPostStatusFilter =
   | "unanswered"
   | "unread"
   | "resolved"
-  | "new_replies" 
-  | "approved"  
-  | "favorites" 
+  | "new_replies"
+  | "approved"
+  | "favorites"
   | "instructors";
 
 /**
@@ -224,7 +224,7 @@ function resolveCourseFromSynonyms(
  */
 function hasExplicitCategoryHint(userQuery: string): boolean {
   const lower = userQuery.toLowerCase();
-  
+
   // Exercise/problem set hints
   if (
     /\bps\d+/i.test(lower) || // ps5, ps6, etc.
@@ -234,7 +234,7 @@ function hasExplicitCategoryHint(userQuery: string): boolean {
   ) {
     return true;
   }
-  
+
   // Homework/assignment hints
   if (
     /\b(homework|homeworks|hw\s*\d+|hw\d+)\b/i.test(lower) ||
@@ -242,19 +242,19 @@ function hasExplicitCategoryHint(userQuery: string): boolean {
   ) {
     return true;
   }
-  
+
   // Module hints
   if (/\bmodule\s+\d+/i.test(lower)) {
     return true;
   }
-  
+
   return false;
 }
 
 /**
  * Applies LLM router output to fetchOptions (textQuery, limit, status, category).
  * This is a helper to avoid code duplication.
- * 
+ *
  * Category selection is conservative: we only apply category filters when:
  * - The chosen category is NOT "General" (we never filter by "General")
  * - The user query contains explicit exercise/module/homework hints
@@ -304,7 +304,7 @@ async function applyLLMParameters(
     // 3. The user query contains explicit exercise/module/homework hints
     if (catOutput.chosenCategory && categoryNames.includes(catOutput.chosenCategory)) {
       const chosenCategoryLower = catOutput.chosenCategory.toLowerCase();
-      
+
       // Never filter by "General" - let ED search across all categories
       if (chosenCategoryLower === "general") {
         logger.info("edCategoryLLM.result", {
