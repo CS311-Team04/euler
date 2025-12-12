@@ -1934,43 +1934,4 @@ class HomeViewModel(
     }
     return false
   }
-
-  /**
-   * Handles ED fetch intent detection from the LLM reply. If an ED fetch intent is detected, routes
-   * to the existing ED fetch flow. Currently surfaces a debug message to keep the UX responsive
-   * until the full fetch flow is wired.
-   *
-   * @param reply The BotReply from the LLM
-   * @param originalQuestion The original user question (used as fallback for fetch query)
-   * @param messageId The ID of the AI message being processed
-   * @return true if fetch intent was detected and handled, false otherwise
-   */
-  private fun handleEdFetchIntent(
-      reply: BotReply,
-      originalQuestion: String,
-      messageId: String
-  ): Boolean {
-    val fetchIntent = reply.edFetchIntent
-    if (!fetchIntent.detected) return false
-
-    val query = fetchIntent.query ?: originalQuestion
-    Log.d(TAG, "ED fetch intent detected with query: $query")
-
-    // Temporary UX: surface a debug message so we visibly react to the intent.
-    val debugMessage =
-        ChatUIModel(
-            id = UUID.randomUUID().toString(),
-            text = "🔍 ED fetch intent detected (DEBUG) – this is a test message.",
-            timestamp = System.currentTimeMillis(),
-            type = ChatType.AI)
-
-    _uiState.update { state ->
-      state.copy(
-          messages = state.messages + debugMessage,
-          streamingSequence = state.streamingSequence + 1,
-          streamingMessageId = null,
-          isSending = false)
-    }
-    return true
-  }
 }
