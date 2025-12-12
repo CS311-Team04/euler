@@ -282,7 +282,7 @@ export async function getCourseOverview(
 ): Promise<CourseOverviewResult> {
   const { uid, decrypt } = userContext;
   const currentWeekId = getCurrentWeekId();
-  const cacheWeekId = typeof targetWeekNumber === "number" ? `specific-week-${targetWeekNumber}` : currentWeekId;
+  const cacheWeekId = typeof targetWeekNumber === "number" ? `specific-week-${targetWeekNumber}` : currentWeekId;//This is a deterministic lookup key. It may differ from the human-readable 'weekId' stored inside the document.
 
   logger.info("getCourseOverview.start", {
     courseName,
