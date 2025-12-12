@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import com.android.sample.ui.theme.Dimensions
 import com.android.sample.ui.theme.MoodleOrangeDark
 import com.android.sample.ui.theme.MoodleOrangeLight
