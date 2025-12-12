@@ -219,11 +219,15 @@ class HomeViewModelOfflineCacheCoverageTest {
     vm.sendMessage("Test question")
     advanceUntilIdle()
     vm.awaitStreamingCompletion()
+    
+    // Additional wait to ensure simulateStreamingFromText completes (it has delays)
+    delay(300)
+    advanceUntilIdle()
 
     // Should still show cached response despite persist failure
     val messages = vm.uiState.first().messages
     assertTrue(
-        "Should have AI message with cached response",
+        "Should have AI message with cached response, got ${messages.size} messages: ${messages.map { "${it.type}: ${it.text.take(50)}" }}",
         messages.any { it.type == ChatType.AI && it.text.contains("Cached response") })
   }
 

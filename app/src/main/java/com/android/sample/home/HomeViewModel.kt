@@ -891,6 +891,7 @@ class HomeViewModel(
               Log.d(TAG, "sendMessage: found cached response in local Firestore cache, using it")
               // Use cached response
               simulateStreamingFromText(aiMessageId, cachedResponse)
+              clearStreamingState(aiMessageId)
 
               // Persist to conversation if we have one
               val cid = _uiState.value.currentConversationId
