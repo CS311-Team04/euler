@@ -374,8 +374,8 @@ Contraintes/préférences : Section informatique (IC) préférée.`
       const systemMessage = calls[0][0].messages.find((m: any) => m.role === 'system');
       expect(systemMessage).toBeDefined();
       // System prompt should include our EPFL guardrails and sourcing rules
-      expect(systemMessage.content).toContain('assistant EPFL');
-      expect(systemMessage.content).toContain('Sources (ordre): 1) Résumé');
+      expect(systemMessage.content).toContain('EPFL assistant');
+      expect(systemMessage.content).toContain('Sources (priority): 1) Summary');
     });
 
     if (emulatorConnected) {

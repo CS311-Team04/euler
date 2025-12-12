@@ -60,12 +60,13 @@ export function extractFileInfo(question: string): {
   const trimmed = question.trim();
 
   // 1) Extract number closest to file type keywords (lecture/homework/solution)
+  // Supports both French and English keywords
   let number: string | null = null;
   
   // Try to find number near file type keywords first
-  const lectureNumMatch = trimmed.match(/\b(lecture|leçon|lesson|cours)\s*(\d+)/i);
-  const homeworkNumMatch = trimmed.match(/\b(devoir|homework|home\s*work|travail|serie|série)\s*(\d+)/i);
-  const solutionNumMatch = trimmed.match(/\b(solution|correction|corrigé)\s*(\d+)/i);
+  const lectureNumMatch = trimmed.match(/\b(lecture|lectures|leçon|lesson|cours|slide|slides)\s*(\d+)/i);
+  const homeworkNumMatch = trimmed.match(/\b(devoir|homework|home\s*work|travail|serie|série|assignment|exercise)\s*(\d+)/i);
+  const solutionNumMatch = trimmed.match(/\b(solution|solutions|correction|corrigé|answer|answers)\s*(\d+)/i);
   
   if (solutionNumMatch) {
     number = solutionNumMatch[2];
@@ -80,10 +81,11 @@ export function extractFileInfo(question: string): {
   }
 
   // 2) Detect file type by keywords (priority: solution > homework > lecture)
-  const isSolution = /\b(solution|correction|corrigé)\b/i.test(trimmed);
+  // Supports both French and English keywords
+  const isSolution = /\b(solution|solutions|correction|corrigé|answer|answers)\b/i.test(trimmed);
   const isHomework =
-    /\b(devoir|homework|home\s*work|travail|serie|série)\b/i.test(trimmed);
-  const isLecture = /\b(lecture|leçon|lesson|cours)\b/i.test(trimmed);
+    /\b(devoir|homework|home\s*work|travail|serie|série|assignment|exercise|exercises|exercice|exercices)\b/i.test(trimmed);
+  const isLecture = /\b(lecture|lectures|leçon|lesson|cours|slide|slides|notes|class\s*notes)\b/i.test(trimmed);
 
   let fileType: "lecture" | "homework" | "homework_solution" = "lecture";
   if (isSolution) fileType = "homework_solution";
