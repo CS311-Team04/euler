@@ -166,22 +166,28 @@ private fun AiMessageColumn(
     onDownloadAttachment: (ChatAttachment) -> Unit,
     modifier: Modifier = Modifier
 ) {
-  val moodlePayload = remember(message.text) { parseMoodleOverviewPayload(message.text) }
+  // Detect if this looks like a Moodle JSON response (check BEFORE parsing)
+  val looksLikeMoodleJson =
+      message.text.trimStart().startsWith("{") &&
+          (message.text.contains("\"type\":\"moodle") ||
+              message.text.contains("\"type\": \"moodle"))
+
+  // Only try to parse if it looks like Moodle JSON
+  val moodlePayload =
+      remember(message.text, looksLikeMoodleJson) {
+        if (looksLikeMoodleJson) parseMoodleOverviewPayload(message.text) else null
+      }
   val moodleContent =
       remember(moodlePayload) { moodlePayload?.let { cleanMoodleMarkdown(it.content) } }
 
-  // Detect if we're streaming a Moodle JSON response (incomplete JSON during streaming)
-  // This prevents showing raw JSON to the user while the response is being streamed
-  val isStreamingMoodleJson =
-      isStreaming &&
-          message.text.trimStart().startsWith("{") &&
-          message.text.contains("\"type\":\"moodle")
+  // Show loading if it looks like Moodle JSON but hasn't parsed successfully yet
+  val showMoodleLoading = looksLikeMoodleJson && moodlePayload == null
 
   Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
     if (isStreaming && message.text.isEmpty()) {
       LeadingThinkingDot(color = aiText)
-    } else if (isStreamingMoodleJson && moodlePayload == null) {
-      // Show friendly loading message while Moodle JSON is still streaming
+    } else if (showMoodleLoading) {
+      // Show friendly loading message while Moodle JSON is incomplete
       MoodleLoadingIndicator(color = aiText)
     } else {
       Column(modifier = Modifier.fillMaxWidth()) {
