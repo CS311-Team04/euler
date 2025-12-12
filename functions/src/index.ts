@@ -1789,8 +1789,8 @@ interface OptimizedSchedule {
   semesterEnd?: string;
 }
 
-/** Pattern to detect final exams */
-const EXAM_PATTERN = /\b(written|exam|examen|écrit|final)\b/i;
+/** Pattern to detect final exams (written or oral) */
+const EXAM_PATTERN = /\b(written|oral|exam|examen|écrit|final|midterm|test)\b/i;
 
 /** Extract course code from summary (e.g., "COM-300" from description) */
 function extractCourseCode(description?: string): string | undefined {
@@ -1818,13 +1818,13 @@ function parseICSOptimized(icsText: string): OptimizedSchedule {
       const colonIdx = line.indexOf(':');
       if (colonIdx === -1) continue;
 
-      let key = line.slice(0, colonIdx);
+      const fullKey = line.slice(0, colonIdx);
       const value = line.slice(colonIdx + 1);
 
-      const semicolonIdx = key.indexOf(';');
-      if (semicolonIdx !== -1) {
-        key = key.slice(0, semicolonIdx);
-      }
+      // Check if the key has parameters (like TZID)
+      const semicolonIdx = fullKey.indexOf(';');
+      const key = semicolonIdx !== -1 ? fullKey.slice(0, semicolonIdx) : fullKey;
+      const hasSwissTZ = fullKey.includes('TZID=Europe/Zurich');
 
       switch (key) {
         case 'UID':
@@ -1840,10 +1840,10 @@ function parseICSOptimized(icsText: string): OptimizedSchedule {
           currentEvent.description = value.replace(/\\,/g, ',').replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
           break;
         case 'DTSTART':
-          currentEvent.dtstart = parseICSDate(value);
+          currentEvent.dtstart = parseICSDate(value, hasSwissTZ);
           break;
         case 'DTEND':
-          currentEvent.dtend = parseICSDate(value);
+          currentEvent.dtend = parseICSDate(value, hasSwissTZ);
           break;
         case 'RRULE':
           currentEvent.rrule = value;
@@ -1855,10 +1855,30 @@ function parseICSOptimized(icsText: string): OptimizedSchedule {
   // Separate regular classes from exams
   const regularClasses: ScheduleEvent[] = [];
   const examEvents: ScheduleEvent[] = [];
+  
+  const now = new Date();
+  const fourWeeksFromNow = new Date(now.getTime() + 28 * 24 * 60 * 60 * 1000);
 
   for (const event of allEvents) {
-    if (EXAM_PATTERN.test(event.summary)) {
+    const eventDate = new Date(event.dtstart);
+    const eventEnd = new Date(event.dtend);
+    const durationHours = (eventEnd.getTime() - eventDate.getTime()) / (1000 * 60 * 60);
+    
+    // Treat as exam if:
+    // 1. Summary contains exam-related words (written, oral, exam, etc.)
+    // 2. OR event is far in the future (>4 weeks) with long duration (>3 hours) - likely an exam slot
+    const isExamByPattern = EXAM_PATTERN.test(event.summary);
+    const isExamByDateAndDuration = eventDate > fourWeeksFromNow && durationHours > 3;
+    
+    if (isExamByPattern || isExamByDateAndDuration) {
       examEvents.push(event);
+      logger.info("parseICSOptimized.examDetected", {
+        summary: event.summary,
+        date: event.dtstart,
+        byPattern: isExamByPattern,
+        byDateDuration: isExamByDateAndDuration,
+        durationHours,
+      });
     } else {
       regularClasses.push(event);
     }
@@ -1872,9 +1892,23 @@ function parseICSOptimized(icsText: string): OptimizedSchedule {
   for (const event of regularClasses) {
     const start = new Date(event.dtstart);
     const end = new Date(event.dtend);
-    const dayOfWeek = start.getDay();
-    const startTime = `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`;
-    const endTime = `${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`;
+    
+    // Get day of week in Swiss timezone
+    const dayOfWeek = getZurichDayOfWeek(start);
+    
+    // Get times in Swiss timezone (HH:MM format)
+    const startTime = start.toLocaleTimeString('en-GB', { 
+      timeZone: 'Europe/Zurich', 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      hour12: false 
+    });
+    const endTime = end.toLocaleTimeString('en-GB', { 
+      timeZone: 'Europe/Zurich', 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      hour12: false 
+    });
 
     // Create unique key for deduplication
     const key = `${dayOfWeek}-${startTime}-${event.summary}`;
@@ -1911,9 +1945,23 @@ function parseICSOptimized(icsText: string): OptimizedSchedule {
   for (const event of examEvents) {
     const start = new Date(event.dtstart);
     const end = new Date(event.dtend);
-    const dateStr = start.toISOString().split('T')[0];
-    const startTime = `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`;
-    const endTime = `${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`;
+    
+    // Get date in Swiss timezone (YYYY-MM-DD format)
+    const dateStr = start.toLocaleDateString('en-CA', { timeZone: 'Europe/Zurich' });
+    
+    // Get times in Swiss timezone (HH:MM format)
+    const startTime = start.toLocaleTimeString('en-GB', { 
+      timeZone: 'Europe/Zurich', 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      hour12: false 
+    });
+    const endTime = end.toLocaleTimeString('en-GB', { 
+      timeZone: 'Europe/Zurich', 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      hour12: false 
+    });
     const courseCode = extractCourseCode(event.description);
 
     // Dedupe by summary (one exam per course)
@@ -1944,18 +1992,35 @@ function parseICSOptimized(icsText: string): OptimizedSchedule {
   return { weeklySlots, finalExams };
 }
 
-/** Convert ICS date format to ISO string */
-function parseICSDate(icsDate: string): string {
+/** Convert ICS date format to ISO string with proper timezone handling */
+function parseICSDate(icsDate: string, isSwissTime: boolean = false): string {
   // Handle formats: 20251127T081500Z or 20251127T081500 or 20251127
+  const isUTC = icsDate.endsWith('Z');
   const clean = icsDate.replace('Z', '');
+  
   if (clean.length === 8) {
     // Date only: YYYYMMDD
-    return `${clean.slice(0, 4)}-${clean.slice(4, 6)}-${clean.slice(6, 8)}T00:00:00`;
+    const dateStr = `${clean.slice(0, 4)}-${clean.slice(4, 6)}-${clean.slice(6, 8)}T00:00:00`;
+    // If Swiss time, add timezone offset; if UTC, add Z; otherwise no suffix
+    return isSwissTime ? dateStr + '+01:00' : (isUTC ? dateStr + 'Z' : dateStr);
   }
+  
   // DateTime: YYYYMMDDTHHMMSS
   const datePart = clean.slice(0, 8);
   const timePart = clean.slice(9, 15);
-  return `${datePart.slice(0, 4)}-${datePart.slice(4, 6)}-${datePart.slice(6, 8)}T${timePart.slice(0, 2)}:${timePart.slice(2, 4)}:${timePart.slice(4, 6)}`;
+  const isoString = `${datePart.slice(0, 4)}-${datePart.slice(4, 6)}-${datePart.slice(6, 8)}T${timePart.slice(0, 2)}:${timePart.slice(2, 4)}:${timePart.slice(4, 6)}`;
+  
+  // If already in Swiss time (TZID=Europe/Zurich), add timezone offset
+  // CET (+01:00) in winter, CEST (+02:00) in summer
+  if (isSwissTime) {
+    const month = parseInt(datePart.slice(4, 6));
+    // DST in Switzerland: approximately April to September
+    const isDST = month >= 4 && month <= 9;
+    return isoString + (isDST ? '+02:00' : '+01:00');
+  }
+  
+  // If originally UTC, add Z suffix
+  return isUTC ? isoString + 'Z' : isoString;
 }
 
 /** Format optimized schedule for LLM context */
@@ -2138,6 +2203,17 @@ export async function syncEpflScheduleCore(uid: string, { icsUrl }: SyncSchedule
     uid,
     weeklySlots: schedule.weeklySlots.length,
     finalExams: schedule.finalExams.length,
+    // Log each slot's day for debugging
+    slotDetails: schedule.weeklySlots.map(s => ({
+      dayOfWeek: s.dayOfWeek,
+      dayName: s.dayName,
+      time: s.startTime,
+      summary: s.summary.substring(0, 30),
+    })),
+    examDetails: schedule.finalExams.map(e => ({
+      date: e.date,
+      summary: e.summary.substring(0, 30),
+    })),
   });
 
   // Store OPTIMIZED structure in Firestore (much smaller!)
@@ -2188,15 +2264,39 @@ export async function getScheduleContextCore(uid: string): Promise<string> {
     // Use Zurich timezone for "now"
     const now = getZurichDate();
     const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    
+    // Get today's info in Swiss timezone
+    const todayStr = now.toLocaleDateString('en-US', {
+      timeZone: 'Europe/Zurich',
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+    const todayDayOfWeek = getZurichDayOfWeek(now);
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
     const lines: string[] = [];
+    
+    // IMPORTANT: Explicitly tell the LLM what today is
+    lines.push(`⚠️ TODAY IS: ${todayStr} (${dayNames[todayDayOfWeek]})`);
+    lines.push(`When the user asks about "today", use ${dayNames[todayDayOfWeek]}'s schedule.\n`);
 
     // Weekly template (always useful)
     lines.push(formatOptimizedScheduleForContext(schedule));
 
     // Also show specific dates for the next 7 days
-    lines.push("\n\n📆 CETTE SEMAINE (dates spécifiques):");
+    lines.push("\n\n📆 THIS WEEK (specific dates):");
     lines.push(generateScheduleForDateRange(schedule, now, nextWeek));
+    
+    // Log for debugging
+    logger.info("getScheduleContextCore.todayInfo", {
+      uid,
+      todayStr,
+      todayDayOfWeek,
+      dayName: dayNames[todayDayOfWeek],
+      weeklySlotDays: schedule.weeklySlots.map(s => ({ day: s.dayOfWeek, name: s.dayName, summary: s.summary })),
+    });
 
     return lines.join('\n');
   }
@@ -2204,7 +2304,7 @@ export async function getScheduleContextCore(uid: string): Promise<string> {
   // Fallback for old format (legacy)
   if (data.epflSchedule.events && data.epflSchedule.events.length > 0) {
     // Old format - just show a message to re-sync
-    return "Emploi du temps disponible. Pour de meilleures performances, reconnectez votre calendrier EPFL Campus.";
+    return "Schedule available. For better performance, please reconnect your EPFL Campus calendar.";
   }
 
   return "";
