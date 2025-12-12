@@ -90,6 +90,9 @@ class HomeViewModelTest {
     stateFlow.value = transform(stateFlow.value)
   }
 
+  private fun HomeViewModel.editState(transform: (HomeUiState) -> HomeUiState) =
+      updateUiState(transform)
+
   private fun HomeViewModel.getBooleanField(name: String): Boolean {
     val field = HomeViewModel::class.java.getDeclaredField(name)
     field.isAccessible = true
@@ -2504,5 +2507,265 @@ class HomeViewModelTest {
 
     // Verify the LLM client was called (indicating profile context was built and passed)
     assertTrue("LLM client should be called", fakeLlm.prompts.isNotEmpty())
+  }
+
+  @Test
+  fun parseDate_handles_string_number_and_invalid() = runTest {
+    val vm = HomeViewModel()
+    val method = HomeViewModel::class.java.getDeclaredMethod("parseDate", Any::class.java)
+    method.isAccessible = true
+
+    val isoResult = method.invoke(vm, "2024-01-01T10:30:00Z") as Long
+    assertTrue(isoResult > 0)
+
+    assertEquals(5000000L, method.invoke(vm, 5000) as Long) // Seconds to ms
+    assertTrue((method.invoke(vm, "invalid") as Long) > 0) // Fallback to current time
+    assertTrue((method.invoke(vm, null) as Long) > 0)
+  }
+
+  @Test
+  fun parseEdPostsFromResponse_parses_valid_and_skips_invalid() = runTest {
+    val vm = HomeViewModel()
+    val method =
+        HomeViewModel::class.java.getDeclaredMethod("parseEdPostsFromResponse", Map::class.java)
+    method.isAccessible = true
+
+    val data =
+        mapOf(
+            "posts" to
+                listOf(
+                    mapOf(
+                        "title" to "T1",
+                        "content" to "C1",
+                        "createdAt" to "2024-01-01T10:00:00Z",
+                        "author" to "A1",
+                        "url" to "http://t1"),
+                    "invalid",
+                    mapOf(
+                        "title" to "T2",
+                        "snippet" to "S2",
+                        "createdAt" to 1000,
+                        "url" to "http://t2")))
+
+    @Suppress("UNCHECKED_CAST") val posts = method.invoke(vm, data) as List<EdPost>
+
+    assertEquals(2, posts.size)
+    assertEquals("T1", posts[0].title)
+    assertEquals("C1", posts[0].content)
+    assertEquals("S2", posts[1].content) // Fallback to snippet
+    assertEquals("Unknown", posts[1].author) // Default author
+  }
+
+  @Test
+  fun edFetchIntent_returns_false_when_no_user_message() = runTest {
+    val edDataSource: EdPostRemoteDataSource = mock()
+    val llm = FakeLlmClient()
+    llm.nextEdFetchIntent = EdFetchIntent(detected = true, query = "test")
+
+    val vm = HomeViewModel(llmClient = llm, edPostDataSourceOverride = edDataSource)
+    vm.editState { it.copy(messages = emptyList()) } // No messages
+
+    val handleMethod =
+        HomeViewModel::class
+            .java
+            .getDeclaredMethod(
+                "handleEdFetchIntent",
+                BotReply::class.java,
+                String::class.java,
+                String::class.java,
+                String::class.java)
+    handleMethod.isAccessible = true
+
+    val reply =
+        BotReply(
+            llm.nextReply, llm.nextUrl, llm.nextSourceType, llm.nextEdIntent, llm.nextEdFetchIntent)
+    val result = handleMethod.invoke(vm, reply, "q", "aid", null) as Boolean
+    assertFalse(result)
+  }
+
+  @Test
+  fun edFetchIntent_creates_loading_card_and_updates_with_results() = runTest {
+    val edDataSource: EdPostRemoteDataSource = mock()
+    whenever(edDataSource.fetchPosts(any(), anyOrNull()))
+        .thenReturn(
+            EdBrainSearchResult(
+                ok = true,
+                posts =
+                    listOf(
+                        NormalizedEdPost(
+                            "1",
+                            "Title",
+                            "Snip",
+                            "MD",
+                            "Author",
+                            "2024-01-01T10:00:00Z",
+                            "active",
+                            "CS",
+                            emptyList(),
+                            "http://url")),
+                filters = EdSearchFilters(course = "CS-101"),
+                error = null))
+
+    val llm = FakeLlmClient()
+    llm.nextEdFetchIntent = EdFetchIntent(detected = true, query = "search")
+
+    val vm = HomeViewModel(llmClient = llm, edPostDataSourceOverride = edDataSource)
+    vm.editState {
+      it.copy(
+          messages =
+              listOf(ChatUIModel(id = "u1", text = "Q", timestamp = 100, type = ChatType.USER)))
+    }
+
+    val handleMethod =
+        HomeViewModel::class
+            .java
+            .getDeclaredMethod(
+                "handleEdFetchIntent",
+                BotReply::class.java,
+                String::class.java,
+                String::class.java,
+                String::class.java)
+    handleMethod.isAccessible = true
+    val reply =
+        BotReply(
+            llm.nextReply, llm.nextUrl, llm.nextSourceType, llm.nextEdIntent, llm.nextEdFetchIntent)
+    handleMethod.invoke(vm, reply, "q", "aid", "u1")
+
+    advanceUntilIdle()
+    delay(200)
+    advanceUntilIdle()
+
+    val cards = vm.uiState.value.edPostsCards
+    assertTrue(cards.isNotEmpty())
+    assertEquals(EdPostsStage.SUCCESS, cards.last().stage)
+    assertEquals(1, cards.last().posts.size)
+    assertEquals("Title", cards.last().posts[0].title)
+  }
+
+  @Test
+  fun edFetchIntent_handles_empty_and_error_stages() = runTest {
+    val edDataSource: EdPostRemoteDataSource = mock()
+    whenever(edDataSource.fetchPosts(eq("empty"), anyOrNull()))
+        .thenReturn(
+            EdBrainSearchResult(
+                ok = true, posts = emptyList(), filters = EdSearchFilters(), error = null))
+    whenever(edDataSource.fetchPosts(eq("error"), anyOrNull()))
+        .thenReturn(
+            EdBrainSearchResult(
+                ok = false,
+                posts = emptyList(),
+                filters = EdSearchFilters(),
+                error = EdBrainError("ERR", "Test error")))
+
+    val vm = HomeViewModel(edPostDataSourceOverride = edDataSource)
+    vm.editState {
+      it.copy(
+          messages =
+              listOf(ChatUIModel(id = "u1", text = "Q", timestamp = 100, type = ChatType.USER)))
+    }
+
+    val handleMethod =
+        HomeViewModel::class
+            .java
+            .getDeclaredMethod(
+                "handleEdFetchIntent",
+                BotReply::class.java,
+                String::class.java,
+                String::class.java,
+                String::class.java)
+    handleMethod.isAccessible = true
+
+    handleMethod.invoke(
+        vm,
+        BotReply(
+            reply = "",
+            url = null,
+            edFetchIntent = EdFetchIntent(detected = true, query = "empty")),
+        "q",
+        "aid1",
+        "u1")
+    advanceUntilIdle()
+    delay(100)
+    advanceUntilIdle()
+    assertEquals(EdPostsStage.EMPTY, vm.uiState.value.edPostsCards.last().stage)
+
+    handleMethod.invoke(
+        vm,
+        BotReply(
+            reply = "",
+            url = null,
+            edFetchIntent = EdFetchIntent(detected = true, query = "error")),
+        "q",
+        "aid2",
+        "u1")
+    advanceUntilIdle()
+    delay(100)
+    advanceUntilIdle()
+    assertEquals(EdPostsStage.ERROR, vm.uiState.value.edPostsCards.last().stage)
+    assertNotNull(vm.uiState.value.edPostsCards.last().errorMessage)
+  }
+
+  @Test
+  fun handleEdFetchIntent_returns_false_when_no_user_message_found() = runTest {
+    val vm = HomeViewModel()
+    vm.updateUiState {
+      it.copy(
+          messages =
+              listOf(ChatUIModel(id = "ai1", text = "Hi", timestamp = 100, type = ChatType.AI)))
+    }
+
+    val method =
+        HomeViewModel::class
+            .java
+            .getDeclaredMethod(
+                "handleEdFetchIntent",
+                BotReply::class.java,
+                String::class.java,
+                String::class.java,
+                String::class.java)
+    method.isAccessible = true
+    val result =
+        method.invoke(
+            vm,
+            BotReply(
+                reply = "",
+                url = null,
+                edFetchIntent = EdFetchIntent(detected = true, query = "test")),
+            "q",
+            "aid",
+            null) as Boolean
+
+    assertFalse(result)
+  }
+
+  @Test
+  fun parseDate_handles_iso_string_number_and_invalid() = runTest {
+    val method = HomeViewModel::class.java.declaredMethods.first { it.name == "parseDate" }
+    method.isAccessible = true
+    val vm = HomeViewModel()
+
+    assertTrue((method.invoke(vm, "2024-01-01T00:00:00Z") as Long) > 0)
+    assertEquals(1000000L, method.invoke(vm, 1000))
+    assertTrue((method.invoke(vm, "invalid") as Long) > 0)
+    assertTrue((method.invoke(vm, null) as Long) > 0)
+  }
+
+  @Test
+  fun parseEdPostsFromResponse_handles_invalid_data() = runTest {
+    val method =
+        HomeViewModel::class.java.getDeclaredMethod("parseEdPostsFromResponse", Map::class.java)
+    method.isAccessible = true
+    val vm = HomeViewModel()
+
+    @Suppress("UNCHECKED_CAST")
+    val result1 =
+        method.invoke(
+            vm, mapOf("posts" to listOf(mapOf("title" to "T", "url" to "U"), "invalid", null)))
+            as List<EdPost>
+    assertEquals(1, result1.size)
+
+    @Suppress("UNCHECKED_CAST")
+    val result2 = method.invoke(vm, mapOf<String, Any>()) as List<EdPost>
+    assertTrue(result2.isEmpty())
   }
 }
