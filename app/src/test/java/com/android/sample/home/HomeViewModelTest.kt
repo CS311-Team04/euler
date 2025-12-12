@@ -1730,10 +1730,11 @@ class HomeViewModelTest {
     field.isAccessible = true
     field.set(this, value)
   }
-  // ============ Tests for existingSourceCards logic in messagesFlow collector ============
+  // ============ Tests for source/attachment preservation in messagesFlow collector ============
+  // These tests verify that source/attachment on AI messages is preserved during Firestore sync
 
   @Test
-  fun messagesFlow_sourceCard_inserts_after_matching_ai_message() =
+  fun messagesFlow_preserves_source_on_matching_ai_message() =
       runTest(testDispatcher) {
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
         val repo = mock<ConversationRepository>()
@@ -1742,34 +1743,32 @@ class HomeViewModelTest {
         whenever(repo.messagesFlow(any())).thenReturn(messagesFlow)
         val viewModel = HomeViewModel(FakeLlmClient(), auth, repo)
 
-        // Set up initial state with a source card after an AI message
-        val aiMessageId = "ai-1"
-        val sourceCardId = "source-1"
         val aiText = "Here is a helpful response"
         val sourceMeta = SourceMeta(siteLabel = "EPFL.ch", title = "Test", url = "https://epfl.ch")
 
+        // Set conversation ID first, then start data
+        viewModel.updateUiState { it.copy(currentConversationId = "conv-1") }
+        viewModel.setPrivateField("isInLocalNewChat", false)
+        viewModel.invokeStartData()
+        advanceUntilIdle()
+
+        // Set up AI message WITH source (new behavior: source on same message)
         viewModel.updateUiState {
           it.copy(
-              currentConversationId = "conv-1",
               messages =
                   listOf(
                       ChatUIModel(
                           id = "user-1", text = "Question", timestamp = 0L, type = ChatType.USER),
                       ChatUIModel(
-                          id = aiMessageId, text = aiText, timestamp = 1000L, type = ChatType.AI),
-                      ChatUIModel(
-                          id = sourceCardId,
-                          text = "",
-                          timestamp = 2000L,
+                          id = "ai-1",
+                          text = aiText,
+                          timestamp = 1000L,
                           type = ChatType.AI,
                           source = sourceMeta)))
         }
-
-        viewModel.setPrivateField("isInLocalNewChat", false)
-        viewModel.invokeStartData()
         advanceUntilIdle()
 
-        // Emit Firestore messages (matching AI message)
+        // Emit Firestore messages (matching AI message text)
         messagesFlow.emit(
             listOf(
                 MessageDTO(role = "user", text = "Question", createdAt = null),
@@ -1777,17 +1776,15 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         val finalMessages = viewModel.uiState.value.messages
-        val aiIndex = finalMessages.indexOfFirst { it.type == ChatType.AI && it.text == aiText }
-        val sourceCardIndex = finalMessages.indexOfFirst { it.source != null }
+        val aiMessage = finalMessages.find { it.type == ChatType.AI && it.text == aiText }
 
-        assertTrue("Source card should be inserted after AI message", sourceCardIndex > aiIndex)
-        assertEquals(
-            "Source card should be immediately after AI message", aiIndex + 1, sourceCardIndex)
-        assertEquals(sourceMeta.url, finalMessages[sourceCardIndex].source?.url)
+        assertNotNull("AI message should exist", aiMessage)
+        assertNotNull("Source should be preserved on AI message", aiMessage?.source)
+        assertEquals(sourceMeta.url, aiMessage?.source?.url)
       }
 
   @Test
-  fun messagesFlow_sourceCard_adds_to_end_when_matching_ai_not_found() =
+  fun messagesFlow_preserves_multiple_sources_on_ai_messages() =
       runTest(testDispatcher) {
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
         val repo = mock<ConversationRepository>()
@@ -1796,207 +1793,6 @@ class HomeViewModelTest {
         whenever(repo.messagesFlow(any())).thenReturn(messagesFlow)
         val viewModel = HomeViewModel(FakeLlmClient(), auth, repo)
 
-        // Set up initial state with a source card after an AI message
-        val aiMessageId = "ai-1"
-        val sourceCardId = "source-1"
-        val aiText = "Original AI response"
-        val sourceMeta = SourceMeta(siteLabel = "EPFL.ch", title = "Test", url = "https://epfl.ch")
-
-        viewModel.updateUiState {
-          it.copy(
-              currentConversationId = "conv-1",
-              messages =
-                  listOf(
-                      ChatUIModel(
-                          id = "user-1", text = "Question", timestamp = 0L, type = ChatType.USER),
-                      ChatUIModel(
-                          id = aiMessageId, text = aiText, timestamp = 1000L, type = ChatType.AI),
-                      ChatUIModel(
-                          id = sourceCardId,
-                          text = "",
-                          timestamp = 2000L,
-                          type = ChatType.AI,
-                          source = sourceMeta)))
-        }
-
-        viewModel.setPrivateField("isInLocalNewChat", false)
-        viewModel.invokeStartData()
-        advanceUntilIdle()
-
-        // Emit Firestore messages with DIFFERENT AI text (matching AI not found)
-        messagesFlow.emit(
-            listOf(
-                MessageDTO(role = "user", text = "Question", createdAt = null),
-                MessageDTO(role = "assistant", text = "Different AI response", createdAt = null)))
-        advanceUntilIdle()
-
-        val finalMessages = viewModel.uiState.value.messages
-        val sourceCardIndex = finalMessages.indexOfFirst { it.source != null }
-
-        // Source card should be at the end
-        assertEquals("Source card should be at the end", finalMessages.size - 1, sourceCardIndex)
-        assertEquals(sourceMeta.url, finalMessages[sourceCardIndex].source?.url)
-      }
-
-  @Test
-  fun messagesFlow_sourceCard_adds_to_end_when_preceding_not_ai() =
-      runTest(testDispatcher) {
-        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
-        val repo = mock<ConversationRepository>()
-        val messagesFlow = MutableSharedFlow<List<MessageDTO>>(replay = 1)
-        whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
-        whenever(repo.messagesFlow(any())).thenReturn(messagesFlow)
-        val viewModel = HomeViewModel(FakeLlmClient(), auth, repo)
-
-        // Set up initial state with a source card after a USER message (not AI)
-        val sourceCardId = "source-1"
-        val sourceMeta = SourceMeta(siteLabel = "EPFL.ch", title = "Test", url = "https://epfl.ch")
-
-        viewModel.updateUiState {
-          it.copy(
-              currentConversationId = "conv-1",
-              messages =
-                  listOf(
-                      ChatUIModel(
-                          id = "user-1", text = "Question", timestamp = 0L, type = ChatType.USER),
-                      ChatUIModel(
-                          id = sourceCardId,
-                          text = "",
-                          timestamp = 2000L,
-                          type = ChatType.AI,
-                          source = sourceMeta)))
-        }
-
-        viewModel.setPrivateField("isInLocalNewChat", false)
-        viewModel.invokeStartData()
-        advanceUntilIdle()
-
-        // Emit Firestore messages
-        messagesFlow.emit(
-            listOf(
-                MessageDTO(role = "user", text = "Question", createdAt = null),
-                MessageDTO(role = "assistant", text = "AI response", createdAt = null)))
-        advanceUntilIdle()
-
-        val finalMessages = viewModel.uiState.value.messages
-        val sourceCardIndex = finalMessages.indexOfFirst { it.source != null }
-
-        // Source card should be at the end (preceding message was USER, not AI)
-        assertEquals("Source card should be at the end", finalMessages.size - 1, sourceCardIndex)
-        assertEquals(sourceMeta.url, finalMessages[sourceCardIndex].source?.url)
-      }
-
-  @Test
-  fun messagesFlow_sourceCard_adds_to_end_when_preceding_ai_has_blank_text() =
-      runTest(testDispatcher) {
-        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
-        val repo = mock<ConversationRepository>()
-        val messagesFlow = MutableSharedFlow<List<MessageDTO>>(replay = 1)
-        whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
-        whenever(repo.messagesFlow(any())).thenReturn(messagesFlow)
-        val viewModel = HomeViewModel(FakeLlmClient(), auth, repo)
-
-        // Set up initial state with a source card after an AI message with blank text
-        val aiMessageId = "ai-1"
-        val sourceCardId = "source-1"
-        val sourceMeta = SourceMeta(siteLabel = "EPFL.ch", title = "Test", url = "https://epfl.ch")
-
-        viewModel.updateUiState {
-          it.copy(
-              currentConversationId = "conv-1",
-              messages =
-                  listOf(
-                      ChatUIModel(
-                          id = "user-1", text = "Question", timestamp = 0L, type = ChatType.USER),
-                      ChatUIModel(
-                          id = aiMessageId,
-                          text = "", // Blank text
-                          timestamp = 1000L,
-                          type = ChatType.AI),
-                      ChatUIModel(
-                          id = sourceCardId,
-                          text = "",
-                          timestamp = 2000L,
-                          type = ChatType.AI,
-                          source = sourceMeta)))
-        }
-
-        viewModel.setPrivateField("isInLocalNewChat", false)
-        viewModel.invokeStartData()
-        advanceUntilIdle()
-
-        // Emit Firestore messages
-        messagesFlow.emit(
-            listOf(
-                MessageDTO(role = "user", text = "Question", createdAt = null),
-                MessageDTO(role = "assistant", text = "AI response", createdAt = null)))
-        advanceUntilIdle()
-
-        val finalMessages = viewModel.uiState.value.messages
-        val sourceCardIndex = finalMessages.indexOfFirst { it.source != null }
-
-        // Source card should be at the end (preceding AI had blank text)
-        assertEquals("Source card should be at the end", finalMessages.size - 1, sourceCardIndex)
-        assertEquals(sourceMeta.url, finalMessages[sourceCardIndex].source?.url)
-      }
-
-  @Test
-  fun messagesFlow_sourceCard_adds_to_end_when_originalIndex_is_zero() =
-      runTest(testDispatcher) {
-        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
-        val repo = mock<ConversationRepository>()
-        val messagesFlow = MutableSharedFlow<List<MessageDTO>>(replay = 1)
-        whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
-        whenever(repo.messagesFlow(any())).thenReturn(messagesFlow)
-        val viewModel = HomeViewModel(FakeLlmClient(), auth, repo)
-
-        // Set up initial state with a source card at index 0 (first message)
-        val sourceCardId = "source-1"
-        val sourceMeta = SourceMeta(siteLabel = "EPFL.ch", title = "Test", url = "https://epfl.ch")
-
-        viewModel.updateUiState {
-          it.copy(
-              currentConversationId = "conv-1",
-              messages =
-                  listOf(
-                      ChatUIModel(
-                          id = sourceCardId,
-                          text = "",
-                          timestamp = 0L,
-                          type = ChatType.AI,
-                          source = sourceMeta)))
-        }
-
-        viewModel.setPrivateField("isInLocalNewChat", false)
-        viewModel.invokeStartData()
-        advanceUntilIdle()
-
-        // Emit Firestore messages
-        messagesFlow.emit(
-            listOf(
-                MessageDTO(role = "user", text = "Question", createdAt = null),
-                MessageDTO(role = "assistant", text = "AI response", createdAt = null)))
-        advanceUntilIdle()
-
-        val finalMessages = viewModel.uiState.value.messages
-        val sourceCardIndex = finalMessages.indexOfFirst { it.source != null }
-
-        // Source card should be at the end (originalIndex was 0, which is <= 0)
-        assertEquals("Source card should be at the end", finalMessages.size - 1, sourceCardIndex)
-        assertEquals(sourceMeta.url, finalMessages[sourceCardIndex].source?.url)
-      }
-
-  @Test
-  fun messagesFlow_sourceCard_preserves_multiple_source_cards() =
-      runTest(testDispatcher) {
-        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
-        val repo = mock<ConversationRepository>()
-        val messagesFlow = MutableSharedFlow<List<MessageDTO>>(replay = 1)
-        whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
-        whenever(repo.messagesFlow(any())).thenReturn(messagesFlow)
-        val viewModel = HomeViewModel(FakeLlmClient(), auth, repo)
-
-        // Set up initial state with multiple source cards
         val aiText1 = "First AI response"
         val aiText2 = "Second AI response"
         val sourceMeta1 =
@@ -2004,34 +1800,29 @@ class HomeViewModelTest {
         val sourceMeta2 =
             SourceMeta(siteLabel = "EPFL.ch", title = "Test2", url = "https://epfl.ch/2")
 
-        // Set conversation ID first, then start data, then set messages
         viewModel.updateUiState { it.copy(currentConversationId = "conv-1") }
         viewModel.setPrivateField("isInLocalNewChat", false)
         viewModel.invokeStartData()
         advanceUntilIdle()
 
-        // Now set messages with source cards
+        // Set messages with sources ON the AI messages (new behavior)
         viewModel.updateUiState {
           it.copy(
               messages =
                   listOf(
                       ChatUIModel(id = "user-1", text = "Q1", timestamp = 0L, type = ChatType.USER),
                       ChatUIModel(
-                          id = "ai-1", text = aiText1, timestamp = 1000L, type = ChatType.AI),
-                      ChatUIModel(
-                          id = "source-1",
-                          text = "",
-                          timestamp = 2000L,
+                          id = "ai-1",
+                          text = aiText1,
+                          timestamp = 1000L,
                           type = ChatType.AI,
                           source = sourceMeta1),
                       ChatUIModel(
                           id = "user-2", text = "Q2", timestamp = 3000L, type = ChatType.USER),
                       ChatUIModel(
-                          id = "ai-2", text = aiText2, timestamp = 4000L, type = ChatType.AI),
-                      ChatUIModel(
-                          id = "source-2",
-                          text = "",
-                          timestamp = 5000L,
+                          id = "ai-2",
+                          text = aiText2,
+                          timestamp = 4000L,
                           type = ChatType.AI,
                           source = sourceMeta2)))
         }
@@ -2047,39 +1838,17 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         val finalMessages = viewModel.uiState.value.messages
-        val sourceCards = finalMessages.filter { it.source != null }
 
-        // Verify we have source cards
-        assertTrue(
-            "Should have at least 2 source cards, found: ${sourceCards.size}",
-            sourceCards.size >= 2)
+        // Find AI messages and verify they have their sources
+        val ai1 = finalMessages.find { it.type == ChatType.AI && it.text == aiText1 }
+        val ai2 = finalMessages.find { it.type == ChatType.AI && it.text == aiText2 }
 
-        // Find indices of AI messages and source cards
-        val aiMessages = finalMessages.filter { it.type == ChatType.AI && it.text.isNotBlank() }
-        val ai1Index = finalMessages.indexOfFirst { it.type == ChatType.AI && it.text == aiText1 }
-        val source1Index = finalMessages.indexOfFirst { it.source?.url == sourceMeta1.url }
-        val ai2Index = finalMessages.indexOfFirst { it.type == ChatType.AI && it.text == aiText2 }
-        val source2Index = finalMessages.indexOfFirst { it.source?.url == sourceMeta2.url }
-
-        // Verify source cards are present
-        assertTrue("First source card should be found (index=$source1Index)", source1Index >= 0)
-        assertTrue("Second source card should be found (index=$source2Index)", source2Index >= 0)
-
-        // If AI messages are found, verify relative order
-        if (ai1Index >= 0) {
-          assertTrue(
-              "First source card should be after first AI message (ai1Index=$ai1Index, source1Index=$source1Index)",
-              source1Index > ai1Index)
-        }
-        if (ai2Index >= 0) {
-          assertTrue(
-              "Second source card should be after second AI message (ai2Index=$ai2Index, source2Index=$source2Index)",
-              source2Index > ai2Index)
-        }
-
-        // Verify source cards have correct metadata
-        assertEquals(sourceMeta1.url, finalMessages[source1Index].source?.url)
-        assertEquals(sourceMeta2.url, finalMessages[source2Index].source?.url)
+        assertNotNull("First AI message should exist", ai1)
+        assertNotNull("Second AI message should exist", ai2)
+        assertNotNull("First AI message should have source", ai1?.source)
+        assertNotNull("Second AI message should have source", ai2?.source)
+        assertEquals(sourceMeta1.url, ai1?.source?.url)
+        assertEquals(sourceMeta2.url, ai2?.source?.url)
       }
 
   // ==================== ED INTENT TESTS ====================
