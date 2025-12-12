@@ -36,20 +36,6 @@ export interface EdSearchParsedQuery {
 
   /** High-level status filter (unanswered, unread, resolved, etc.) */
   status?: EdPostStatusFilter;
-
-  /** Date range (ISO) to filter on ED side */
-  dateFrom?: string;
-  dateTo?: string;
-
-  /** Tags / keywords if any */
-  tags?: string[];
-
-  /** Limit on the number of posts to return (first 5, latest 10, etc.) */
-  limit?: number;
-
-  textQuery?: string;     // free-text to send as `query`
-  categoryHint?: string;  // what the user said: "problem set", "series 5", etc.
-  assignmentIndex?: number; // assignment number if detected (1, 2, 3, ...)
 }
 
 /**
@@ -93,12 +79,10 @@ function normalize(str: string): string {
 
 /**
  * Parses natural language query into structured EdSearchParsedQuery.
- * Extracts course query and date range.
+ * Extracts course query.
  * Note: status and limit are now handled by the LLM router.
  */
 export function parseEdSearchQuery(text: string): EdSearchParsedQuery {
-  const lower = text.toLowerCase();
-
   // ===== Course =====
   // 1) First, try a code like COM-301, CS-202, etc. (case-insensitive)
   let courseQuery: string | undefined;
@@ -148,26 +132,9 @@ export function parseEdSearchQuery(text: string): EdSearchParsedQuery {
     }
   }
 
-  // Dates (MVP)
-  let dateFrom: string | undefined;
-  let dateTo: string | undefined;
-  const now = new Date();
-
-  if (lower.includes("yesterday") || lower.includes("hier")) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - 1);
-    dateFrom = d.toISOString();
-    dateTo = d.toISOString();
-  } else if (lower.includes("today") || lower.includes("aujourd'hui")) {
-    dateFrom = now.toISOString();
-    dateTo = now.toISOString();
-  }
-
   return {
     originalQuery: text,
     courseQuery,
-    dateFrom,
-    dateTo,
   };
 }
 
@@ -251,8 +218,47 @@ function resolveCourseFromSynonyms(
 }
 
 /**
+ * Checks if the user query contains explicit hints for exercise/module/homework categories.
+ * We only apply category filters when the user explicitly mentions these terms to avoid
+ * over-filtering vague queries (e.g., "exam format", "general questions").
+ */
+function hasExplicitCategoryHint(userQuery: string): boolean {
+  const lower = userQuery.toLowerCase();
+
+  // Exercise/problem set hints
+  if (
+    /\bps\d+/i.test(lower) || // ps5, ps6, etc.
+    /\b(problem\s+set|problemset|problem\s+sets)\b/i.test(lower) ||
+    /\b(sheet|sheets|série|serie|series)\b/i.test(lower) ||
+    /\b(exo|exos|exercise|exercises|exercice|exercices)\b/i.test(lower)
+  ) {
+    return true;
+  }
+
+  // Homework/assignment hints
+  if (
+    /\b(homework|homeworks|hw\s*\d+|hw\d+)\b/i.test(lower) ||
+    /\b(assignment|assignments|assignement)\b/i.test(lower)
+  ) {
+    return true;
+  }
+
+  // Module hints
+  if (/\bmodule\s+\d+/i.test(lower)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Applies LLM router output to fetchOptions (textQuery, limit, status, category).
  * This is a helper to avoid code duplication.
+ *
+ * Category selection is conservative: we only apply category filters when:
+ * - The chosen category is NOT "General" (we never filter by "General")
+ * - The user query contains explicit exercise/module/homework hints
+ * This prevents over-filtering vague queries like "exam format" or "general questions".
  */
 async function applyLLMParameters(
   edClient: EdDiscussionClient,
@@ -292,29 +298,64 @@ async function applyLLMParameters(
 
     const catOutput = await callEdCategoryLLM(catInput);
 
-    // Set main category if valid
+    // Conservative category filtering: only apply if:
+    // 1. A category was chosen AND it's valid
+    // 2. It's NOT "General" (we never filter by "General" to allow searching across all categories)
+    // 3. The user query contains explicit exercise/module/homework hints
     if (catOutput.chosenCategory && categoryNames.includes(catOutput.chosenCategory)) {
-      fetchOptions.category = catOutput.chosenCategory;
+      const chosenCategoryLower = catOutput.chosenCategory.toLowerCase();
 
-      // Set subcategory if valid and available
-      if (catOutput.chosenSubcategory) {
-        const subcategories = categoryTree.subcategoriesByCategory[catOutput.chosenCategory] || [];
-        // Case-insensitive match for subcategory
-        const matchedSubcategory = subcategories.find(
-          (sub) => sub.toLowerCase().trim() === catOutput.chosenSubcategory!.toLowerCase().trim()
-        );
-        if (matchedSubcategory) {
-          fetchOptions.subcategory = matchedSubcategory;
+      // Never filter by "General" - let ED search across all categories
+      if (chosenCategoryLower === "general") {
+        logger.info("edCategoryLLM.result", {
+          chosenCategory: catOutput.chosenCategory,
+          chosenSubcategory: catOutput.chosenSubcategory,
+          resolvedCategory: null,
+          resolvedSubcategory: null,
+          reason: "Ignored 'General' category to allow cross-category search",
+        });
+      } else if (hasExplicitCategoryHint(originalQuery)) {
+        // Only apply category filter if user explicitly mentioned exercise/module/homework
+        fetchOptions.category = catOutput.chosenCategory;
+
+        // Set subcategory if valid and available
+        if (catOutput.chosenSubcategory) {
+          const subcategories = categoryTree.subcategoriesByCategory[catOutput.chosenCategory] || [];
+          // Case-insensitive match for subcategory
+          const matchedSubcategory = subcategories.find(
+            (sub) => sub.toLowerCase().trim() === catOutput.chosenSubcategory!.toLowerCase().trim()
+          );
+          if (matchedSubcategory) {
+            fetchOptions.subcategory = matchedSubcategory;
+          }
         }
-      }
-    }
 
-    logger.info("edCategoryLLM.result", {
-      chosenCategory: catOutput.chosenCategory,
-      chosenSubcategory: catOutput.chosenSubcategory,
-      resolvedCategory: fetchOptions.category,
-      resolvedSubcategory: fetchOptions.subcategory,
-    });
+        logger.info("edCategoryLLM.result", {
+          chosenCategory: catOutput.chosenCategory,
+          chosenSubcategory: catOutput.chosenSubcategory,
+          resolvedCategory: fetchOptions.category,
+          resolvedSubcategory: fetchOptions.subcategory,
+          reason: "Applied category filter due to explicit hints in query",
+        });
+      } else {
+        // No explicit hints - ignore category to avoid over-filtering
+        logger.info("edCategoryLLM.result", {
+          chosenCategory: catOutput.chosenCategory,
+          chosenSubcategory: catOutput.chosenSubcategory,
+          resolvedCategory: null,
+          resolvedSubcategory: null,
+          reason: "Ignored category filter - no explicit exercise/module/homework hints in query",
+        });
+      }
+    } else {
+      logger.info("edCategoryLLM.result", {
+        chosenCategory: catOutput.chosenCategory,
+        chosenSubcategory: catOutput.chosenSubcategory,
+        resolvedCategory: null,
+        resolvedSubcategory: null,
+        reason: "No valid category chosen",
+      });
+    }
   }
 }
 
