@@ -43,7 +43,9 @@ class ChatMessageTest {
     }
 
     composeRule.onNodeWithTag("chat_ai_moodle_badge").assertIsDisplayed()
-    composeRule.onNodeWithTag("chat_ai_text").assertTextEquals("- Topic")
+    // MarkdownText renders "- Topic" as a bullet list, so check for the text content
+    // The "- " prefix is rendered as a bullet point, leaving "Topic: Details" as text
+    composeRule.onNodeWithText("Topic", substring = true, useUnmergedTree = true).assertIsDisplayed()
   }
 
   @Test
