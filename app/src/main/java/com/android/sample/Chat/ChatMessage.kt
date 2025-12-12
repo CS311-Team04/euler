@@ -54,7 +54,6 @@ import androidx.compose.ui.unit.sp
 import com.android.sample.R
 import com.android.sample.settings.connectors.ConnectorsDimensions as Dimens
 import com.android.sample.ui.components.MarkdownText
-import com.android.sample.ui.theme.DarkSurfaceVariant
 import com.android.sample.ui.theme.EulerAudioButtonLoadingColor
 import com.android.sample.ui.theme.EulerAudioButtonTint
 import com.android.sample.ui.theme.EulerAudioButtonTintSemiTransparent
