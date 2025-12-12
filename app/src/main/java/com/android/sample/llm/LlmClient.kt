@@ -175,7 +175,7 @@ class FirebaseFunctionsLlmClient(
           fallback?.let {
             return@withContext it.generateReply(prompt, summary, transcript, profileContext)
           }
-          return@withContext buildBotReply(map, "Voici le document demandé.")
+          return@withContext buildBotReply(map, "Here is the requested document.")
         }
 
         return@withContext buildBotReply(map, parsedReply)

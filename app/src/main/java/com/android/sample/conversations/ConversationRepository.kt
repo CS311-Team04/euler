@@ -228,8 +228,7 @@ class ConversationRepository(private val auth: FirebaseAuth, private val db: Fir
     edCardRef.set(edCardData).await()
 
     // Update the message to reference this EdCard
-    val msgRef = msgCol(conversationId).document(messageId)
-    msgRef.update("edCardId", edCard.id).await()
+    updateMessageWithEdCard(conversationId, messageId, edCard.id)
   }
 
   /**
@@ -324,8 +323,7 @@ class ConversationRepository(private val auth: FirebaseAuth, private val db: Fir
     edCardRef.set(edCardData).await()
 
     // Update the message to reference this EdCard
-    val msgRef = msgCol(conversationId).document(messageId)
-    msgRef.update("edCardId", edPostsCard.id).await()
+    updateMessageWithEdCard(conversationId, messageId, edPostsCard.id)
   }
 
   /**

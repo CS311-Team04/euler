@@ -493,7 +493,8 @@ fun HomeScreen(
                             // Add standalone EdPostCards (not associated with messages)
                             timelineItems.addAll(cardItems)
                             // Sort by timestamp to ensure correct order
-                            timelineItems.sortedBy { it.timestamp }
+                            timelineItems.sortBy { it.timestamp }
+                            timelineItems
                           }
 
                       LazyColumn(
@@ -572,9 +573,6 @@ fun HomeScreen(
                                       },
                                       onRetry = { filters ->
                                         // Retry is not supported for persisted cards
-                                      },
-                                      onRefine = { refinedQuery ->
-                                        viewModel.updateMessageDraft(refinedQuery)
                                       })
                                 }
                               }
@@ -1010,7 +1008,7 @@ internal fun PdfViewerDialog(
   val openExternally: () -> Unit = {
     runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
         .onFailure {
-          Toast.makeText(context, "Aucune appli pour ouvrir le PDF", Toast.LENGTH_SHORT).show()
+          Toast.makeText(context, "No app available to open the PDF", Toast.LENGTH_SHORT).show()
         }
   }
 
@@ -1079,14 +1077,14 @@ internal fun PdfViewerDialog(
               LinearProgressIndicator(
                   modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp))
               Text(
-                  text = "Chargement du PDF...",
+                  text = "Loading PDF...",
                   modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                   color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                   style = MaterialTheme.typography.bodySmall)
               Button(
                   onClick = openExternally,
                   modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
-                    Text("Ouvrir dans une autre app")
+                    Text("Open in another app")
                   }
             }
             if (loadFailed) {
@@ -1095,10 +1093,10 @@ internal fun PdfViewerDialog(
                   verticalArrangement = Arrangement.Center,
                   horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "Impossible d'afficher le PDF ici.",
+                        text = "Unable to display the PDF here.",
                         color = MaterialTheme.colorScheme.onBackground)
                     Spacer(Modifier.height(12.dp))
-                    Button(onClick = { openExternally() }) { Text("Ouvrir dans une autre app") }
+                    Button(onClick = { openExternally() }) { Text("Open in another app") }
                   }
             } else {
               val scrollState = rememberScrollState()

@@ -87,7 +87,6 @@ fun EdPostsSection(
     onOpenPost: (String) -> Unit = {},
     onRetry: (EdIntentFilters) -> Unit = {},
     onOpenSettings: () -> Unit = {},
-    onRefine: (String) -> Unit = {},
 ) {
   if (state.stage == EdPostsStage.IDLE) return
 
@@ -115,7 +114,7 @@ fun EdPostsSection(
 
           val scrollState = rememberScrollState()
 
-          // ⬇️ ICI : on borne la hauteur du contenu scrollable
+          // Limit scrollable content height here
           Column(
               modifier =
                   Modifier.fillMaxWidth()
@@ -126,7 +125,7 @@ fun EdPostsSection(
                   EdPostsStage.LOADING -> LoadingBlock()
                   EdPostsStage.EMPTY -> EmptyBlock()
                   EdPostsStage.ERROR -> ErrorBlock(state, onRetry)
-                  EdPostsStage.SUCCESS -> PostsBlock(state.posts, onOpenPost, onRefine)
+                  EdPostsStage.SUCCESS -> PostsBlock(state.posts, onOpenPost)
                   EdPostsStage.IDLE -> Unit
                 }
 
@@ -249,11 +248,7 @@ private fun ErrorBlock(state: EdPostsUiState, onRetry: (EdIntentFilters) -> Unit
 }
 
 @Composable
-private fun PostsBlock(
-    posts: List<EdPost>,
-    onOpenPost: (String) -> Unit,
-    onRefine: (String) -> Unit
-) {
+private fun PostsBlock(posts: List<EdPost>, onOpenPost: (String) -> Unit) {
   Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
     posts.forEach { post -> EdCard(post = post, onOpenPost = onOpenPost) }
   }
@@ -266,7 +261,7 @@ private fun EdCard(post: EdPost, onOpenPost: (String) -> Unit) {
 
   Card(
       modifier =
-          Modifier.fillMaxWidth().wrapContentHeight().clickable( // 👈 clic sur toute la carte
+          Modifier.fillMaxWidth().wrapContentHeight().clickable( // Clickable on entire card
               interactionSource = remember { MutableInteractionSource() },
               indication = null // 👈 pas de ripple / petit rond
               ) {
@@ -278,7 +273,7 @@ private fun EdCard(post: EdPost, onOpenPost: (String) -> Unit) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
-              // Titre + date (pareil que ton marquee)
+              // Title + date (same as marquee)
               Row(
                   modifier = Modifier.fillMaxWidth(),
                   verticalAlignment = Alignment.CenterVertically) {
@@ -300,7 +295,7 @@ private fun EdCard(post: EdPost, onOpenPost: (String) -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                   }
 
-              // Preview du contenu (un peu plus court)
+              // Content preview (slightly shorter)
               Text(
                   text = htmlToPlainText(post.content),
                   style = MaterialTheme.typography.bodyMedium,
@@ -308,7 +303,7 @@ private fun EdCard(post: EdPost, onOpenPost: (String) -> Unit) {
                   maxLines = 2,
                   overflow = TextOverflow.Ellipsis)
 
-              // Footer méta comme dans le screen (auteur à gauche)
+              // Meta footer like the mock (author on the left)
               Row(
                   modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                   verticalAlignment = Alignment.CenterVertically,
@@ -325,23 +320,23 @@ private fun EdCard(post: EdPost, onOpenPost: (String) -> Unit) {
                               color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
 
-                    // Tu peux mettre d'autres infos ici (nb réponses, likes…)
-                    // pour l'instant on laisse vide ou on ajoute plus tard
+                    // You can put other info here (reply count, likes…)
+                    // for now we leave it empty or add later
                   }
             }
       }
 }
 
+// Cached date formatters to avoid allocations on every call
+private val dayFormat = java.text.SimpleDateFormat("d", java.util.Locale.ENGLISH)
+private val yearFormat = java.text.SimpleDateFormat("yyyy", java.util.Locale.ENGLISH)
+private val monthFormat = java.text.SimpleDateFormat("MMM", java.util.Locale.ENGLISH)
+
 private fun formatDate(timestamp: Long): String {
   val date = java.util.Date(timestamp)
-  val dayFormat = java.text.SimpleDateFormat("d", java.util.Locale.ENGLISH)
-  val yearFormat = java.text.SimpleDateFormat("yyyy", java.util.Locale.ENGLISH)
-  val monthFormat = java.text.SimpleDateFormat("MMM", java.util.Locale.ENGLISH)
-
   val day = dayFormat.format(date)
   val month = monthFormat.format(date).lowercase()
   val year = yearFormat.format(date)
-
   // Format: "24 oct. 2025" (lowercase month with dot)
   return "$day $month. $year"
 }

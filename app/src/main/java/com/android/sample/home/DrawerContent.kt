@@ -686,15 +686,15 @@ private fun RecentRow(
                   Icon(
                       imageVector = Icons.Filled.Check,
                       contentDescription = null,
-                      // J'utilise iconTint (défini dans 'main') au lieu de Color.White
-                      // pour que l'icône soit visible sur le fond clair.
+                      // Using iconTint (defined in 'main') instead of Color.White
+                      // so the icon is visible on the light background.
                       tint = iconTint,
                       modifier = Modifier.size(15.dp))
                 } else {
                   Icon(
                       imageVector = Icons.Outlined.ChatBubbleOutline,
                       contentDescription = null,
-                      // Utilisation de la couleur du thème 'main'
+                      // Using the 'main' theme color
                       tint = iconTint,
                       modifier = Modifier.size(15.dp))
                 }
