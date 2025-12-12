@@ -1730,10 +1730,63 @@ class HomeViewModelTest {
         // Emit messages while streaming
         messagesFlow.emit(listOf(MessageDTO(role = "user", text = "test") to "msg-1"))
         advanceUntilIdle()
-
-        // Messages should not be updated when streaming (covers line 217)
-        // The state should remain unchanged because of the early return
       }
+
+  @Test
+  fun loadEdCardsForMessages_returns_postsCard_when_available() = runTest {
+    val repo = mock<ConversationRepository>()
+    val postsCard =
+        EdPostsCard(
+            id = "edp-1",
+            messageId = "mid-1",
+            query = "q",
+            posts = emptyList(),
+            filters = EdIntentFilters(),
+            stage = EdPostsStage.SUCCESS,
+            errorMessage = null,
+            createdAt = 10L)
+    whenever(repo.loadEdPostsCard("conv-1", "mid-1", "edp-1")).thenReturn(postsCard)
+
+    val vm = HomeViewModel()
+    val (edCards, edPostsCards) =
+        vm.loadEdCardsForMessages(
+            "conv-1",
+            listOf(
+                MessageDTO(role = "assistant", text = "t", edCardId = "edp-1", createdAt = null) to
+                    "mid-1"),
+            repo = repo)
+
+    assertTrue(edCards.isEmpty())
+    assertEquals(1, edPostsCards.size)
+    assertEquals("edp-1", edPostsCards.first().id)
+  }
+
+  @Test
+  fun loadEdCardsForMessages_fallbacks_to_edPostCard_when_postsCard_null() = runTest {
+    val repo = mock<ConversationRepository>()
+    whenever(repo.loadEdPostsCard(any(), any(), any())).thenReturn(null)
+    val edCard =
+        EdPostCard(
+            id = "edc-1",
+            title = "Title",
+            body = "Body",
+            status = EdPostStatus.Published,
+            createdAt = 20L)
+    whenever(repo.loadEdCard("conv-1", "mid-1", "edc-1")).thenReturn(edCard)
+
+    val vm = HomeViewModel()
+    val (edCards, edPostsCards) =
+        vm.loadEdCardsForMessages(
+            "conv-1",
+            listOf(
+                MessageDTO(role = "assistant", text = "t", edCardId = "edc-1", createdAt = null) to
+                    "mid-1"),
+            repo = repo)
+
+    assertTrue(edPostsCards.isEmpty())
+    assertEquals(1, edCards.size)
+    assertEquals("edc-1", edCards.first().id)
+  }
 
   private fun HomeViewModel.setPrivateField(name: String, value: Any?) {
     val field = HomeViewModel::class.java.getDeclaredField(name)

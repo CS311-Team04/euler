@@ -395,38 +395,10 @@ class HomeViewModel(
                 val loadedEdPostsCards = mutableListOf<EdPostsCard>()
 
                 if (conversationId != null && !isGuest()) {
-                  msgs.forEach { (dto, messageId) ->
-                    if (dto.edCardId != null) {
-                      try {
-                        // Try loading as EdPostsCard first (check type field)
-                        val edPostsCard =
-                            repo.loadEdPostsCard(conversationId, messageId, dto.edCardId)
-                        if (edPostsCard != null) {
-                          loadedEdPostsCards.add(edPostsCard)
-                        } else {
-                          // If null, try loading as EdPostCard (for published posts)
-                          val edCard = repo.loadEdCard(conversationId, messageId, dto.edCardId)
-                          if (edCard != null) {
-                            loadedEdCards.add(edCard)
-                          }
-                        }
-                      } catch (e: Exception) {
-                        Log.w(
-                            TAG,
-                            "Failed to load EdCard for message $messageId, edCardId=${dto.edCardId}",
-                            e)
-                        // Try loading as EdPostCard as fallback
-                        try {
-                          val edCard = repo.loadEdCard(conversationId, messageId, dto.edCardId)
-                          if (edCard != null) {
-                            loadedEdCards.add(edCard)
-                          }
-                        } catch (e2: Exception) {
-                          Log.w(TAG, "Failed to load EdCard as EdPostCard either", e2)
-                        }
-                      }
-                    }
-                  }
+                  val (newEdCards, newEdPostsCards) =
+                      loadEdCardsForMessages(conversationId, msgs, repo = repo)
+                  loadedEdCards.addAll(newEdCards)
+                  loadedEdPostsCards.addAll(newEdPostsCards)
                 }
 
                 withContext(Dispatchers.Main) {
@@ -1504,6 +1476,45 @@ class HomeViewModel(
     ref.set(data).await()
     conversationId = newId
     return newId
+  }
+
+  @VisibleForTesting
+  internal suspend fun loadEdCardsForMessages(
+      conversationId: String,
+      msgs: List<Pair<MessageDTO, String>>,
+      repo: ConversationRepository = this.repo
+  ): Pair<List<EdPostCard>, List<EdPostsCard>> {
+    val loadedEdCards = mutableListOf<EdPostCard>()
+    val loadedEdPostsCards = mutableListOf<EdPostsCard>()
+    msgs.forEach { (dto, messageId) ->
+      if (dto.edCardId != null) {
+        try {
+          // Try loading as EdPostsCard first (check type field)
+          val edPostsCard = repo.loadEdPostsCard(conversationId, messageId, dto.edCardId)
+          if (edPostsCard != null) {
+            loadedEdPostsCards.add(edPostsCard)
+          } else {
+            // If null, try loading as EdPostCard (for published posts)
+            val edCard = repo.loadEdCard(conversationId, messageId, dto.edCardId)
+            if (edCard != null) {
+              loadedEdCards.add(edCard)
+            }
+          }
+        } catch (e: Exception) {
+          Log.w(TAG, "Failed to load EdCard for message $messageId, edCardId=${dto.edCardId}", e)
+          // Try loading as EdPostCard as fallback
+          try {
+            val edCard = repo.loadEdCard(conversationId, messageId, dto.edCardId)
+            if (edCard != null) {
+              loadedEdCards.add(edCard)
+            }
+          } catch (e2: Exception) {
+            Log.w(TAG, "Failed to load EdCard as EdPostCard either", e2)
+          }
+        }
+      }
+    }
+    return loadedEdCards to loadedEdPostsCards
   }
 
   /**
