@@ -219,7 +219,7 @@ class HomeViewModelOfflineCacheCoverageTest {
     vm.sendMessage("Test question")
     advanceUntilIdle()
     vm.awaitStreamingCompletion()
-    
+
     // Additional wait to ensure simulateStreamingFromText completes (it has delays)
     delay(300)
     advanceUntilIdle()
