@@ -27,6 +27,7 @@ import io.mockk.unmockkAll
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -1516,5 +1517,35 @@ class HomeScreenComposeInteractionsTest {
     composeRule.onNodeWithText("Card One").assertIsDisplayed()
     composeRule.onNodeWithText("Card Two").assertIsDisplayed()
     composeRule.onNodeWithText("Card Three").assertIsDisplayed()
+  }
+
+  @Test
+  fun homeScreen_renders_edPostsCard_from_timeline() = runTest {
+    val viewModel = createViewModel()
+    val userMsg = ChatUIModel(id = "u1", text = "Hello", timestamp = 100, type = ChatType.USER)
+    val edPostsCard =
+        EdPostsCard(
+            id = "epc1",
+            messageId = "u1",
+            query = "q",
+            posts =
+                listOf(
+                    EdPost(
+                        title = "ED Post Title",
+                        content = "Body",
+                        date = 0,
+                        author = "A",
+                        url = "u")),
+            filters = EdIntentFilters(),
+            stage = EdPostsStage.SUCCESS,
+            errorMessage = null,
+            createdAt = 50)
+    viewModel.editState { it.copy(messages = listOf(userMsg), edPostsCards = listOf(edPostsCard)) }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    composeRule.onNodeWithText("Hello").assertIsDisplayed()
+    composeRule.onNodeWithText("ED Post Title").assertIsDisplayed()
   }
 }
