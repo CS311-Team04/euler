@@ -602,7 +602,7 @@ fun HomeScreen(
                                     title = edPostAction.draftTitle,
                                     body = edPostAction.draftBody,
                                     courses = ui.edCourses,
-                                    selectedCourseId = null,
+                                    selectedCourseId = edPostAction.selectedCourseId,
                                     isLoading = ui.isPostingToEd || ui.isLoadingEdCourses,
                                     onPublish = { title, body, courseId, isAnonymous ->
                                       viewModel.publishEdPost(title, body, courseId, isAnonymous)

@@ -57,7 +57,8 @@ sealed class PendingAction {
   data class PostOnEd(
       val draftTitle: String,
       val draftBody: String,
-      val messageId: String? = null
+      val messageId: String? = null,
+      val selectedCourseId: Long? = null
   ) : PendingAction()
 }
 

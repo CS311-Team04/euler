@@ -1237,12 +1237,14 @@ class HomeScreenComposeInteractionsTest {
     val viewModel = HomeViewModel(edPostDataSourceOverride = dataSource)
     // Add a message so LazyColumn is displayed (modal is in LazyColumn)
     val userMsg = ChatUIModel(id = "msg-1", text = "Hello", timestamp = 0L, type = ChatType.USER)
+    val testCourse = EdCourse(id = 1153L, code = "CS-101", name = "Intro to CS")
     viewModel.editState {
       it.copy(
           messages = listOf(userMsg),
+          edCourses = listOf(testCourse),
           pendingAction =
               com.android.sample.home.PendingAction.PostOnEd(
-                  draftTitle = "Original Title", draftBody = "Original Body"))
+                  draftTitle = "Original Title", draftBody = "Original Body", selectedCourseId = 1153L))
     }
 
     composeRule.setContent { HomeScreen(viewModel = viewModel) }
@@ -1401,12 +1403,14 @@ class HomeScreenComposeInteractionsTest {
     val viewModel = HomeViewModel(edPostDataSourceOverride = dataSource)
     // Add a message so LazyColumn is displayed (modal is in LazyColumn)
     val userMsg = ChatUIModel(id = "msg-1", text = "Hello", timestamp = 0L, type = ChatType.USER)
+    val testCourse = EdCourse(id = 1153L, code = "CS-101", name = "Intro to CS")
     viewModel.editState {
       it.copy(
           messages = listOf(userMsg),
+          edCourses = listOf(testCourse),
           pendingAction =
               com.android.sample.home.PendingAction.PostOnEd(
-                  draftTitle = "Initial Title", draftBody = "Initial Body"))
+                  draftTitle = "Initial Title", draftBody = "Initial Body", selectedCourseId = 1153L))
     }
 
     composeRule.setContent { HomeScreen(viewModel = viewModel) }
