@@ -601,9 +601,11 @@ fun HomeScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     title = edPostAction.draftTitle,
                                     body = edPostAction.draftBody,
-                                    isLoading = ui.isPostingToEd,
-                                    onPublish = { title, body ->
-                                      viewModel.publishEdPost(title, body)
+                                    courses = ui.edCourses,
+                                    selectedCourseId = null,
+                                    isLoading = ui.isPostingToEd || ui.isLoadingEdCourses,
+                                    onPublish = { title, body, courseId, isAnonymous ->
+                                      viewModel.publishEdPost(title, body, courseId, isAnonymous)
                                     },
                                     onCancel = { viewModel.cancelEdPost() })
                                 Spacer(Modifier.height(8.dp))

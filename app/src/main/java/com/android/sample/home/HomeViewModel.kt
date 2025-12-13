@@ -657,14 +657,40 @@ class HomeViewModel(
     _uiState.update { it.copy(edPostResult = null) }
   }
 
+  private var loadEdCoursesJob: Job? = null
+
+  /** Loads the list of ED courses for the current user. */
+  fun loadEdCourses() {
+    if (loadEdCoursesJob?.isActive == true) return
+
+    loadEdCoursesJob =
+        viewModelScope.launch(exceptionHandler) {
+          _uiState.update { it.copy(isLoadingEdCourses = true) }
+          try {
+            val result = edPostDataSource.getCourses()
+            _uiState.update { it.copy(edCourses = result.courses, isLoadingEdCourses = false) }
+          } catch (e: Exception) {
+            Log.e(TAG, "loadEdCourses: Failed to load courses", e)
+            _uiState.update { it.copy(isLoadingEdCourses = false) }
+          }
+        }
+  }
+
   /**
    * Publishes the ED post with the given title and body. Clears the pending action and triggers the
    * post creation workflow.
    *
    * @param title The final title for the post
    * @param body The final body text for the post
+   * @param courseId The ID of the course to post to, or null to use default
+   * @param isAnonymous Whether to post anonymously
    */
-  fun publishEdPost(title: String, body: String) {
+  fun publishEdPost(
+      title: String,
+      body: String,
+      courseId: Long? = null,
+      isAnonymous: Boolean = false
+  ) {
     Log.d(TAG, "publishEdPost: title='$title', body length=${body.length}")
 
     val sanitizedTitle = title.trim()
@@ -682,7 +708,7 @@ class HomeViewModel(
 
     viewModelScope.launch(exceptionHandler) {
       try {
-        edPostDataSource.publish(sanitizedTitle, sanitizedBody)
+        edPostDataSource.publish(sanitizedTitle, sanitizedBody, courseId, isAnonymous)
         val now = System.currentTimeMillis()
         val edCardId = UUID.randomUUID().toString()
         val edCard =
@@ -1918,6 +1944,9 @@ class HomeViewModel(
       Log.d(TAG, "ED intent detected: ${reply.edIntent.intent} - creating PostOnEd pending action")
       val formattedQuestion = reply.edIntent.formattedQuestion ?: originalQuestion
       val formattedTitle = reply.edIntent.formattedTitle ?: ""
+
+      // Load courses when ED post intent is detected
+      loadEdCourses()
 
       _uiState.update { state ->
         state.copy(

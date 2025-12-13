@@ -1232,7 +1232,8 @@ class HomeScreenComposeInteractionsTest {
   @Test
   fun HomeScreen_edPostConfirmationModal_publish_calls_viewModel_publishEdPost() {
     val dataSource = mockk<EdPostRemoteDataSource>()
-    coEvery { dataSource.publish(any(), any()) } returns EdPostPublishResult(1, 1153, 10)
+    coEvery { dataSource.publish(any(), any(), any(), any()) } returns
+        EdPostPublishResult(1, 1153, 10)
     val viewModel = HomeViewModel(edPostDataSourceOverride = dataSource)
     // Add a message so LazyColumn is displayed (modal is in LazyColumn)
     val userMsg = ChatUIModel(id = "msg-1", text = "Hello", timestamp = 0L, type = ChatType.USER)
@@ -1395,7 +1396,8 @@ class HomeScreenComposeInteractionsTest {
   @Test
   fun HomeScreen_edPostConfirmationModal_allows_editing_before_publish() {
     val dataSource = mockk<EdPostRemoteDataSource>()
-    coEvery { dataSource.publish(any(), any()) } returns EdPostPublishResult(2, 1153, 11)
+    coEvery { dataSource.publish(any(), any(), any(), any()) } returns
+        EdPostPublishResult(2, 1153, 11)
     val viewModel = HomeViewModel(edPostDataSourceOverride = dataSource)
     // Add a message so LazyColumn is displayed (modal is in LazyColumn)
     val userMsg = ChatUIModel(id = "msg-1", text = "Hello", timestamp = 0L, type = ChatType.USER)
