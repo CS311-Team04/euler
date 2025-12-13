@@ -176,7 +176,7 @@ class HomeScreenTestCov {
         val viewModel = createHomeViewModel()
         val initialCount = viewModel.uiState.value.messages.size
 
-        viewModel.updateMessageDraft("What is EPFL?")
+        viewModel.updateMessageDraft("What can Euler do for me?")
 
         // sendMessage() is called, which:
         // 1. Adds user message synchronously
@@ -188,7 +188,7 @@ class HomeScreenTestCov {
         val stateAfterSend = viewModel.uiState.value
         assertTrue(stateAfterSend.messages.size >= initialCount + 1)
         val userMessage = stateAfterSend.messages.first()
-        assertEquals("What is EPFL?", userMessage.text)
+        assertEquals("What can Euler do for me?", userMessage.text)
         assertEquals(com.android.sample.Chat.ChatType.USER, userMessage.type)
         // Placeholder AI message should exist while waiting for the coroutine
         val lastMessage = stateAfterSend.messages.last()
@@ -581,10 +581,10 @@ class HomeScreenTestCov {
     composeRule.waitForIdle()
 
     assertTrue(action1Called)
-    assertTrue(sentMessages.contains("What is EPFL?"))
+    assertTrue(sentMessages.contains("What can Euler do for me?"))
     assertTrue(
         viewModel.uiState.value.messages.any {
-          it.type == ChatType.USER && it.text == "What is EPFL?"
+          it.type == ChatType.USER && it.text == "What can Euler do for me?"
         })
   }
 
@@ -614,8 +614,8 @@ class HomeScreenTestCov {
     composeRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed()
     composeRule.onNodeWithTag(HomeTags.Action2Btn).assertIsDisplayed()
     // Verify additional suggestion texts are displayed (these are unique to the chips)
-    composeRule.onNodeWithText("When was EPFL founded?").assertIsDisplayed()
-    composeRule.onNodeWithText("How many students at EPFL?").assertIsDisplayed()
+    composeRule.onNodeWithText("How do I use offline mode?").assertIsDisplayed()
+    composeRule.onNodeWithText("How do I find my previous chats?").assertIsDisplayed()
   }
 
   @Test
@@ -680,7 +680,7 @@ class HomeScreenTestCov {
         )
       }
     }
-    composeRule.onAllNodesWithText("What is EPFL?").assertCountEquals(0)
+    composeRule.onAllNodesWithText("What can Euler do for me?").assertCountEquals(0)
   }
 
   @Test
@@ -729,7 +729,7 @@ class HomeScreenTestCov {
         // Verify callbacks were called
         assertTrue("onAction1Click should be called", action1Called)
         assertTrue("onSendMessage should be called", sendMessageCalled)
-        assertEquals("What is EPFL?", sendMessageText)
+        assertEquals("What can Euler do for me?", sendMessageText)
 
         // Note: messageDraft will be empty after sendMessage() is called, which is expected
         // The important thing is that updateMessageDraft() was called with the correct text
@@ -766,7 +766,7 @@ class HomeScreenTestCov {
         // Verify callbacks were called
         assertTrue("onAction2Click should be called", action2Called)
         assertTrue("onSendMessage should be called", sendMessageCalled)
-        assertEquals("Where is EPFL located?", sendMessageText)
+        assertEquals("How do I start a new conversation?", sendMessageText)
 
         // Note: messageDraft will be empty after sendMessage() is called, which is expected
         // The important thing is that updateMessageDraft() was called with the correct text
@@ -803,7 +803,7 @@ class HomeScreenTestCov {
         advanceUntilIdle()
         assertTrue("User message should be added", viewModel.uiState.value.messages.isNotEmpty())
         val userMessage = viewModel.uiState.value.messages.first()
-        assertEquals("What is EPFL?", userMessage.text)
+        assertEquals("What can Euler do for me?", userMessage.text)
         assertEquals(ChatType.USER, userMessage.type)
       }
 
@@ -816,8 +816,8 @@ class HomeScreenTestCov {
     composeRule.onNodeWithTag(HomeTags.Action1Btn).assertIsDisplayed()
     composeRule.onNodeWithTag(HomeTags.Action2Btn).assertIsDisplayed()
     // Additional suggestions are unique to the chip row
-    composeRule.onNodeWithText("When was EPFL founded?").assertIsDisplayed()
-    composeRule.onNodeWithText("How many students at EPFL?").assertIsDisplayed()
+    composeRule.onNodeWithText("How do I use offline mode?").assertIsDisplayed()
+    composeRule.onNodeWithText("How do I find my previous chats?").assertIsDisplayed()
   }
 
   @Test
@@ -860,8 +860,8 @@ class HomeScreenTestCov {
 
     // Other suggestions (index > 1) should not have specific testTags
     // They should still be visible via their text content
-    composeRule.onNodeWithText("When was EPFL founded?").assertIsDisplayed()
-    composeRule.onNodeWithText("How many students at EPFL?").assertIsDisplayed()
+    composeRule.onNodeWithText("How do I use offline mode?").assertIsDisplayed()
+    composeRule.onNodeWithText("How do I find my previous chats?").assertIsDisplayed()
   }
 
   @Test
@@ -889,7 +889,7 @@ class HomeScreenTestCov {
 
         // Verify that onSendMessage was called with the suggestion text
         // This confirms that updateMessageDraft() was called with the correct text
-        assertEquals("What is EPFL?", sendMessageText)
+        assertEquals("What can Euler do for me?", sendMessageText)
         // Note: messageDraft will be empty after sendMessage() is called, which is expected
         // The important thing is that updateMessageDraft() was called with the correct text
       }
@@ -1095,8 +1095,8 @@ class HomeScreenTestCov {
         }
         composeRule.waitForIdle()
 
-        // Click on third suggestion (index 2) - "When was EPFL founded?"
-        composeRule.onNodeWithText("When was EPFL founded?").performClick()
+        // Click on third suggestion (index 2) - "How do I use offline mode?"
+        composeRule.onNodeWithText("How do I use offline mode?").performClick()
         composeRule.waitForIdle()
         advanceUntilIdle()
 
@@ -1105,7 +1105,7 @@ class HomeScreenTestCov {
         assertFalse("onAction2Click should not be called for index > 1", action2Called)
         // But onSendMessage should still be called with the correct text
         assertTrue("onSendMessage should be called for any suggestion", sendMessageCalled)
-        assertEquals("When was EPFL founded?", sendMessageText)
+        assertEquals("How do I use offline mode?", sendMessageText)
         // Note: messageDraft will be empty after sendMessage() is called, which is expected
         // behavior
       }
@@ -1145,7 +1145,7 @@ class HomeScreenTestCov {
 
         assertEquals("Action1 should be called once", 1, action1CallCount)
         assertEquals("SendMessage should be called once", 1, sendMessageCallCount)
-        assertEquals("What is EPFL?", firstSendMessageText)
+        assertEquals("What can Euler do for me?", firstSendMessageText)
         // Note: messageDraft will be empty after sendMessage() is called
 
         // Click on second suggestion - try by testTag first, fallback to text

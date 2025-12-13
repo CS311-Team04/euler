@@ -419,12 +419,15 @@ class HomeScreenNewFeaturesTest {
   @Test
   fun suggestionsList_containExpectedKeywords() {
     val expectedSuggestions = getExpectedSuggestions()
-    // Updated to reflect new offline-friendly EPFL questions
-    assertTrue(expectedSuggestions[0].contains("EPFL"))
-    assertTrue(expectedSuggestions[1].contains("EPFL"))
-    assertTrue(expectedSuggestions[2].contains("EPFL"))
-    assertTrue(expectedSuggestions[3].contains("EPFL"))
-    assertTrue(expectedSuggestions[4].contains("EPFL"))
+    // Updated to reflect new Euler-focused questions
+    assertTrue(expectedSuggestions[0].contains("Euler") || expectedSuggestions[0].contains("do"))
+    assertTrue(
+        expectedSuggestions[1].contains("conversation") || expectedSuggestions[1].contains("start"))
+    assertTrue(
+        expectedSuggestions[2].contains("offline") || expectedSuggestions[2].contains("voice"))
+    assertTrue(expectedSuggestions[3].contains("chats") || expectedSuggestions[3].contains("find"))
+    assertTrue(
+        expectedSuggestions[4].contains("theme") || expectedSuggestions[4].contains("change"))
   }
 
   /** Test that all suggestions are properly formatted. */
