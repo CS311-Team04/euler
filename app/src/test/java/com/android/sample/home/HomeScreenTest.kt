@@ -1244,7 +1244,9 @@ class HomeScreenComposeInteractionsTest {
           edCourses = listOf(testCourse),
           pendingAction =
               com.android.sample.home.PendingAction.PostOnEd(
-                  draftTitle = "Original Title", draftBody = "Original Body", selectedCourseId = 1153L))
+                  draftTitle = "Original Title",
+                  draftBody = "Original Body",
+                  selectedCourseId = 1153L))
     }
 
     composeRule.setContent { HomeScreen(viewModel = viewModel) }
@@ -1410,7 +1412,9 @@ class HomeScreenComposeInteractionsTest {
           edCourses = listOf(testCourse),
           pendingAction =
               com.android.sample.home.PendingAction.PostOnEd(
-                  draftTitle = "Initial Title", draftBody = "Initial Body", selectedCourseId = 1153L))
+                  draftTitle = "Initial Title",
+                  draftBody = "Initial Body",
+                  selectedCourseId = 1153L))
     }
 
     composeRule.setContent { HomeScreen(viewModel = viewModel) }
