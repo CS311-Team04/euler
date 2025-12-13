@@ -4,9 +4,9 @@ import org.junit.Assert.*
 import org.junit.Test
 
 /**
- * Deterministic unit tests for HomeViewModel predefined responses functionality.
- * These tests directly test the companion object functions which are pure and deterministic.
- * 
+ * Deterministic unit tests for HomeViewModel predefined responses functionality. These tests
+ * directly test the companion object functions which are pure and deterministic.
+ *
  * The ViewModel integration is tested indirectly through the existing HomeViewModelOfflineCacheTest
  * and HomeViewModelOfflineCacheCoverageTest classes.
  */
@@ -114,22 +114,23 @@ class HomeViewModelPredefinedResponsesTest {
   fun `all OFFLINE_SUGGESTIONS have matching predefined responses`() {
     HomeViewModel.OFFLINE_SUGGESTIONS.forEach { question ->
       val response = HomeViewModel.getPredefinedResponse(question)
-      assertNotNull("OFFLINE_SUGGESTIONS '$question' should have matching predefined response", response)
+      assertNotNull(
+          "OFFLINE_SUGGESTIONS '$question' should have matching predefined response", response)
       assertTrue("Response should not be empty for '$question'", response!!.isNotEmpty())
     }
   }
 
   @Test
   fun `all 7 predefined questions have correct expected content`() {
-    val expectedContents = mapOf(
-        "What can Euler do for me?" to "answer questions",
-        "How do I start a new conversation?" to "New chat",
-        "How do I use offline mode?" to "suggestion bubbles",
-        "How do I find my previous chats?" to "conversation list",
-        "How do I use voice input?" to "mic",
-        "How do I change the theme?" to "Appearance",
-        "How does Euler handle my privacy?" to "securely"
-    )
+    val expectedContents =
+        mapOf(
+            "What can Euler do for me?" to "answer questions",
+            "How do I start a new conversation?" to "New chat",
+            "How do I use offline mode?" to "suggestion bubbles",
+            "How do I find my previous chats?" to "conversation list",
+            "How do I use voice input?" to "mic",
+            "How do I change the theme?" to "Appearance",
+            "How does Euler handle my privacy?" to "securely")
 
     expectedContents.forEach { (question, expectedContent) ->
       val response = HomeViewModel.getPredefinedResponse(question)
@@ -232,14 +233,14 @@ class HomeViewModelPredefinedResponsesTest {
   @Test
   fun `all 7 questions work with case insensitive lookup`() {
     val questionsUppercase = HomeViewModel.OFFLINE_SUGGESTIONS.map { it.uppercase() }
-    
+
     questionsUppercase.forEachIndexed { index, uppercaseQuestion ->
       val canonical = HomeViewModel.getCanonicalQuestion(uppercaseQuestion)
       assertEquals(
           "Uppercase question should resolve to canonical form",
           HomeViewModel.OFFLINE_SUGGESTIONS[index],
           canonical)
-      
+
       val response = HomeViewModel.getPredefinedResponse(canonical)
       assertNotNull("Should find response for uppercase question: $uppercaseQuestion", response)
     }
@@ -262,10 +263,7 @@ class HomeViewModelPredefinedResponsesTest {
     HomeViewModel.OFFLINE_SUGGESTIONS.forEach { question ->
       val response = HomeViewModel.getPredefinedResponse(question)
       assertNotNull(response)
-      assertEquals(
-          "Response for '$question' should be trimmed",
-          response!!.trim(),
-          response)
+      assertEquals("Response for '$question' should be trimmed", response!!.trim(), response)
     }
   }
 }
