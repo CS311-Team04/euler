@@ -26,6 +26,7 @@ import {
   EdBrainError,
   NormalizedEdPost,
 } from "./edSearchDomain";
+import { callEdRouterLLM, EdLLMRouterInput } from "./edLLMRouter";
 import { 
   scrapeWeeklyMenu, 
   formatMenuForContext,
@@ -1278,6 +1279,46 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
       // Parse the response to extract formatted question and title
       const { reply, formattedQuestion, formattedTitle } = parseEdPostResponse(rawReply);
 
+      // Try to detect the suggested course from the prompt
+      let suggestedCourseId: number | null = null;
+      if (uid) {
+        try {
+          const existing = await edConnectorRepository.getConfig(uid);
+          if (existing && existing.apiKeyEncrypted) {
+            const apiToken = decryptSecret(existing.apiKeyEncrypted);
+            const baseUrl = existing.baseUrl || "https://eu.edstem.org/api";
+            const client = new EdDiscussionClient(baseUrl, apiToken);
+            const courses = await client.getCourses();
+
+            if (courses.length > 0) {
+              const llmInput: EdLLMRouterInput = {
+                userQuery: question,
+                courses: courses.map((c) => ({
+                  id: c.id,
+                  code: c.code || undefined,
+                  name: c.name || undefined,
+                })),
+              };
+
+              const llmOutput = await callEdRouterLLM(llmInput);
+              if (llmOutput.courseId) {
+                suggestedCourseId = llmOutput.courseId;
+                logger.info("answerWithRagFn.courseDetected", {
+                  suggestedCourseId,
+                  courseCode: llmOutput.courseCode,
+                });
+              }
+            }
+          }
+        } catch (e: any) {
+          // If course detection fails, continue without it (non-blocking)
+          logger.warn("answerWithRagFn.courseDetectionFailed", {
+            error: String(e),
+            message: e?.message,
+          });
+        }
+      }
+
       return {
         reply,
         primary_url: null,
@@ -1287,6 +1328,7 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
         ed_intent: edIntentResult.ed_intent,
         ed_formatted_question: formattedQuestion,
         ed_formatted_title: formattedTitle,
+        ed_suggested_course_id: suggestedCourseId,
         ed_fetch_intent_detected,
         ed_fetch_query,
       };
@@ -1675,6 +1717,7 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
       ed_intent: null,
       ed_formatted_question: null,
       ed_formatted_title: null,
+      ed_suggested_course_id: null,
       ed_fetch_intent_detected,
       ed_fetch_query,
       moodle_intent_detected: false,
@@ -1762,6 +1805,7 @@ export const answerWithRagHttp = europeFunctions.https.onRequest(async (req: fun
         ed_intent: edIntentResult.ed_intent,
         ed_formatted_question: formattedQuestion,
         ed_formatted_title: formattedTitle,
+        ed_suggested_course_id: null, // HTTP endpoint doesn't have auth context
         ed_fetch_intent_detected,
         ed_fetch_query,
       });
@@ -1776,6 +1820,7 @@ export const answerWithRagHttp = europeFunctions.https.onRequest(async (req: fun
       ed_intent: null,
       ed_formatted_question: null,
       ed_formatted_title: null,
+      ed_suggested_course_id: null,
       ed_fetch_intent_detected,
       ed_fetch_query,
       moodle_intent_detected: false,

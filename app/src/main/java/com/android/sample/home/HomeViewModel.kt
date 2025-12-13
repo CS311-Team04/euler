@@ -1944,6 +1944,7 @@ class HomeViewModel(
       Log.d(TAG, "ED intent detected: ${reply.edIntent.intent} - creating PostOnEd pending action")
       val formattedQuestion = reply.edIntent.formattedQuestion ?: originalQuestion
       val formattedTitle = reply.edIntent.formattedTitle ?: ""
+      val suggestedCourseId = reply.edIntent.suggestedCourseId
 
       // Load courses when ED post intent is detected
       loadEdCourses()
@@ -1954,7 +1955,8 @@ class HomeViewModel(
                 PendingAction.PostOnEd(
                     draftTitle = formattedTitle,
                     draftBody = formattedQuestion,
-                    messageId = messageId),
+                    messageId = messageId,
+                    selectedCourseId = suggestedCourseId),
             messages = state.messages.filterNot { it.id == messageId && it.type == ChatType.AI },
             streamingMessageId = null,
             isSending = false)

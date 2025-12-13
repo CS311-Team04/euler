@@ -27,7 +27,8 @@ class FakeLlmClient : LlmClient {
       reply: String,
       intent: String,
       formattedQuestion: String,
-      formattedTitle: String
+      formattedTitle: String,
+      suggestedCourseId: Long? = null
   ) {
     nextReply = reply
     nextEdIntent =
@@ -35,7 +36,8 @@ class FakeLlmClient : LlmClient {
             detected = true,
             intent = intent,
             formattedQuestion = formattedQuestion,
-            formattedTitle = formattedTitle)
+            formattedTitle = formattedTitle,
+            suggestedCourseId = suggestedCourseId)
   }
 
   /** Configure the fake to return an ED fetch intent response */

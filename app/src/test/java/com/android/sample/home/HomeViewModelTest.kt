@@ -2130,6 +2130,80 @@ class HomeViewModelTest {
   }
 
   @Test
+  fun homeViewModel_creates_PostOnEd_with_suggested_course_id() = runTest {
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.setEdIntentResponseWithFormatted(
+        reply = "Voici votre question formatée pour ED.",
+        intent = "post_question",
+        formattedQuestion =
+            "Bonjour,\n\nComment résoudre la question 5 de COM-301 ?\n\nMerci d'avance !",
+        formattedTitle = "Question 5 COM-301",
+        suggestedCourseId = 12345L)
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val repo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id")
+      whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel = HomeViewModel(fakeLlm, auth, repo)
+
+    viewModel.updateMessageDraft("Poste sur ed question 5 COM-301")
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    val state = viewModel.uiState.value
+    assertNotNull("pendingAction should be set", state.pendingAction)
+    assertTrue("pendingAction should be PostOnEd", state.pendingAction is PendingAction.PostOnEd)
+    val postOnEd = state.pendingAction as PendingAction.PostOnEd
+    assertEquals("Question 5 COM-301", postOnEd.draftTitle)
+    assertEquals(
+        "Bonjour,\n\nComment résoudre la question 5 de COM-301 ?\n\nMerci d'avance !",
+        postOnEd.draftBody)
+    assertEquals(12345L, postOnEd.selectedCourseId) // Suggested course ID should be passed
+  }
+
+  @Test
+  fun homeViewModel_creates_PostOnEd_without_suggested_course_id_when_null() = runTest {
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.setEdIntentResponseWithFormatted(
+        reply = "Voici votre question formatée pour ED.",
+        intent = "post_question",
+        formattedQuestion = "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
+        formattedTitle = "Question générale",
+        suggestedCourseId = null)
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val repo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id")
+      whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel = HomeViewModel(fakeLlm, auth, repo)
+
+    viewModel.updateMessageDraft("Poste sur ed ma question")
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    val state = viewModel.uiState.value
+    assertNotNull("pendingAction should be set", state.pendingAction)
+    assertTrue("pendingAction should be PostOnEd", state.pendingAction is PendingAction.PostOnEd)
+    val postOnEd = state.pendingAction as PendingAction.PostOnEd
+    assertEquals("Question générale", postOnEd.draftTitle)
+    assertNull("selectedCourseId should be null when not suggested", postOnEd.selectedCourseId)
+  }
+
+  @Test
   fun homeViewModel_creates_EdPostsCard_when_ed_fetch_intent_detected() = runTest {
     val fakeLlm = FakeLlmClient()
     fakeLlm.setEdFetchIntentResponse(
