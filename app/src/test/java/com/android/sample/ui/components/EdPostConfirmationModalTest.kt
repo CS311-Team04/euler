@@ -22,11 +22,15 @@ class EdPostConfirmationModalTest {
   fun EdPostConfirmationModal_displays_and_allows_editing() {
     var publishTitle = ""
     var publishBody = ""
+    val testCourse =
+        com.android.sample.home.EdCourse(id = 1153L, code = "CS-101", name = "Intro to CS")
 
     composeRule.setContent {
       EdPostConfirmationModal(
           title = "Initial Title",
           body = "Initial Body",
+          courses = listOf(testCourse),
+          selectedCourseId = 1153L,
           onPublish = { title, body, _, _ ->
             publishTitle = title
             publishBody = body
