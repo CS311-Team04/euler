@@ -558,16 +558,23 @@ class HomeViewModelOfflineCacheCoverageTest {
     val vm =
         HomeViewModel(llmClient, auth, repo, networkMonitor = networkMonitor, cacheRepo = cacheRepo)
 
+    // Prevent messages from being cleared by Firestore flows
+    vm.editState { it.copy(currentConversationId = "test-conv") }
+
     networkMonitor.setOnline(false)
     delay(100)
 
     vm.sendMessage("Test question")
     advanceUntilIdle()
     vm.awaitStreamingCompletion()
+    delay(300)
+    advanceUntilIdle()
 
     // Verify cached response is in messages
     val messages = vm.uiState.first().messages
-    assertTrue("Should have AI message", messages.any { it.type == ChatType.AI })
+    assertTrue(
+        "Should have AI message, got: ${messages.map { "${it.type}: ${it.text.take(30)}" }}",
+        messages.any { it.type == ChatType.AI })
   }
 
   // ==================== CONCURRENT SEND PROTECTION ====================
