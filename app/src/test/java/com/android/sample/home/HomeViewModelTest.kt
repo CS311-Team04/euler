@@ -43,9 +43,11 @@ import org.junit.runner.RunWith
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.timeout
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.robolectric.RobolectricTestRunner
@@ -287,7 +289,8 @@ class HomeViewModelTest {
       runTest(testDispatcher) {
         val dataSource = mock<EdPostRemoteDataSource>()
         runBlocking {
-          whenever(dataSource.publish(any(), any())).thenReturn(EdPostPublishResult(1, 1, 1))
+          whenever(dataSource.publish(any(), any(), anyOrNull(), any()))
+              .thenReturn(EdPostPublishResult(1, 1, 1))
         }
         val viewModel =
             HomeViewModel(
@@ -355,7 +358,8 @@ class HomeViewModelTest {
       runTest(testDispatcher) {
         val dataSource = mock<EdPostRemoteDataSource>()
         runBlocking {
-          whenever(dataSource.publish(any(), any())).thenReturn(EdPostPublishResult(2, 1153, 20))
+          whenever(dataSource.publish(any(), any(), anyOrNull(), any()))
+              .thenReturn(EdPostPublishResult(2, 1153, 20))
         }
         val viewModel =
             HomeViewModel(
@@ -522,7 +526,8 @@ class HomeViewModelTest {
       runTest(testDispatcher) {
         val dataSource = mock<EdPostRemoteDataSource>()
         runBlocking {
-          whenever(dataSource.publish(any(), any())).thenReturn(EdPostPublishResult(1, 1, 1))
+          whenever(dataSource.publish(any(), any(), anyOrNull(), any()))
+              .thenReturn(EdPostPublishResult(1, 1, 1))
         }
         val viewModel =
             HomeViewModel(
@@ -562,7 +567,8 @@ class HomeViewModelTest {
       runTest(testDispatcher) {
         val dataSource = mock<EdPostRemoteDataSource>()
         runBlocking {
-          whenever(dataSource.publish(any(), any())).thenReturn(EdPostPublishResult(99, 1153, 12))
+          whenever(dataSource.publish(any(), any(), anyOrNull(), any()))
+              .thenReturn(EdPostPublishResult(99, 1153, 12))
         }
         val viewModel =
             HomeViewModel(
@@ -583,7 +589,8 @@ class HomeViewModelTest {
       runTest(testDispatcher) {
         val dataSource = mock<EdPostRemoteDataSource>()
         runBlocking {
-          whenever(dataSource.publish(any(), any())).thenThrow(RuntimeException("backend down"))
+          whenever(dataSource.publish(any(), any(), anyOrNull(), any()))
+              .thenThrow(RuntimeException("backend down"))
         }
         val viewModel =
             HomeViewModel(
@@ -597,6 +604,104 @@ class HomeViewModelTest {
         assertTrue(state.edPostResult is EdPostResult.Failed)
         assertTrue(state.edPostCards.isEmpty())
         assertFalse(state.isPostingToEd)
+      }
+
+  @Test
+  fun publishEdPost_with_courseId_and_isAnonymous() =
+      runTest(testDispatcher) {
+        val dataSource = mock<EdPostRemoteDataSource>()
+        runBlocking {
+          whenever(dataSource.publish(eq("Title"), eq("Body"), eq(2000L), eq(true)))
+              .thenReturn(EdPostPublishResult(99, 2000, 12))
+        }
+        val viewModel =
+            HomeViewModel(
+                profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
+
+        viewModel.publishEdPost("Title", "Body", 2000L, true)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.edPostResult is EdPostResult.Published)
+        assertNull(state.pendingAction)
+        assertFalse(state.isPostingToEd)
+      }
+
+  @Test
+  fun loadEdCourses_loads_and_stores_courses() =
+      runTest(testDispatcher) {
+        val dataSource = mock<EdPostRemoteDataSource>()
+        val coursesResult =
+            EdCoursesResult(
+                listOf(EdCourse(1L, "CS-101", "Intro CS"), EdCourse(2L, "MATH-200", "Calculus")))
+        runBlocking { whenever(dataSource.getCourses()).thenReturn(coursesResult) }
+        val viewModel =
+            HomeViewModel(
+                profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
+
+        viewModel.loadEdCourses()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(2, state.edCourses.size)
+        assertEquals("CS-101", state.edCourses[0].code)
+        assertEquals("Intro CS", state.edCourses[0].name)
+        assertFalse(state.isLoadingEdCourses)
+      }
+
+  @Test
+  fun loadEdCourses_handles_error_gracefully() =
+      runTest(testDispatcher) {
+        val dataSource = mock<EdPostRemoteDataSource>()
+        runBlocking {
+          whenever(dataSource.getCourses()).thenThrow(RuntimeException("Network error"))
+        }
+        val viewModel =
+            HomeViewModel(
+                profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
+
+        viewModel.loadEdCourses()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.edCourses.isEmpty())
+        assertFalse(state.isLoadingEdCourses)
+      }
+
+  @Test
+  fun loadEdCourses_prevents_multiple_concurrent_loads() =
+      runTest(testDispatcher) {
+        val dataSource = mock<EdPostRemoteDataSource>()
+        val coursesResult = EdCoursesResult(listOf(EdCourse(1L, "CS-101", "Intro CS")))
+        runBlocking { whenever(dataSource.getCourses()).thenReturn(coursesResult) }
+        val viewModel =
+            HomeViewModel(
+                profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
+
+        viewModel.loadEdCourses()
+        viewModel.loadEdCourses() // Second call should be ignored
+        advanceUntilIdle()
+
+        verify(dataSource, times(1)).getCourses()
+      }
+
+  @Test
+  fun publishEdPost_with_default_parameters() =
+      runTest(testDispatcher) {
+        val dataSource = mock<EdPostRemoteDataSource>()
+        runBlocking {
+          whenever(dataSource.publish(eq("Title"), eq("Body"), eq(null), eq(false)))
+              .thenReturn(EdPostPublishResult(99, 1153, 12))
+        }
+        val viewModel =
+            HomeViewModel(
+                profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
+
+        viewModel.publishEdPost("Title", "Body")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.edPostResult is EdPostResult.Published)
       }
 
   @Test
@@ -2022,6 +2127,80 @@ class HomeViewModelTest {
     val postOnEd = state.pendingAction as PendingAction.PostOnEd
     assertEquals("", postOnEd.draftTitle) // Falls back to empty string
     assertEquals(question, postOnEd.draftBody) // Falls back to original question
+  }
+
+  @Test
+  fun homeViewModel_creates_PostOnEd_with_suggested_course_id() = runTest {
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.setEdIntentResponseWithFormatted(
+        reply = "Voici votre question formatée pour ED.",
+        intent = "post_question",
+        formattedQuestion =
+            "Bonjour,\n\nComment résoudre la question 5 de COM-301 ?\n\nMerci d'avance !",
+        formattedTitle = "Question 5 COM-301",
+        suggestedCourseId = 12345L)
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val repo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id")
+      whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel = HomeViewModel(fakeLlm, auth, repo)
+
+    viewModel.updateMessageDraft("Poste sur ed question 5 COM-301")
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    val state = viewModel.uiState.value
+    assertNotNull("pendingAction should be set", state.pendingAction)
+    assertTrue("pendingAction should be PostOnEd", state.pendingAction is PendingAction.PostOnEd)
+    val postOnEd = state.pendingAction as PendingAction.PostOnEd
+    assertEquals("Question 5 COM-301", postOnEd.draftTitle)
+    assertEquals(
+        "Bonjour,\n\nComment résoudre la question 5 de COM-301 ?\n\nMerci d'avance !",
+        postOnEd.draftBody)
+    assertEquals(12345L, postOnEd.selectedCourseId) // Suggested course ID should be passed
+  }
+
+  @Test
+  fun homeViewModel_creates_PostOnEd_without_suggested_course_id_when_null() = runTest {
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.setEdIntentResponseWithFormatted(
+        reply = "Voici votre question formatée pour ED.",
+        intent = "post_question",
+        formattedQuestion = "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
+        formattedTitle = "Question générale",
+        suggestedCourseId = null)
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val repo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id")
+      whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel = HomeViewModel(fakeLlm, auth, repo)
+
+    viewModel.updateMessageDraft("Poste sur ed ma question")
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    val state = viewModel.uiState.value
+    assertNotNull("pendingAction should be set", state.pendingAction)
+    assertTrue("pendingAction should be PostOnEd", state.pendingAction is PendingAction.PostOnEd)
+    val postOnEd = state.pendingAction as PendingAction.PostOnEd
+    assertEquals("Question générale", postOnEd.draftTitle)
+    assertNull("selectedCourseId should be null when not suggested", postOnEd.selectedCourseId)
   }
 
   @Test

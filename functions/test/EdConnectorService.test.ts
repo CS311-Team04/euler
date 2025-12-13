@@ -23,6 +23,7 @@ describe("EdConnectorService", () => {
   let service: EdConnectorService;
   let testConnectionMock: any;
   let postThreadMock: any;
+  let getCoursesMock: any;
 
   beforeEach(() => {
     // Mock repository
@@ -36,11 +37,13 @@ describe("EdConnectorService", () => {
     // an object with a mocked testConnection() function.
     testConnectionMock = jest.fn();
     postThreadMock = jest.fn();
+    getCoursesMock = jest.fn();
     MockedEdDiscussionClient.mockImplementation(
       () =>
         ({
           testConnection: testConnectionMock,
           postThread: postThreadMock,
+          getCourses: getCoursesMock,
         } as any)
     );
 
@@ -48,8 +51,7 @@ describe("EdConnectorService", () => {
       repo,
       encrypt,
       decrypt,
-      "https://eu.edstem.org/api",
-      1153
+      "https://eu.edstem.org/api"
     );
   });
 
@@ -225,8 +227,68 @@ describe("EdConnectorService", () => {
     repo.getConfig.mockResolvedValueOnce(null);
 
     await expect(
-      service.postThread("user-1", { title: "T", body: "B" })
+      service.postThread("user-1", { title: "T", body: "B", courseId: 1153 })
     ).rejects.toThrow("ED connector is not connected");
+  });
+
+  it("postThread throws when courseId is missing", async () => {
+    const existing: EdConnectorConfig = {
+      status: "connected",
+      baseUrl: "https://custom.ed/api",
+      apiKeyEncrypted: encrypt("secret-token"),
+    };
+    repo.getConfig.mockResolvedValueOnce(existing);
+
+    await expect(
+      service.postThread("user-1", { title: "T", body: "B" })
+    ).rejects.toThrow("courseId is required");
+  });
+
+  it("postThread passes isAnonymous to client", async () => {
+    const existing: EdConnectorConfig = {
+      status: "connected",
+      baseUrl: "https://custom.ed/api",
+      apiKeyEncrypted: encrypt("secret-token"),
+    };
+    repo.getConfig.mockResolvedValueOnce(existing);
+    postThreadMock.mockResolvedValueOnce({
+      id: 99,
+      course_id: 1153,
+      number: 12,
+    });
+
+    await service.postThread("user-1", {
+      title: "Hello",
+      body: "World",
+      courseId: 1153,
+      isAnonymous: true,
+    });
+
+    const payload = postThreadMock.mock.calls[0][1];
+    expect(payload.isAnonymous).toBe(true);
+  });
+
+  it("postThread defaults isAnonymous to false", async () => {
+    const existing: EdConnectorConfig = {
+      status: "connected",
+      baseUrl: "https://custom.ed/api",
+      apiKeyEncrypted: encrypt("secret-token"),
+    };
+    repo.getConfig.mockResolvedValueOnce(existing);
+    postThreadMock.mockResolvedValueOnce({
+      id: 99,
+      course_id: 1153,
+      number: 12,
+    });
+
+    await service.postThread("user-1", {
+      title: "Hello",
+      body: "World",
+      courseId: 1153,
+    });
+
+    const payload = postThreadMock.mock.calls[0][1];
+    expect(payload.isAnonymous).toBe(false);
   });
 
   it("postThread builds paragraph XML with breaks and escaping", async () => {

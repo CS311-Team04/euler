@@ -22,7 +22,7 @@ import org.mockito.kotlin.verify
 class EdPostRemoteDataSourceTest {
 
   @Test
-  fun publish_parses_camelCase_ids_and_sends_default_course() = runTest {
+  fun publish_parses_camelCase_ids_and_sends_courseId_and_isAnonymous() = runTest {
     val callableResult =
         mock<HttpsCallableResult> {
           on { getData() } doReturn
@@ -42,17 +42,75 @@ class EdPostRemoteDataSourceTest {
         }
 
     val dataSource = EdPostRemoteDataSource(functions)
-    val result = dataSource.publish("T", "B")
+    val result = dataSource.publish("T", "B", 2000L, true)
 
     // ids parsed
     assertEquals(10L, result.threadId)
     assertEquals(1153L, result.courseId)
     assertEquals(7L, result.threadNumber)
 
-    // payload contains default courseId
+    // payload contains courseId and isAnonymous
     val captor = argumentCaptor<Map<String, Any>>()
     verify(callableRef).call(captor.capture())
-    assertEquals(1153L, captor.firstValue["courseId"])
+    assertEquals(2000L, captor.firstValue["courseId"])
+    assertEquals(true, captor.firstValue["isAnonymous"])
+  }
+
+  @Test
+  fun publish_defaults_isAnonymous_to_false() = runTest {
+    val callableResult =
+        mock<HttpsCallableResult> {
+          on { getData() } doReturn
+              mapOf(
+                  "threadId" to 10,
+                  "courseId" to 1153,
+                  "threadNumber" to 7,
+              )
+        }
+    val callableRef =
+        mock<HttpsCallableReference> {
+          on { call(any<Map<String, Any>>()) } doReturn Tasks.forResult(callableResult)
+        }
+    val functions =
+        mock<FirebaseFunctions> {
+          on { getHttpsCallable("edConnectorPostFn") } doReturn callableRef
+        }
+
+    val dataSource = EdPostRemoteDataSource(functions)
+    dataSource.publish("T", "B", 2000L)
+
+    val captor = argumentCaptor<Map<String, Any>>()
+    verify(callableRef).call(captor.capture())
+    assertEquals(false, captor.firstValue["isAnonymous"])
+  }
+
+  @Test
+  fun publish_sends_null_courseId_when_not_provided() = runTest {
+    val callableResult =
+        mock<HttpsCallableResult> {
+          on { getData() } doReturn
+              mapOf(
+                  "threadId" to 10,
+                  "courseId" to 1153,
+                  "threadNumber" to 7,
+              )
+        }
+    val callableRef =
+        mock<HttpsCallableReference> {
+          on { call(any<Map<String, Any>>()) } doReturn Tasks.forResult(callableResult)
+        }
+    val functions =
+        mock<FirebaseFunctions> {
+          on { getHttpsCallable("edConnectorPostFn") } doReturn callableRef
+        }
+
+    val dataSource = EdPostRemoteDataSource(functions)
+    dataSource.publish("T", "B")
+
+    val captor = argumentCaptor<Map<String, Any>>()
+    verify(callableRef).call(captor.capture())
+    assertNull(captor.firstValue["courseId"])
+    assertEquals(false, captor.firstValue["isAnonymous"])
   }
 
   @Test
@@ -224,5 +282,87 @@ class EdPostRemoteDataSourceTest {
     val result = EdPostRemoteDataSource(functions).fetchPosts("test")
 
     assertEquals(42, result.filters.limit)
+  }
+
+  @Test
+  fun getCourses_parses_courses_correctly() = runTest {
+    val callableResult =
+        mock<HttpsCallableResult> {
+          on { getData() } doReturn
+              mapOf(
+                  "courses" to
+                      listOf(
+                          mapOf("id" to 1, "code" to "CS-101", "name" to "Intro CS"),
+                          mapOf("id" to 2, "code" to null, "name" to "No Code Course"),
+                          mapOf("id" to 3, "code" to "MATH-200", "name" to "Calculus")))
+        }
+    val callableRef =
+        mock<HttpsCallableReference> {
+          on { call(any<Map<String, Any>>()) } doReturn Tasks.forResult(callableResult)
+        }
+    val functions =
+        mock<FirebaseFunctions> {
+          on { getHttpsCallable("edConnectorGetCoursesFn") } doReturn callableRef
+        }
+
+    val dataSource = EdPostRemoteDataSource(functions)
+    val result = dataSource.getCourses()
+
+    assertEquals(3, result.courses.size)
+    assertEquals(1L, result.courses[0].id)
+    assertEquals("CS-101", result.courses[0].code)
+    assertEquals("Intro CS", result.courses[0].name)
+    assertEquals(2L, result.courses[1].id)
+    assertNull(result.courses[1].code)
+    assertEquals("No Code Course", result.courses[1].name)
+  }
+
+  @Test
+  fun getCourses_handles_empty_courses_list() = runTest {
+    val callableResult =
+        mock<HttpsCallableResult> { on { getData() } doReturn mapOf("courses" to emptyList<Any>()) }
+    val callableRef =
+        mock<HttpsCallableReference> {
+          on { call(any<Map<String, Any>>()) } doReturn Tasks.forResult(callableResult)
+        }
+    val functions =
+        mock<FirebaseFunctions> {
+          on { getHttpsCallable("edConnectorGetCoursesFn") } doReturn callableRef
+        }
+
+    val dataSource = EdPostRemoteDataSource(functions)
+    val result = dataSource.getCourses()
+
+    assertTrue(result.courses.isEmpty())
+  }
+
+  @Test
+  fun getCourses_handles_invalid_course_data() = runTest {
+    val callableResult =
+        mock<HttpsCallableResult> {
+          on { getData() } doReturn
+              mapOf(
+                  "courses" to
+                      listOf(
+                          mapOf("id" to 1, "code" to "CS-101", "name" to "Valid"),
+                          "invalid", // Not a map
+                          mapOf<String, Any?>(), // Empty map - should be filtered
+                          mapOf("id" to "not-a-number"))) // Invalid id
+        }
+    val callableRef =
+        mock<HttpsCallableReference> {
+          on { call(any<Map<String, Any>>()) } doReturn Tasks.forResult(callableResult)
+        }
+    val functions =
+        mock<FirebaseFunctions> {
+          on { getHttpsCallable("edConnectorGetCoursesFn") } doReturn callableRef
+        }
+
+    val dataSource = EdPostRemoteDataSource(functions)
+    val result = dataSource.getCourses()
+
+    // Only valid courses should be parsed
+    assertTrue(result.courses.size >= 1)
+    assertEquals("CS-101", result.courses.find { it.code == "CS-101" }?.code)
   }
 }

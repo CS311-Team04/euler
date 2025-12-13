@@ -40,12 +40,14 @@ enum class SourceType {
  * @param intent The type of ED intent detected (e.g., "post_question")
  * @param formattedQuestion The formatted question for ED post (when detected is true)
  * @param formattedTitle The formatted title for ED post (when detected is true)
+ * @param suggestedCourseId The suggested course ID detected from the prompt (when detected is true)
  */
 data class EdIntent(
     val detected: Boolean = false,
     val intent: String? = null,
     val formattedQuestion: String? = null,
-    val formattedTitle: String? = null
+    val formattedTitle: String? = null,
+    val suggestedCourseId: Long? = null
 )
 
 /**
@@ -240,6 +242,15 @@ class FirebaseFunctionsLlmClient(
   private fun parseEdFormattedTitle(map: Map<String, Any?>): String? =
       map[KEY_ED_FORMATTED_TITLE] as? String
 
+  private fun parseEdSuggestedCourseId(map: Map<String, Any?>): Long? {
+    val value = map[KEY_ED_SUGGESTED_COURSE_ID] ?: return null
+    return when (value) {
+      is Number -> value.toLong()
+      is String -> value.toLongOrNull()
+      else -> null
+    }?.takeIf { it >= 0 }
+  }
+
   private fun parseEdFetchIntentDetected(map: Map<String, Any?>): Boolean =
       map[KEY_ED_FETCH_INTENT_DETECTED] as? Boolean ?: false
 
@@ -254,12 +265,14 @@ class FirebaseFunctionsLlmClient(
 
     val edFormattedQuestion = parseEdFormattedQuestion(map)
     val edFormattedTitle = parseEdFormattedTitle(map)
+    val edSuggestedCourseId = parseEdSuggestedCourseId(map)
     val edIntent =
         EdIntent(
             detected = edIntentDetected,
             intent = edIntentType,
             formattedQuestion = edFormattedQuestion,
-            formattedTitle = edFormattedTitle)
+            formattedTitle = edFormattedTitle,
+            suggestedCourseId = edSuggestedCourseId)
 
     val edFetchDetected = parseEdFetchIntentDetected(map)
     val edFetchQuery = parseEdFetchQuery(map)
@@ -296,6 +309,7 @@ class FirebaseFunctionsLlmClient(
     private const val KEY_ED_INTENT = "ed_intent"
     private const val KEY_ED_FORMATTED_QUESTION = "ed_formatted_question"
     private const val KEY_ED_FORMATTED_TITLE = "ed_formatted_title"
+    private const val KEY_ED_SUGGESTED_COURSE_ID = "ed_suggested_course_id"
     private const val KEY_ED_FETCH_INTENT_DETECTED = "ed_fetch_intent_detected"
     private const val KEY_ED_FETCH_QUERY = "ed_fetch_query"
 

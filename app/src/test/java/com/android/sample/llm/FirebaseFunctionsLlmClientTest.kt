@@ -333,4 +333,174 @@ class FirebaseFunctionsLlmClientTest {
     assertTrue(result.edFetchIntent.detected)
     assertNull(result.edFetchIntent.query)
   }
+
+  // ==================== ED SUGGESTED COURSE ID TESTS ====================
+
+  @Test
+  fun generateReply_parses_ed_suggested_course_id_as_number() = runTest {
+    val reply = "I detected you want to post on ED"
+    val client =
+        clientWithResult(
+            mapOf(
+                "reply" to reply,
+                "ed_intent_detected" to true,
+                "ed_intent" to "post_question",
+                "ed_suggested_course_id" to 12345))
+
+    val result = client.generateReply("poste sur ed")
+
+    assertEquals(reply, result.reply)
+    assertTrue(result.edIntent.detected)
+    assertEquals(12345L, result.edIntent.suggestedCourseId)
+  }
+
+  @Test
+  fun generateReply_parses_ed_suggested_course_id_as_long() = runTest {
+    val reply = "Response"
+    val client =
+        clientWithResult(
+            mapOf(
+                "reply" to reply,
+                "ed_intent_detected" to true,
+                "ed_intent" to "post_question",
+                "ed_suggested_course_id" to 67890L))
+
+    val result = client.generateReply("test")
+
+    assertEquals(reply, result.reply)
+    assertTrue(result.edIntent.detected)
+    assertEquals(67890L, result.edIntent.suggestedCourseId)
+  }
+
+  @Test
+  fun generateReply_handles_ed_suggested_course_id_missing() = runTest {
+    val reply = "Response"
+    val client =
+        clientWithResult(
+            mapOf("reply" to reply, "ed_intent_detected" to true, "ed_intent" to "post_question"))
+
+    val result = client.generateReply("test")
+
+    assertEquals(reply, result.reply)
+    assertTrue(result.edIntent.detected)
+    assertNull(result.edIntent.suggestedCourseId)
+  }
+
+  @Test
+  fun generateReply_handles_ed_suggested_course_id_null() = runTest {
+    val reply = "Response"
+    val client =
+        clientWithResult(
+            mapOf(
+                "reply" to reply,
+                "ed_intent_detected" to true,
+                "ed_intent" to "post_question",
+                "ed_suggested_course_id" to null))
+
+    val result = client.generateReply("test")
+
+    assertEquals(reply, result.reply)
+    assertTrue(result.edIntent.detected)
+    assertNull(result.edIntent.suggestedCourseId)
+  }
+
+  @Test
+  fun generateReply_rejects_ed_suggested_course_id_negative() = runTest {
+    val reply = "Response"
+    val client =
+        clientWithResult(
+            mapOf(
+                "reply" to reply,
+                "ed_intent_detected" to true,
+                "ed_intent" to "post_question",
+                "ed_suggested_course_id" to -1))
+
+    val result = client.generateReply("test")
+
+    assertEquals(reply, result.reply)
+    assertTrue(result.edIntent.detected)
+    assertNull(result.edIntent.suggestedCourseId) // Negative values should be rejected
+  }
+
+  @Test
+  fun generateReply_handles_ed_suggested_course_id_invalid_type() = runTest {
+    val reply = "Response"
+    val client =
+        clientWithResult(
+            mapOf(
+                "reply" to reply,
+                "ed_intent_detected" to true,
+                "ed_intent" to "post_question",
+                "ed_suggested_course_id" to "not-a-number"))
+
+    val result = client.generateReply("test")
+
+    assertEquals(reply, result.reply)
+    assertTrue(result.edIntent.detected)
+    assertNull(result.edIntent.suggestedCourseId) // Invalid type should be rejected
+  }
+
+  @Test
+  fun generateReply_complete_ed_response_with_suggested_course_id() = runTest {
+    val reply = "I detected you want to post on ED"
+    val client =
+        clientWithResult(
+            mapOf(
+                "reply" to reply,
+                "primary_url" to "https://epfl.ch",
+                "ed_intent_detected" to true,
+                "ed_intent" to "post_question",
+                "ed_formatted_question" to
+                    "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
+                "ed_formatted_title" to "Question 5 Modstoch",
+                "ed_suggested_course_id" to 54321))
+
+    val result = client.generateReply("poste sur ed")
+
+    assertEquals(reply, result.reply)
+    assertEquals("https://epfl.ch", result.url)
+    assertTrue(result.edIntent.detected)
+    assertEquals("post_question", result.edIntent.intent)
+    assertEquals(
+        "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
+        result.edIntent.formattedQuestion)
+    assertEquals("Question 5 Modstoch", result.edIntent.formattedTitle)
+    assertEquals(54321L, result.edIntent.suggestedCourseId)
+  }
+
+  @Test
+  fun generateReply_handles_ed_suggested_course_id_zero() = runTest {
+    val reply = "Response"
+    val client =
+        clientWithResult(
+            mapOf(
+                "reply" to reply,
+                "ed_intent_detected" to true,
+                "ed_intent" to "post_question",
+                "ed_suggested_course_id" to 0))
+
+    val result = client.generateReply("test")
+
+    assertEquals(reply, result.reply)
+    assertTrue(result.edIntent.detected)
+    assertEquals(0L, result.edIntent.suggestedCourseId) // Zero is valid
+  }
+
+  @Test
+  fun generateReply_handles_ed_suggested_course_id_large_number() = runTest {
+    val reply = "Response"
+    val client =
+        clientWithResult(
+            mapOf(
+                "reply" to reply,
+                "ed_intent_detected" to true,
+                "ed_intent" to "post_question",
+                "ed_suggested_course_id" to 999999999))
+
+    val result = client.generateReply("test")
+
+    assertEquals(reply, result.reply)
+    assertTrue(result.edIntent.detected)
+    assertEquals(999999999L, result.edIntent.suggestedCourseId)
+  }
 }

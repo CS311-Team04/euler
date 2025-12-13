@@ -1232,16 +1232,21 @@ class HomeScreenComposeInteractionsTest {
   @Test
   fun HomeScreen_edPostConfirmationModal_publish_calls_viewModel_publishEdPost() {
     val dataSource = mockk<EdPostRemoteDataSource>()
-    coEvery { dataSource.publish(any(), any()) } returns EdPostPublishResult(1, 1153, 10)
+    coEvery { dataSource.publish(any(), any(), any(), any()) } returns
+        EdPostPublishResult(1, 1153, 10)
     val viewModel = HomeViewModel(edPostDataSourceOverride = dataSource)
     // Add a message so LazyColumn is displayed (modal is in LazyColumn)
     val userMsg = ChatUIModel(id = "msg-1", text = "Hello", timestamp = 0L, type = ChatType.USER)
+    val testCourse = EdCourse(id = 1153L, code = "CS-101", name = "Intro to CS")
     viewModel.editState {
       it.copy(
           messages = listOf(userMsg),
+          edCourses = listOf(testCourse),
           pendingAction =
               com.android.sample.home.PendingAction.PostOnEd(
-                  draftTitle = "Original Title", draftBody = "Original Body"))
+                  draftTitle = "Original Title",
+                  draftBody = "Original Body",
+                  selectedCourseId = 1153L))
     }
 
     composeRule.setContent { HomeScreen(viewModel = viewModel) }
@@ -1395,16 +1400,21 @@ class HomeScreenComposeInteractionsTest {
   @Test
   fun HomeScreen_edPostConfirmationModal_allows_editing_before_publish() {
     val dataSource = mockk<EdPostRemoteDataSource>()
-    coEvery { dataSource.publish(any(), any()) } returns EdPostPublishResult(2, 1153, 11)
+    coEvery { dataSource.publish(any(), any(), any(), any()) } returns
+        EdPostPublishResult(2, 1153, 11)
     val viewModel = HomeViewModel(edPostDataSourceOverride = dataSource)
     // Add a message so LazyColumn is displayed (modal is in LazyColumn)
     val userMsg = ChatUIModel(id = "msg-1", text = "Hello", timestamp = 0L, type = ChatType.USER)
+    val testCourse = EdCourse(id = 1153L, code = "CS-101", name = "Intro to CS")
     viewModel.editState {
       it.copy(
           messages = listOf(userMsg),
+          edCourses = listOf(testCourse),
           pendingAction =
               com.android.sample.home.PendingAction.PostOnEd(
-                  draftTitle = "Initial Title", draftBody = "Initial Body"))
+                  draftTitle = "Initial Title",
+                  draftBody = "Initial Body",
+                  selectedCourseId = 1153L))
     }
 
     composeRule.setContent { HomeScreen(viewModel = viewModel) }

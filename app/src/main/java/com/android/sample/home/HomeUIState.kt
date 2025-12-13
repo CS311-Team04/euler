@@ -31,7 +31,9 @@ data class HomeUiState(
     val edPostsCards: List<EdPostsCard> =
         emptyList(), // Cards for fetched posts, associated with messages
     val isPostingToEd: Boolean = false,
-    val edPostsState: EdPostsUiState = EdPostsUiState(stage = EdPostsStage.IDLE)
+    val edPostsState: EdPostsUiState = EdPostsUiState(stage = EdPostsStage.IDLE),
+    val edCourses: List<EdCourse> = emptyList(),
+    val isLoadingEdCourses: Boolean = false
 )
 
 /** Represents an EPFL system (e.g., IS-Academia, Moodle, Drive) and its connection state. */
@@ -55,7 +57,8 @@ sealed class PendingAction {
   data class PostOnEd(
       val draftTitle: String,
       val draftBody: String,
-      val messageId: String? = null
+      val messageId: String? = null,
+      val selectedCourseId: Long? = null
   ) : PendingAction()
 }
 

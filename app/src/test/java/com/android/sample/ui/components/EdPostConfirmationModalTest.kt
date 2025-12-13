@@ -22,12 +22,16 @@ class EdPostConfirmationModalTest {
   fun EdPostConfirmationModal_displays_and_allows_editing() {
     var publishTitle = ""
     var publishBody = ""
+    val testCourse =
+        com.android.sample.home.EdCourse(id = 1153L, code = "CS-101", name = "Intro to CS")
 
     composeRule.setContent {
       EdPostConfirmationModal(
           title = "Initial Title",
           body = "Initial Body",
-          onPublish = { title, body ->
+          courses = listOf(testCourse),
+          selectedCourseId = 1153L,
+          onPublish = { title, body, _, _ ->
             publishTitle = title
             publishBody = body
           },
@@ -53,7 +57,7 @@ class EdPostConfirmationModalTest {
       EdPostConfirmationModal(
           title = "Title",
           body = "Body",
-          onPublish = { _, _ -> },
+          onPublish = { _, _, _, _ -> },
           onCancel = { cancelCalled = true })
     }
 
@@ -66,7 +70,10 @@ class EdPostConfirmationModalTest {
   fun EdPostConfirmationModal_handles_backslash_n_in_title() {
     composeRule.setContent {
       EdPostConfirmationModal(
-          title = "Title\\nWith\\nNewlines", body = "Body", onPublish = { _, _ -> }, onCancel = {})
+          title = "Title\\nWith\\nNewlines",
+          body = "Body",
+          onPublish = { _, _, _, _ -> },
+          onCancel = {})
     }
 
     // The text should be displayed (the component replaces \n internally)
@@ -78,7 +85,7 @@ class EdPostConfirmationModalTest {
   fun EdPostConfirmationModal_displays_initial_title() {
     composeRule.setContent {
       EdPostConfirmationModal(
-          title = "Title 1", body = "Body", onPublish = { _, _ -> }, onCancel = {})
+          title = "Title 1", body = "Body", onPublish = { _, _, _, _ -> }, onCancel = {})
     }
 
     composeRule.onNode(hasText("Title 1")).assertIsDisplayed()
@@ -88,7 +95,7 @@ class EdPostConfirmationModalTest {
   fun EdPostConfirmationModal_displays_initial_body() {
     composeRule.setContent {
       EdPostConfirmationModal(
-          title = "Title", body = "Body 1", onPublish = { _, _ -> }, onCancel = {})
+          title = "Title", body = "Body 1", onPublish = { _, _, _, _ -> }, onCancel = {})
     }
 
     composeRule.onNode(hasText("Body 1")).assertIsDisplayed()
@@ -98,7 +105,11 @@ class EdPostConfirmationModalTest {
   fun edPostConfirmationModal_shows_loading_indicator_when_isLoading_is_true() {
     composeRule.setContent {
       EdPostConfirmationModal(
-          title = "Title", body = "Body", isLoading = true, onPublish = { _, _ -> }, onCancel = {})
+          title = "Title",
+          body = "Body",
+          isLoading = true,
+          onPublish = { _, _, _, _ -> },
+          onCancel = {})
     }
 
     // Verify that text fields are disabled when loading
