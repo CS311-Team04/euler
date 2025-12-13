@@ -132,22 +132,47 @@ class HomeViewModel(
     // These must match the localization keys exactly for cache hits
     val OFFLINE_SUGGESTIONS =
         listOf(
-            "What is EPFL?",
-            "Where is EPFL located?",
-            "When was EPFL founded?",
-            "How many students at EPFL?",
-            "What are EPFL's research areas?",
-            "Tell me about EPFL campus")
+            "What can Euler do for me?",
+            "How do I start a new conversation?",
+            "How do I use offline mode?",
+            "How do I find my previous chats?",
+            "How do I use voice input?",
+            "How do I change the theme?",
+            "How does Euler handle my privacy?")
 
     // Mapping of localization keys to canonical English questions for cache lookup
     private val SUGGESTION_KEY_TO_CANONICAL =
         mapOf(
-            "suggestion_what_is_epfl" to "What is EPFL?",
-            "suggestion_where_epfl" to "Where is EPFL located?",
-            "suggestion_epfl_founded" to "When was EPFL founded?",
-            "suggestion_epfl_students" to "How many students at EPFL?",
-            "suggestion_epfl_research" to "What are EPFL's research areas?",
-            "suggestion_epfl_campus" to "Tell me about EPFL campus")
+            "suggestion_euler_capabilities" to "What can Euler do for me?",
+            "suggestion_new_conversation" to "How do I start a new conversation?",
+            "suggestion_offline_mode" to "How do I use offline mode?",
+            "suggestion_previous_chats" to "How do I find my previous chats?",
+            "suggestion_voice_input" to "How do I use voice input?",
+            "suggestion_change_theme" to "How do I change the theme?",
+            "suggestion_privacy" to "How does Euler handle my privacy?")
+
+    // Predefined offline responses bundled with the app
+    // These are always available without network or Firestore cache
+    private val PREDEFINED_RESPONSES =
+        mapOf(
+            "What can Euler do for me?" to
+                """Euler can answer questions, summarize text, draft messages, explain concepts, and provide quick service info you've synced before.""",
+            "How do I start a new conversation?" to
+                """Tap "New chat" (or clear the draft) and type or use voice; Euler creates a fresh thread automatically.""",
+            "How do I use offline mode?" to
+                """When offline, you can tap the suggestion bubbles to get predefined answers. Typing new, uncached questions will prompt you to reconnect.""",
+            "How do I find my previous chats?" to
+                """Open the conversation list from the home screen. Previously synced chats are available; new devices need one online sync to fetch history.""",
+            "How do I use voice input?" to
+                """Tap the mic in the input bar, speak, and Euler fills the draft with your transcript; send or edit before sending.""",
+            "How do I change the theme?" to
+                """Go to settings → Appearance and choose light/dark/system; chat colors adapt automatically.""",
+            "How does Euler handle my privacy?" to
+                """Your chats are tied to your account and stored securely. Offline predefined answers stay on-device.""")
+
+    /** Returns a predefined offline response for a canonical question, or null if not found. */
+    fun getPredefinedResponse(canonicalQuestion: String): String? =
+        PREDEFINED_RESPONSES[canonicalQuestion]
 
     /**
      * Finds the canonical English question for a given localized suggestion text. Returns the input
@@ -874,52 +899,55 @@ class HomeViewModel(
       try {
         Log.d(TAG, "sendMessage: starting, message='${msg.take(50)}...'")
 
-        // Check cache when offline (for signed-in users only)
-        // Use Firestore offline persistence to read from local cache
-        val isOffline = current.isOffline || networkMonitor?.isCurrentlyOnline() == false
-        if (isOffline && !isGuest()) {
-          Log.d(TAG, "sendMessage: offline, checking Firestore local cache for question")
-          try {
-            // Use canonical English question for cache lookup (handles localized suggestions)
-            val canonicalQuestion = getCanonicalQuestion(msg)
-            Log.d(TAG, "sendMessage: looking up cache for canonical question: $canonicalQuestion")
-            // Use preferCache=true to force reading from local Firestore cache
-            val cachedResponse = cacheRepo.getCachedResponse(canonicalQuestion, preferCache = true)
-            if (cachedResponse != null && cachedResponse.isNotBlank()) {
-              Log.d(TAG, "sendMessage: found cached response in local Firestore cache, using it")
-              // Use cached response
-              simulateStreamingFromText(aiMessageId, cachedResponse)
-              clearStreamingState(aiMessageId)
+        // Check for predefined responses first (works both online and offline)
+        // This ensures suggestion bubbles always return consistent answers
+        val canonicalQuestion = getCanonicalQuestion(msg)
+        val predefinedResponse = getPredefinedResponse(canonicalQuestion)
+        if (predefinedResponse != null) {
+          Log.d(TAG, "sendMessage: using predefined response for: $canonicalQuestion")
+          simulateStreamingFromText(aiMessageId, predefinedResponse)
+          clearStreamingState(aiMessageId)
+          return@launch
+        }
 
-              // Persist to conversation if we have one
-              val cid = _uiState.value.currentConversationId
-              if (cid != null) {
-                try {
-                  repo.appendMessage(cid, "assistant", cachedResponse)
-                } catch (e: Exception) {
-                  Log.w(TAG, "Failed to persist cached response to conversation", e)
+        // Handle offline mode for non-predefined questions
+        val isOffline = current.isOffline || networkMonitor?.isCurrentlyOnline() == false
+        if (isOffline) {
+          Log.d(TAG, "sendMessage: offline mode, checking Firestore cache")
+
+          // For signed-in users, try Firestore local cache
+          if (!isGuest()) {
+            try {
+              val cachedResponse =
+                  cacheRepo.getCachedResponse(canonicalQuestion, preferCache = true)
+              if (cachedResponse != null && cachedResponse.isNotBlank()) {
+                Log.d(TAG, "sendMessage: found cached response in Firestore local cache")
+                simulateStreamingFromText(aiMessageId, cachedResponse)
+                clearStreamingState(aiMessageId)
+
+                // Persist to conversation if we have one
+                val cid = _uiState.value.currentConversationId
+                if (cid != null) {
+                  try {
+                    repo.appendMessage(cid, "assistant", cachedResponse)
+                  } catch (e: Exception) {
+                    Log.w(TAG, "Failed to persist cached response to conversation", e)
+                  }
                 }
+                return@launch
               }
-              return@launch
-            } else {
-              Log.d(
-                  TAG,
-                  "sendMessage: no cached response found in local Firestore cache for offline request")
-              // No cache and offline - show error immediately
-              handleSendMessageError(
-                  IOException(
-                      "No cached response available. Please connect to the internet to get a response."),
-                  aiMessageId)
-              return@launch
+            } catch (e: Exception) {
+              Log.w(TAG, "Error checking Firestore local cache", e)
             }
-          } catch (e: Exception) {
-            Log.w(TAG, "Error checking Firestore local cache", e)
-            // If cache check fails and we're offline, show error
-            handleSendMessageError(
-                IOException("Unable to retrieve cached response. Please connect to the internet."),
-                aiMessageId)
-            return@launch
           }
+
+          // No cached response available - show error
+          Log.d(TAG, "sendMessage: no offline response available")
+          handleSendMessageError(
+              IOException(
+                  "No offline response available for this question. Please connect to the internet."),
+              aiMessageId)
+          return@launch
         }
 
         // GUEST: no Firestore, just streaming UI

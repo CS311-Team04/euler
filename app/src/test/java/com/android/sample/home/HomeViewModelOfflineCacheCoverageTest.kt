@@ -702,6 +702,9 @@ class HomeViewModelOfflineCacheCoverageTest {
     val vm =
         HomeViewModel(llmClient, auth, repo, networkMonitor = networkMonitor, cacheRepo = cacheRepo)
 
+    // Prevent messages from being cleared by setting a conversation ID
+    vm.editState { it.copy(currentConversationId = "test-conv") }
+
     // Set offline state
     networkMonitor.setOnline(false)
     delay(100)
@@ -709,12 +712,16 @@ class HomeViewModelOfflineCacheCoverageTest {
     vm.sendMessage("Test question")
     advanceUntilIdle()
     vm.awaitStreamingCompletion()
+    delay(200)
+    advanceUntilIdle()
 
     // Should have both user and AI messages (AI message will be error)
     val messages = vm.uiState.first().messages
     assertTrue(
-        "Should have user message",
+        "Should have user message, got: ${messages.map { "${it.type}: ${it.text.take(30)}" }}",
         messages.any { it.type == ChatType.USER && it.text == "Test question" })
-    assertTrue("Should have AI message", messages.any { it.type == ChatType.AI })
+    assertTrue(
+        "Should have AI message, got: ${messages.map { "${it.type}: ${it.text.take(30)}" }}",
+        messages.any { it.type == ChatType.AI })
   }
 }
