@@ -28,6 +28,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.*
+import org.mockito.kotlin.timeout
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
@@ -114,26 +115,42 @@ class HomeViewModelOfflineCacheCoverageTest {
     val vm =
         HomeViewModel(llmClient, auth, repo, networkMonitor = networkMonitor, cacheRepo = cacheRepo)
 
-    // Go offline
+    // Wait for ViewModel initialization to complete
+    advanceUntilIdle()
+    delay(50)
+
+    // Go offline and wait for state to update
     networkMonitor.setOnline(false)
+    advanceUntilIdle()
     delay(100)
+    advanceUntilIdle()
+
+    // Verify we're offline before sending
+    assertTrue(
+        "Should be offline", vm.uiState.value.isOffline || !networkMonitor.isCurrentlyOnline())
 
     vm.updateMessageDraft("What is EPFL?")
     vm.sendMessage()
+
+    // Wait for all coroutines to complete
     advanceUntilIdle()
     vm.awaitStreamingCompletion()
 
-    // Verify cached response was used
-    val messages = vm.uiState.first().messages
+    // Additional wait to ensure simulateStreamingFromText completes
+    delay(200)
+    advanceUntilIdle()
+
+    // Verify cached response was used - use value instead of first() to get current state
+    val messages = vm.uiState.value.messages
     assertTrue(
-        "Should have user message",
+        "Should have user message, got ${messages.size} messages: ${messages.map { "${it.type}: ${it.text.take(50)}" }}",
         messages.any { it.type == ChatType.USER && it.text == "What is EPFL?" })
     assertTrue(
-        "Should have AI message with cached response",
+        "Should have AI message with cached response, got ${messages.size} messages: ${messages.map { "${it.type}: ${it.text.take(50)}" }}",
         messages.any { it.type == ChatType.AI && it.text.contains("cached response") })
 
     // Verify cache was queried with preferCache=true
-    verify(cacheRepo).getCachedResponse("What is EPFL?", true)
+    verify(cacheRepo, timeout(1000)).getCachedResponse("What is EPFL?", true)
   }
 
   @Test
