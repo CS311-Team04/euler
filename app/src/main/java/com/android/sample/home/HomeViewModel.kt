@@ -405,6 +405,15 @@ class HomeViewModel(
                 }
 
                 val conversationId = _uiState.value.currentConversationId
+
+                // Don't overwrite local messages when no conversation is selected
+                // and incoming messages are empty. This preserves offline messages
+                // that haven't been persisted yet. We always skip in this case
+                // because updating with empty messages is either a no-op (if messages
+                // are already empty) or destructive (if we have local messages).
+                if (conversationId == null && msgs.isEmpty()) {
+                  return@collect
+                }
                 // Load all EdCards (both EdPostCard and EdPostsCard) before updating state
                 val loadedEdCards = mutableListOf<EdPostCard>()
                 val loadedEdPostsCards = mutableListOf<EdPostsCard>()
