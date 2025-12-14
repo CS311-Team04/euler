@@ -49,8 +49,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -394,7 +394,9 @@ class HomeViewModel(
               .map { it.currentConversationId }
               .distinctUntilChanged()
               .flatMapLatest { cid ->
-                if (cid == null) flowOf(emptyList()) else repo.messagesFlow(cid)
+                // Use emptyFlow() when no conversation is selected to avoid
+                // race conditions where stale emissions could clear local messages
+                if (cid == null) emptyFlow() else repo.messagesFlow(cid)
               }
               .flowOn(Dispatchers.IO)
               .collect { msgs ->
