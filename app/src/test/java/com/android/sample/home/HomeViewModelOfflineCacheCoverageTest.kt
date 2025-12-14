@@ -167,12 +167,18 @@ class HomeViewModelOfflineCacheCoverageTest {
     val vm =
         HomeViewModel(llmClient, auth, repo, networkMonitor = networkMonitor, cacheRepo = cacheRepo)
 
+    // Wait for ViewModel initialization
+    advanceUntilIdle()
+    delay(50)
+
     // Set an existing conversation ID BEFORE going offline
     vm.editState { it.copy(currentConversationId = "existing-conv-123") }
 
-    // Go offline
+    // Go offline and wait for state to update
     networkMonitor.setOnline(false)
+    advanceUntilIdle()
     delay(100)
+    advanceUntilIdle()
 
     vm.sendMessage("Test question")
 
@@ -184,14 +190,14 @@ class HomeViewModelOfflineCacheCoverageTest {
     delay(500)
     advanceUntilIdle()
 
-    // Verify that the messages were added (cached response was used)
-    val messages = vm.uiState.first().messages
+    // Verify that the messages were added (cached response was used) - use value instead of first()
+    val messages = vm.uiState.value.messages
     assertTrue(
-        "Should have AI message with cached response",
+        "Should have AI message with cached response, got ${messages.size} messages: ${messages.map { "${it.type}: ${it.text.take(50)}" }}",
         messages.any { it.type == ChatType.AI && it.text.contains("Cached response") })
 
     // Verify repo.appendMessage was called to persist the cached response
-    verify(repo, atLeastOnce())
+    verify(repo, timeout(1000).atLeastOnce())
         .appendMessage(eq("existing-conv-123"), eq("assistant"), eq(cachedResponse), anyOrNull())
   }
 
@@ -227,11 +233,18 @@ class HomeViewModelOfflineCacheCoverageTest {
 
     val vm =
         HomeViewModel(llmClient, auth, repo, networkMonitor = networkMonitor, cacheRepo = cacheRepo)
+
+    // Wait for ViewModel initialization
+    advanceUntilIdle()
+    delay(50)
+
     vm.editState { it.copy(currentConversationId = "conv-123") }
 
-    // Go offline
+    // Go offline and wait for state to update
     networkMonitor.setOnline(false)
+    advanceUntilIdle()
     delay(100)
+    advanceUntilIdle()
 
     vm.sendMessage("Test question")
     advanceUntilIdle()
@@ -241,8 +254,8 @@ class HomeViewModelOfflineCacheCoverageTest {
     delay(300)
     advanceUntilIdle()
 
-    // Should still show cached response despite persist failure
-    val messages = vm.uiState.first().messages
+    // Should still show cached response despite persist failure - use value instead of first()
+    val messages = vm.uiState.value.messages
     assertTrue(
         "Should have AI message with cached response, got ${messages.size} messages: ${messages.map { "${it.type}: ${it.text.take(50)}" }}",
         messages.any { it.type == ChatType.AI && it.text.contains("Cached response") })
@@ -257,12 +270,19 @@ class HomeViewModelOfflineCacheCoverageTest {
 
     val vm =
         HomeViewModel(llmClient, auth, repo, networkMonitor = networkMonitor, cacheRepo = cacheRepo)
+
+    // Wait for ViewModel initialization
+    advanceUntilIdle()
+    delay(50)
+
     // Avoid messagesFlow() wiping local messages by keeping a non-null conversation id
     vm.editState { it.copy(currentConversationId = "conv-offline") }
 
-    // Go offline
+    // Go offline and wait for state to update
     networkMonitor.setOnline(false)
+    advanceUntilIdle()
     delay(100)
+    advanceUntilIdle()
 
     vm.sendMessage("What is EPFL?")
     advanceUntilIdle()
@@ -272,8 +292,8 @@ class HomeViewModelOfflineCacheCoverageTest {
     delay(200)
     advanceUntilIdle()
 
-    // Verify error message is shown
-    val messages = vm.uiState.first().messages
+    // Verify error message is shown - use value instead of first()
+    val messages = vm.uiState.value.messages
     assertTrue(
         "Should have user message, got ${messages.size} messages: ${messages.map { "${it.type}: ${it.text.take(50)}" }}",
         messages.any { it.type == ChatType.USER })
@@ -311,16 +331,27 @@ class HomeViewModelOfflineCacheCoverageTest {
     val vm =
         HomeViewModel(llmClient, auth, repo, networkMonitor = networkMonitor, cacheRepo = cacheRepo)
 
-    // Go offline
+    // Wait for ViewModel initialization
+    advanceUntilIdle()
+    delay(50)
+
+    // Go offline and wait for state to update
     networkMonitor.setOnline(false)
+    advanceUntilIdle()
     delay(100)
+    advanceUntilIdle()
 
     vm.sendMessage("What is EPFL?")
     advanceUntilIdle()
     vm.awaitStreamingCompletion()
 
-    // Verify send flow completed gracefully (no crash) and streaming stopped
-    val state = vm.uiState.first()
+    // Additional wait to ensure error handling completes
+    delay(200)
+    advanceUntilIdle()
+
+    // Verify send flow completed gracefully (no crash) and streaming stopped - use value instead of
+    // first()
+    val state = vm.uiState.value
     assertFalse("Should stop sending after cache exception", state.isSending)
   }
 
@@ -335,16 +366,27 @@ class HomeViewModelOfflineCacheCoverageTest {
     val vm =
         HomeViewModel(llmClient, auth, repo, networkMonitor = networkMonitor, cacheRepo = cacheRepo)
 
-    // Go offline
+    // Wait for ViewModel initialization
+    advanceUntilIdle()
+    delay(50)
+
+    // Go offline and wait for state to update
     networkMonitor.setOnline(false)
+    advanceUntilIdle()
     delay(100)
+    advanceUntilIdle()
 
     vm.sendMessage("What is EPFL?")
     advanceUntilIdle()
     vm.awaitStreamingCompletion()
 
-    // Verify send flow completed gracefully (no crash) and streaming stopped
-    val state = vm.uiState.first()
+    // Additional wait to ensure error handling completes
+    delay(200)
+    advanceUntilIdle()
+
+    // Verify send flow completed gracefully (no crash) and streaming stopped - use value instead of
+    // first()
+    val state = vm.uiState.value
     assertFalse("Should stop sending after cache exception", state.isSending)
   }
 
@@ -356,17 +398,30 @@ class HomeViewModelOfflineCacheCoverageTest {
     val vm =
         HomeViewModel(llmClient, auth, repo, networkMonitor = networkMonitor, cacheRepo = cacheRepo)
 
-    // Go offline
+    // Wait for ViewModel initialization
+    advanceUntilIdle()
+    delay(50)
+
+    // Go offline and wait for state to update
     networkMonitor.setOnline(false)
+    advanceUntilIdle()
     delay(100)
+    advanceUntilIdle()
 
     vm.sendMessage("Test question")
     advanceUntilIdle()
     vm.awaitStreamingCompletion()
 
-    val messages = vm.uiState.first().messages
+    // Additional wait to ensure error handling completes
+    delay(200)
+    advanceUntilIdle()
+
+    // Use value instead of first()
+    val messages = vm.uiState.value.messages
     val aiMessage = messages.find { it.type == ChatType.AI }
-    assertNotNull("Should have AI message", aiMessage)
+    assertNotNull(
+        "Should have AI message, got ${messages.size} messages: ${messages.map { "${it.type}: ${it.text.take(50)}" }}",
+        aiMessage)
   }
 
   // ==================== OFFLINE CHECK VIA isCurrentlyOnline ====================
@@ -379,20 +434,30 @@ class HomeViewModelOfflineCacheCoverageTest {
     val vm =
         HomeViewModel(llmClient, auth, repo, networkMonitor = networkMonitor, cacheRepo = cacheRepo)
 
+    // Wait for ViewModel initialization
+    advanceUntilIdle()
+    delay(50)
+
     // State says online but monitor says offline
     vm.editState { it.copy(isOffline = false) }
     networkMonitor.setOnline(false)
+    advanceUntilIdle()
     delay(100)
+    advanceUntilIdle()
 
     vm.sendMessage("Test question")
     advanceUntilIdle()
     vm.awaitStreamingCompletion()
 
-    // Should have detected offline via isCurrentlyOnline() and used cache
-    verify(cacheRepo).getCachedResponse("Test question", true)
+    // Additional wait to ensure state updates
+    delay(200)
+    advanceUntilIdle()
 
-    // Should update state to reflect offline
-    assertTrue("Should detect offline", vm.uiState.first().isOffline)
+    // Should have detected offline via isCurrentlyOnline() and used cache
+    verify(cacheRepo, timeout(1000)).getCachedResponse("Test question", true)
+
+    // Should update state to reflect offline - use value instead of first()
+    assertTrue("Should detect offline", vm.uiState.value.isOffline)
   }
 
   @Test
@@ -438,8 +503,12 @@ class HomeViewModelOfflineCacheCoverageTest {
     verify(cacheRepo, never()).getCachedResponse(any(), any())
 
     // Verify LLM path was taken: streaming finished and an AI message exists
-    val messages = vm.uiState.first().messages
-    assertTrue(messages.any { it.type == ChatType.AI })
+    delay(200)
+    advanceUntilIdle()
+    val messages = vm.uiState.value.messages
+    assertTrue(
+        "Should have AI message, got ${messages.size} messages: ${messages.map { "${it.type}: ${it.text.take(50)}" }}",
+        messages.any { it.type == ChatType.AI })
     assertFalse("streaming should be complete", vm.uiState.value.isSending)
   }
 
@@ -467,10 +536,14 @@ class HomeViewModelOfflineCacheCoverageTest {
     // Verify cache was NOT queried with preferCache=true (offline mode)
     verify(cacheRepo, never()).getCachedResponse(any(), eq(true))
 
-    // Verify user message was sent (conversation was created)
-    val messages = vm.uiState.first().messages
+    // Additional wait to ensure state updates
+    delay(200)
+    advanceUntilIdle()
+
+    // Verify user message was sent (conversation was created) - use value instead of first()
+    val messages = vm.uiState.value.messages
     assertTrue(
-        "Should have user message",
+        "Should have user message, got ${messages.size} messages: ${messages.map { "${it.type}: ${it.text.take(50)}" }}",
         messages.any { it.type == ChatType.USER && it.text == "Test question" })
   }
 
@@ -496,10 +569,12 @@ class HomeViewModelOfflineCacheCoverageTest {
     vm.awaitStreamingCompletion()
 
     // Verify parameter was used, not draft
-    verify(cacheRepo).getCachedResponse(eq("parameter message"), eq(true))
-    val messages = vm.uiState.first().messages
+    verify(cacheRepo, timeout(1000)).getCachedResponse(eq("parameter message"), eq(true))
+    delay(200)
+    advanceUntilIdle()
+    val messages = vm.uiState.value.messages
     assertTrue(
-        "Should have user message with parameter",
+        "Should have user message with parameter, got ${messages.size} messages: ${messages.map { "${it.type}: ${it.text.take(50)}" }}",
         messages.any { it.type == ChatType.USER && it.text == "parameter message" })
   }
 
@@ -562,8 +637,12 @@ class HomeViewModelOfflineCacheCoverageTest {
     advanceUntilIdle()
     vm.awaitStreamingCompletion()
 
-    // Verify sending completes (isSending should be false)
-    val state = vm.uiState.first()
+    // Additional wait to ensure state updates
+    delay(200)
+    advanceUntilIdle()
+
+    // Verify sending completes (isSending should be false) - use value instead of first()
+    val state = vm.uiState.value
     assertFalse("isSending should be false after completion", state.isSending)
   }
 
@@ -582,9 +661,15 @@ class HomeViewModelOfflineCacheCoverageTest {
     advanceUntilIdle()
     vm.awaitStreamingCompletion()
 
-    // Verify cached response is in messages
-    val messages = vm.uiState.first().messages
-    assertTrue("Should have AI message", messages.any { it.type == ChatType.AI })
+    // Additional wait to ensure state updates
+    delay(200)
+    advanceUntilIdle()
+
+    // Verify cached response is in messages - use value instead of first()
+    val messages = vm.uiState.value.messages
+    assertTrue(
+        "Should have AI message, got ${messages.size} messages: ${messages.map { "${it.type}: ${it.text.take(50)}" }}",
+        messages.any { it.type == ChatType.AI })
   }
 
   // ==================== CONCURRENT SEND PROTECTION ====================
@@ -728,10 +813,16 @@ class HomeViewModelOfflineCacheCoverageTest {
     vm.awaitStreamingCompletion()
 
     // Should have both user and AI messages (AI message will be error)
-    val messages = vm.uiState.first().messages
+    // Additional wait to ensure state updates
+    delay(200)
+    advanceUntilIdle()
+
+    val messages = vm.uiState.value.messages
     assertTrue(
-        "Should have user message",
+        "Should have user message, got ${messages.size} messages: ${messages.map { "${it.type}: ${it.text.take(50)}" }}",
         messages.any { it.type == ChatType.USER && it.text == "Test question" })
-    assertTrue("Should have AI message", messages.any { it.type == ChatType.AI })
+    assertTrue(
+        "Should have AI message, got ${messages.size} messages: ${messages.map { "${it.type}: ${it.text.take(50)}" }}",
+        messages.any { it.type == ChatType.AI })
   }
 }
