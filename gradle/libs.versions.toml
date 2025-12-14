@@ -32,6 +32,7 @@ securityCrypto = "1.1.0-alpha06"
 msal = "4.3.0"
 datastore = "1.0.0"
 okhttp = "4.12.0"
+richtext = "1.0.0-alpha02"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -111,6 +112,10 @@ okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhtt
 
 datastore-core = { group = "androidx.datastore", name = "datastore-core", version.ref = "datastore" }
 datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+
+# Markdown rendering
+richtext-commonmark = { group = "com.halilibo.compose-richtext", name = "richtext-commonmark", version.ref = "richtext" }
+richtext-ui-material3 = { group = "com.halilibo.compose-richtext", name = "richtext-ui-material3", version.ref = "richtext" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

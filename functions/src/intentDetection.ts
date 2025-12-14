@@ -172,10 +172,10 @@ export const MOODLE_INTENT_CONFIGS: IntentConfig[] = [
     id: "fetch_file",
     matchPatterns: [
       // English patterns - require file-related context or explicit moodle mention
-      /\b(fetch|get|show|display|download|retrieve|bring|open|find)\s+(me\s+)?(the\s+)?(lecture|homework|solution|file|document|cours|moodle|slides?|notes?|assignment|exercise)/i,
+      /\b(fetch|get|show|display|download|retrieve|bring|open|find)\s+(me\s+)?(the\s+)?(lecture|homework|solution|file|document|cours|moodle|slides?|notes?|assignment|exercise|course|class)/i,
       /\b(fetch|get|show|display|download|retrieve|bring|open|find)\s+(me\s+)?(the\s+).*\bmoodle\b/i,
-      /\b(i\s+)?(want|need|would\s+like|'d\s+like)\s+(to\s+)?(fetch|get|see|view|download|retrieve|open|find)\s+(the\s+)?(lecture|homework|solution|file|document|cours|moodle|slides?|notes?|assignment|exercise)/i,
-      /\b(can\s+you|could\s+you|please)\s+(fetch|get|show|download|retrieve|find|open)\s+(me\s+)?(the\s+)?(lecture|homework|solution|slides?|notes?|assignment)/i,
+      /\b(i\s+)?(want|need|would\s+like|'d\s+like)\s+(to\s+)?(fetch|get|see|view|download|retrieve|open|find)\s+(the\s+)?(lecture|homework|solution|file|document|cours|moodle|slides?|notes?|assignment|exercise|course|class)/i,
+      /\b(can\s+you|could\s+you|please)\s+(fetch|get|show|download|retrieve|find|open)\s+(me\s+)?(the\s+)?(lecture|homework|solution|slides?|notes?|assignment|course|class)/i,
       // French patterns - require file-related context or explicit moodle mention
       /\b(donne|donner?|récupérer?|obtenir?|télécharger?|charger?|voir|afficher?|montrer?|ouvrir?|chercher?|trouver?)\s+(moi\s+)?(le\s+|la\s+|les\s+)?(cours|devoir|lecture|fichier|document|moodle|slides?|exercice)/i,
       /\b(donne|donner?|récupérer?|obtenir?|télécharger?|charger?|voir|afficher?|montrer?|ouvrir?|chercher?|trouver?)\s+(moi\s+)?(le\s+|la\s+|les\s+)?.*\bmoodle\b/i,
@@ -190,6 +190,15 @@ export const MOODLE_INTENT_CONFIGS: IntentConfig[] = [
       // Direct "download X from moodle" patterns
       /\bdownload\b.*\b(from|on)\s+moodle/i,
       /\b(get|fetch)\b.*\b(from|on)\s+moodle/i,
+      // ===== NEW: Flexible patterns for "retrieve/get/fetch <course> <ordinal> <type>" =====
+      // e.g., "retrieve algebra first course", "get analysis second lecture"
+      /\b(fetch|get|show|retrieve|download|find|open)\s+[a-z]+\s+(first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th|\d+)\s*(lecture|course|cours|lesson|class|homework|exercise|slides?)/i,
+      // e.g., "retrieve first algebra course", "get second calculus lecture"
+      /\b(fetch|get|show|retrieve|download|find|open)\s+(first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th|\d+)\s+[a-z]+\s*(lecture|course|cours|lesson|class|homework|exercise|slides?)/i,
+      // e.g., "first lecture of algebra", "second course from analysis"
+      /\b(first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th|\d+)\s*(lecture|course|cours|lesson|class|homework|exercise|slides?)\s+(of|from|de|du)\s+[a-z]/i,
+      // e.g., "algebra lecture 1", "calculus course 2"
+      /\b[a-z]{3,}\s+(lecture|course|cours|lesson|class|homework|exercise|slides?)\s*(\d+|first|second|third|fourth|fifth)/i,
     ],
     blockPatterns: MOODLE_BLOCK_PATTERNS,
   },
