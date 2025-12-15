@@ -23,7 +23,17 @@ import okhttp3.RequestBody.Companion.toRequestBody
  * backend is expected to accept a JSON payload `{"question": "<prompt>"}` and respond with
  * `{"reply": "<text>"}`. Any deviation throws an [IllegalStateException] that the caller can
  * surface to the UI.
+ *
+ * @deprecated This class is no longer used. The project now uses Firebase Cloud Functions instead
+ *   of direct HTTP endpoints. This class is kept for backward compatibility but should not be used
+ *   in new code.
  */
+@Deprecated(
+    message = "HttpLlmClient is deprecated. Use FirebaseFunctionsLlmClient instead.",
+    replaceWith =
+        ReplaceWith(
+            "FirebaseFunctionsLlmClient", "com.android.sample.llm.FirebaseFunctionsLlmClient"),
+    level = DeprecationLevel.WARNING)
 class HttpLlmClient(
     private val endpoint: String = BuildConfig.LLM_HTTP_ENDPOINT,
     private val apiKey: String = BuildConfig.LLM_HTTP_API_KEY,

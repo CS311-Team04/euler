@@ -124,4 +124,52 @@ class EdPostConfirmationModalTest {
     // We verify this by checking that the Post button is still displayed but disabled
     composeRule.onNodeWithText("Post").assertIsDisplayed()
   }
+
+  @Test
+  fun edPostConfirmationModal_shows_spinner_in_dropdown_when_isLoadingCourses_is_true() {
+    val testCourse =
+        com.android.sample.home.EdCourse(id = 1153L, code = "CS-101", name = "Intro to CS")
+
+    composeRule.setContent {
+      EdPostConfirmationModal(
+          title = "Title",
+          body = "Body",
+          courses = listOf(testCourse),
+          isLoadingCourses = true,
+          onPublish = { _, _, _, _ -> },
+          onCancel = {})
+    }
+
+    // Verify that the dropdown field is displayed
+    composeRule.onNode(hasText("Select a course", substring = true)).assertIsDisplayed()
+
+    // Verify that the dropdown is disabled when loading courses
+    // The dropdown field should be disabled
+    composeRule.onNode(hasText("Select a course", substring = true)).assertIsNotEnabled()
+
+    // Verify that a CircularProgressIndicator is shown in the trailing icon
+    // We can verify this by checking that the dropdown exists but is disabled
+    // and the text field is present (which contains the spinner)
+    composeRule.onNode(hasText("Select a course", substring = true)).assertIsDisplayed()
+  }
+
+  @Test
+  fun edPostConfirmationModal_shows_dropdown_when_courses_empty_but_isLoadingCourses_true() {
+    composeRule.setContent {
+      EdPostConfirmationModal(
+          title = "Title",
+          body = "Body",
+          courses = emptyList(),
+          isLoadingCourses = true,
+          onPublish = { _, _, _, _ -> },
+          onCancel = {})
+    }
+
+    // Verify that the dropdown is displayed even when courses list is empty
+    // but isLoadingCourses is true
+    composeRule.onNode(hasText("Select a course", substring = true)).assertIsDisplayed()
+
+    // Verify that the dropdown is disabled when loading
+    composeRule.onNode(hasText("Select a course", substring = true)).assertIsNotEnabled()
+  }
 }

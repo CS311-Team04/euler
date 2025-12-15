@@ -19,7 +19,8 @@
     <string name="ed_post_body_placeholder">Votre question pour ED…</string>
     <string name="ed_post_cancel_button">Cancel</string>
     <string name="ed_post_post_button">Post</string>
-
+    <string name="select_course">Select a course</string>
+    <string name="post_anonymously">Post anonymously</string>
     <string name="ed_post_published_title">Posted to Ed</string>
     <string name="ed_post_published_subtitle">Your question was published.</string>
     <string name="ed_post_cancelled_title">Post cancelled</string>

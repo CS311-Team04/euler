@@ -163,7 +163,7 @@ export class EdConnectorService {
 
     const apiToken = this.decrypt(existing.apiKeyEncrypted);
     const baseUrl = this.resolveBaseUrl(existing.baseUrl);
-    if (!params.courseId) {
+    if (params.courseId == null) {
       throw new Error("courseId is required");
     }
     const courseId = params.courseId;

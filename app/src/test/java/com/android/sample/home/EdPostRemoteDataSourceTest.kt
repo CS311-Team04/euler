@@ -85,7 +85,7 @@ class EdPostRemoteDataSourceTest {
   }
 
   @Test
-  fun publish_sends_null_courseId_when_not_provided() = runTest {
+  fun publish_omits_courseId_when_not_provided() = runTest {
     val callableResult =
         mock<HttpsCallableResult> {
           on { getData() } doReturn
@@ -109,7 +109,10 @@ class EdPostRemoteDataSourceTest {
 
     val captor = argumentCaptor<Map<String, Any>>()
     verify(callableRef).call(captor.capture())
-    assertNull(captor.firstValue["courseId"])
+    // Verify that courseId key is omitted entirely (not present in the map)
+    assertFalse(
+        "courseId should be omitted from payload when not provided",
+        captor.firstValue.containsKey("courseId"))
     assertEquals(false, captor.firstValue["isAnonymous"])
   }
 

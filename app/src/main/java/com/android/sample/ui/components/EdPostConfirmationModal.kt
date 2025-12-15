@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import com.android.sample.R
 import com.android.sample.home.EdCourse
+import com.android.sample.ui.theme.DarkBackground
 import com.android.sample.ui.theme.EdPostBorderSecondary
 import com.android.sample.ui.theme.EdPostDimensions
 import com.android.sample.ui.theme.EdPostIconSecondary
@@ -50,6 +51,7 @@ fun EdPostConfirmationModal(
     courses: List<EdCourse> = emptyList(),
     selectedCourseId: Long? = null,
     isLoading: Boolean = false,
+    isLoadingCourses: Boolean = false,
     onPublish: (String, String, Long?, Boolean) -> Unit,
     onCancel: () -> Unit
 ) {
@@ -61,6 +63,7 @@ fun EdPostConfirmationModal(
   var isAnonymous by remember { mutableStateOf(false) }
 
   val colorScheme = MaterialTheme.colorScheme
+  val isDark = colorScheme.background == DarkBackground
   val textSecondary = colorScheme.onSurfaceVariant
   val gradient = Brush.horizontalGradient(listOf(ed1, ed2))
 
@@ -79,24 +82,26 @@ fun EdPostConfirmationModal(
               modifier = Modifier.fillMaxWidth().padding(EdPostDimensions.ContentHorizontalPadding),
               verticalArrangement = Arrangement.spacedBy(EdPostDimensions.ContentVerticalSpacing)) {
                 // Course selection dropdown
-                if (courses.isNotEmpty()) {
+                if (courses.isNotEmpty() || isLoadingCourses) {
                   ExposedDropdownMenuBox(
-                      expanded = courseDropdownExpanded,
-                      onExpandedChange = { courseDropdownExpanded = !courseDropdownExpanded }) {
+                      expanded = courseDropdownExpanded && !isLoadingCourses,
+                      onExpandedChange = {
+                        if (!isLoadingCourses) courseDropdownExpanded = !courseDropdownExpanded
+                      }) {
                         val selectedCourse = courses.find { it.id == currentSelectedCourseId }
                         val displayText =
                             selectedCourse?.let { "${it.code ?: ""} ${it.name}".trim() }
-                                ?: "Select a course"
+                                ?: stringResource(R.string.select_course)
 
                         OutlinedTextField(
                             value = displayText,
                             onValueChange = {},
                             readOnly = true,
-                            enabled = !isLoading,
+                            enabled = !isLoading && !isLoadingCourses,
                             modifier = Modifier.fillMaxWidth().menuAnchor(),
                             placeholder = {
                               Text(
-                                  text = "Select a course",
+                                  text = stringResource(R.string.select_course),
                                   color = textSecondary,
                                   fontSize = EdPostDimensions.TextFieldPlaceholderFontSize)
                             },
@@ -114,13 +119,22 @@ fun EdPostConfirmationModal(
                                     unfocusedContainerColor = EdPostTextFieldContainer),
                             shape = RoundedCornerShape(EdPostDimensions.TextFieldBodyCornerRadius),
                             trailingIcon = {
-                              ExposedDropdownMenuDefaults.TrailingIcon(
-                                  expanded = courseDropdownExpanded)
+                              if (isLoadingCourses) {
+                                CircularProgressIndicator(
+                                    color = EdPostIconSecondary,
+                                    strokeWidth = EdPostDimensions.IconLoadingSpinnerStrokeWidth,
+                                    modifier =
+                                        Modifier.size(EdPostDimensions.IconLoadingSpinnerSize))
+                              } else {
+                                ExposedDropdownMenuDefaults.TrailingIcon(
+                                    expanded = courseDropdownExpanded)
+                              }
                             })
 
                         ExposedDropdownMenu(
                             expanded = courseDropdownExpanded,
-                            onDismissRequest = { courseDropdownExpanded = false }) {
+                            onDismissRequest = { courseDropdownExpanded = false },
+                            modifier = Modifier.background(EdPostTextFieldContainer)) {
                               courses.forEach { course ->
                                 DropdownMenuItem(
                                     text = {
@@ -213,7 +227,7 @@ fun EdPostConfirmationModal(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween) {
                       Text(
-                          text = "Post anonymously",
+                          text = stringResource(R.string.post_anonymously),
                           style =
                               MaterialTheme.typography.bodyMedium.copy(
                                   fontSize = EdPostDimensions.TextFieldBodyFontSize,
@@ -226,8 +240,12 @@ fun EdPostConfirmationModal(
                               SwitchDefaults.colors(
                                   checkedThumbColor = ed1,
                                   checkedTrackColor = ed1.copy(alpha = 0.5f),
-                                  uncheckedThumbColor = colorScheme.outline,
-                                  uncheckedTrackColor = colorScheme.surfaceVariant))
+                                  uncheckedThumbColor =
+                                      if (isDark) colorScheme.outline
+                                      else colorScheme.outlineVariant,
+                                  uncheckedTrackColor =
+                                      if (isDark) colorScheme.surfaceVariant
+                                      else colorScheme.surfaceVariant.copy(alpha = 0.6f)))
                     }
 
                 // Action buttons row

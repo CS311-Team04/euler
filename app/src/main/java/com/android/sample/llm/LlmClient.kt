@@ -126,8 +126,8 @@ interface LlmClient {
  * Production [LlmClient] relying on Firebase callable Cloud Functions.
  *
  * Uses the `answerWithRagFn` callable function and applies a short timeout. It optionally falls
- * back to [HttpLlmClient] (when configured) if the primary call times out or the response payload
- * is invalid. The fallback is handy for local development with a plain HTTP server.
+ * back to a fallback [LlmClient] (when configured) if the primary call times out or the response
+ * payload is invalid. The fallback is handy for local development.
  */
 class FirebaseFunctionsLlmClient(
     private val functions: FirebaseFunctions = defaultFunctions(),

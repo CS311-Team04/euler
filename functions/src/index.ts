@@ -45,6 +45,8 @@ import { resolveGetWeeklyOverview } from "./tools/courseTools";
 
 const europeFunctions = functions.region("europe-west6");
 
+// ED Discussion API base URL
+const ED_DEFAULT_BASE_URL = "https://eu.edstem.org/api";
 
 /* ---------- helpers ---------- */
 function withV1(url?: string): string {
@@ -97,7 +99,7 @@ const edConnectorService = new EdConnectorService(
   edConnectorRepository,
   encryptSecret,
   decryptSecret,
-  "https://eu.edstem.org/api"
+  ED_DEFAULT_BASE_URL
 );
 
 /* =========================================================
@@ -1286,7 +1288,7 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
           const existing = await edConnectorRepository.getConfig(uid);
           if (existing && existing.apiKeyEncrypted) {
             const apiToken = decryptSecret(existing.apiKeyEncrypted);
-            const baseUrl = existing.baseUrl || "https://eu.edstem.org/api";
+            const baseUrl = existing.baseUrl || ED_DEFAULT_BASE_URL;
             const client = new EdDiscussionClient(baseUrl, apiToken);
             const courses = await client.getCourses();
 
@@ -2044,7 +2046,7 @@ export const edConnectorGetCoursesFn = europeFunctions.https.onCall(
       }
 
       const apiToken = decryptSecret(existing.apiKeyEncrypted);
-      const baseUrl = existing.baseUrl || "https://eu.edstem.org/api";
+      const baseUrl = existing.baseUrl || ED_DEFAULT_BASE_URL;
       const client = new EdDiscussionClient(baseUrl, apiToken);
 
       const courses = await client.getCourses();
