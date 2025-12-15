@@ -20,8 +20,7 @@ export class EdConnectorService {
     private readonly repo: EdConnectorRepository,
     private readonly encrypt: (plain: string) => string,
     private readonly decrypt: (cipher: string) => string,
-    private readonly defaultBaseUrl: string = "https://eu.edstem.org/api",
-    private readonly defaultCourseId: number = 1153
+    private readonly defaultBaseUrl: string = "https://eu.edstem.org/api"
   ) {}
 
   private resolveBaseUrl(baseUrl?: string): string {
@@ -150,7 +149,7 @@ export class EdConnectorService {
    */
   async postThread(
     userId: string,
-    params: { title: string; body: string; courseId?: number }
+    params: { title: string; body: string; courseId?: number; isAnonymous?: boolean }
   ): Promise<{
     threadId?: number;
     courseId?: number;
@@ -164,12 +163,16 @@ export class EdConnectorService {
 
     const apiToken = this.decrypt(existing.apiKeyEncrypted);
     const baseUrl = this.resolveBaseUrl(existing.baseUrl);
-    const courseId = params.courseId ?? this.defaultCourseId;
+    if (params.courseId == null) {
+      throw new Error("courseId is required");
+    }
+    const courseId = params.courseId;
     const client = new EdDiscussionClient(baseUrl, apiToken);
 
     const thread = await client.postThread(courseId, {
       title: params.title,
       content: this.buildContentXml(params.body),
+      isAnonymous: params.isAnonymous ?? false,
     });
 
     return {

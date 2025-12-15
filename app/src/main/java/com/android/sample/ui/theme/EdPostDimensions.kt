@@ -38,6 +38,8 @@ object EdPostDimensions {
   val IconEditSize = 18.dp
   val IconSendSize = 18.dp
   val IconStatusSize = 16.dp
+  val IconLoadingSpinnerSize = 20.dp
+  val IconLoadingSpinnerStrokeWidth = 2.dp
 
   // ========== Button Dimensions ==========
   val ButtonCancelCornerRadius = 10.dp

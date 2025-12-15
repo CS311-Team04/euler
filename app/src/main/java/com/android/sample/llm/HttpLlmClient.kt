@@ -23,7 +23,17 @@ import okhttp3.RequestBody.Companion.toRequestBody
  * backend is expected to accept a JSON payload `{"question": "<prompt>"}` and respond with
  * `{"reply": "<text>"}`. Any deviation throws an [IllegalStateException] that the caller can
  * surface to the UI.
+ *
+ * @deprecated This class is no longer used. The project now uses Firebase Cloud Functions instead
+ *   of direct HTTP endpoints. This class is kept for backward compatibility but should not be used
+ *   in new code.
  */
+@Deprecated(
+    message = "HttpLlmClient is deprecated. Use FirebaseFunctionsLlmClient instead.",
+    replaceWith =
+        ReplaceWith(
+            "FirebaseFunctionsLlmClient", "com.android.sample.llm.FirebaseFunctionsLlmClient"),
+    level = DeprecationLevel.WARNING)
 class HttpLlmClient(
     private val endpoint: String = BuildConfig.LLM_HTTP_ENDPOINT,
     private val apiKey: String = BuildConfig.LLM_HTTP_API_KEY,
@@ -159,12 +169,14 @@ internal fun parseBotReply(body: String, gson: Gson): BotReply {
   val edIntentType = json.getTrimmedString(JSON_KEY_ED_INTENT)
   val edFormattedQuestion = json.getTrimmedString(JSON_KEY_ED_FORMATTED_QUESTION)
   val edFormattedTitle = json.getTrimmedString(JSON_KEY_ED_FORMATTED_TITLE)
+  val edSuggestedCourseId = json.optLong(JSON_KEY_ED_SUGGESTED_COURSE_ID)
   val edIntent =
       com.android.sample.llm.EdIntent(
           detected = edIntentDetected,
           intent = edIntentType,
           formattedQuestion = edFormattedQuestion,
-          formattedTitle = edFormattedTitle)
+          formattedTitle = edFormattedTitle,
+          suggestedCourseId = edSuggestedCourseId)
 
   val edFetchIntent =
       com.android.sample.llm.EdFetchIntent(
@@ -207,6 +219,17 @@ private fun JsonObject.optString(key: String, defaultValue: String?): String? {
   return value.takeIf { it.isNotEmpty() } ?: defaultValue
 }
 
+private fun JsonObject.optLong(key: String, defaultValue: Long = -1): Long? {
+  val element: JsonElement = get(key) ?: return null
+  if (element.isJsonNull || !element.isJsonPrimitive) return null
+  val primitive = element.asJsonPrimitive
+  return when {
+    primitive.isNumber -> primitive.asLong
+    primitive.isString -> primitive.asString.toLongOrNull()
+    else -> null
+  }?.takeIf { it >= 0 } ?: null
+}
+
 private const val HEADER_CONTENT_TYPE = "Content-Type"
 private const val HEADER_AUTHORIZATION = "Authorization"
 private const val AUTH_SCHEME_BEARER = "Bearer"
@@ -222,6 +245,7 @@ private const val JSON_KEY_ED_INTENT_DETECTED = "ed_intent_detected"
 private const val JSON_KEY_ED_INTENT = "ed_intent"
 private const val JSON_KEY_ED_FORMATTED_QUESTION = "ed_formatted_question"
 private const val JSON_KEY_ED_FORMATTED_TITLE = "ed_formatted_title"
+private const val JSON_KEY_ED_SUGGESTED_COURSE_ID = "ed_suggested_course_id"
 private const val JSON_KEY_ED_FETCH_INTENT_DETECTED = "ed_fetch_intent_detected"
 private const val JSON_KEY_ED_FETCH_QUERY = "ed_fetch_query"
 // Standard localhost identifier - safe loopback address (RFC 5735)

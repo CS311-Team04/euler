@@ -26,6 +26,7 @@ import {
   EdBrainError,
   NormalizedEdPost,
 } from "./edSearchDomain";
+import { callEdRouterLLM, EdLLMRouterInput } from "./edLLMRouter";
 import { 
   scrapeWeeklyMenu, 
   formatMenuForContext,
@@ -44,6 +45,8 @@ import { resolveGetWeeklyOverview } from "./tools/courseTools";
 
 const europeFunctions = functions.region("europe-west6");
 
+// ED Discussion API base URL
+const ED_DEFAULT_BASE_URL = "https://eu.edstem.org/api";
 
 /* ---------- helpers ---------- */
 function withV1(url?: string): string {
@@ -90,18 +93,13 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
-const ED_DEFAULT_COURSE_ID = Number(
-  process.env.ED_DEFAULT_COURSE_ID || "1153"
-);
-
 // ED Discussion connector (stored in Firestore under connectors_ed/{userId})
 const edConnectorRepository = new EdConnectorRepository(db);
 const edConnectorService = new EdConnectorService(
   edConnectorRepository,
   encryptSecret,
   decryptSecret,
-  "https://eu.edstem.org/api",
-  ED_DEFAULT_COURSE_ID
+  ED_DEFAULT_BASE_URL
 );
 
 /* =========================================================
@@ -1283,6 +1281,46 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
       // Parse the response to extract formatted question and title
       const { reply, formattedQuestion, formattedTitle } = parseEdPostResponse(rawReply);
 
+      // Try to detect the suggested course from the prompt
+      let suggestedCourseId: number | null = null;
+      if (uid) {
+        try {
+          const existing = await edConnectorRepository.getConfig(uid);
+          if (existing && existing.apiKeyEncrypted) {
+            const apiToken = decryptSecret(existing.apiKeyEncrypted);
+            const baseUrl = existing.baseUrl || ED_DEFAULT_BASE_URL;
+            const client = new EdDiscussionClient(baseUrl, apiToken);
+            const courses = await client.getCourses();
+
+            if (courses.length > 0) {
+              const llmInput: EdLLMRouterInput = {
+                userQuery: question,
+                courses: courses.map((c) => ({
+                  id: c.id,
+                  code: c.code || undefined,
+                  name: c.name || undefined,
+                })),
+              };
+
+              const llmOutput = await callEdRouterLLM(llmInput);
+              if (llmOutput.courseId) {
+                suggestedCourseId = llmOutput.courseId;
+                logger.info("answerWithRagFn.courseDetected", {
+                  suggestedCourseId,
+                  courseCode: llmOutput.courseCode,
+                });
+              }
+            }
+          }
+        } catch (e: any) {
+          // If course detection fails, continue without it (non-blocking)
+          logger.warn("answerWithRagFn.courseDetectionFailed", {
+            error: String(e),
+            message: e?.message,
+          });
+        }
+      }
+
       return {
         reply,
         primary_url: null,
@@ -1292,6 +1330,7 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
         ed_intent: edIntentResult.ed_intent,
         ed_formatted_question: formattedQuestion,
         ed_formatted_title: formattedTitle,
+        ed_suggested_course_id: suggestedCourseId,
         ed_fetch_intent_detected,
         ed_fetch_query,
       };
@@ -1680,6 +1719,7 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
       ed_intent: null,
       ed_formatted_question: null,
       ed_formatted_title: null,
+      ed_suggested_course_id: null,
       ed_fetch_intent_detected,
       ed_fetch_query,
       moodle_intent_detected: false,
@@ -1767,6 +1807,7 @@ export const answerWithRagHttp = europeFunctions.https.onRequest(async (req: fun
         ed_intent: edIntentResult.ed_intent,
         ed_formatted_question: formattedQuestion,
         ed_formatted_title: formattedTitle,
+        ed_suggested_course_id: null, // HTTP endpoint doesn't have auth context
         ed_fetch_intent_detected,
         ed_fetch_query,
       });
@@ -1781,6 +1822,7 @@ export const answerWithRagHttp = europeFunctions.https.onRequest(async (req: fun
       ed_intent: null,
       ed_formatted_question: null,
       ed_formatted_title: null,
+      ed_suggested_course_id: null,
       ed_fetch_intent_detected,
       ed_fetch_query,
       moodle_intent_detected: false,
@@ -1939,6 +1981,7 @@ type EdConnectorPostCallableInput = {
   title?: string;
   body?: string;
   courseId?: number;
+  isAnonymous?: boolean;
 };
 
 export const edConnectorPostFn = europeFunctions.https.onCall(
@@ -1949,6 +1992,8 @@ export const edConnectorPostFn = europeFunctions.https.onCall(
     const body = String(data?.body || "").trim();
     const courseId =
       typeof data?.courseId === "number" ? data.courseId : undefined;
+    const isAnonymous =
+      typeof data?.isAnonymous === "boolean" ? data.isAnonymous : false;
 
     if (!title && !body) {
       throw new functions.https.HttpsError(
@@ -1957,11 +2002,19 @@ export const edConnectorPostFn = europeFunctions.https.onCall(
       );
     }
 
+    if (!courseId) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "courseId is required"
+      );
+    }
+
     try {
       const result = await edConnectorService.postThread(uid, {
         title,
         body,
         courseId,
+        isAnonymous,
       });
       return result;
     } catch (e: any) {
@@ -1973,6 +2026,46 @@ export const edConnectorPostFn = europeFunctions.https.onCall(
       throw new functions.https.HttpsError(
         "internal",
         "Failed to post ED thread",
+        String(e?.message || e)
+      );
+    }
+  }
+);
+
+export const edConnectorGetCoursesFn = europeFunctions.https.onCall(
+  async (_data, context) => {
+    const uid = requireAuth(context);
+
+    try {
+      const existing = await edConnectorRepository.getConfig(uid);
+      if (!existing || !existing.apiKeyEncrypted) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "ED connector is not connected"
+        );
+      }
+
+      const apiToken = decryptSecret(existing.apiKeyEncrypted);
+      const baseUrl = existing.baseUrl || ED_DEFAULT_BASE_URL;
+      const client = new EdDiscussionClient(baseUrl, apiToken);
+
+      const courses = await client.getCourses();
+      return {
+        courses: courses.map((c) => ({
+          id: c.id,
+          code: c.code,
+          name: c.name,
+        })),
+      };
+    } catch (e: any) {
+      if (e instanceof functions.https.HttpsError) throw e;
+      logger.error("edConnectorGetCoursesFn.failed", {
+        uid,
+        error: String(e),
+      });
+      throw new functions.https.HttpsError(
+        "internal",
+        "Failed to get ED courses",
         String(e?.message || e)
       );
     }

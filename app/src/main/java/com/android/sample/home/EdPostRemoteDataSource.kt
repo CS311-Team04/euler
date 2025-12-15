@@ -5,6 +5,10 @@ import kotlinx.coroutines.tasks.await
 
 data class EdPostPublishResult(val threadId: Long?, val courseId: Long?, val threadNumber: Long?)
 
+data class EdCourse(val id: Long, val code: String?, val name: String)
+
+data class EdCoursesResult(val courses: List<EdCourse>)
+
 data class EdBrainSearchResult(
     val ok: Boolean,
     val posts: List<NormalizedEdPost>,
@@ -37,13 +41,33 @@ data class EdBrainError(val type: String, val message: String)
 
 class EdPostRemoteDataSource(private val functions: FirebaseFunctions) {
 
-  suspend fun publish(title: String, body: String): EdPostPublishResult {
+  suspend fun getCourses(): EdCoursesResult {
+    val result =
+        functions.getHttpsCallable("edConnectorGetCoursesFn").call(emptyMap<String, Any>()).await()
+    val data = parseResponseData(result.getData())
+
+    val coursesList =
+        (data?.get("courses") as? List<*>)?.mapNotNull { courseData -> parseEdCourse(courseData) }
+            ?: emptyList()
+
+    return EdCoursesResult(courses = coursesList)
+  }
+
+  suspend fun publish(
+      title: String,
+      body: String,
+      courseId: Long? = null,
+      isAnonymous: Boolean = false
+  ): EdPostPublishResult {
     val payload =
         hashMapOf<String, Any>(
             "title" to title,
             "body" to body,
-            "courseId" to 1153L, // default course/channel for initial rollout
+            "isAnonymous" to isAnonymous,
         )
+    if (courseId != null) {
+      payload["courseId"] = courseId
+    }
 
     val result = functions.getHttpsCallable("edConnectorPostFn").call(payload).await()
     val data = parseResponseData(result.getData())
@@ -165,5 +189,16 @@ class EdPostRemoteDataSource(private val functions: FirebaseFunctions) {
       is String -> value.toLongOrNull()
       else -> null
     }
+  }
+
+  private fun parseEdCourse(data: Any?): EdCourse? {
+    if (data !is Map<*, *>) return null
+    @Suppress("UNCHECKED_CAST") val map = data as? Map<String, Any?> ?: return null
+
+    val id = extractLong(map, "id") ?: return null
+    val code = extractString(map, "code")
+    val name = extractString(map, "name") ?: ""
+
+    return EdCourse(id = id, code = code, name = name)
   }
 }
