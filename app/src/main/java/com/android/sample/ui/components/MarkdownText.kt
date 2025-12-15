@@ -146,63 +146,109 @@ fun SimpleMarkdownText(
 }
 
 /**
+ * Finds the end index of a delimited text segment.
+ *
+ * @param text The full text being parsed
+ * @param startIndex The index after the opening delimiter
+ * @param delimiter The closing delimiter to find
+ * @param doubleDelimiter If non-null, excludes matches that start with this double delimiter
+ * @return The end index, or -1 if not found or invalid
+ */
+private fun findDelimitedEnd(
+    text: String,
+    startIndex: Int,
+    delimiter: String,
+    doubleDelimiter: String? = null
+): Int {
+  val end = text.indexOf(delimiter, startIndex)
+  return if (end != -1 && (doubleDelimiter == null || !text.startsWith(doubleDelimiter, end))) {
+    end
+  } else {
+    -1
+  }
+}
+
+/**
+ * Result of parsing a delimited style segment.
+ *
+ * @property newIndex The new index after processing
+ * @property processed Whether the delimiter was successfully processed
+ */
+private data class ParseResult(val newIndex: Int, val processed: Boolean)
+
+/**
+ * Parses a delimited style (bold/italic/code) and appends the styled content.
+ *
+ * @param text The full text being parsed
+ * @param currentIndex The current parsing index
+ * @param openDelimiter The opening delimiter
+ * @param closeDelimiter The closing delimiter
+ * @param doubleDelimiter Optional double delimiter to exclude from matches
+ * @param style The span style to apply
+ * @param contentTransform Optional transform for the content (e.g., adding spaces for code)
+ * @return ParseResult with the new index and whether processing succeeded
+ */
+private fun AnnotatedString.Builder.parseDelimitedStyle(
+    text: String,
+    currentIndex: Int,
+    openDelimiter: String,
+    closeDelimiter: String,
+    doubleDelimiter: String? = null,
+    style: SpanStyle,
+    contentTransform: (String) -> String = { it }
+): ParseResult {
+  val contentStart = currentIndex + openDelimiter.length
+  val end = findDelimitedEnd(text, contentStart, closeDelimiter, doubleDelimiter)
+  return if (end != -1) {
+    withStyle(style) { append(contentTransform(text.substring(contentStart, end))) }
+    ParseResult(end + closeDelimiter.length, true)
+  } else {
+    ParseResult(currentIndex, false)
+  }
+}
+
+/**
  * Parses simple markdown formatting into an AnnotatedString. Handles: **bold**, *italic*, `code`,
  * [links](url)
  */
 private fun parseSimpleMarkdown(text: String, baseColor: Color): AnnotatedString {
+  // Pre-defined styles for reuse
+  val boldStyle = SpanStyle(fontWeight = FontWeight.Bold)
+  val italicStyle = SpanStyle(fontStyle = FontStyle.Italic)
+  val codeStyle =
+      SpanStyle(
+          fontFamily = FontFamily.Monospace,
+          background = MarkdownStyles.inlineCodeBackground,
+          color = MarkdownStyles.codeTextColor)
+  val linkStyle =
+      SpanStyle(color = MarkdownStyles.linkColor, textDecoration = TextDecoration.Underline)
+
   return buildAnnotatedString {
     var i = 0
     val len = text.length
 
     while (i < len) {
       when {
-        // Bold: **text**
-        text.startsWith("**", i) -> {
-          val end = text.indexOf("**", i + 2)
-          if (end != -1) {
-            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-              append(text.substring(i + 2, end))
-            }
-            i = end + 2
+        // Bold: **text** or __text__
+        text.startsWith("**", i) || text.startsWith("__", i) -> {
+          val delimiter = text.substring(i, i + 2)
+          val result = parseDelimitedStyle(text, i, delimiter, delimiter, style = boldStyle)
+          if (result.processed) {
+            i = result.newIndex
           } else {
             append(text[i])
             i++
           }
         }
-        // Bold: __text__
-        text.startsWith("__", i) -> {
-          val end = text.indexOf("__", i + 2)
-          if (end != -1) {
-            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-              append(text.substring(i + 2, end))
-            }
-            i = end + 2
-          } else {
-            append(text[i])
-            i++
-          }
-        }
-        // Italic: *text* (but not **)
-        text.startsWith("*", i) && !text.startsWith("**", i) -> {
-          val end = text.indexOf("*", i + 1)
-          if (end != -1 && !text.startsWith("**", end)) {
-            withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
-              append(text.substring(i + 1, end))
-            }
-            i = end + 1
-          } else {
-            append(text[i])
-            i++
-          }
-        }
-        // Italic: _text_ (but not __)
-        text.startsWith("_", i) && !text.startsWith("__", i) -> {
-          val end = text.indexOf("_", i + 1)
-          if (end != -1 && !text.startsWith("__", end)) {
-            withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
-              append(text.substring(i + 1, end))
-            }
-            i = end + 1
+        // Italic: *text* (but not **) or _text_ (but not __)
+        (text.startsWith("*", i) && !text.startsWith("**", i)) ||
+            (text.startsWith("_", i) && !text.startsWith("__", i)) -> {
+          val delimiter = text[i].toString()
+          val doubleDelimiter = delimiter + delimiter
+          val result =
+              parseDelimitedStyle(text, i, delimiter, delimiter, doubleDelimiter, italicStyle)
+          if (result.processed) {
+            i = result.newIndex
           } else {
             append(text[i])
             i++
@@ -210,16 +256,10 @@ private fun parseSimpleMarkdown(text: String, baseColor: Color): AnnotatedString
         }
         // Inline code: `code`
         text.startsWith("`", i) && !text.startsWith("```", i) -> {
-          val end = text.indexOf("`", i + 1)
-          if (end != -1) {
-            withStyle(
-                SpanStyle(
-                    fontFamily = FontFamily.Monospace,
-                    background = MarkdownStyles.inlineCodeBackground,
-                    color = MarkdownStyles.codeTextColor)) {
-                  append(" ${text.substring(i + 1, end)} ")
-                }
-            i = end + 1
+          val result =
+              parseDelimitedStyle(text, i, "`", "`", style = codeStyle) { content -> " $content " }
+          if (result.processed) {
+            i = result.newIndex
           } else {
             append(text[i])
             i++
@@ -234,11 +274,7 @@ private fun parseSimpleMarkdown(text: String, baseColor: Color): AnnotatedString
             val linkText = text.substring(i + 1, closeText)
             val url = text.substring(openUrl + 1, closeUrl)
             pushStringAnnotation("URL", url)
-            withStyle(
-                SpanStyle(
-                    color = MarkdownStyles.linkColor, textDecoration = TextDecoration.Underline)) {
-                  append(linkText)
-                }
+            withStyle(linkStyle) { append(linkText) }
             pop()
             i = closeUrl + 1
           } else {
