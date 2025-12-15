@@ -81,247 +81,305 @@ fun EdPostConfirmationModal(
           Column(
               modifier = Modifier.fillMaxWidth().padding(EdPostDimensions.ContentHorizontalPadding),
               verticalArrangement = Arrangement.spacedBy(EdPostDimensions.ContentVerticalSpacing)) {
-                // Course selection dropdown
-                if (courses.isNotEmpty() || isLoadingCourses) {
-                  ExposedDropdownMenuBox(
-                      expanded = courseDropdownExpanded && !isLoadingCourses,
-                      onExpandedChange = {
-                        if (!isLoadingCourses) courseDropdownExpanded = !courseDropdownExpanded
-                      }) {
-                        val selectedCourse = courses.find { it.id == currentSelectedCourseId }
-                        val displayText =
-                            selectedCourse?.let { "${it.code ?: ""} ${it.name}".trim() }
-                                ?: stringResource(R.string.select_course)
+                CourseDropdown(
+                    courses = courses,
+                    selectedCourseId = currentSelectedCourseId,
+                    onCourseSelected = { currentSelectedCourseId = it },
+                    courseDropdownExpanded = courseDropdownExpanded,
+                    onExpandedChange = { courseDropdownExpanded = it },
+                    isLoading = isLoading,
+                    isLoadingCourses = isLoadingCourses,
+                    textSecondary = textSecondary)
 
-                        OutlinedTextField(
-                            value = displayText,
-                            onValueChange = {},
-                            readOnly = true,
-                            enabled = !isLoading && !isLoadingCourses,
-                            modifier = Modifier.fillMaxWidth().menuAnchor(),
-                            placeholder = {
-                              Text(
-                                  text = stringResource(R.string.select_course),
-                                  color = textSecondary,
-                                  fontSize = EdPostDimensions.TextFieldPlaceholderFontSize)
-                            },
-                            textStyle =
-                                MaterialTheme.typography.bodyLarge.copy(
-                                    fontSize = EdPostDimensions.TextFieldBodyFontSize,
-                                    color = EdPostTextPrimary),
-                            colors =
-                                OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = EdPostTextPrimary,
-                                    unfocusedTextColor = EdPostTextPrimary,
-                                    focusedBorderColor = EdPostTransparent,
-                                    unfocusedBorderColor = EdPostTransparent,
-                                    focusedContainerColor = EdPostTextFieldContainer,
-                                    unfocusedContainerColor = EdPostTextFieldContainer),
-                            shape = RoundedCornerShape(EdPostDimensions.TextFieldBodyCornerRadius),
-                            trailingIcon = {
-                              if (isLoadingCourses) {
-                                CircularProgressIndicator(
-                                    color = EdPostIconSecondary,
-                                    strokeWidth = EdPostDimensions.IconLoadingSpinnerStrokeWidth,
-                                    modifier =
-                                        Modifier.size(EdPostDimensions.IconLoadingSpinnerSize))
-                              } else {
-                                ExposedDropdownMenuDefaults.TrailingIcon(
-                                    expanded = courseDropdownExpanded)
-                              }
-                            })
-
-                        ExposedDropdownMenu(
-                            expanded = courseDropdownExpanded,
-                            onDismissRequest = { courseDropdownExpanded = false },
-                            modifier = Modifier.background(EdPostTextFieldContainer)) {
-                              courses.forEach { course ->
-                                DropdownMenuItem(
-                                    text = {
-                                      Text(
-                                          text = "${course.code ?: ""} ${course.name}".trim(),
-                                          color = EdPostTextPrimary)
-                                    },
-                                    onClick = {
-                                      currentSelectedCourseId = course.id
-                                      courseDropdownExpanded = false
-                                    })
-                              }
-                            }
-                      }
-                }
-
-                // Title capsule row
-                OutlinedTextField(
-                    value = editedTitle,
-                    onValueChange = { editedTitle = it },
+                EdPostTitleField(
+                    title = editedTitle,
+                    onTitleChange = { editedTitle = it },
                     enabled = !isLoading,
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = {
-                      Text(
-                          text = stringResource(R.string.ed_post_title_placeholder),
-                          color = textSecondary,
-                          fontSize = EdPostDimensions.TextFieldPlaceholderFontSize)
-                    },
-                    textStyle =
-                        MaterialTheme.typography.titleLarge.copy(
-                            fontSize = EdPostDimensions.TextFieldTitleFontSize,
-                            fontWeight = FontWeight.Bold,
-                            color = EdPostTextPrimary),
-                    colors =
-                        OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = EdPostTextPrimary,
-                            unfocusedTextColor = EdPostTextPrimary,
-                            cursorColor = EdPostTextPrimary,
-                            focusedBorderColor = EdPostTransparent,
-                            unfocusedBorderColor = EdPostTransparent,
-                            focusedContainerColor = EdPostTextFieldContainer,
-                            unfocusedContainerColor = EdPostTextFieldContainer),
-                    shape = RoundedCornerShape(EdPostDimensions.TextFieldTitleCornerRadius),
-                    singleLine = true,
-                    trailingIcon = {
-                      Icon(
-                          imageVector = Icons.Outlined.Edit,
-                          contentDescription = "Edit title",
-                          tint = EdPostIconSecondary,
-                          modifier = Modifier.size(EdPostDimensions.IconEditSize))
-                    })
+                    textSecondary = textSecondary)
 
-                // Body text field (multiline)
-                OutlinedTextField(
-                    value = editedBody,
-                    onValueChange = { editedBody = it },
+                EdPostBodyField(
+                    body = editedBody,
+                    onBodyChange = { editedBody = it },
                     enabled = !isLoading,
-                    modifier =
-                        Modifier.fillMaxWidth()
-                            .heightIn(
-                                min = EdPostDimensions.TextFieldBodyMinHeight,
-                                max = EdPostDimensions.TextFieldBodyMaxHeight),
-                    placeholder = {
-                      Text(
-                          text = stringResource(R.string.ed_post_body_placeholder),
-                          color = textSecondary,
-                          fontSize = EdPostDimensions.TextFieldPlaceholderFontSize)
+                    textSecondary = textSecondary)
+
+                AnonymousToggle(
+                    isAnonymous = isAnonymous,
+                    onAnonymousChange = { isAnonymous = it },
+                    enabled = !isLoading,
+                    isDark = isDark,
+                    colorScheme = colorScheme)
+
+                EdPostActionButtons(
+                    isLoading = isLoading,
+                    canPost = currentSelectedCourseId != null,
+                    onPublish = {
+                      onPublish(editedTitle, editedBody, currentSelectedCourseId, isAnonymous)
                     },
-                    textStyle =
-                        MaterialTheme.typography.bodyLarge.copy(
-                            fontSize = EdPostDimensions.TextFieldBodyFontSize,
-                            color = EdPostTextPrimary,
-                            lineHeight = EdPostDimensions.TextFieldBodyLineHeight),
-                    colors =
-                        OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = EdPostTextPrimary,
-                            unfocusedTextColor = EdPostTextPrimary,
-                            cursorColor = EdPostTextPrimary,
-                            focusedBorderColor = EdPostTransparent,
-                            unfocusedBorderColor = EdPostTransparent,
-                            focusedContainerColor = EdPostTextFieldContainer,
-                            unfocusedContainerColor = EdPostTextFieldContainer),
-                    shape = RoundedCornerShape(EdPostDimensions.TextFieldBodyCornerRadius),
-                    maxLines = EdPostDimensions.TextFieldBodyMaxLines,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default))
-
-                // Anonymous post toggle
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween) {
-                      Text(
-                          text = stringResource(R.string.post_anonymously),
-                          style =
-                              MaterialTheme.typography.bodyMedium.copy(
-                                  fontSize = EdPostDimensions.TextFieldBodyFontSize,
-                                  color = EdPostTextPrimary))
-                      Switch(
-                          checked = isAnonymous,
-                          onCheckedChange = { isAnonymous = it },
-                          enabled = !isLoading,
-                          colors =
-                              SwitchDefaults.colors(
-                                  checkedThumbColor = ed1,
-                                  checkedTrackColor = ed1.copy(alpha = 0.5f),
-                                  uncheckedThumbColor =
-                                      if (isDark) colorScheme.outline
-                                      else colorScheme.outlineVariant,
-                                  uncheckedTrackColor =
-                                      if (isDark) colorScheme.surfaceVariant
-                                      else colorScheme.surfaceVariant.copy(alpha = 0.6f)))
-                    }
-
-                // Action buttons row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(EdPostDimensions.ButtonSpacing)) {
-                      // Cancel button (outline)
-                      OutlinedButton(
-                          onClick = onCancel,
-                          enabled = !isLoading,
-                          modifier = Modifier.weight(1f),
-                          colors =
-                              ButtonDefaults.outlinedButtonColors(contentColor = EdPostTextPrimary),
-                          shape = RoundedCornerShape(EdPostDimensions.ButtonCancelCornerRadius),
-                          border =
-                              BorderStroke(
-                                  EdPostDimensions.ButtonBorderWidth, EdPostBorderSecondary)) {
-                            Text(
-                                text = stringResource(R.string.ed_post_cancel_button),
-                                fontSize = EdPostDimensions.ButtonTextFontSize,
-                                fontWeight = FontWeight.Medium)
-                          }
-
-                      // Post button (gradient purple)
-                      // Disable button if no course is selected
-                      val canPost = !isLoading && currentSelectedCourseId != null
-                      Button(
-                          onClick = {
-                            onPublish(editedTitle, editedBody, currentSelectedCourseId, isAnonymous)
-                          },
-                          enabled = canPost,
-                          modifier = Modifier.weight(1f),
-                          colors = ButtonDefaults.buttonColors(containerColor = EdPostTransparent),
-                          contentPadding = PaddingValues(),
-                          shape = RoundedCornerShape(EdPostDimensions.ButtonPostCornerRadius)) {
-                            Box(
-                                modifier =
-                                    Modifier.background(
-                                            brush = gradient,
-                                            shape =
-                                                RoundedCornerShape(
-                                                    EdPostDimensions.ButtonGradientCornerRadius))
-                                        .fillMaxWidth()
-                                        .padding(vertical = EdPostDimensions.ButtonVerticalPadding),
-                                contentAlignment = Alignment.Center) {
-                                  Row(
-                                      horizontalArrangement = Arrangement.Center,
-                                      verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = stringResource(R.string.ed_post_post_button),
-                                            fontSize = EdPostDimensions.ButtonTextFontSize,
-                                            fontWeight = FontWeight.Bold,
-                                            color = EdPostTextPrimary)
-                                        Spacer(
-                                            modifier =
-                                                Modifier.width(
-                                                    EdPostDimensions.ButtonIconSpacerWidth))
-                                        if (isLoading) {
-                                          CircularProgressIndicator(
-                                              color = EdPostTextPrimary,
-                                              strokeWidth = EdPostDimensions.ButtonBorderWidth,
-                                              modifier =
-                                                  Modifier.size(EdPostDimensions.IconSendSize))
-                                        } else {
-                                          Icon(
-                                              imageVector = Icons.AutoMirrored.Rounded.Send,
-                                              contentDescription = null,
-                                              modifier =
-                                                  Modifier.size(EdPostDimensions.IconSendSize),
-                                              tint = EdPostTextPrimary)
-                                        }
-                                      }
-                                }
-                          }
-                    }
+                    onCancel = onCancel,
+                    gradient = gradient)
               }
         }
+      }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CourseDropdown(
+    courses: List<EdCourse>,
+    selectedCourseId: Long?,
+    onCourseSelected: (Long) -> Unit,
+    courseDropdownExpanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    isLoading: Boolean,
+    isLoadingCourses: Boolean,
+    textSecondary: androidx.compose.ui.graphics.Color
+) {
+  if (courses.isNotEmpty() || isLoadingCourses) {
+    ExposedDropdownMenuBox(
+        expanded = courseDropdownExpanded && !isLoadingCourses,
+        onExpandedChange = { if (!isLoadingCourses) onExpandedChange(!courseDropdownExpanded) }) {
+          val selectedCourse = courses.find { it.id == selectedCourseId }
+          val displayText =
+              selectedCourse?.let { "${it.code ?: ""} ${it.name}".trim() }
+                  ?: stringResource(R.string.select_course)
+
+          OutlinedTextField(
+              value = displayText,
+              onValueChange = {},
+              readOnly = true,
+              enabled = !isLoading && !isLoadingCourses,
+              modifier = Modifier.fillMaxWidth().menuAnchor(),
+              placeholder = {
+                Text(
+                    text = stringResource(R.string.select_course),
+                    color = textSecondary,
+                    fontSize = EdPostDimensions.TextFieldPlaceholderFontSize)
+              },
+              textStyle =
+                  MaterialTheme.typography.bodyLarge.copy(
+                      fontSize = EdPostDimensions.TextFieldBodyFontSize, color = EdPostTextPrimary),
+              colors =
+                  OutlinedTextFieldDefaults.colors(
+                      focusedTextColor = EdPostTextPrimary,
+                      unfocusedTextColor = EdPostTextPrimary,
+                      focusedBorderColor = EdPostTransparent,
+                      unfocusedBorderColor = EdPostTransparent,
+                      focusedContainerColor = EdPostTextFieldContainer,
+                      unfocusedContainerColor = EdPostTextFieldContainer),
+              shape = RoundedCornerShape(EdPostDimensions.TextFieldBodyCornerRadius),
+              trailingIcon = {
+                if (isLoadingCourses) {
+                  CircularProgressIndicator(
+                      color = EdPostIconSecondary,
+                      strokeWidth = EdPostDimensions.IconLoadingSpinnerStrokeWidth,
+                      modifier = Modifier.size(EdPostDimensions.IconLoadingSpinnerSize))
+                } else {
+                  ExposedDropdownMenuDefaults.TrailingIcon(expanded = courseDropdownExpanded)
+                }
+              })
+
+          ExposedDropdownMenu(
+              expanded = courseDropdownExpanded,
+              onDismissRequest = { onExpandedChange(false) },
+              modifier = Modifier.background(EdPostTextFieldContainer)) {
+                courses.forEach { course ->
+                  DropdownMenuItem(
+                      text = {
+                        Text(
+                            text = "${course.code ?: ""} ${course.name}".trim(),
+                            color = EdPostTextPrimary)
+                      },
+                      onClick = {
+                        onCourseSelected(course.id)
+                        onExpandedChange(false)
+                      })
+                }
+              }
+        }
+  }
+}
+
+@Composable
+private fun EdPostTitleField(
+    title: String,
+    onTitleChange: (String) -> Unit,
+    enabled: Boolean,
+    textSecondary: androidx.compose.ui.graphics.Color
+) {
+  OutlinedTextField(
+      value = title,
+      onValueChange = onTitleChange,
+      enabled = enabled,
+      modifier = Modifier.fillMaxWidth(),
+      placeholder = {
+        Text(
+            text = stringResource(R.string.ed_post_title_placeholder),
+            color = textSecondary,
+            fontSize = EdPostDimensions.TextFieldPlaceholderFontSize)
+      },
+      textStyle =
+          MaterialTheme.typography.titleLarge.copy(
+              fontSize = EdPostDimensions.TextFieldTitleFontSize,
+              fontWeight = FontWeight.Bold,
+              color = EdPostTextPrimary),
+      colors =
+          OutlinedTextFieldDefaults.colors(
+              focusedTextColor = EdPostTextPrimary,
+              unfocusedTextColor = EdPostTextPrimary,
+              cursorColor = EdPostTextPrimary,
+              focusedBorderColor = EdPostTransparent,
+              unfocusedBorderColor = EdPostTransparent,
+              focusedContainerColor = EdPostTextFieldContainer,
+              unfocusedContainerColor = EdPostTextFieldContainer),
+      shape = RoundedCornerShape(EdPostDimensions.TextFieldTitleCornerRadius),
+      singleLine = true,
+      trailingIcon = {
+        Icon(
+            imageVector = Icons.Outlined.Edit,
+            contentDescription = "Edit title",
+            tint = EdPostIconSecondary,
+            modifier = Modifier.size(EdPostDimensions.IconEditSize))
+      })
+}
+
+@Composable
+private fun EdPostBodyField(
+    body: String,
+    onBodyChange: (String) -> Unit,
+    enabled: Boolean,
+    textSecondary: androidx.compose.ui.graphics.Color
+) {
+  OutlinedTextField(
+      value = body,
+      onValueChange = onBodyChange,
+      enabled = enabled,
+      modifier =
+          Modifier.fillMaxWidth()
+              .heightIn(
+                  min = EdPostDimensions.TextFieldBodyMinHeight,
+                  max = EdPostDimensions.TextFieldBodyMaxHeight),
+      placeholder = {
+        Text(
+            text = stringResource(R.string.ed_post_body_placeholder),
+            color = textSecondary,
+            fontSize = EdPostDimensions.TextFieldPlaceholderFontSize)
+      },
+      textStyle =
+          MaterialTheme.typography.bodyLarge.copy(
+              fontSize = EdPostDimensions.TextFieldBodyFontSize,
+              color = EdPostTextPrimary,
+              lineHeight = EdPostDimensions.TextFieldBodyLineHeight),
+      colors =
+          OutlinedTextFieldDefaults.colors(
+              focusedTextColor = EdPostTextPrimary,
+              unfocusedTextColor = EdPostTextPrimary,
+              cursorColor = EdPostTextPrimary,
+              focusedBorderColor = EdPostTransparent,
+              unfocusedBorderColor = EdPostTransparent,
+              focusedContainerColor = EdPostTextFieldContainer,
+              unfocusedContainerColor = EdPostTextFieldContainer),
+      shape = RoundedCornerShape(EdPostDimensions.TextFieldBodyCornerRadius),
+      maxLines = EdPostDimensions.TextFieldBodyMaxLines,
+      keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default))
+}
+
+@Composable
+private fun AnonymousToggle(
+    isAnonymous: Boolean,
+    onAnonymousChange: (Boolean) -> Unit,
+    enabled: Boolean,
+    isDark: Boolean,
+    colorScheme: ColorScheme
+) {
+  Row(
+      modifier = Modifier.fillMaxWidth(),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(
+            text = stringResource(R.string.post_anonymously),
+            style =
+                MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = EdPostDimensions.TextFieldBodyFontSize, color = EdPostTextPrimary))
+        Switch(
+            checked = isAnonymous,
+            onCheckedChange = onAnonymousChange,
+            enabled = enabled,
+            colors =
+                SwitchDefaults.colors(
+                    checkedThumbColor = ed1,
+                    checkedTrackColor = ed1.copy(alpha = 0.5f),
+                    uncheckedThumbColor =
+                        if (isDark) colorScheme.outline else colorScheme.outlineVariant,
+                    uncheckedTrackColor =
+                        if (isDark) colorScheme.surfaceVariant
+                        else colorScheme.surfaceVariant.copy(alpha = 0.6f)))
+      }
+}
+
+@Composable
+private fun EdPostActionButtons(
+    isLoading: Boolean,
+    canPost: Boolean,
+    onPublish: () -> Unit,
+    onCancel: () -> Unit,
+    gradient: Brush
+) {
+  Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.spacedBy(EdPostDimensions.ButtonSpacing)) {
+        OutlinedButton(
+            onClick = onCancel,
+            enabled = !isLoading,
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = EdPostTextPrimary),
+            shape = RoundedCornerShape(EdPostDimensions.ButtonCancelCornerRadius),
+            border = BorderStroke(EdPostDimensions.ButtonBorderWidth, EdPostBorderSecondary)) {
+              Text(
+                  text = stringResource(R.string.ed_post_cancel_button),
+                  fontSize = EdPostDimensions.ButtonTextFontSize,
+                  fontWeight = FontWeight.Medium)
+            }
+
+        Button(
+            onClick = onPublish,
+            enabled = canPost,
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.buttonColors(containerColor = EdPostTransparent),
+            contentPadding = PaddingValues(),
+            shape = RoundedCornerShape(EdPostDimensions.ButtonPostCornerRadius)) {
+              Box(
+                  modifier =
+                      Modifier.background(
+                              brush = gradient,
+                              shape =
+                                  RoundedCornerShape(EdPostDimensions.ButtonGradientCornerRadius))
+                          .fillMaxWidth()
+                          .padding(vertical = EdPostDimensions.ButtonVerticalPadding),
+                  contentAlignment = Alignment.Center) {
+                    Row(
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically) {
+                          Text(
+                              text = stringResource(R.string.ed_post_post_button),
+                              fontSize = EdPostDimensions.ButtonTextFontSize,
+                              fontWeight = FontWeight.Bold,
+                              color = EdPostTextPrimary)
+                          Spacer(modifier = Modifier.width(EdPostDimensions.ButtonIconSpacerWidth))
+                          if (isLoading) {
+                            CircularProgressIndicator(
+                                color = EdPostTextPrimary,
+                                strokeWidth = EdPostDimensions.ButtonBorderWidth,
+                                modifier = Modifier.size(EdPostDimensions.IconSendSize))
+                          } else {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.Send,
+                                contentDescription = null,
+                                modifier = Modifier.size(EdPostDimensions.IconSendSize),
+                                tint = EdPostTextPrimary)
+                          }
+                        }
+                  }
+            }
       }
 }
