@@ -352,16 +352,15 @@ private fun FieldLabelRow(
   Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Surface(
-            modifier = Modifier.size(40.dp), shape = CircleShape, color = iconBackground) {
-              Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = textPrimary,
-                    modifier = Modifier.size(20.dp))
-              }
-            }
+        Surface(modifier = Modifier.size(40.dp), shape = CircleShape, color = iconBackground) {
+          Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = textPrimary,
+                modifier = Modifier.size(20.dp))
+          }
+        }
         Text(text = label, color = textSecondary, fontSize = 13.sp)
       }
 }
@@ -390,18 +389,19 @@ private fun DropdownFieldContent(
         Modifier.fillMaxWidth()
       }
 
-  Surface(modifier = clickableModifier, color = dropdownBackground, shape = RoundedCornerShape(12.dp)) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween) {
-          Text(text = displayText, color = displayColor, fontSize = 15.sp)
-          Icon(
-              imageVector = Icons.Filled.ExpandMore,
-              contentDescription = null,
-              tint = textSecondary)
-        }
-  }
+  Surface(
+      modifier = clickableModifier, color = dropdownBackground, shape = RoundedCornerShape(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween) {
+              Text(text = displayText, color = displayColor, fontSize = 15.sp)
+              Icon(
+                  imageVector = Icons.Filled.ExpandMore,
+                  contentDescription = null,
+                  tint = textSecondary)
+            }
+      }
 
   DropdownMenu(
       expanded = expanded,
