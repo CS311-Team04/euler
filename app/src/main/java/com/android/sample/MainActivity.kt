@@ -15,7 +15,7 @@ import com.google.firebase.firestore.FirebaseFirestoreSettings
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
-  private val speechHelper by lazy { SpeechToTextHelper(this, this, Locale("fr", "FR")) }
+  private val speechHelper by lazy { SpeechToTextHelper(this, this, Locale.ENGLISH) }
   private val ttsHelper by lazy { TextToSpeechHelper(this) }
 
   override fun onCreate(savedInstanceState: Bundle?) {
