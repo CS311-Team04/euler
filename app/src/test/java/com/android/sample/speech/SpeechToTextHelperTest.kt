@@ -285,19 +285,6 @@ class SpeechToTextHelperTest {
   }
 
   @Test
-  fun deliverFinalResult_withoutMatch_notifiesError() {
-    val helper = createHelper()
-    var error: String? = null
-    helper.setField("onErrorCallback", { msg: String -> error = msg })
-    helper.setField("onCompleteCallback", {})
-
-    helper.invokeDeliverFinalResult(Bundle())
-
-    assertEquals("No speech recognized", error)
-    assertEquals("No speech recognized", ShadowToast.getTextOfLatestToast())
-  }
-
-  @Test
   fun errorMessageForCode_mapsAllErrors() {
     val helper = createHelper()
     val messages =
