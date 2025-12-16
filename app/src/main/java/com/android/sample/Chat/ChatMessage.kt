@@ -165,65 +165,103 @@ private fun AiMessageColumn(
     onDownloadAttachment: (ChatAttachment) -> Unit,
     modifier: Modifier = Modifier
 ) {
-  // Detect if this looks like a Moodle JSON response (check BEFORE parsing)
-  val looksLikeMoodleJson =
-      message.text.trimStart().startsWith("{") &&
-          (message.text.contains("\"type\":\"moodle") ||
-              message.text.contains("\"type\": \"moodle"))
-
-  // Only try to parse if it looks like Moodle JSON
-  val moodlePayload =
-      remember(message.text, looksLikeMoodleJson) {
-        if (looksLikeMoodleJson) parseMoodleOverviewPayload(message.text) else null
-      }
-  val moodleContent =
-      remember(moodlePayload) { moodlePayload?.let { cleanMoodleMarkdown(it.content) } }
-
-  // Show loading if it looks like Moodle JSON but hasn't parsed successfully yet
-  val showMoodleLoading = looksLikeMoodleJson && moodlePayload == null
+  val moodleState = rememberMoodleParseState(message.text)
 
   Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
-    if (isStreaming && message.text.isEmpty()) {
-      LeadingThinkingDot(color = aiText)
-    } else if (showMoodleLoading) {
-      // Show friendly loading message while Moodle JSON is incomplete
-      MoodleLoadingIndicator(color = aiText)
-    } else {
-      Column(modifier = Modifier.fillMaxWidth()) {
-        if (moodlePayload != null && moodleContent != null) {
-          // Use MarkdownText for Moodle content to render rich formatting
-          MarkdownText(
-              markdown = moodleContent, modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
-          Spacer(modifier = Modifier.height(8.dp))
-          MoodleSourceBadge(
-              metadata = moodlePayload.metadata,
-              modifier = Modifier.testTag("chat_ai_moodle_badge"))
-        } else {
-          // Use MarkdownText for AI messages to render rich formatting
-          MarkdownText(
-              markdown = message.text, modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
-        }
-
-        if (audioState != null) {
-          Spacer(modifier = Modifier.height(4.dp))
-          Row(
-              modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.End,
-              verticalAlignment = Alignment.CenterVertically) {
-                AudioPlaybackButton(state = audioState, tint = EulerAudioButtonTintSemiTransparent)
-              }
-        }
-
-        message.attachment?.let { attachment ->
-          Spacer(modifier = Modifier.height(10.dp))
-          AttachmentCard(
-              attachment = attachment,
-              onOpen = { onOpenAttachment(attachment) },
-              onDownload = { onDownloadAttachment(attachment) })
-        }
-      }
+    when {
+      isStreaming && message.text.isEmpty() -> LeadingThinkingDot(color = aiText)
+      moodleState.showLoading -> MoodleLoadingIndicator(color = aiText)
+      else ->
+          AiMessageContent(
+              message = message,
+              moodleState = moodleState,
+              audioState = audioState,
+              onOpenAttachment = onOpenAttachment,
+              onDownloadAttachment = onDownloadAttachment)
     }
   }
+}
+
+/** Holds the parsed state for Moodle JSON content. */
+private data class MoodleParseState(
+    val payload: MoodleOverviewResponse?,
+    val content: String?,
+    val showLoading: Boolean
+)
+
+@Composable
+private fun rememberMoodleParseState(text: String): MoodleParseState {
+  val looksLikeMoodleJson =
+      text.trimStart().startsWith("{") &&
+          (text.contains("\"type\":\"moodle") || text.contains("\"type\": \"moodle"))
+
+  val payload =
+      remember(text, looksLikeMoodleJson) {
+        if (looksLikeMoodleJson) parseMoodleOverviewPayload(text) else null
+      }
+  val content = remember(payload) { payload?.let { cleanMoodleMarkdown(it.content) } }
+  val showLoading = looksLikeMoodleJson && payload == null
+
+  return MoodleParseState(payload, content, showLoading)
+}
+
+@Composable
+private fun AiMessageContent(
+    message: ChatUIModel,
+    moodleState: MoodleParseState,
+    audioState: MessageAudioState?,
+    onOpenAttachment: (ChatAttachment) -> Unit,
+    onDownloadAttachment: (ChatAttachment) -> Unit
+) {
+  Column(modifier = Modifier.fillMaxWidth()) {
+    AiMessageTextContent(message = message, moodleState = moodleState)
+    AiMessageAudioControls(audioState = audioState)
+    AiMessageAttachment(
+        attachment = message.attachment,
+        onOpenAttachment = onOpenAttachment,
+        onDownloadAttachment = onDownloadAttachment)
+  }
+}
+
+@Composable
+private fun AiMessageTextContent(message: ChatUIModel, moodleState: MoodleParseState) {
+  if (moodleState.payload != null && moodleState.content != null) {
+    MarkdownText(
+        markdown = moodleState.content, modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+    Spacer(modifier = Modifier.height(8.dp))
+    MoodleSourceBadge(
+        metadata = moodleState.payload.metadata,
+        modifier = Modifier.testTag("chat_ai_moodle_badge"))
+  } else {
+    MarkdownText(
+        markdown = message.text, modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+  }
+}
+
+@Composable
+private fun AiMessageAudioControls(audioState: MessageAudioState?) {
+  if (audioState == null) return
+  Spacer(modifier = Modifier.height(4.dp))
+  Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.End,
+      verticalAlignment = Alignment.CenterVertically) {
+        AudioPlaybackButton(state = audioState, tint = EulerAudioButtonTintSemiTransparent)
+      }
+}
+
+@Composable
+private fun AiMessageAttachment(
+    attachment: ChatAttachment?,
+    onOpenAttachment: (ChatAttachment) -> Unit,
+    onDownloadAttachment: (ChatAttachment) -> Unit
+) {
+  if (attachment == null) return
+  Spacer(modifier = Modifier.height(10.dp))
+  AttachmentCard(
+      attachment = attachment,
+      onOpen = { onOpenAttachment(attachment) },
+      onDownload = { onDownloadAttachment(attachment) })
 }
 
 @Composable

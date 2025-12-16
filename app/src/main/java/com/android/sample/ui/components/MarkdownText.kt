@@ -135,8 +135,7 @@ fun SimpleMarkdownText(
     style: TextStyle = MaterialTheme.typography.bodyMedium,
     lineHeight: androidx.compose.ui.unit.TextUnit = 20.sp
 ) {
-  val annotatedString: AnnotatedString =
-      remember(text, textColor) { parseSimpleMarkdown(text, textColor) }
+  val annotatedString: AnnotatedString = remember(text, textColor) { parseSimpleMarkdown(text) }
 
   Text(
       text = annotatedString,
@@ -208,87 +207,129 @@ private fun AnnotatedString.Builder.parseDelimitedStyle(
 }
 
 /**
- * Parses simple markdown formatting into an AnnotatedString. Handles: **bold**, *italic*, `code`,
- * [links](url)
+ * Result of parsing a link segment.
+ *
+ * @property newIndex The new index after processing
+ * @property processed Whether the link was successfully processed
  */
-private fun parseSimpleMarkdown(text: String, baseColor: Color): AnnotatedString {
-  // Pre-defined styles for reuse
-  val boldStyle = SpanStyle(fontWeight = FontWeight.Bold)
-  val italicStyle = SpanStyle(fontStyle = FontStyle.Italic)
-  val codeStyle =
+private data class LinkParseResult(val newIndex: Int, val processed: Boolean)
+
+/**
+ * Parses a markdown link and appends the styled content.
+ *
+ * @param text The full text being parsed
+ * @param currentIndex The current parsing index (should be at '[')
+ * @param linkStyle The span style to apply to the link text
+ * @return LinkParseResult with the new index and whether processing succeeded
+ */
+private fun AnnotatedString.Builder.parseLink(
+    text: String,
+    currentIndex: Int,
+    linkStyle: SpanStyle
+): LinkParseResult {
+  val closeText = text.indexOf("]", currentIndex)
+  if (closeText == -1) return LinkParseResult(currentIndex, false)
+
+  val openUrl = text.indexOf("(", closeText)
+  if (openUrl != closeText + 1) return LinkParseResult(currentIndex, false)
+
+  val closeUrl = text.indexOf(")", openUrl)
+  if (closeUrl == -1) return LinkParseResult(currentIndex, false)
+
+  val linkText = text.substring(currentIndex + 1, closeText)
+  val url = text.substring(openUrl + 1, closeUrl)
+  pushStringAnnotation("URL", url)
+  withStyle(linkStyle) { append(linkText) }
+  pop()
+  return LinkParseResult(closeUrl + 1, true)
+}
+
+/** Pre-defined styles for markdown formatting. */
+private object MarkdownParseStyles {
+  val bold = SpanStyle(fontWeight = FontWeight.Bold)
+  val italic = SpanStyle(fontStyle = FontStyle.Italic)
+  val code =
       SpanStyle(
           fontFamily = FontFamily.Monospace,
           background = MarkdownStyles.inlineCodeBackground,
           color = MarkdownStyles.codeTextColor)
-  val linkStyle =
-      SpanStyle(color = MarkdownStyles.linkColor, textDecoration = TextDecoration.Underline)
+  val link = SpanStyle(color = MarkdownStyles.linkColor, textDecoration = TextDecoration.Underline)
+}
 
-  return buildAnnotatedString {
-    var i = 0
-    val len = text.length
+/**
+ * Parses simple markdown formatting into an AnnotatedString. Handles: **bold**, *italic*, `code`,
+ * [links](url)
+ */
+@Suppress("CyclomaticComplexMethod")
+private fun parseSimpleMarkdown(text: String): AnnotatedString = buildAnnotatedString {
+  var i = 0
+  val len = text.length
 
-    while (i < len) {
-      when {
-        // Bold: **text** or __text__
-        text.startsWith("**", i) || text.startsWith("__", i) -> {
-          val delimiter = text.substring(i, i + 2)
-          val result = parseDelimitedStyle(text, i, delimiter, delimiter, style = boldStyle)
-          if (result.processed) {
-            i = result.newIndex
-          } else {
-            append(text[i])
-            i++
-          }
-        }
-        // Italic: *text* (but not **) or _text_ (but not __)
-        (text.startsWith("*", i) && !text.startsWith("**", i)) ||
-            (text.startsWith("_", i) && !text.startsWith("__", i)) -> {
-          val delimiter = text[i].toString()
-          val doubleDelimiter = delimiter + delimiter
-          val result =
-              parseDelimitedStyle(text, i, delimiter, delimiter, doubleDelimiter, italicStyle)
-          if (result.processed) {
-            i = result.newIndex
-          } else {
-            append(text[i])
-            i++
-          }
-        }
-        // Inline code: `code`
-        text.startsWith("`", i) && !text.startsWith("```", i) -> {
-          val result =
-              parseDelimitedStyle(text, i, "`", "`", style = codeStyle) { content -> " $content " }
-          if (result.processed) {
-            i = result.newIndex
-          } else {
-            append(text[i])
-            i++
-          }
-        }
-        // Link: [text](url)
-        text.startsWith("[", i) -> {
-          val closeText = text.indexOf("]", i)
-          val openUrl = text.indexOf("(", closeText)
-          val closeUrl = text.indexOf(")", openUrl)
-          if (closeText != -1 && openUrl == closeText + 1 && closeUrl != -1) {
-            val linkText = text.substring(i + 1, closeText)
-            val url = text.substring(openUrl + 1, closeUrl)
-            pushStringAnnotation("URL", url)
-            withStyle(linkStyle) { append(linkText) }
-            pop()
-            i = closeUrl + 1
-          } else {
-            append(text[i])
-            i++
-          }
-        }
-        else -> {
-          append(text[i])
-          i++
-        }
-      }
-    }
+  while (i < len) {
+    i = parseNextToken(text, i)
   }
+}
+
+/**
+ * Parses the next token in the markdown text and appends it to the builder.
+ * Returns the new index after processing.
+ */
+private fun AnnotatedString.Builder.parseNextToken(text: String, index: Int): Int {
+  // Bold: **text** or __text__
+  if (text.startsWith("**", index) || text.startsWith("__", index)) {
+    return parseBold(text, index)
+  }
+  // Italic: *text* (but not **) or _text_ (but not __)
+  if (isItalicStart(text, index)) {
+    return parseItalic(text, index)
+  }
+  // Inline code: `code`
+  if (text.startsWith("`", index) && !text.startsWith("```", index)) {
+    return parseInlineCode(text, index)
+  }
+  // Link: [text](url)
+  if (text.startsWith("[", index)) {
+    return parseLinkToken(text, index)
+  }
+  // Default: append character
+  append(text[index])
+  return index + 1
+}
+
+private fun isItalicStart(text: String, index: Int): Boolean =
+    (text.startsWith("*", index) && !text.startsWith("**", index)) ||
+        (text.startsWith("_", index) && !text.startsWith("__", index))
+
+private fun AnnotatedString.Builder.parseBold(text: String, index: Int): Int {
+  val delimiter = text.substring(index, index + 2)
+  val result =
+      parseDelimitedStyle(text, index, delimiter, delimiter, style = MarkdownParseStyles.bold)
+  return if (result.processed) result.newIndex else appendAndAdvance(text[index], index)
+}
+
+private fun AnnotatedString.Builder.parseItalic(text: String, index: Int): Int {
+  val delimiter = text[index].toString()
+  val doubleDelimiter = delimiter + delimiter
+  val result =
+      parseDelimitedStyle(
+          text, index, delimiter, delimiter, doubleDelimiter, MarkdownParseStyles.italic)
+  return if (result.processed) result.newIndex else appendAndAdvance(text[index], index)
+}
+
+private fun AnnotatedString.Builder.parseInlineCode(text: String, index: Int): Int {
+  val result =
+      parseDelimitedStyle(text, index, "`", "`", style = MarkdownParseStyles.code) { " $it " }
+  return if (result.processed) result.newIndex else appendAndAdvance(text[index], index)
+}
+
+private fun AnnotatedString.Builder.parseLinkToken(text: String, index: Int): Int {
+  val result = parseLink(text, index, MarkdownParseStyles.link)
+  return if (result.processed) result.newIndex else appendAndAdvance(text[index], index)
+}
+
+private fun AnnotatedString.Builder.appendAndAdvance(char: Char, index: Int): Int {
+  append(char)
+  return index + 1
 }
 
 /**
