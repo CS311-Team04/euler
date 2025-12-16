@@ -271,8 +271,8 @@ private fun parseSimpleMarkdown(text: String): AnnotatedString = buildAnnotatedS
 }
 
 /**
- * Parses the next token in the markdown text and appends it to the builder.
- * Returns the new index after processing.
+ * Parses the next token in the markdown text and appends it to the builder. Returns the new index
+ * after processing.
  */
 private fun AnnotatedString.Builder.parseNextToken(text: String, index: Int): Int {
   // Bold: **text** or __text__
