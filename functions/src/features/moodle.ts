@@ -122,17 +122,19 @@ export async function handleMoodleIntent(
       // Get Moodle config
       const moodleConfig = await deps.moodleService.getStatus(uid);
       if (moodleConfig.status !== "connected" || !moodleConfig.baseUrl || !moodleConfig.tokenEncrypted) {
-        return {
-          reply: isEnglishMoodle
-            ? "You're not connected to Moodle. Please connect in the settings."
-            : "Vous n'êtes pas connecté à Moodle. Veuillez vous connecter dans les paramètres.",
-          primary_url: null,
-          best_score: 0,
-          sources: [],
-          moodle_intent_detected: true,
-          moodle_intent: moodleIntentResult.moodle_intent,
-          moodle_file: null,
-        };
+      return {
+        reply: isEnglishMoodle
+          ? "You're not connected to Moodle. Please connect in the settings."
+          : "Vous n'êtes pas connecté à Moodle. Veuillez vous connecter dans les paramètres.",
+        primary_url: null,
+        best_score: 0,
+        sources: [],
+        ed_intent_detected: false,
+        ed_intent: null,
+        moodle_intent_detected: true,
+        moodle_intent: moodleIntentResult.moodle_intent,
+        moodle_file: null,
+      };
       }
 
       // Second layer: Extract specific file type, number, course name, and week
@@ -145,6 +147,8 @@ export async function handleMoodleIntent(
           primary_url: null,
           best_score: 0,
           sources: [],
+          ed_intent_detected: false,
+          ed_intent: null,
           moodle_intent_detected: true,
           moodle_intent: moodleIntentResult.moodle_intent,
           moodle_file: null,
@@ -177,6 +181,8 @@ export async function handleMoodleIntent(
           primary_url: null,
           best_score: 0,
           sources: [],
+          ed_intent_detected: false,
+          ed_intent: null,
           moodle_intent_detected: true,
           moodle_intent: moodleIntentResult.moodle_intent,
           moodle_file: null,
@@ -208,6 +214,8 @@ export async function handleMoodleIntent(
             primary_url: null,
             best_score: 0,
             sources: [],
+            ed_intent_detected: false,
+            ed_intent: null,
             moodle_intent_detected: true,
             moodle_intent: moodleIntentResult.moodle_intent,
             moodle_file: null,
@@ -229,6 +237,8 @@ export async function handleMoodleIntent(
             primary_url: null,
             best_score: 0,
             sources: [],
+            ed_intent_detected: false,
+            ed_intent: null,
             moodle_intent_detected: true,
             moodle_intent: moodleIntentResult.moodle_intent,
             moodle_file: null,
@@ -250,6 +260,8 @@ export async function handleMoodleIntent(
             primary_url: null,
             best_score: 0,
             sources: [],
+            ed_intent_detected: false,
+            ed_intent: null,
             moodle_intent_detected: true,
             moodle_intent: moodleIntentResult.moodle_intent,
             moodle_file: null,
@@ -287,6 +299,8 @@ export async function handleMoodleIntent(
             primary_url: null,
             best_score: 0,
             sources: [],
+            ed_intent_detected: false,
+            ed_intent: null,
             moodle_intent_detected: true,
             moodle_intent: moodleIntentResult.moodle_intent,
             moodle_file: null,
@@ -369,6 +383,8 @@ export async function handleMoodleIntent(
           primary_url: null,
           best_score: 0,
           sources: [],
+          ed_intent_detected: false,
+          ed_intent: null,
           moodle_intent_detected: true,
           moodle_intent: moodleIntentResult.moodle_intent,
           moodle_file: null,
@@ -425,6 +441,8 @@ export async function handleMoodleIntent(
         primary_url: null,
         best_score: 0,
         sources: [],
+        ed_intent_detected: false,
+        ed_intent: null,
         moodle_intent_detected: true,
         moodle_intent: moodleIntentResult.moodle_intent,
         moodle_file: moodleFileResponse,
@@ -449,6 +467,8 @@ export async function handleMoodleIntent(
         primary_url: null,
         best_score: 0,
         sources: [],
+        ed_intent_detected: false,
+        ed_intent: null,
         moodle_intent_detected: true,
         moodle_intent: moodleIntentResult.moodle_intent,
         moodle_file: null,

@@ -3,8 +3,7 @@
 import * as logger from "firebase-functions/logger";
 import { db } from "../core/firebase";
 import { EdConnectorRepository } from "../connectors/ed/EdConnectorRepository";
-import { EdConnectorService } from "../connectors/ed/EdConnectorService";
-import { encryptSecret, decryptSecret } from "../security/secretCrypto";
+import { decryptSecret } from "../security/secretCrypto";
 import { EdDiscussionClient } from "../connectors/ed/EdDiscussionClient";
 import {
   parseEdSearchQuery,
@@ -13,9 +12,6 @@ import {
   EdBrainError,
   NormalizedEdPost,
 } from "../edSearchDomain";
-
-// ED Discussion API base URL
-const ED_DEFAULT_BASE_URL = "https://eu.edstem.org/api";
 
 type EdBrainSearchInput = {
   query: string;

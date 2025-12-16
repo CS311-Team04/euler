@@ -12,7 +12,7 @@ import { generateTitleCore, apertusChatFnCore, type GenerateTitleInput } from ".
 import { indexChunksCore, type IndexChunksInput } from "./rag/indexChunks";
 import { answerWithRagCore, type AnswerWithRagInput } from "./rag/rag";
 import { edBrainSearchCore } from "./features/ed";
-import { syncEpflScheduleCore, getScheduleContextCore, type SyncScheduleInput } from "./features/schedule";
+import { syncEpflScheduleCore, type SyncScheduleInput } from "./features/schedule";
 import { syncEpflFoodMenusCore, getFoodContextCore } from "./features/food";
 import { handleMoodleIntent } from "./features/moodle";
 import { onMessageCreateHandler } from "./triggers/summary";
@@ -270,8 +270,7 @@ export const answerWithRagHttp = europeFunctions.https.onRequest(async (req: fun
     });
     res.status(200).json(result);
   } catch (e: any) {
-    const code = (e as any).code;
-    res.status(e.code === 401 ? 401 : 400).json({ error: String(e) });
+    res.status((e as any).code === 401 ? 401 : 400).json({ error: String(e) });
   }
 });
 
@@ -802,4 +801,9 @@ export const onMessageCreate = europeFunctions.firestore
   .document("users/{uid}/conversations/{cid}/messages/{mid}")
   .onCreate(async (snap: functions.firestore.DocumentSnapshot, ctx: functions.EventContext) => {
     await onMessageCreateHandler(snap, ctx);
-});
+  });
+
+// Re-export core functions for tests
+export { answerWithRagCore } from "./rag/rag";
+export { generateTitleCore } from "./core/openai";
+export { indexChunksCore } from "./rag/indexChunks";
