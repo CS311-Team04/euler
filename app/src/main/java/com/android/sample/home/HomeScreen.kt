@@ -463,7 +463,7 @@ fun HomeScreen(
                         textPrimary = textPrimary,
                         textSecondary = textSecondary,
                         surfaceVariantColor = surfaceVariantColor,
-                        modifier = Modifier.testTag(HomeTags.MessageField))
+                        modifier = Modifier)
 
                     Spacer(Modifier.height(16.dp))
                     Text(
@@ -1026,7 +1026,10 @@ private fun ChatInputBar(
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Normal)
               },
-              modifier = Modifier.fillMaxWidth().heightIn(min = InputHeight),
+              modifier =
+                  Modifier.fillMaxWidth()
+                      .heightIn(min = InputHeight)
+                      .testTag(HomeTags.MessageField),
               enabled = enabled,
               singleLine = false,
               maxLines = ChatInputMaxLines, // Allow expansion up to 5 lines
