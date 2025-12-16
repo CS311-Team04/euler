@@ -30,7 +30,7 @@ import java.util.Locale
 class SpeechToTextHelper(
     private val context: Context,
     caller: ActivityResultCaller,
-    private val language: Locale = Locale.getDefault(),
+    private val language: Locale = Locale.ENGLISH,
 ) {
 
   // Consumer-provided callbacks wired on each call to startListening.
