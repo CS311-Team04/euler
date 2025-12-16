@@ -128,46 +128,55 @@ class HomeViewModel(
     private const val FALLBACK_FOOD_LABEL = "EPFL Restaurants"
     private const val FALLBACK_FOOD_TITLE = "Retrieved from Pocket Campus"
 
+    // Canonical suggestion question constants to avoid duplication
+    private const val SUGGESTION_EULER_CAPABILITIES = "What can Euler do for me?"
+    private const val SUGGESTION_NEW_CONVERSATION = "How do I start a new conversation?"
+    private const val SUGGESTION_OFFLINE_MODE = "How do I use offline mode?"
+    private const val SUGGESTION_PREVIOUS_CHATS = "How do I find my previous chats?"
+    private const val SUGGESTION_VOICE_INPUT = "How do I use voice input?"
+    private const val SUGGESTION_CHANGE_THEME = "How do I change the theme?"
+    private const val SUGGESTION_PRIVACY = "How does Euler handle my privacy?"
+
     // Canonical suggestion questions (English) for offline cache
     // These must match the localization keys exactly for cache hits
     val OFFLINE_SUGGESTIONS =
         listOf(
-            "What can Euler do for me?",
-            "How do I start a new conversation?",
-            "How do I use offline mode?",
-            "How do I find my previous chats?",
-            "How do I use voice input?",
-            "How do I change the theme?",
-            "How does Euler handle my privacy?")
+            SUGGESTION_EULER_CAPABILITIES,
+            SUGGESTION_NEW_CONVERSATION,
+            SUGGESTION_OFFLINE_MODE,
+            SUGGESTION_PREVIOUS_CHATS,
+            SUGGESTION_VOICE_INPUT,
+            SUGGESTION_CHANGE_THEME,
+            SUGGESTION_PRIVACY)
 
     // Mapping of localization keys to canonical English questions for cache lookup
     private val SUGGESTION_KEY_TO_CANONICAL =
         mapOf(
-            "suggestion_euler_capabilities" to "What can Euler do for me?",
-            "suggestion_new_conversation" to "How do I start a new conversation?",
-            "suggestion_offline_mode" to "How do I use offline mode?",
-            "suggestion_previous_chats" to "How do I find my previous chats?",
-            "suggestion_voice_input" to "How do I use voice input?",
-            "suggestion_change_theme" to "How do I change the theme?",
-            "suggestion_privacy" to "How does Euler handle my privacy?")
+            "suggestion_euler_capabilities" to SUGGESTION_EULER_CAPABILITIES,
+            "suggestion_new_conversation" to SUGGESTION_NEW_CONVERSATION,
+            "suggestion_offline_mode" to SUGGESTION_OFFLINE_MODE,
+            "suggestion_previous_chats" to SUGGESTION_PREVIOUS_CHATS,
+            "suggestion_voice_input" to SUGGESTION_VOICE_INPUT,
+            "suggestion_change_theme" to SUGGESTION_CHANGE_THEME,
+            "suggestion_privacy" to SUGGESTION_PRIVACY)
 
     // Predefined offline responses bundled with the app
     // These are always available without network or Firestore cache
     private val PREDEFINED_RESPONSES =
         mapOf(
-            "What can Euler do for me?" to
+            SUGGESTION_EULER_CAPABILITIES to
                 """Euler can answer questions, summarize text, draft messages, explain concepts, and provide quick service info you've synced before.""",
-            "How do I start a new conversation?" to
+            SUGGESTION_NEW_CONVERSATION to
                 """Tap "New chat" (or clear the draft) and type or use voice; Euler creates a fresh thread automatically.""",
-            "How do I use offline mode?" to
+            SUGGESTION_OFFLINE_MODE to
                 """When offline, you can tap the suggestion bubbles to get predefined answers. Typing new, uncached questions will prompt you to reconnect.""",
-            "How do I find my previous chats?" to
+            SUGGESTION_PREVIOUS_CHATS to
                 """Open the conversation list from the home screen. Previously synced chats are available; new devices need one online sync to fetch history.""",
-            "How do I use voice input?" to
+            SUGGESTION_VOICE_INPUT to
                 """Tap the mic in the input bar, speak, and Euler fills the draft with your transcript; send or edit before sending.""",
-            "How do I change the theme?" to
+            SUGGESTION_CHANGE_THEME to
                 """Go to settings → Appearance and choose light/dark/system; chat colors adapt automatically.""",
-            "How does Euler handle my privacy?" to
+            SUGGESTION_PRIVACY to
                 """Your chats are tied to your account and stored securely. Offline predefined answers stay on-device.""")
 
     /** Returns a predefined offline response for a canonical question, or null if not found. */
