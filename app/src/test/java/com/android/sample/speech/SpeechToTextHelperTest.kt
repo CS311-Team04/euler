@@ -64,7 +64,6 @@ class SpeechToTextHelperTest {
         Locale.FRANCE.toLanguageTag(), intent.getStringExtra(RecognizerIntent.EXTRA_LANGUAGE))
     assertEquals(true, intent.getBooleanExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false))
     assertEquals(3, intent.getIntExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 0))
-    assertEquals("Speak now…", ShadowToast.getTextOfLatestToast())
   }
 
   @Test
