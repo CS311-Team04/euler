@@ -11,9 +11,15 @@ import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -73,6 +79,31 @@ import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.ui.components.EdPostConfirmationModal
 import com.android.sample.ui.components.EdPostedCard
 import com.android.sample.ui.components.GuestProfileWarningModal
+import com.android.sample.ui.theme.Dimensions.ChatInputButtonRowPaddingEnd
+import com.android.sample.ui.theme.Dimensions.ChatInputButtonSpacing
+import com.android.sample.ui.theme.Dimensions.ChatInputCornerRadius
+import com.android.sample.ui.theme.Dimensions.ChatInputListeningViewHeight
+import com.android.sample.ui.theme.Dimensions.ChatInputListeningViewPaddingEnd
+import com.android.sample.ui.theme.Dimensions.ChatInputListeningViewPaddingStart
+import com.android.sample.ui.theme.Dimensions.ChatInputMaxLines
+import com.android.sample.ui.theme.Dimensions.ChatInputMicBorderWidth
+import com.android.sample.ui.theme.Dimensions.ChatInputMicButtonSize
+import com.android.sample.ui.theme.Dimensions.ChatInputMicIconSize
+import com.android.sample.ui.theme.Dimensions.ChatInputProgressIndicatorStrokeWidth
+import com.android.sample.ui.theme.Dimensions.ChatInputVoiceBarAnimationDelays
+import com.android.sample.ui.theme.Dimensions.ChatInputVoiceBarAnimationDurationMillis
+import com.android.sample.ui.theme.Dimensions.ChatInputVoiceBarAnimationInitialScale
+import com.android.sample.ui.theme.Dimensions.ChatInputVoiceBarAnimationTargetScale
+import com.android.sample.ui.theme.Dimensions.ChatInputVoiceBarColorAlpha
+import com.android.sample.ui.theme.Dimensions.ChatInputVoiceBarMaxHeight
+import com.android.sample.ui.theme.Dimensions.ChatInputVoiceBarMinHeight
+import com.android.sample.ui.theme.Dimensions.ChatInputVoiceBarSpacerWidth
+import com.android.sample.ui.theme.Dimensions.ChatInputVoiceBarSpacing
+import com.android.sample.ui.theme.Dimensions.ChatInputVoiceBarWidth
+import com.android.sample.ui.theme.Dimensions.ChatInputVoiceModeButtonAlpha
+import com.android.sample.ui.theme.Dimensions.ChatInputVoiceSendButtonOffsetY
+import com.android.sample.ui.theme.Dimensions.ChatInputVoiceSendButtonSize
+import com.android.sample.ui.theme.Dimensions.ChatInputVoiceSendIconSize
 import com.android.sample.ui.theme.Dimensions.InputHeight
 import com.android.sample.ui.theme.Dimensions.InputHorizontal
 import com.android.sample.ui.theme.EdPostDimensions
@@ -160,6 +191,7 @@ fun HomeScreen(
   val accentColor = colorScheme.primary
   val context = LocalContext.current
   var pdfViewerUrl by remember { mutableStateOf<String?>(null) }
+  var isListening by remember { mutableStateOf(false) }
 
   val audioController = remember(ttsHelper) { HomeAudioController(ttsHelper) }
 
@@ -408,11 +440,17 @@ fun HomeScreen(
                           }
                         },
                         onMicClick = {
-                          if (!ui.isOffline) {
+                          if (!ui.isOffline && !isListening) {
+                            isListening = true
                             speechHelper?.startListening(
                                 onResult = { recognized ->
                                   viewModel.updateMessageDraft(recognized)
-                                })
+                                  isListening = false
+                                },
+                                onError = { _ -> isListening = false },
+                                onComplete = { isListening = false })
+                          } else if (!ui.isOffline) {
+                            isListening = false
                           }
                         },
                         onVoiceModeClick = {
@@ -421,6 +459,7 @@ fun HomeScreen(
                           }
                         },
                         speechHelperAvailable = speechHelper != null && !ui.isOffline,
+                        isListening = isListening,
                         textPrimary = textPrimary,
                         textSecondary = textSecondary,
                         surfaceVariantColor = surfaceVariantColor,
@@ -784,6 +823,7 @@ private fun DeleteMenuItem(onClick: () -> Unit) {
  * - Vertically centered placeholder text
  * - Properly aligned microphone and voice/send buttons
  * - Smooth transition from voice mode to send button
+ * - Visual listening mode with animated voice bars
  */
 @Composable
 private fun ChatInputBar(
@@ -797,123 +837,219 @@ private fun ChatInputBar(
     onMicClick: () -> Unit,
     onVoiceModeClick: () -> Unit,
     speechHelperAvailable: Boolean,
+    isListening: Boolean = false,
     textPrimary: Color,
     textSecondary: Color,
     surfaceVariantColor: Color,
     modifier: Modifier = Modifier
 ) {
-  OutlinedTextField(
-      value = value,
-      onValueChange = onValueChange,
-      placeholder = {
-        Text(
-            text = placeholder,
-            color = textSecondary,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Normal)
-      },
-      modifier =
-          modifier.fillMaxWidth().padding(horizontal = InputHorizontal).heightIn(min = InputHeight),
-      enabled = enabled,
-      singleLine = false,
-      maxLines = 5,
-      textStyle =
-          MaterialTheme.typography.bodyMedium.copy(
-              fontSize = 15.sp, fontWeight = FontWeight.Normal),
-      trailingIcon = {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(end = 4.dp)) {
-              // Microphone button
-              IconButton(
-                  onClick = onMicClick,
-                  enabled = speechHelperAvailable && enabled,
-                  modifier = Modifier.size(40.dp).testTag(HomeTags.MicBtn)) {
-                    Icon(
-                        Icons.Default.Mic,
-                        contentDescription = Localization.t("dictate"),
-                        tint = textSecondary,
-                        modifier = Modifier.size(22.dp))
-                  }
+  // Helper composable to render the buttons (Mic + Send/Voice).
+  // Extracted to avoid duplication since we need them in both 'Listening' and 'Text' modes.
+  val buttonsUI: @Composable () -> Unit = {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(ChatInputButtonSpacing),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(end = ChatInputButtonRowPaddingEnd)) {
+          // Microphone button
+          IconButton(
+              onClick = onMicClick,
+              enabled = speechHelperAvailable && enabled,
+              modifier =
+                  Modifier.size(ChatInputMicButtonSize)
+                      // Apply a red border only when listening to give visual feedback
+                      .then(
+                          if (isListening) {
+                            Modifier.border(
+                                width = ChatInputMicBorderWidth,
+                                color = EulerRed,
+                                shape = CircleShape)
+                          } else {
+                            Modifier
+                          })
+                      .testTag(HomeTags.MicBtn)) {
+                Icon(
+                    Icons.Default.Mic,
+                    contentDescription = Localization.t("dictate"),
+                    tint = textSecondary,
+                    modifier = Modifier.size(ChatInputMicIconSize))
+              }
 
-              // Voice mode / Send button - sized to match chatbox height with tiny margin (52dp -
-              // 9dp margin = 43dp)
-              Box(
-                  modifier = Modifier.size(43.dp).offset(y = (-1).dp),
-                  contentAlignment = Alignment.Center) {
-                    Crossfade(targetState = canSend, label = "voice-to-send-transition") {
-                        readyToSend ->
-                      if (!readyToSend) {
-                        // Voice mode button - circular with waveform icon
-                        Surface(
-                            onClick = onVoiceModeClick,
-                            modifier = Modifier.fillMaxSize().testTag(HomeTags.VoiceBtn),
-                            shape = CircleShape,
-                            color = textSecondary.copy(alpha = 0.2f),
-                            tonalElevation = 0.dp,
-                            shadowElevation = 0.dp) {
-                              Box(
-                                  modifier = Modifier.fillMaxSize(),
-                                  contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        Icons.Default.GraphicEq,
-                                        contentDescription = "Voice mode",
-                                        tint = textSecondary,
-                                        modifier = Modifier.size(18.dp))
-                                  }
-                            }
-                      } else {
-                        // Red send button - transitions from voice mode, matches chatbox height
-                        Surface(
-                            onClick = onSendClick,
-                            modifier = Modifier.fillMaxSize().testTag(HomeTags.SendBtn),
-                            shape = CircleShape,
-                            color = EulerRed,
-                            tonalElevation = 0.dp,
-                            shadowElevation = 0.dp) {
-                              Box(
-                                  modifier = Modifier.fillMaxSize(),
-                                  contentAlignment = Alignment.Center) {
-                                    if (isSending) {
-                                      CircularProgressIndicator(
-                                          strokeWidth = 2.dp,
-                                          modifier = Modifier.size(18.dp),
-                                          color = Color.White)
-                                    } else {
-                                      val icon =
-                                          try {
-                                            androidx.compose.material.icons.Icons.Rounded.Send
-                                          } catch (_: Throwable) {
-                                            androidx.compose.material.icons.Icons.Default.Send
-                                          }
-                                      Icon(
-                                          imageVector = icon,
-                                          contentDescription = Localization.t("send"),
-                                          tint = Color.White,
-                                          modifier = Modifier.size(18.dp))
-                                    }
-                                  }
-                            }
-                      }
-                    }
+          // Voice mode / Send button - sized to match chatbox height with tiny margin (52dp -
+          // 9dp margin = 43dp)
+          Box(
+              modifier =
+                  Modifier.size(ChatInputVoiceSendButtonSize)
+                      .offset(y = ChatInputVoiceSendButtonOffsetY),
+              contentAlignment = Alignment.Center) {
+                Crossfade(targetState = canSend, label = "voice-to-send-transition") { readyToSend
+                  ->
+                  if (!readyToSend) {
+                    // Voice mode button - circular with waveform icon
+                    Surface(
+                        onClick = onVoiceModeClick,
+                        modifier = Modifier.fillMaxSize().testTag(HomeTags.VoiceBtn),
+                        shape = CircleShape,
+                        color = textSecondary.copy(alpha = ChatInputVoiceModeButtonAlpha),
+                        tonalElevation = 0.dp,
+                        shadowElevation = 0.dp) {
+                          Box(
+                              modifier = Modifier.fillMaxSize(),
+                              contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.GraphicEq,
+                                    contentDescription = "Voice mode",
+                                    tint = textSecondary,
+                                    modifier = Modifier.size(ChatInputVoiceSendIconSize))
+                              }
+                        }
+                  } else {
+                    // Red send button - transitions from voice mode, matches chatbox height
+                    Surface(
+                        onClick = onSendClick,
+                        modifier = Modifier.fillMaxSize().testTag(HomeTags.SendBtn),
+                        shape = CircleShape,
+                        color = EulerRed,
+                        tonalElevation = 0.dp,
+                        shadowElevation = 0.dp) {
+                          Box(
+                              modifier = Modifier.fillMaxSize(),
+                              contentAlignment = Alignment.Center) {
+                                if (isSending) {
+                                  CircularProgressIndicator(
+                                      strokeWidth = ChatInputProgressIndicatorStrokeWidth,
+                                      modifier = Modifier.size(ChatInputVoiceSendIconSize),
+                                      color = Color.White)
+                                } else {
+                                  val icon =
+                                      try {
+                                        androidx.compose.material.icons.Icons.Rounded.Send
+                                      } catch (_: Throwable) {
+                                        androidx.compose.material.icons.Icons.Default.Send
+                                      }
+                                  Icon(
+                                      imageVector = icon,
+                                      contentDescription = Localization.t("send"),
+                                      tint = Color.White,
+                                      modifier = Modifier.size(ChatInputVoiceSendIconSize))
+                                }
+                              }
+                        }
                   }
-            }
-      },
-      shape = RoundedCornerShape(50.dp),
-      colors =
-          OutlinedTextFieldDefaults.colors(
-              focusedTextColor = textPrimary,
-              unfocusedTextColor = textPrimary,
-              disabledTextColor = textPrimary.copy(alpha = 0.6f),
-              cursorColor = textPrimary,
-              focusedPlaceholderColor = textSecondary,
-              unfocusedPlaceholderColor = textSecondary,
-              focusedBorderColor = textSecondary.copy(alpha = 0.5f),
-              unfocusedBorderColor = textSecondary.copy(alpha = 0.35f),
-              focusedContainerColor = surfaceVariantColor,
-              unfocusedContainerColor = surfaceVariantColor,
-              disabledContainerColor = surfaceVariantColor))
+                }
+              }
+        }
+  }
+
+  // Main Container
+  Box(
+      modifier =
+          modifier
+              .fillMaxWidth()
+              .padding(horizontal = InputHorizontal)
+              .heightIn(min = InputHeight)) {
+        if (isListening) {
+          // --- LISTENING MODE (Visualizer) ---
+          // Uses a Surface with the same shape/color as the TextField to prevent UI jumps
+          Surface(
+              modifier = Modifier.fillMaxWidth().height(ChatInputListeningViewHeight),
+              shape = RoundedCornerShape(ChatInputCornerRadius),
+              color = surfaceVariantColor) {
+                Row(
+                    modifier =
+                        Modifier.fillMaxSize()
+                            .padding(
+                                start = ChatInputListeningViewPaddingStart,
+                                end = ChatInputListeningViewPaddingEnd),
+                    verticalAlignment = Alignment.CenterVertically) {
+
+                      // Animated voice bars (simulated waveform)
+                      val infiniteTransition = rememberInfiniteTransition(label = "voice-bars")
+                      val barCount = 5
+                      val delays =
+                          ChatInputVoiceBarAnimationDelays // Staggered start for wave effect
+
+                      Row(
+                          horizontalArrangement = Arrangement.spacedBy(ChatInputVoiceBarSpacing),
+                          verticalAlignment = Alignment.CenterVertically) {
+                            repeat(barCount) { index ->
+                              val scale by
+                                  infiniteTransition.animateFloat(
+                                      initialValue = ChatInputVoiceBarAnimationInitialScale,
+                                      targetValue = ChatInputVoiceBarAnimationTargetScale,
+                                      animationSpec =
+                                          infiniteRepeatable(
+                                              animation =
+                                                  tween(
+                                                      durationMillis =
+                                                          ChatInputVoiceBarAnimationDurationMillis,
+                                                      delayMillis = delays[index],
+                                                      easing = LinearEasing),
+                                              repeatMode = RepeatMode.Reverse),
+                                      label = "bar-$index")
+
+                              Box(
+                                  modifier =
+                                      Modifier.width(ChatInputVoiceBarWidth)
+                                          .height(
+                                              (ChatInputVoiceBarMaxHeight * scale).coerceAtLeast(
+                                                  ChatInputVoiceBarMinHeight))
+                                          .clip(CircleShape)
+                                          .background(
+                                              EulerRed.copy(alpha = ChatInputVoiceBarColorAlpha)))
+                            }
+                          }
+
+                      Spacer(Modifier.width(ChatInputVoiceBarSpacerWidth))
+
+                      Text(
+                          text = "Listening...",
+                          color = textSecondary,
+                          fontSize = 15.sp,
+                          fontWeight = FontWeight.Normal)
+
+                      // Push buttons to the end
+                      Spacer(Modifier.weight(1f))
+
+                      // Show buttons so user can stop listening or send
+                      buttonsUI()
+                    }
+              }
+        } else {
+          // --- NORMAL TEXT MODE ---
+          OutlinedTextField(
+              value = value,
+              onValueChange = onValueChange,
+              placeholder = {
+                Text(
+                    text = placeholder,
+                    color = textSecondary,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Normal)
+              },
+              modifier = Modifier.fillMaxWidth().heightIn(min = InputHeight),
+              enabled = enabled,
+              singleLine = false,
+              maxLines = ChatInputMaxLines, // Allow expansion up to 5 lines
+              textStyle =
+                  MaterialTheme.typography.bodyMedium.copy(
+                      fontSize = 15.sp, fontWeight = FontWeight.Normal),
+              trailingIcon = buttonsUI, // Reusing the same buttons
+              shape = RoundedCornerShape(ChatInputCornerRadius),
+              colors =
+                  OutlinedTextFieldDefaults.colors(
+                      focusedTextColor = textPrimary,
+                      unfocusedTextColor = textPrimary,
+                      disabledTextColor = textPrimary.copy(alpha = 0.6f),
+                      cursorColor = textPrimary,
+                      focusedPlaceholderColor = textSecondary,
+                      unfocusedPlaceholderColor = textSecondary,
+                      focusedBorderColor = textSecondary.copy(alpha = 0.5f),
+                      unfocusedBorderColor = textSecondary.copy(alpha = 0.35f),
+                      focusedContainerColor = surfaceVariantColor,
+                      unfocusedContainerColor = surfaceVariantColor,
+                      disabledContainerColor = surfaceVariantColor))
+        }
+      }
 }
 
 /** Simple delete confirmation modal with "Delete chat?" title and Cancel/Delete buttons. */
