@@ -41,6 +41,7 @@ class AAASettingsPageTest {
   fun setup() {
     Dispatchers.setMain(testDispatcher)
     AppSettings.setDispatcher(testDispatcher)
+    AppSettings.clearForTests()
     context = ApplicationProvider.getApplicationContext()
     AppSettings.initialize(context)
     // Reset to English for consistent tests
@@ -50,6 +51,7 @@ class AAASettingsPageTest {
   @After
   fun tearDown() {
     AppSettings.resetDispatcher()
+    AppSettings.clearForTests()
     Dispatchers.resetMain()
   }
 

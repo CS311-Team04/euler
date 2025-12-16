@@ -27,6 +27,7 @@ import io.mockk.unmockkAll
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -1231,16 +1232,21 @@ class HomeScreenComposeInteractionsTest {
   @Test
   fun HomeScreen_edPostConfirmationModal_publish_calls_viewModel_publishEdPost() {
     val dataSource = mockk<EdPostRemoteDataSource>()
-    coEvery { dataSource.publish(any(), any()) } returns EdPostPublishResult(1, 1153, 10)
+    coEvery { dataSource.publish(any(), any(), any(), any()) } returns
+        EdPostPublishResult(1, 1153, 10)
     val viewModel = HomeViewModel(edPostDataSourceOverride = dataSource)
     // Add a message so LazyColumn is displayed (modal is in LazyColumn)
     val userMsg = ChatUIModel(id = "msg-1", text = "Hello", timestamp = 0L, type = ChatType.USER)
+    val testCourse = EdCourse(id = 1153L, code = "CS-101", name = "Intro to CS")
     viewModel.editState {
       it.copy(
           messages = listOf(userMsg),
+          edCourses = listOf(testCourse),
           pendingAction =
               com.android.sample.home.PendingAction.PostOnEd(
-                  draftTitle = "Original Title", draftBody = "Original Body"))
+                  draftTitle = "Original Title",
+                  draftBody = "Original Body",
+                  selectedCourseId = 1153L))
     }
 
     composeRule.setContent { HomeScreen(viewModel = viewModel) }
@@ -1394,16 +1400,21 @@ class HomeScreenComposeInteractionsTest {
   @Test
   fun HomeScreen_edPostConfirmationModal_allows_editing_before_publish() {
     val dataSource = mockk<EdPostRemoteDataSource>()
-    coEvery { dataSource.publish(any(), any()) } returns EdPostPublishResult(2, 1153, 11)
+    coEvery { dataSource.publish(any(), any(), any(), any()) } returns
+        EdPostPublishResult(2, 1153, 11)
     val viewModel = HomeViewModel(edPostDataSourceOverride = dataSource)
     // Add a message so LazyColumn is displayed (modal is in LazyColumn)
     val userMsg = ChatUIModel(id = "msg-1", text = "Hello", timestamp = 0L, type = ChatType.USER)
+    val testCourse = EdCourse(id = 1153L, code = "CS-101", name = "Intro to CS")
     viewModel.editState {
       it.copy(
           messages = listOf(userMsg),
+          edCourses = listOf(testCourse),
           pendingAction =
               com.android.sample.home.PendingAction.PostOnEd(
-                  draftTitle = "Initial Title", draftBody = "Initial Body"))
+                  draftTitle = "Initial Title",
+                  draftBody = "Initial Body",
+                  selectedCourseId = 1153L))
     }
 
     composeRule.setContent { HomeScreen(viewModel = viewModel) }
@@ -1516,5 +1527,35 @@ class HomeScreenComposeInteractionsTest {
     composeRule.onNodeWithText("Card One").assertIsDisplayed()
     composeRule.onNodeWithText("Card Two").assertIsDisplayed()
     composeRule.onNodeWithText("Card Three").assertIsDisplayed()
+  }
+
+  @Test
+  fun homeScreen_renders_edPostsCard_from_timeline() = runTest {
+    val viewModel = createViewModel()
+    val userMsg = ChatUIModel(id = "u1", text = "Hello", timestamp = 100, type = ChatType.USER)
+    val edPostsCard =
+        EdPostsCard(
+            id = "epc1",
+            messageId = "u1",
+            query = "q",
+            posts =
+                listOf(
+                    EdPost(
+                        title = "ED Post Title",
+                        content = "Body",
+                        date = 0,
+                        author = "A",
+                        url = "u")),
+            filters = EdIntentFilters(),
+            stage = EdPostsStage.SUCCESS,
+            errorMessage = null,
+            createdAt = 50)
+    viewModel.editState { it.copy(messages = listOf(userMsg), edPostsCards = listOf(edPostsCard)) }
+
+    composeRule.setContent { HomeScreen(viewModel = viewModel) }
+    composeRule.waitForIdle()
+
+    composeRule.onNodeWithText("Hello").assertIsDisplayed()
+    composeRule.onNodeWithText("ED Post Title").assertIsDisplayed()
   }
 }

@@ -66,34 +66,52 @@ export function detectIntent(
 /**
  * Block patterns - questions ABOUT ED (not action intents)
  * These patterns prevent false positives when users ask about ED itself
+ * Supports both French and English
  */
 const ED_BLOCK_PATTERNS: RegExp[] = [
+  // French patterns
   /\b(c['']?est\s+quoi|qu['']?est[- ]ce\s+que?)\b.*\bed\b/i,
   /\bcomment\s+(marche|fonctionne|utiliser?)\b.*\bed\b/i,
   /\b(où|ou)\s+(trouver?|est)\b.*\bed\b/i,
   /\bexplique[rz]?\b.*\bed\b/i,
+  // English patterns
+  /\bwhat\s+is\b.*\bed\b/i,
+  /\bhow\s+(does|do|to)\s+(use|work)\b.*\bed\b/i,
+  /\bwhere\s+(is|can\s+i\s+find)\b.*\bed\b/i,
+  /\bexplain\b.*\bed\b/i,
+  /\btell\s+me\s+about\b.*\bed\b/i,
 ];
 
 /**
  * Block patterns - questions ABOUT Moodle (not action intents)
  * These patterns prevent false positives when users ask about Moodle itself
+ * Supports both French and English
  */
 const MOODLE_BLOCK_PATTERNS: RegExp[] = [
+  // French patterns
   /\b(c['']?est\s+quoi|qu['']?est[- ]ce\s+que?)\b.{0,50}\bmoodle\b/i,
   /\bcomment\s+(marche|fonctionne|utiliser?)\b.{0,50}\bmoodle\b/i,
   /\b(où|ou)\s+(trouver?|est)\b.{0,50}\bmoodle\b/i,
   /\bexplique[rz]?\b.{0,50}\bmoodle\b/i,
+  // English patterns
+  /\bwhat\s+is\b.{0,50}\bmoodle\b/i,
+  /\bhow\s+(does|do|to)\s+(use|work)\b.{0,50}\bmoodle\b/i,
+  /\bwhere\s+(is|can\s+i\s+find)\b.{0,50}\bmoodle\b/i,
+  /\bexplain\b.{0,50}\bmoodle\b/i,
+  /\btell\s+me\s+about\b.{0,50}\bmoodle\b/i,
 ];
 
 /**
  * Registry of all ED intents
  * ADD NEW FUNCTIONS HERE
+ * Supports both French and English patterns
  */
 export const ED_INTENT_CONFIGS: IntentConfig[] = [
   // ===== POST TO ED =====
   {
     id: "post_question",
     matchPatterns: [
+      // French patterns
       /\b(post[eé]?[rz]?|publi[eé]?[rz]?)\b.*\b(sur|à|a)\s+(ed|edstem|ed\s*discussion)/i,
       /\b(met[st]?[rz]?|mettre|ajoute[rz]?)\b.*\b(sur|à|a)\s+(ed|edstem|ed\s*discussion)/i,
       /\b(envoie[rz]?|envoyer)\b.*\b(sur|à|a)\s+(ed|edstem|ed\s*discussion)/i,
@@ -101,6 +119,20 @@ export const ED_INTENT_CONFIGS: IntentConfig[] = [
       /\bpartage[rz]?\b.*\b(sur|à|a)\s+(ed|edstem|ed\s*discussion)/i,
       /\b(cr[ée]{1,2}[rz]?|faire?|fais)\b.*\b(post|thread|discussion|sujet)\b.*\b(sur|à|a)\s+(ed|edstem)/i,
       /\b(je\s+(veux|voudrais|souhaite)|peux[- ]tu|tu\s+peux)\b.*\b(post[eé]?[rz]?|publi[eé]?[rz]?)\b.*\b(sur|à|a)\s+(ed|edstem)/i,
+      // English patterns - comprehensive verbs
+      /\b(post|publish|share|send|upload|write)\b.*\b(on|to)\s+(ed|edstem|ed\s*discussion)/i,
+      /\b(put|add|submit)\b.*\b(on|to)\s+(ed|edstem|ed\s*discussion)/i,
+      /\b(ask|create)\b.*\b(on|to|in)\s+(ed|edstem|ed\s*discussion)/i,
+      /\b(make|create|start|open)\b.*\b(a\s+)?(post|thread|discussion|question|topic)\b.*\b(on|to|in)\s+(ed|edstem)/i,
+      /\b(can\s+you|could\s+you|please|would\s+you)\b.*\b(post|publish|share|send|upload)\b.*\b(on|to)\s+(ed|edstem)/i,
+      /\b(i\s+(want|need|would\s+like|'d\s+like))\s+(to\s+)?(post|publish|share|send|upload)\b.*\b(on|to)\s+(ed|edstem)/i,
+      // Direct "post this on ED" style
+      /\bpost\s+this\b.*\b(on|to)\s+(ed|edstem)/i,
+      /\bshare\s+this\b.*\b(on|to)\s+(ed|edstem)/i,
+      /\bsend\s+this\b.*\b(on|to)\s+(ed|edstem)/i,
+      /\bpublish\s+this\b.*\b(on|to)\s+(ed|edstem)/i,
+      // "on ED" at the end patterns
+      /\b(post|share|publish|send|ask)\s+(a\s+)?(question|message|post|this)\b.*\b(on|to)\s+(ed|edstem)/i,
     ],
     blockPatterns: ED_BLOCK_PATTERNS,
   },
@@ -140,20 +172,33 @@ export const MOODLE_INTENT_CONFIGS: IntentConfig[] = [
     id: "fetch_file",
     matchPatterns: [
       // English patterns - require file-related context or explicit moodle mention
-      /\b(fetch|get|show|display|download|retrieve|bring)\s+(me\s+)?(the\s+)?(lecture|homework|solution|file|document|cours|moodle)/i,
-      /\b(fetch|get|show|display|download|retrieve|bring)\s+(me\s+)?(the\s+).*\bmoodle\b/i,
-      /\b(i\s+)?(want|need|would\s+like)\s+(to\s+)?(fetch|get|see|view|download|retrieve)\s+(the\s+)?(lecture|homework|solution|file|document|cours|moodle)/i,
+      /\b(fetch|get|show|display|download|retrieve|bring|open|find)\s+(me\s+)?(the\s+)?(lecture|homework|solution|file|document|cours|moodle|slides?|notes?|assignment|exercise|course|class)/i,
+      /\b(fetch|get|show|display|download|retrieve|bring|open|find)\s+(me\s+)?(the\s+).*\bmoodle\b/i,
+      /\b(i\s+)?(want|need|would\s+like|'d\s+like)\s+(to\s+)?(fetch|get|see|view|download|retrieve|open|find)\s+(the\s+)?(lecture|homework|solution|file|document|cours|moodle|slides?|notes?|assignment|exercise|course|class)/i,
+      /\b(can\s+you|could\s+you|please)\s+(fetch|get|show|download|retrieve|find|open)\s+(me\s+)?(the\s+)?(lecture|homework|solution|slides?|notes?|assignment|course|class)/i,
       // French patterns - require file-related context or explicit moodle mention
-      /\b(donne|donner?|récupérer?|obtenir?|télécharger?|charger?|voir|afficher?|montrer?|ouvrir?|chercher?|trouver?)\s+(moi\s+)?(le\s+|la\s+|les\s+)?(cours|devoir|lecture|fichier|document|moodle)/i,
+      /\b(donne|donner?|récupérer?|obtenir?|télécharger?|charger?|voir|afficher?|montrer?|ouvrir?|chercher?|trouver?)\s+(moi\s+)?(le\s+|la\s+|les\s+)?(cours|devoir|lecture|fichier|document|moodle|slides?|exercice)/i,
       /\b(donne|donner?|récupérer?|obtenir?|télécharger?|charger?|voir|afficher?|montrer?|ouvrir?|chercher?|trouver?)\s+(moi\s+)?(le\s+|la\s+|les\s+)?.*\bmoodle\b/i,
-      /\b(je\s+)?(veux|voudrais|souhaite|ai\s+besoin)\s+(de\s+)?(récupérer?|obtenir?|voir|afficher?|télécharger?|donner?)\s+(le\s+|la\s+|les\s+)?(cours|devoir|lecture|fichier|document|moodle)/i,
+      /\b(je\s+)?(veux|voudrais|souhaite|ai\s+besoin)\s+(de\s+)?(récupérer?|obtenir?|voir|afficher?|télécharger?|donner?)\s+(le\s+|la\s+|les\s+)?(cours|devoir|lecture|fichier|document|moodle|slides?|exercice)/i,
       // Patterns that include file type keywords (lecture, homework, etc.)
-      /\b(lecture|leçon|lesson|devoir|homework|home\s*work|travail|solution|correction|corrigé|cours)\s+(\d+|[a-z])/i,
-      // Patterns with "cours" (course) and "semaine" (week) - common French patterns
-      /\b(cours|leçon|lecture|devoir|homework)\s+(semaine|week)\s+\d+/i,
+      /\b(lecture|leçon|lesson|devoir|homework|home\s*work|travail|solution|correction|corrigé|cours|slides?|notes?|assignment|exercise)\s+(\d+|[a-z])/i,
+      // Patterns with "cours" (course) and "semaine" (week) - common French/English patterns
+      /\b(cours|leçon|lecture|devoir|homework|slides?|notes?)\s+(semaine|week)\s+\d+/i,
       /\b(semaine|week)\s+\d+\s+(de|du|of)\s+/i,
-      // Pattern for "sur moodle" (on moodle) - explicit Moodle request
+      // Pattern for "sur moodle" / "on/from moodle" - explicit Moodle request
       /\b(sur|on|from)\s+moodle/i,
+      // Direct "download X from moodle" patterns
+      /\bdownload\b.*\b(from|on)\s+moodle/i,
+      /\b(get|fetch)\b.*\b(from|on)\s+moodle/i,
+      // ===== NEW: Flexible patterns for "retrieve/get/fetch <course> <ordinal> <type>" =====
+      // e.g., "retrieve algebra first course", "get analysis second lecture"
+      /\b(fetch|get|show|retrieve|download|find|open)\s+[a-z]+\s+(first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th|\d+)\s*(lecture|course|cours|lesson|class|homework|exercise|slides?)/i,
+      // e.g., "retrieve first algebra course", "get second calculus lecture"
+      /\b(fetch|get|show|retrieve|download|find|open)\s+(first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th|\d+)\s+[a-z]+\s*(lecture|course|cours|lesson|class|homework|exercise|slides?)/i,
+      // e.g., "first lecture of algebra", "second course from analysis"
+      /\b(first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th|\d+)\s*(lecture|course|cours|lesson|class|homework|exercise|slides?)\s+(of|from|de|du)\s+[a-z]/i,
+      // e.g., "algebra lecture 1", "calculus course 2"
+      /\b[a-z]{3,}\s+(lecture|course|cours|lesson|class|homework|exercise|slides?)\s*(\d+|first|second|third|fourth|fifth)/i,
     ],
     blockPatterns: MOODLE_BLOCK_PATTERNS,
   },

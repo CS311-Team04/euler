@@ -96,7 +96,7 @@ object HomeTags {
   const val TopRightMenu = "home_topright_menu"
 }
 
-private sealed class TimelineItem {
+internal sealed class TimelineItem {
   abstract val timestamp: Long
   abstract val key: String
 
@@ -108,6 +108,10 @@ private sealed class TimelineItem {
   }
 
   data class CardItem(val card: EdPostCard, override val timestamp: Long) : TimelineItem() {
+    override val key: String = card.id
+  }
+
+  data class PostsCardItem(val card: EdPostsCard, override val timestamp: Long) : TimelineItem() {
     override val key: String = card.id
   }
 }
@@ -331,12 +335,14 @@ fun HomeScreen(
 
                     val scrollState = rememberScrollState()
 
-                    // Check if AI has already responded (at least one AI message exists)
-                    val hasAiResponded = ui.messages.any { it.type == ChatType.AI }
+                    // Hide suggestions once a message is sent (user message exists or is sending)
+                    // This ensures suggestions disappear immediately when user sends a request
+                    val hasUserSentMessage =
+                        ui.messages.any { it.type == ChatType.USER } || ui.isSending
 
-                    // Animate visibility of suggestions - hide after first AI response
+                    // Animate visibility of suggestions - hide after user sends a message
                     AnimatedVisibility(
-                        visible = !hasAiResponded,
+                        visible = !hasUserSentMessage,
                         enter = fadeIn(tween(300)) + slideInVertically(initialOffsetY = { 20 }),
                         exit = fadeOut(tween(300)) + slideOutVertically(targetOffsetY = { -20 })) {
                           Row(
@@ -457,14 +463,38 @@ fun HomeScreen(
                           ui.pendingAction as? com.android.sample.home.PendingAction.PostOnEd
                       val messagesToShow = ui.messages
 
-                      // Merge messages and ED cards into a single timeline sorted by timestamp
+                      // Merge messages, ED cards, and EdPostsCards into a single timeline
+                      // EdPostsCards are placed immediately after their associated message
                       val timeline =
-                          remember(messagesToShow, ui.edPostCards) {
+                          remember(messagesToShow, ui.edPostCards, ui.edPostsCards) {
                             val msgItems =
                                 messagesToShow.map { TimelineItem.MessageItem(it, it.timestamp) }
                             val cardItems =
                                 ui.edPostCards.map { TimelineItem.CardItem(it, it.createdAt) }
-                            (msgItems + cardItems).sortedBy { it.timestamp }
+
+                            // Create a map of messageId -> EdPostsCard for quick lookup
+                            val edPostsCardsByMessage = ui.edPostsCards.associateBy { it.messageId }
+
+                            // Build timeline: for each message, add it, then add its EdPostsCard if
+                            // it exists
+                            val timelineItems = mutableListOf<TimelineItem>()
+                            msgItems.forEach { msgItem ->
+                              timelineItems.add(msgItem)
+                              // Add EdPostsCard immediately after its message
+                              edPostsCardsByMessage[msgItem.message.id]?.let { edPostsCard ->
+                                // Ensure EdCard timestamp is after message timestamp for correct
+                                // ordering
+                                val cardTimestamp =
+                                    maxOf(msgItem.timestamp + 1, edPostsCard.createdAt)
+                                timelineItems.add(
+                                    TimelineItem.PostsCardItem(edPostsCard, cardTimestamp))
+                              }
+                            }
+                            // Add standalone EdPostCards (not associated with messages)
+                            timelineItems.addAll(cardItems)
+                            // Sort by timestamp to ensure correct order
+                            timelineItems.sortBy { it.timestamp }
+                            timelineItems
                           }
 
                       LazyColumn(
@@ -526,8 +556,31 @@ fun HomeScreen(
                                 is TimelineItem.CardItem -> {
                                   EdPostedCard(item.card, modifier = Modifier.fillMaxWidth())
                                 }
+                                is TimelineItem.PostsCardItem -> {
+                                  val context = LocalContext.current
+                                  Spacer(Modifier.height(8.dp))
+                                  EdPostsSection(
+                                      state =
+                                          EdPostsUiState(
+                                              stage = item.card.stage,
+                                              posts = item.card.posts,
+                                              filters = item.card.filters,
+                                              errorMessage = item.card.errorMessage),
+                                      modifier = Modifier.fillMaxWidth(),
+                                      onOpenPost = { url ->
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                        context.startActivity(intent)
+                                      },
+                                      onRetry = { filters ->
+                                        // Retry is not supported for persisted cards
+                                      })
+                                }
                               }
                             }
+
+                            // Note: EdPostsSection is now displayed inline with each message via
+                            // EdPostsCard
+                            // No need for a global EdPostsSection here
 
                             // Global thinking indicator shown AFTER the last user message.
                             if (ui.isSending && ui.streamingMessageId == null) {
@@ -548,9 +601,12 @@ fun HomeScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     title = edPostAction.draftTitle,
                                     body = edPostAction.draftBody,
+                                    courses = ui.edCourses,
+                                    selectedCourseId = edPostAction.selectedCourseId,
                                     isLoading = ui.isPostingToEd,
-                                    onPublish = { title, body ->
-                                      viewModel.publishEdPost(title, body)
+                                    isLoadingCourses = ui.isLoadingEdCourses,
+                                    onPublish = { title, body, courseId, isAnonymous ->
+                                      viewModel.publishEdPost(title, body, courseId, isAnonymous)
                                     },
                                     onCancel = { viewModel.cancelEdPost() })
                                 Spacer(Modifier.height(8.dp))
@@ -955,7 +1011,7 @@ internal fun PdfViewerDialog(
   val openExternally: () -> Unit = {
     runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
         .onFailure {
-          Toast.makeText(context, "Aucune appli pour ouvrir le PDF", Toast.LENGTH_SHORT).show()
+          Toast.makeText(context, "No app available to open the PDF", Toast.LENGTH_SHORT).show()
         }
   }
 
@@ -1024,14 +1080,14 @@ internal fun PdfViewerDialog(
               LinearProgressIndicator(
                   modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp))
               Text(
-                  text = "Chargement du PDF...",
+                  text = "Loading PDF...",
                   modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                   color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                   style = MaterialTheme.typography.bodySmall)
               Button(
                   onClick = openExternally,
                   modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
-                    Text("Ouvrir dans une autre app")
+                    Text("Open in another app")
                   }
             }
             if (loadFailed) {
@@ -1040,10 +1096,10 @@ internal fun PdfViewerDialog(
                   verticalArrangement = Arrangement.Center,
                   horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "Impossible d'afficher le PDF ici.",
+                        text = "Unable to display the PDF here.",
                         color = MaterialTheme.colorScheme.onBackground)
                     Spacer(Modifier.height(12.dp))
-                    Button(onClick = { openExternally() }) { Text("Ouvrir dans une autre app") }
+                    Button(onClick = { openExternally() }) { Text("Open in another app") }
                   }
             } else {
               val scrollState = rememberScrollState()

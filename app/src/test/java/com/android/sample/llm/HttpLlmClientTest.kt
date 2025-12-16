@@ -652,4 +652,166 @@ class HttpLlmClientTest {
     assertTrue(reply.edFetchIntent.detected)
     assertEquals("show me the ED post about linear algebra", reply.edFetchIntent.query)
   }
+
+  // ==================== ED SUGGESTED COURSE ID TESTS ====================
+
+  @Test
+  fun generateReply_parses_ed_suggested_course_id_as_number() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody(
+                """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question","ed_suggested_course_id":12345}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertTrue(reply.edIntent.detected)
+    assertEquals(12345L, reply.edIntent.suggestedCourseId)
+  }
+
+  @Test
+  fun generateReply_parses_ed_suggested_course_id_as_string() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody(
+                """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question","ed_suggested_course_id":"67890"}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertTrue(reply.edIntent.detected)
+    assertEquals(67890L, reply.edIntent.suggestedCourseId)
+  }
+
+  @Test
+  fun generateReply_handles_ed_suggested_course_id_missing() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody(
+                """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question"}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertTrue(reply.edIntent.detected)
+    assertNull(reply.edIntent.suggestedCourseId)
+  }
+
+  @Test
+  fun generateReply_handles_ed_suggested_course_id_null() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody(
+                """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question","ed_suggested_course_id":null}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertTrue(reply.edIntent.detected)
+    assertNull(reply.edIntent.suggestedCourseId)
+  }
+
+  @Test
+  fun generateReply_rejects_ed_suggested_course_id_negative() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody(
+                """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question","ed_suggested_course_id":-1}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertTrue(reply.edIntent.detected)
+    assertNull(reply.edIntent.suggestedCourseId) // Negative values should be rejected
+  }
+
+  @Test
+  fun generateReply_rejects_ed_suggested_course_id_invalid_string() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody(
+                """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question","ed_suggested_course_id":"not-a-number"}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertTrue(reply.edIntent.detected)
+    assertNull(reply.edIntent.suggestedCourseId) // Invalid string should be rejected
+  }
+
+  @Test
+  fun generateReply_complete_ed_response_with_suggested_course_id() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody(
+                """{"reply":"Response","primary_url":"https://epfl.ch","ed_intent_detected":true,"ed_intent":"post_question","ed_formatted_question":"Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !","ed_formatted_title":"Question 5 Modstoch","ed_suggested_course_id":54321}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertEquals("Response", reply.reply)
+    assertEquals("https://epfl.ch", reply.url)
+    assertTrue(reply.edIntent.detected)
+    assertEquals("post_question", reply.edIntent.intent)
+    assertEquals(
+        "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
+        reply.edIntent.formattedQuestion)
+    assertEquals("Question 5 Modstoch", reply.edIntent.formattedTitle)
+    assertEquals(54321L, reply.edIntent.suggestedCourseId)
+  }
+
+  @Test
+  fun generateReply_handles_ed_suggested_course_id_zero() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody(
+                """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question","ed_suggested_course_id":0}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertTrue(reply.edIntent.detected)
+    assertEquals(0L, reply.edIntent.suggestedCourseId) // Zero is valid
+  }
+
+  @Test
+  fun generateReply_handles_ed_suggested_course_id_large_number() = runBlocking {
+    server.enqueue(
+        MockResponse()
+            .setResponseCode(HttpURLConnection.HTTP_OK)
+            .setBody(
+                """{"reply":"Response","ed_intent_detected":true,"ed_intent":"post_question","ed_suggested_course_id":999999999}"""))
+    val client =
+        HttpLlmClient(
+            endpoint = server.url("/answer").toString(), apiKey = "", client = OkHttpClient())
+
+    val reply = client.generateReply("Test")
+
+    assertTrue(reply.edIntent.detected)
+    assertEquals(999999999L, reply.edIntent.suggestedCourseId)
+  }
 }

@@ -38,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,13 +46,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.sample.R
 import com.android.sample.settings.connectors.ConnectorsDimensions as Dimens
-import com.android.sample.ui.theme.DarkSurfaceVariant
+import com.android.sample.ui.components.MarkdownText
 import com.android.sample.ui.theme.EulerAudioButtonLoadingColor
 import com.android.sample.ui.theme.EulerAudioButtonTint
 import com.android.sample.ui.theme.EulerAudioButtonTintSemiTransparent
@@ -77,7 +79,6 @@ import com.android.sample.ui.theme.MoodleOrange
  * @param aiText Text color for the AI paragraph.
  * @param maxUserBubbleWidthFraction Maximum width fraction for the user bubble (0 < f ≤ 1).
  */
-@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun ChatMessage(
     message: ChatUIModel,
@@ -94,68 +95,173 @@ fun ChatMessage(
   val isUser = message.type == ChatType.USER
 
   if (isUser) {
-    // RIGHT-ALIGNED row; bubble wraps content (no fillMaxWidth on bubble or text)
-    Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-      BoxWithConstraints {
-        val maxBubbleWidth = maxWidth * maxUserBubbleWidthFraction
-
-        Surface(
-            color = userBubbleBg,
-            shape = RoundedCornerShape(18.dp),
-            tonalElevation = 0.dp,
-            shadowElevation = 0.dp,
-            modifier =
-                Modifier.widthIn(max = maxBubbleWidth) // cap width
-                    .testTag("chat_user_bubble")) {
-              Text(
-                  text = message.text,
-                  color = userBubbleText,
-                  style = MaterialTheme.typography.bodyMedium,
-                  lineHeight = 18.sp,
-                  textAlign = TextAlign.Start,
-                  // IMPORTANT: no fillMaxWidth here → wrap content
-                  modifier =
-                      Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
-                          .testTag("chat_user_text"))
-            }
-      }
-    }
+    UserMessageRow(
+        message = message,
+        userBubbleBg = userBubbleBg,
+        userBubbleText = userBubbleText,
+        maxUserBubbleWidthFraction = maxUserBubbleWidthFraction,
+        onOpenAttachment = onOpenAttachment,
+        onDownloadAttachment = onDownloadAttachment,
+        modifier = modifier)
   } else {
-    // AI: full-width plain text
-    Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
-      if (isStreaming && message.text.isEmpty()) {
-        LeadingThinkingDot(color = aiText)
-      } else {
-        Column(modifier = Modifier.fillMaxWidth()) {
-          Text(
-              text = message.text,
-              color = aiText,
-              style = MaterialTheme.typography.bodyMedium,
-              lineHeight = 20.sp,
-              modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+    AiMessageColumn(
+        message = message,
+        aiText = aiText,
+        isStreaming = isStreaming,
+        audioState = audioState,
+        onOpenAttachment = onOpenAttachment,
+        onDownloadAttachment = onDownloadAttachment,
+        modifier = modifier)
+  }
+}
 
-          if (audioState != null) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically) {
-                  AudioPlaybackButton(
-                      state = audioState, tint = EulerAudioButtonTintSemiTransparent)
-                }
-          }
+@SuppressLint("UnusedBoxWithConstraintsScope")
+@Suppress("UnusedParameter")
+@Composable
+private fun UserMessageRow(
+    message: ChatUIModel,
+    userBubbleBg: Color,
+    userBubbleText: Color,
+    maxUserBubbleWidthFraction: Float,
+    onOpenAttachment: (ChatAttachment) -> Unit,
+    onDownloadAttachment: (ChatAttachment) -> Unit,
+    modifier: Modifier = Modifier
+) {
+  // RIGHT-ALIGNED row; bubble wraps content (no fillMaxWidth on bubble or text)
+  Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+    BoxWithConstraints {
+      val maxBubbleWidth = maxWidth * maxUserBubbleWidthFraction
 
-          message.attachment?.let { attachment ->
-            Spacer(modifier = Modifier.height(10.dp))
-            AttachmentCard(
-                attachment = attachment,
-                onOpen = { onOpenAttachment(attachment) },
-                onDownload = { onDownloadAttachment(attachment) })
+      Surface(
+          color = userBubbleBg,
+          shape = RoundedCornerShape(18.dp),
+          tonalElevation = 0.dp,
+          shadowElevation = 0.dp,
+          modifier =
+              Modifier.widthIn(max = maxBubbleWidth) // cap width
+                  .testTag("chat_user_bubble")) {
+            Text(
+                text = message.text,
+                color = userBubbleText,
+                style = MaterialTheme.typography.bodyMedium,
+                lineHeight = 18.sp,
+                textAlign = TextAlign.Start,
+                // IMPORTANT: no fillMaxWidth here → wrap content
+                modifier =
+                    Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                        .testTag("chat_user_text"))
           }
-        }
-      }
     }
   }
+}
+
+@Composable
+private fun AiMessageColumn(
+    message: ChatUIModel,
+    aiText: Color,
+    isStreaming: Boolean,
+    audioState: MessageAudioState?,
+    onOpenAttachment: (ChatAttachment) -> Unit,
+    onDownloadAttachment: (ChatAttachment) -> Unit,
+    modifier: Modifier = Modifier
+) {
+  val moodleState = rememberMoodleParseState(message.text)
+
+  Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
+    when {
+      isStreaming && message.text.isEmpty() -> LeadingThinkingDot(color = aiText)
+      moodleState.showLoading -> MoodleLoadingIndicator(color = aiText)
+      else ->
+          AiMessageContent(
+              message = message,
+              moodleState = moodleState,
+              audioState = audioState,
+              onOpenAttachment = onOpenAttachment,
+              onDownloadAttachment = onDownloadAttachment)
+    }
+  }
+}
+
+/** Holds the parsed state for Moodle JSON content. */
+private data class MoodleParseState(
+    val payload: MoodleOverviewResponse?,
+    val content: String?,
+    val showLoading: Boolean
+)
+
+@Composable
+private fun rememberMoodleParseState(text: String): MoodleParseState {
+  val looksLikeMoodleJson =
+      text.trimStart().startsWith("{") &&
+          (text.contains("\"type\":\"moodle") || text.contains("\"type\": \"moodle"))
+
+  val payload =
+      remember(text, looksLikeMoodleJson) {
+        if (looksLikeMoodleJson) parseMoodleOverviewPayload(text) else null
+      }
+  val content = remember(payload) { payload?.let { cleanMoodleMarkdown(it.content) } }
+  val showLoading = looksLikeMoodleJson && payload == null
+
+  return MoodleParseState(payload, content, showLoading)
+}
+
+@Composable
+private fun AiMessageContent(
+    message: ChatUIModel,
+    moodleState: MoodleParseState,
+    audioState: MessageAudioState?,
+    onOpenAttachment: (ChatAttachment) -> Unit,
+    onDownloadAttachment: (ChatAttachment) -> Unit
+) {
+  Column(modifier = Modifier.fillMaxWidth()) {
+    AiMessageTextContent(message = message, moodleState = moodleState)
+    AiMessageAudioControls(audioState = audioState)
+    AiMessageAttachment(
+        attachment = message.attachment,
+        onOpenAttachment = onOpenAttachment,
+        onDownloadAttachment = onDownloadAttachment)
+  }
+}
+
+@Composable
+private fun AiMessageTextContent(message: ChatUIModel, moodleState: MoodleParseState) {
+  if (moodleState.payload != null && moodleState.content != null) {
+    MarkdownText(
+        markdown = moodleState.content, modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+    Spacer(modifier = Modifier.height(8.dp))
+    MoodleSourceBadge(
+        metadata = moodleState.payload.metadata,
+        modifier = Modifier.testTag("chat_ai_moodle_badge"))
+  } else {
+    MarkdownText(
+        markdown = message.text, modifier = Modifier.fillMaxWidth().testTag("chat_ai_text"))
+  }
+}
+
+@Composable
+private fun AiMessageAudioControls(audioState: MessageAudioState?) {
+  if (audioState == null) return
+  Spacer(modifier = Modifier.height(4.dp))
+  Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.End,
+      verticalAlignment = Alignment.CenterVertically) {
+        AudioPlaybackButton(state = audioState, tint = EulerAudioButtonTintSemiTransparent)
+      }
+}
+
+@Composable
+private fun AiMessageAttachment(
+    attachment: ChatAttachment?,
+    onOpenAttachment: (ChatAttachment) -> Unit,
+    onDownloadAttachment: (ChatAttachment) -> Unit
+) {
+  if (attachment == null) return
+  Spacer(modifier = Modifier.height(10.dp))
+  AttachmentCard(
+      attachment = attachment,
+      onOpen = { onOpenAttachment(attachment) },
+      onDownload = { onDownloadAttachment(attachment) })
 }
 
 @Composable
@@ -177,6 +283,40 @@ private fun LeadingThinkingDot(color: Color) {
       shape = CircleShape,
       tonalElevation = 0.dp,
       shadowElevation = 0.dp) {}
+}
+
+/** Friendly loading indicator shown while parsing Moodle course data. */
+@Composable
+private fun MoodleLoadingIndicator(color: Color) {
+  val transition = rememberInfiniteTransition(label = "moodleLoading")
+  val alpha by
+      transition.animateFloat(
+          initialValue = 0.4f,
+          targetValue = 1f,
+          animationSpec =
+              infiniteRepeatable(
+                  animation = tween(durationMillis = 800, easing = FastOutSlowInEasing),
+                  repeatMode = RepeatMode.Reverse),
+          label = "moodleAlpha")
+
+  Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
+      modifier = Modifier.padding(vertical = 4.dp).testTag("chat_ai_moodle_loading")) {
+        // Moodle icon placeholder (animated dot)
+        Surface(
+            modifier = Modifier.size(8.dp),
+            color = MoodleOrange.copy(alpha = alpha),
+            shape = CircleShape,
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp) {}
+
+        Text(
+            text = "Parsing your Moodle courses…",
+            color = color.copy(alpha = alpha),
+            style = MaterialTheme.typography.bodyMedium,
+            fontStyle = FontStyle.Italic)
+      }
 }
 
 @Immutable
@@ -228,7 +368,8 @@ private fun AttachmentCard(
     onDownload: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-  val bg = DarkSurfaceVariant
+  val colorScheme = MaterialTheme.colorScheme
+  val bg = colorScheme.surfaceVariant
   val accent = MoodleOrange
   val borderStroke = BorderStroke(Dimens.CardBorderWidth, accent)
   val cardPadding = Dimens.ScreenContentSpacing + Dimens.CardTitleSubtitleSpacer
@@ -243,7 +384,7 @@ private fun AttachmentCard(
             horizontalArrangement = Arrangement.spacedBy(Dimens.CardTitleSubtitleSpacer)) {
               Surface(
                   shape = RoundedCornerShape(Dimens.LogoCornerRadius),
-                  color = DarkSurfaceVariant,
+                  color = colorScheme.surfaceVariant,
                   modifier = Modifier.size(Dimens.LogoSize)) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                       Image(

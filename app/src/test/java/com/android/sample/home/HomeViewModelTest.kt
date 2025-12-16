@@ -41,10 +41,13 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.timeout
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.robolectric.RobolectricTestRunner
@@ -286,7 +289,8 @@ class HomeViewModelTest {
       runTest(testDispatcher) {
         val dataSource = mock<EdPostRemoteDataSource>()
         runBlocking {
-          whenever(dataSource.publish(any(), any())).thenReturn(EdPostPublishResult(1, 1, 1))
+          whenever(dataSource.publish(any(), any(), anyOrNull(), any()))
+              .thenReturn(EdPostPublishResult(1, 1, 1))
         }
         val viewModel =
             HomeViewModel(
@@ -354,7 +358,8 @@ class HomeViewModelTest {
       runTest(testDispatcher) {
         val dataSource = mock<EdPostRemoteDataSource>()
         runBlocking {
-          whenever(dataSource.publish(any(), any())).thenReturn(EdPostPublishResult(2, 1153, 20))
+          whenever(dataSource.publish(any(), any(), anyOrNull(), any()))
+              .thenReturn(EdPostPublishResult(2, 1153, 20))
         }
         val viewModel =
             HomeViewModel(
@@ -469,8 +474,11 @@ class HomeViewModelTest {
         val conversationRepo = mock<ConversationRepository>()
         runBlocking {
           whenever(conversationRepo.startNewConversation(any())).thenReturn("conv-123")
-          whenever(conversationRepo.appendMessage(any(), any(), any())).thenReturn(Unit)
+          whenever(conversationRepo.appendMessage(any(), any(), any(), anyOrNull()))
+              .thenReturn("msg-123")
           whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
+          whenever(conversationRepo.conversationsFlow()).thenReturn(flowOf(emptyList()))
+          whenever(conversationRepo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
         }
 
         val viewModel = HomeViewModel(llmClient = fakeLlm, auth = auth, repo = conversationRepo)
@@ -498,8 +506,11 @@ class HomeViewModelTest {
         val conversationRepo = mock<ConversationRepository>()
         runBlocking {
           whenever(conversationRepo.startNewConversation(any())).thenReturn("conv-123")
-          whenever(conversationRepo.appendMessage(any(), any(), any())).thenReturn(Unit)
+          whenever(conversationRepo.appendMessage(any(), any(), any(), anyOrNull()))
+              .thenReturn("msg-124")
           whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
+          whenever(conversationRepo.conversationsFlow()).thenReturn(flowOf(emptyList()))
+          whenever(conversationRepo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
         }
 
         val viewModel = HomeViewModel(llmClient = fakeLlm, auth = auth, repo = conversationRepo)
@@ -519,7 +530,8 @@ class HomeViewModelTest {
       runTest(testDispatcher) {
         val dataSource = mock<EdPostRemoteDataSource>()
         runBlocking {
-          whenever(dataSource.publish(any(), any())).thenReturn(EdPostPublishResult(1, 1, 1))
+          whenever(dataSource.publish(any(), any(), anyOrNull(), any()))
+              .thenReturn(EdPostPublishResult(1, 1, 1))
         }
         val viewModel =
             HomeViewModel(
@@ -559,7 +571,8 @@ class HomeViewModelTest {
       runTest(testDispatcher) {
         val dataSource = mock<EdPostRemoteDataSource>()
         runBlocking {
-          whenever(dataSource.publish(any(), any())).thenReturn(EdPostPublishResult(99, 1153, 12))
+          whenever(dataSource.publish(any(), any(), anyOrNull(), any()))
+              .thenReturn(EdPostPublishResult(99, 1153, 12))
         }
         val viewModel =
             HomeViewModel(
@@ -580,7 +593,8 @@ class HomeViewModelTest {
       runTest(testDispatcher) {
         val dataSource = mock<EdPostRemoteDataSource>()
         runBlocking {
-          whenever(dataSource.publish(any(), any())).thenThrow(RuntimeException("backend down"))
+          whenever(dataSource.publish(any(), any(), anyOrNull(), any()))
+              .thenThrow(RuntimeException("backend down"))
         }
         val viewModel =
             HomeViewModel(
@@ -594,6 +608,104 @@ class HomeViewModelTest {
         assertTrue(state.edPostResult is EdPostResult.Failed)
         assertTrue(state.edPostCards.isEmpty())
         assertFalse(state.isPostingToEd)
+      }
+
+  @Test
+  fun publishEdPost_with_courseId_and_isAnonymous() =
+      runTest(testDispatcher) {
+        val dataSource = mock<EdPostRemoteDataSource>()
+        runBlocking {
+          whenever(dataSource.publish(eq("Title"), eq("Body"), eq(2000L), eq(true)))
+              .thenReturn(EdPostPublishResult(99, 2000, 12))
+        }
+        val viewModel =
+            HomeViewModel(
+                profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
+
+        viewModel.publishEdPost("Title", "Body", 2000L, true)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.edPostResult is EdPostResult.Published)
+        assertNull(state.pendingAction)
+        assertFalse(state.isPostingToEd)
+      }
+
+  @Test
+  fun loadEdCourses_loads_and_stores_courses() =
+      runTest(testDispatcher) {
+        val dataSource = mock<EdPostRemoteDataSource>()
+        val coursesResult =
+            EdCoursesResult(
+                listOf(EdCourse(1L, "CS-101", "Intro CS"), EdCourse(2L, "MATH-200", "Calculus")))
+        runBlocking { whenever(dataSource.getCourses()).thenReturn(coursesResult) }
+        val viewModel =
+            HomeViewModel(
+                profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
+
+        viewModel.loadEdCourses()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(2, state.edCourses.size)
+        assertEquals("CS-101", state.edCourses[0].code)
+        assertEquals("Intro CS", state.edCourses[0].name)
+        assertFalse(state.isLoadingEdCourses)
+      }
+
+  @Test
+  fun loadEdCourses_handles_error_gracefully() =
+      runTest(testDispatcher) {
+        val dataSource = mock<EdPostRemoteDataSource>()
+        runBlocking {
+          whenever(dataSource.getCourses()).thenThrow(RuntimeException("Network error"))
+        }
+        val viewModel =
+            HomeViewModel(
+                profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
+
+        viewModel.loadEdCourses()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.edCourses.isEmpty())
+        assertFalse(state.isLoadingEdCourses)
+      }
+
+  @Test
+  fun loadEdCourses_prevents_multiple_concurrent_loads() =
+      runTest(testDispatcher) {
+        val dataSource = mock<EdPostRemoteDataSource>()
+        val coursesResult = EdCoursesResult(listOf(EdCourse(1L, "CS-101", "Intro CS")))
+        runBlocking { whenever(dataSource.getCourses()).thenReturn(coursesResult) }
+        val viewModel =
+            HomeViewModel(
+                profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
+
+        viewModel.loadEdCourses()
+        viewModel.loadEdCourses() // Second call should be ignored
+        advanceUntilIdle()
+
+        verify(dataSource, times(1)).getCourses()
+      }
+
+  @Test
+  fun publishEdPost_with_default_parameters() =
+      runTest(testDispatcher) {
+        val dataSource = mock<EdPostRemoteDataSource>()
+        runBlocking {
+          whenever(dataSource.publish(eq("Title"), eq("Body"), eq(null), eq(false)))
+              .thenReturn(EdPostPublishResult(99, 1153, 12))
+        }
+        val viewModel =
+            HomeViewModel(
+                profileRepository = FakeProfileRepository(), edPostDataSourceOverride = dataSource)
+
+        viewModel.publishEdPost("Title", "Body")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.edPostResult is EdPostResult.Published)
       }
 
   @Test
@@ -1012,13 +1124,17 @@ class HomeViewModelTest {
   @Test
   fun messageDto_toUi_maps_role_and_timestamp() {
     val viewModel = HomeViewModel()
-    val method = HomeViewModel::class.java.getDeclaredMethod("toUi", MessageDTO::class.java)
+    val method =
+        HomeViewModel::class
+            .java
+            .getDeclaredMethod("toUi", MessageDTO::class.java, String::class.java)
     method.isAccessible = true
     val dto = MessageDTO(role = "assistant", text = "Salut")
 
-    val chat = method.invoke(viewModel, dto) as ChatUIModel
+    val chat = method.invoke(viewModel, dto, "msg-123") as ChatUIModel
     assertEquals(ChatType.AI, chat.type)
     assertEquals("Salut", chat.text)
+    assertEquals("msg-123", chat.id)
   }
 
   @Test
@@ -1093,7 +1209,9 @@ class HomeViewModelTest {
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
         val repo = mock<ConversationRepository>()
         runBlocking { whenever(repo.startNewConversation(any())).thenReturn("conv-123") }
-        runBlocking { whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit) }
+        runBlocking {
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id")
+        }
         runBlocking { whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit) }
         val viewModel = HomeViewModel(fakeClient, auth, repo)
 
@@ -1124,7 +1242,9 @@ class HomeViewModelTest {
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
         val repo = mock<ConversationRepository>()
         runBlocking { whenever(repo.startNewConversation(any())).thenReturn("conv-999") }
-        runBlocking { whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit) }
+        runBlocking {
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id")
+        }
         runBlocking { whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit) }
         val viewModel = HomeViewModel(fakeClient, auth, repo)
 
@@ -1375,7 +1495,9 @@ class HomeViewModelTest {
             }
 
         runBlocking {
-          whenever(repo.appendMessage(any(), any(), any())).thenAnswer { throw mockException }
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenAnswer {
+            throw mockException
+          }
           whenever(repo.startNewConversation(any())).thenReturn("conv-123")
         }
 
@@ -1478,7 +1600,7 @@ class HomeViewModelTest {
         // First message succeeds
         runBlocking {
           whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-          whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id")
         }
 
         val fakeClient = FakeLlmClient().apply { nextReply = "First response" }
@@ -1491,7 +1613,7 @@ class HomeViewModelTest {
 
         // Second message fails
         runBlocking {
-          whenever(repo.appendMessage(any(), any(), any())).thenAnswer {
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenAnswer {
             throw RuntimeException("Test error")
           }
         }
@@ -1704,7 +1826,7 @@ class HomeViewModelTest {
 
         val repo = mock<ConversationRepository>()
         val conversationsFlow = MutableSharedFlow<List<Conversation>>(replay = 1)
-        val messagesFlow = MutableSharedFlow<List<MessageDTO>>(replay = 1)
+        val messagesFlow = MutableSharedFlow<List<Pair<MessageDTO, String>>>(replay = 1)
         whenever(repo.conversationsFlow()).thenReturn(conversationsFlow)
         whenever(repo.messagesFlow(any())).thenReturn(messagesFlow)
         viewModel.setPrivateField("repo", repo)
@@ -1718,7 +1840,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         // Emit messages while streaming
-        messagesFlow.emit(listOf(MessageDTO(role = "user", text = "test")))
+        messagesFlow.emit(listOf(MessageDTO(role = "user", text = "test") to "msg-1"))
         advanceUntilIdle()
 
         // Messages should not be updated when streaming (covers line 217)
@@ -1730,24 +1852,28 @@ class HomeViewModelTest {
     field.isAccessible = true
     field.set(this, value)
   }
-  // ============ Tests for existingSourceCards logic in messagesFlow collector ============
+  // ============ Tests for source/attachment preservation in messagesFlow collector ============
+  // These tests verify that source/attachment on AI messages is preserved during Firestore sync
 
   @Test
-  fun messagesFlow_sourceCard_inserts_after_matching_ai_message() =
+  fun messagesFlow_preserves_source_on_matching_ai_message() =
       runTest(testDispatcher) {
+        val viewModel = HomeViewModel()
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
-        val repo = mock<ConversationRepository>()
-        val messagesFlow = MutableSharedFlow<List<MessageDTO>>(replay = 1)
-        whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
-        whenever(repo.messagesFlow(any())).thenReturn(messagesFlow)
-        val viewModel = HomeViewModel(FakeLlmClient(), auth, repo)
+        viewModel.setPrivateField("auth", auth)
 
-        // Set up initial state with a source card after an AI message
-        val aiMessageId = "ai-1"
-        val sourceCardId = "source-1"
+        val repo = mock<ConversationRepository>()
+        val conversationsFlow = MutableSharedFlow<List<Conversation>>(replay = 1)
+        val messagesFlow = MutableSharedFlow<List<Pair<MessageDTO, String>>>(replay = 1)
+        whenever(repo.conversationsFlow()).thenReturn(conversationsFlow)
+        whenever(repo.messagesFlow(any())).thenReturn(messagesFlow)
+        viewModel.setPrivateField("repo", repo)
+        viewModel.setPrivateField("isInLocalNewChat", false)
+
         val aiText = "Here is a helpful response"
         val sourceMeta = SourceMeta(siteLabel = "EPFL.ch", title = "Test", url = "https://epfl.ch")
 
+        // Set up AI message WITH source before starting data
         viewModel.updateUiState {
           it.copy(
               currentConversationId = "conv-1",
@@ -1756,247 +1882,46 @@ class HomeViewModelTest {
                       ChatUIModel(
                           id = "user-1", text = "Question", timestamp = 0L, type = ChatType.USER),
                       ChatUIModel(
-                          id = aiMessageId, text = aiText, timestamp = 1000L, type = ChatType.AI),
-                      ChatUIModel(
-                          id = sourceCardId,
-                          text = "",
-                          timestamp = 2000L,
-                          type = ChatType.AI,
-                          source = sourceMeta)))
-        }
-
-        viewModel.setPrivateField("isInLocalNewChat", false)
-        viewModel.invokeStartData()
-        advanceUntilIdle()
-
-        // Emit Firestore messages (matching AI message)
-        messagesFlow.emit(
-            listOf(
-                MessageDTO(role = "user", text = "Question", createdAt = null),
-                MessageDTO(role = "assistant", text = aiText, createdAt = null)))
-        advanceUntilIdle()
-
-        val finalMessages = viewModel.uiState.value.messages
-        val aiIndex = finalMessages.indexOfFirst { it.type == ChatType.AI && it.text == aiText }
-        val sourceCardIndex = finalMessages.indexOfFirst { it.source != null }
-
-        assertTrue("Source card should be inserted after AI message", sourceCardIndex > aiIndex)
-        assertEquals(
-            "Source card should be immediately after AI message", aiIndex + 1, sourceCardIndex)
-        assertEquals(sourceMeta.url, finalMessages[sourceCardIndex].source?.url)
-      }
-
-  @Test
-  fun messagesFlow_sourceCard_adds_to_end_when_matching_ai_not_found() =
-      runTest(testDispatcher) {
-        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
-        val repo = mock<ConversationRepository>()
-        val messagesFlow = MutableSharedFlow<List<MessageDTO>>(replay = 1)
-        whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
-        whenever(repo.messagesFlow(any())).thenReturn(messagesFlow)
-        val viewModel = HomeViewModel(FakeLlmClient(), auth, repo)
-
-        // Set up initial state with a source card after an AI message
-        val aiMessageId = "ai-1"
-        val sourceCardId = "source-1"
-        val aiText = "Original AI response"
-        val sourceMeta = SourceMeta(siteLabel = "EPFL.ch", title = "Test", url = "https://epfl.ch")
-
-        viewModel.updateUiState {
-          it.copy(
-              currentConversationId = "conv-1",
-              messages =
-                  listOf(
-                      ChatUIModel(
-                          id = "user-1", text = "Question", timestamp = 0L, type = ChatType.USER),
-                      ChatUIModel(
-                          id = aiMessageId, text = aiText, timestamp = 1000L, type = ChatType.AI),
-                      ChatUIModel(
-                          id = sourceCardId,
-                          text = "",
-                          timestamp = 2000L,
-                          type = ChatType.AI,
-                          source = sourceMeta)))
-        }
-
-        viewModel.setPrivateField("isInLocalNewChat", false)
-        viewModel.invokeStartData()
-        advanceUntilIdle()
-
-        // Emit Firestore messages with DIFFERENT AI text (matching AI not found)
-        messagesFlow.emit(
-            listOf(
-                MessageDTO(role = "user", text = "Question", createdAt = null),
-                MessageDTO(role = "assistant", text = "Different AI response", createdAt = null)))
-        advanceUntilIdle()
-
-        val finalMessages = viewModel.uiState.value.messages
-        val sourceCardIndex = finalMessages.indexOfFirst { it.source != null }
-
-        // Source card should be at the end
-        assertEquals("Source card should be at the end", finalMessages.size - 1, sourceCardIndex)
-        assertEquals(sourceMeta.url, finalMessages[sourceCardIndex].source?.url)
-      }
-
-  @Test
-  fun messagesFlow_sourceCard_adds_to_end_when_preceding_not_ai() =
-      runTest(testDispatcher) {
-        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
-        val repo = mock<ConversationRepository>()
-        val messagesFlow = MutableSharedFlow<List<MessageDTO>>(replay = 1)
-        whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
-        whenever(repo.messagesFlow(any())).thenReturn(messagesFlow)
-        val viewModel = HomeViewModel(FakeLlmClient(), auth, repo)
-
-        // Set up initial state with a source card after a USER message (not AI)
-        val sourceCardId = "source-1"
-        val sourceMeta = SourceMeta(siteLabel = "EPFL.ch", title = "Test", url = "https://epfl.ch")
-
-        viewModel.updateUiState {
-          it.copy(
-              currentConversationId = "conv-1",
-              messages =
-                  listOf(
-                      ChatUIModel(
-                          id = "user-1", text = "Question", timestamp = 0L, type = ChatType.USER),
-                      ChatUIModel(
-                          id = sourceCardId,
-                          text = "",
-                          timestamp = 2000L,
-                          type = ChatType.AI,
-                          source = sourceMeta)))
-        }
-
-        viewModel.setPrivateField("isInLocalNewChat", false)
-        viewModel.invokeStartData()
-        advanceUntilIdle()
-
-        // Emit Firestore messages
-        messagesFlow.emit(
-            listOf(
-                MessageDTO(role = "user", text = "Question", createdAt = null),
-                MessageDTO(role = "assistant", text = "AI response", createdAt = null)))
-        advanceUntilIdle()
-
-        val finalMessages = viewModel.uiState.value.messages
-        val sourceCardIndex = finalMessages.indexOfFirst { it.source != null }
-
-        // Source card should be at the end (preceding message was USER, not AI)
-        assertEquals("Source card should be at the end", finalMessages.size - 1, sourceCardIndex)
-        assertEquals(sourceMeta.url, finalMessages[sourceCardIndex].source?.url)
-      }
-
-  @Test
-  fun messagesFlow_sourceCard_adds_to_end_when_preceding_ai_has_blank_text() =
-      runTest(testDispatcher) {
-        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
-        val repo = mock<ConversationRepository>()
-        val messagesFlow = MutableSharedFlow<List<MessageDTO>>(replay = 1)
-        whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
-        whenever(repo.messagesFlow(any())).thenReturn(messagesFlow)
-        val viewModel = HomeViewModel(FakeLlmClient(), auth, repo)
-
-        // Set up initial state with a source card after an AI message with blank text
-        val aiMessageId = "ai-1"
-        val sourceCardId = "source-1"
-        val sourceMeta = SourceMeta(siteLabel = "EPFL.ch", title = "Test", url = "https://epfl.ch")
-
-        viewModel.updateUiState {
-          it.copy(
-              currentConversationId = "conv-1",
-              messages =
-                  listOf(
-                      ChatUIModel(
-                          id = "user-1", text = "Question", timestamp = 0L, type = ChatType.USER),
-                      ChatUIModel(
-                          id = aiMessageId,
-                          text = "", // Blank text
+                          id = "ai-1",
+                          text = aiText,
                           timestamp = 1000L,
-                          type = ChatType.AI),
-                      ChatUIModel(
-                          id = sourceCardId,
-                          text = "",
-                          timestamp = 2000L,
                           type = ChatType.AI,
                           source = sourceMeta)))
         }
 
-        viewModel.setPrivateField("isInLocalNewChat", false)
         viewModel.invokeStartData()
         advanceUntilIdle()
 
-        // Emit Firestore messages
+        // Emit Firestore messages (matching AI message text)
         messagesFlow.emit(
             listOf(
-                MessageDTO(role = "user", text = "Question", createdAt = null),
-                MessageDTO(role = "assistant", text = "AI response", createdAt = null)))
+                MessageDTO(role = "user", text = "Question", createdAt = null) to "msg-2",
+                MessageDTO(role = "assistant", text = aiText, createdAt = null) to "msg-3"))
         advanceUntilIdle()
 
         val finalMessages = viewModel.uiState.value.messages
-        val sourceCardIndex = finalMessages.indexOfFirst { it.source != null }
+        val aiMessage = finalMessages.find { it.type == ChatType.AI && it.text == aiText }
 
-        // Source card should be at the end (preceding AI had blank text)
-        assertEquals("Source card should be at the end", finalMessages.size - 1, sourceCardIndex)
-        assertEquals(sourceMeta.url, finalMessages[sourceCardIndex].source?.url)
+        assertNotNull("AI message should exist", aiMessage)
+        assertNotNull("Source should be preserved on AI message", aiMessage?.source)
+        assertEquals(sourceMeta.url, aiMessage?.source?.url)
       }
 
   @Test
-  fun messagesFlow_sourceCard_adds_to_end_when_originalIndex_is_zero() =
+  fun messagesFlow_preserves_multiple_sources_on_ai_messages() =
       runTest(testDispatcher) {
+        val viewModel = HomeViewModel()
         val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+        viewModel.setPrivateField("auth", auth)
+
         val repo = mock<ConversationRepository>()
-        val messagesFlow = MutableSharedFlow<List<MessageDTO>>(replay = 1)
-        whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
+        val conversationsFlow = MutableSharedFlow<List<Conversation>>(replay = 1)
+        val messagesFlow = MutableSharedFlow<List<Pair<MessageDTO, String>>>(replay = 1)
+        whenever(repo.conversationsFlow()).thenReturn(conversationsFlow)
         whenever(repo.messagesFlow(any())).thenReturn(messagesFlow)
-        val viewModel = HomeViewModel(FakeLlmClient(), auth, repo)
-
-        // Set up initial state with a source card at index 0 (first message)
-        val sourceCardId = "source-1"
-        val sourceMeta = SourceMeta(siteLabel = "EPFL.ch", title = "Test", url = "https://epfl.ch")
-
-        viewModel.updateUiState {
-          it.copy(
-              currentConversationId = "conv-1",
-              messages =
-                  listOf(
-                      ChatUIModel(
-                          id = sourceCardId,
-                          text = "",
-                          timestamp = 0L,
-                          type = ChatType.AI,
-                          source = sourceMeta)))
-        }
-
+        viewModel.setPrivateField("repo", repo)
         viewModel.setPrivateField("isInLocalNewChat", false)
-        viewModel.invokeStartData()
-        advanceUntilIdle()
 
-        // Emit Firestore messages
-        messagesFlow.emit(
-            listOf(
-                MessageDTO(role = "user", text = "Question", createdAt = null),
-                MessageDTO(role = "assistant", text = "AI response", createdAt = null)))
-        advanceUntilIdle()
-
-        val finalMessages = viewModel.uiState.value.messages
-        val sourceCardIndex = finalMessages.indexOfFirst { it.source != null }
-
-        // Source card should be at the end (originalIndex was 0, which is <= 0)
-        assertEquals("Source card should be at the end", finalMessages.size - 1, sourceCardIndex)
-        assertEquals(sourceMeta.url, finalMessages[sourceCardIndex].source?.url)
-      }
-
-  @Test
-  fun messagesFlow_sourceCard_preserves_multiple_source_cards() =
-      runTest(testDispatcher) {
-        val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
-        val repo = mock<ConversationRepository>()
-        val messagesFlow = MutableSharedFlow<List<MessageDTO>>(replay = 1)
-        whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
-        whenever(repo.messagesFlow(any())).thenReturn(messagesFlow)
-        val viewModel = HomeViewModel(FakeLlmClient(), auth, repo)
-
-        // Set up initial state with multiple source cards
         val aiText1 = "First AI response"
         val aiText2 = "Second AI response"
         val sourceMeta1 =
@@ -2004,82 +1929,53 @@ class HomeViewModelTest {
         val sourceMeta2 =
             SourceMeta(siteLabel = "EPFL.ch", title = "Test2", url = "https://epfl.ch/2")
 
-        // Set conversation ID first, then start data, then set messages
-        viewModel.updateUiState { it.copy(currentConversationId = "conv-1") }
-        viewModel.setPrivateField("isInLocalNewChat", false)
-        viewModel.invokeStartData()
-        advanceUntilIdle()
-
-        // Now set messages with source cards
+        // Set messages with sources ON the AI messages before starting data
         viewModel.updateUiState {
           it.copy(
+              currentConversationId = "conv-1",
               messages =
                   listOf(
                       ChatUIModel(id = "user-1", text = "Q1", timestamp = 0L, type = ChatType.USER),
                       ChatUIModel(
-                          id = "ai-1", text = aiText1, timestamp = 1000L, type = ChatType.AI),
-                      ChatUIModel(
-                          id = "source-1",
-                          text = "",
-                          timestamp = 2000L,
+                          id = "ai-1",
+                          text = aiText1,
+                          timestamp = 1000L,
                           type = ChatType.AI,
                           source = sourceMeta1),
                       ChatUIModel(
                           id = "user-2", text = "Q2", timestamp = 3000L, type = ChatType.USER),
                       ChatUIModel(
-                          id = "ai-2", text = aiText2, timestamp = 4000L, type = ChatType.AI),
-                      ChatUIModel(
-                          id = "source-2",
-                          text = "",
-                          timestamp = 5000L,
+                          id = "ai-2",
+                          text = aiText2,
+                          timestamp = 4000L,
                           type = ChatType.AI,
                           source = sourceMeta2)))
         }
+
+        viewModel.invokeStartData()
         advanceUntilIdle()
 
         // Emit Firestore messages (matching both AI messages)
         messagesFlow.emit(
             listOf(
-                MessageDTO(role = "user", text = "Q1", createdAt = null),
-                MessageDTO(role = "assistant", text = aiText1, createdAt = null),
-                MessageDTO(role = "user", text = "Q2", createdAt = null),
-                MessageDTO(role = "assistant", text = aiText2, createdAt = null)))
+                MessageDTO(role = "user", text = "Q1", createdAt = null) to "msg-4",
+                MessageDTO(role = "assistant", text = aiText1, createdAt = null) to "msg-5",
+                MessageDTO(role = "user", text = "Q2", createdAt = null) to "msg-6",
+                MessageDTO(role = "assistant", text = aiText2, createdAt = null) to "msg-7"))
         advanceUntilIdle()
 
         val finalMessages = viewModel.uiState.value.messages
-        val sourceCards = finalMessages.filter { it.source != null }
 
-        // Verify we have source cards
-        assertTrue(
-            "Should have at least 2 source cards, found: ${sourceCards.size}",
-            sourceCards.size >= 2)
+        // Find AI messages and verify they have their sources
+        val ai1 = finalMessages.find { it.type == ChatType.AI && it.text == aiText1 }
+        val ai2 = finalMessages.find { it.type == ChatType.AI && it.text == aiText2 }
 
-        // Find indices of AI messages and source cards
-        val aiMessages = finalMessages.filter { it.type == ChatType.AI && it.text.isNotBlank() }
-        val ai1Index = finalMessages.indexOfFirst { it.type == ChatType.AI && it.text == aiText1 }
-        val source1Index = finalMessages.indexOfFirst { it.source?.url == sourceMeta1.url }
-        val ai2Index = finalMessages.indexOfFirst { it.type == ChatType.AI && it.text == aiText2 }
-        val source2Index = finalMessages.indexOfFirst { it.source?.url == sourceMeta2.url }
-
-        // Verify source cards are present
-        assertTrue("First source card should be found (index=$source1Index)", source1Index >= 0)
-        assertTrue("Second source card should be found (index=$source2Index)", source2Index >= 0)
-
-        // If AI messages are found, verify relative order
-        if (ai1Index >= 0) {
-          assertTrue(
-              "First source card should be after first AI message (ai1Index=$ai1Index, source1Index=$source1Index)",
-              source1Index > ai1Index)
-        }
-        if (ai2Index >= 0) {
-          assertTrue(
-              "Second source card should be after second AI message (ai2Index=$ai2Index, source2Index=$source2Index)",
-              source2Index > ai2Index)
-        }
-
-        // Verify source cards have correct metadata
-        assertEquals(sourceMeta1.url, finalMessages[source1Index].source?.url)
-        assertEquals(sourceMeta2.url, finalMessages[source2Index].source?.url)
+        assertNotNull("First AI message should exist", ai1)
+        assertNotNull("Second AI message should exist", ai2)
+        assertNotNull("First AI message should have source", ai1?.source)
+        assertNotNull("Second AI message should have source", ai2?.source)
+        assertEquals(sourceMeta1.url, ai1?.source?.url)
+        assertEquals(sourceMeta2.url, ai2?.source?.url)
       }
 
   // ==================== ED INTENT TESTS ====================
@@ -2182,8 +2078,10 @@ class HomeViewModelTest {
     val repo = mock<ConversationRepository>()
     runBlocking {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+      whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
+      whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
     }
 
     val viewModel = HomeViewModel(fakeLlm, auth, repo)
@@ -2215,8 +2113,10 @@ class HomeViewModelTest {
     val repo = mock<ConversationRepository>()
     runBlocking {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+      whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
+      whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
     }
 
     val viewModel = HomeViewModel(fakeLlm, auth, repo)
@@ -2238,7 +2138,81 @@ class HomeViewModelTest {
   }
 
   @Test
-  fun homeViewModel_shows_debug_message_when_ed_fetch_intent_detected() = runTest {
+  fun homeViewModel_creates_PostOnEd_with_suggested_course_id() = runTest {
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.setEdIntentResponseWithFormatted(
+        reply = "Voici votre question formatée pour ED.",
+        intent = "post_question",
+        formattedQuestion =
+            "Bonjour,\n\nComment résoudre la question 5 de COM-301 ?\n\nMerci d'avance !",
+        formattedTitle = "Question 5 COM-301",
+        suggestedCourseId = 12345L)
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val repo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id")
+      whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel = HomeViewModel(fakeLlm, auth, repo)
+
+    viewModel.updateMessageDraft("Poste sur ed question 5 COM-301")
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    val state = viewModel.uiState.value
+    assertNotNull("pendingAction should be set", state.pendingAction)
+    assertTrue("pendingAction should be PostOnEd", state.pendingAction is PendingAction.PostOnEd)
+    val postOnEd = state.pendingAction as PendingAction.PostOnEd
+    assertEquals("Question 5 COM-301", postOnEd.draftTitle)
+    assertEquals(
+        "Bonjour,\n\nComment résoudre la question 5 de COM-301 ?\n\nMerci d'avance !",
+        postOnEd.draftBody)
+    assertEquals(12345L, postOnEd.selectedCourseId) // Suggested course ID should be passed
+  }
+
+  @Test
+  fun homeViewModel_creates_PostOnEd_without_suggested_course_id_when_null() = runTest {
+    val fakeLlm = FakeLlmClient()
+    fakeLlm.setEdIntentResponseWithFormatted(
+        reply = "Voici votre question formatée pour ED.",
+        intent = "post_question",
+        formattedQuestion = "Bonjour,\n\nComment résoudre ce problème ?\n\nMerci d'avance !",
+        formattedTitle = "Question générale",
+        suggestedCourseId = null)
+
+    val auth = mock<FirebaseAuth> { on { currentUser } doReturn mock<FirebaseUser>() }
+    val repo = mock<ConversationRepository>()
+    runBlocking {
+      whenever(repo.startNewConversation(any())).thenReturn("conv-123")
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id")
+      whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+    }
+
+    val viewModel = HomeViewModel(fakeLlm, auth, repo)
+
+    viewModel.updateMessageDraft("Poste sur ed ma question")
+    viewModel.sendMessage()
+
+    advanceUntilIdle()
+    viewModel.awaitStreamingCompletion()
+    advanceUntilIdle()
+
+    val state = viewModel.uiState.value
+    assertNotNull("pendingAction should be set", state.pendingAction)
+    assertTrue("pendingAction should be PostOnEd", state.pendingAction is PendingAction.PostOnEd)
+    val postOnEd = state.pendingAction as PendingAction.PostOnEd
+    assertEquals("Question générale", postOnEd.draftTitle)
+    assertNull("selectedCourseId should be null when not suggested", postOnEd.selectedCourseId)
+  }
+
+  @Test
+  fun homeViewModel_creates_EdPostsCard_when_ed_fetch_intent_detected() = runTest {
     val fakeLlm = FakeLlmClient()
     fakeLlm.setEdFetchIntentResponse(
         reply = "Fetching ED question...", query = "show me this ED post about linear algebra")
@@ -2247,8 +2221,10 @@ class HomeViewModelTest {
     val repo = mock<ConversationRepository>()
     runBlocking {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+      whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
+      whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
     }
 
     val viewModel = HomeViewModel(fakeLlm, auth, repo)
@@ -2261,16 +2237,15 @@ class HomeViewModelTest {
     advanceUntilIdle()
 
     val state = viewModel.uiState.value
-    val aiMessages = state.messages.filter { it.type == ChatType.AI }
+    // ED fetch intent creates an EdPostsCard, not a debug message
     assertTrue(
-        "Should have debug message when fetch intent detected",
-        aiMessages.any { it.text.contains("ED fetch intent detected (DEBUG)") })
+        "Should have EdPostsCard when fetch intent detected", state.edPostsCards.isNotEmpty())
     assertNull("Should not have pendingAction when fetch intent detected", state.pendingAction)
     assertFalse("Should not be sending after fetch intent", state.isSending)
   }
 
   @Test
-  fun homeViewModel_shows_debug_message_when_ed_fetch_intent_detected_without_query() = runTest {
+  fun homeViewModel_creates_EdPostsCard_when_ed_fetch_intent_detected_without_query() = runTest {
     val fakeLlm = FakeLlmClient()
     fakeLlm.setEdFetchIntentResponse(
         reply = "Fetching ED question...", query = null) // No query provided
@@ -2279,8 +2254,10 @@ class HomeViewModelTest {
     val repo = mock<ConversationRepository>()
     runBlocking {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+      whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
+      whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
     }
 
     val viewModel = HomeViewModel(fakeLlm, auth, repo)
@@ -2294,11 +2271,9 @@ class HomeViewModelTest {
     advanceUntilIdle()
 
     val state = viewModel.uiState.value
-    val aiMessages = state.messages.filter { it.type == ChatType.AI }
+    // ED fetch intent creates an EdPostsCard even without query (uses originalQuestion as fallback)
     assertTrue(
-        "Should have debug message when fetch intent detected",
-        aiMessages.any { it.text.contains("ED fetch intent detected (DEBUG)") })
-    // When query is null, it should fallback to originalQuestion (tested in handleEdFetchIntent)
+        "Should have EdPostsCard when fetch intent detected", state.edPostsCards.isNotEmpty())
   }
 
   @Test
@@ -2311,8 +2286,10 @@ class HomeViewModelTest {
     val repo = mock<ConversationRepository>()
     runBlocking {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+      whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
+      whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
     }
 
     val viewModel = HomeViewModel(fakeLlm, auth, repo)
@@ -2325,10 +2302,9 @@ class HomeViewModelTest {
     advanceUntilIdle()
 
     val state = viewModel.uiState.value
-    val aiMessages = state.messages.filter { it.type == ChatType.AI }
-    assertFalse(
-        "Should not have debug message when fetch intent not detected",
-        aiMessages.any { it.text.contains("ED fetch intent detected (DEBUG)") })
+    // No EdPostsCard should be created when fetch intent is not detected
+    assertTrue(
+        "Should not have EdPostsCard when fetch intent not detected", state.edPostsCards.isEmpty())
   }
 
   @Test
@@ -2341,8 +2317,10 @@ class HomeViewModelTest {
     val repo = mock<ConversationRepository>()
     runBlocking {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(repo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+      whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
+      whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
     }
 
     val viewModel = HomeViewModel(fakeLlm, auth, repo)
@@ -2358,10 +2336,8 @@ class HomeViewModelTest {
     // Fetch intent should be handled first, so no PostOnEd pendingAction should be created
     assertNull(
         "Should not have PostOnEd pendingAction when fetch intent detected", state.pendingAction)
-    val aiMessages = state.messages.filter { it.type == ChatType.AI }
-    assertTrue(
-        "Should show fetch debug message (fetch takes precedence)",
-        aiMessages.any { it.text.contains("ED fetch intent detected (DEBUG)") })
+    // Fetch intent creates an EdPostsCard (fetch takes precedence over post)
+    assertTrue("Should have EdPostsCard (fetch takes precedence)", state.edPostsCards.isNotEmpty())
   }
 
   // ==================== Profile Context Tests ====================
@@ -2440,7 +2416,8 @@ class HomeViewModelTest {
     val conversationRepo = mock<ConversationRepository>()
     runBlocking {
       whenever(conversationRepo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(conversationRepo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(conversationRepo.appendMessage(any(), any(), any(), anyOrNull()))
+          .thenReturn("msg-id")
       whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
     }
 
@@ -2482,7 +2459,8 @@ class HomeViewModelTest {
     val conversationRepo = mock<ConversationRepository>()
     runBlocking {
       whenever(conversationRepo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(conversationRepo.appendMessage(any(), any(), any())).thenReturn(Unit)
+      whenever(conversationRepo.appendMessage(any(), any(), any(), anyOrNull()))
+          .thenReturn("msg-id")
       whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
     }
 
