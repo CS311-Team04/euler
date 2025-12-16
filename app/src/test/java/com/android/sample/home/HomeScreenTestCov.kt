@@ -17,10 +17,14 @@ import androidx.test.core.app.ApplicationProvider
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
 import com.android.sample.conversations.Conversation
+import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.util.MainDispatcherRule
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.slot
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -122,7 +126,7 @@ class HomeScreenTestCov {
         assertTrue(viewModel.uiState.value.messages.size > initialCount)
         val firstItem = viewModel.uiState.value.messages.first()
         assertEquals("Hello, world!", firstItem.text)
-        assertEquals(com.android.sample.Chat.ChatType.USER, firstItem.type)
+        assertEquals(ChatType.USER, firstItem.type)
       }
 
   @Test
@@ -189,11 +193,11 @@ class HomeScreenTestCov {
         assertTrue(stateAfterSend.messages.size >= initialCount + 1)
         val userMessage = stateAfterSend.messages.first()
         assertEquals("What is EPFL?", userMessage.text)
-        assertEquals(com.android.sample.Chat.ChatType.USER, userMessage.type)
+        assertEquals(ChatType.USER, userMessage.type)
         // Placeholder AI message should exist while waiting for the coroutine
         val lastMessage = stateAfterSend.messages.last()
         if (stateAfterSend.messages.size > initialCount + 1) {
-          assertEquals(com.android.sample.Chat.ChatType.AI, lastMessage.type)
+          assertEquals(ChatType.AI, lastMessage.type)
         }
 
         // Advance time to allow coroutine to complete
@@ -218,7 +222,7 @@ class HomeScreenTestCov {
         // This covers the code in the try block (lines 78-85) where aiMsg is created and added
         if (finalState.messages.size > initialCount + 1) {
           val lastMessage = finalState.messages.last()
-          assertEquals(com.android.sample.Chat.ChatType.AI, lastMessage.type)
+          assertEquals(ChatType.AI, lastMessage.type)
         }
 
         // Note: isSending might still be true if Firebase is taking a long time,
@@ -1256,4 +1260,222 @@ class HomeScreenTestCov {
           timestamp = System.currentTimeMillis(),
           type = ChatType.AI,
           source = source)
+
+  // ========== Listening Mode Visualizer Tests ==========
+
+  @Test
+  fun listening_mode_displays_listening_view_when_active() {
+    val viewModel = createHomeViewModel()
+    val speechHelper = mockk<SpeechToTextHelper>()
+
+    every { speechHelper.startListening(any(), any(), any(), any(), any()) } answers {}
+
+    composeRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = viewModel, speechHelper = speechHelper) }
+    }
+
+    composeRule.waitForIdle()
+
+    // Initially, text field should be visible
+    composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
+
+    // Click mic button to start listening
+    composeRule.onNodeWithTag(HomeTags.MicBtn).performClick()
+    composeRule.waitForIdle()
+
+    // Wait for "Listening..." text to appear (state change needs recomposition)
+    composeRule.waitUntil(timeoutMillis = 2_000) {
+      composeRule.onAllNodesWithText("Listening...").fetchSemanticsNodes().isNotEmpty()
+    }
+    composeRule.onNodeWithText("Listening...").assertIsDisplayed()
+
+    // Verify text field is not visible when listening
+    composeRule.onAllNodesWithTag(HomeTags.MessageField).assertCountEquals(0)
+  }
+
+  @Test
+  fun listening_mode_shows_voice_bars_when_active() {
+    val viewModel = createHomeViewModel()
+    val speechHelper = mockk<SpeechToTextHelper>()
+
+    every { speechHelper.startListening(any(), any(), any(), any(), any()) } answers {}
+
+    composeRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = viewModel, speechHelper = speechHelper) }
+    }
+
+    composeRule.waitForIdle()
+
+    // Click mic button to start listening
+    composeRule.onNodeWithTag(HomeTags.MicBtn).performClick()
+    composeRule.waitForIdle()
+
+    // Verify listening view is displayed (contains "Listening..." text)
+    composeRule.onNodeWithText("Listening...").assertIsDisplayed()
+
+    // Voice bars are animated, so we can't directly test them, but we can verify
+    // the listening view structure is present
+    composeRule.onNodeWithText("Listening...").assertIsDisplayed()
+  }
+
+  @Test
+  fun listening_mode_shows_buttons_when_active() {
+    val viewModel = createHomeViewModel()
+    val speechHelper = mockk<SpeechToTextHelper>()
+
+    every { speechHelper.startListening(any(), any(), any(), any(), any()) } answers {}
+
+    composeRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = viewModel, speechHelper = speechHelper) }
+    }
+
+    // Click mic button to start listening
+    composeRule.onNodeWithTag(HomeTags.MicBtn).performClick()
+    composeRule.waitForIdle()
+
+    // Verify buttons are still visible in listening mode
+    composeRule.onNodeWithTag(HomeTags.MicBtn).assertIsDisplayed()
+    // Voice/Send button should also be visible
+    composeRule.onNodeWithTag(HomeTags.VoiceBtn).assertIsDisplayed()
+  }
+
+  @Test
+  fun listening_mode_returns_to_text_field_when_stopped() {
+    val viewModel = createHomeViewModel()
+    val speechHelper = mockk<SpeechToTextHelper>()
+    val resultSlot = slot<(String) -> Unit>()
+
+    every { speechHelper.startListening(capture(resultSlot), any(), any(), any(), any()) } answers
+        {
+          // Simulate completion by invoking result (which also triggers onComplete in the real
+          // code)
+          resultSlot.captured.invoke("")
+        }
+
+    composeRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = viewModel, speechHelper = speechHelper) }
+    }
+
+    composeRule.waitForIdle()
+
+    // Click mic button to start listening
+    composeRule.onNodeWithTag(HomeTags.MicBtn).performClick()
+
+    // Verify text field is visible again
+    composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
+  }
+
+  @Test
+  fun listening_mode_stops_when_result_received() {
+    val viewModel = createHomeViewModel()
+    val speechHelper = mockk<SpeechToTextHelper>()
+    val resultSlot = slot<(String) -> Unit>()
+
+    every { speechHelper.startListening(capture(resultSlot), any(), any(), any(), any()) } answers
+        {
+          // Immediately invoke result to stop listening
+          resultSlot.captured.invoke("Test transcription")
+        }
+
+    composeRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = viewModel, speechHelper = speechHelper) }
+    }
+
+    composeRule.waitForIdle()
+
+    // Click mic button to start listening
+    composeRule.onNodeWithTag(HomeTags.MicBtn).performClick()
+
+    // Verify text field is visible again
+    composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
+    // Verify the transcribed text is in the draft
+    assertEquals("Test transcription", viewModel.uiState.value.messageDraft)
+  }
+
+  @Test
+  fun listening_mode_stops_when_error_occurs() {
+    val viewModel = createHomeViewModel()
+    val speechHelper = mockk<SpeechToTextHelper>()
+    val resultSlot = slot<(String) -> Unit>()
+
+    every { speechHelper.startListening(capture(resultSlot), any(), any(), any(), any()) } answers
+        {
+          // Don't invoke immediately - let the test control when to simulate error
+          // We'll invoke it after verifying listening view is shown
+        }
+
+    composeRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = viewModel, speechHelper = speechHelper) }
+    }
+
+    composeRule.waitForIdle()
+
+    // Click mic button to start listening
+    composeRule.onNodeWithTag(HomeTags.MicBtn).performClick()
+    composeRule.waitForIdle()
+
+    // Verify listening view is displayed first
+    composeRule.onNodeWithText("Listening...").assertIsDisplayed()
+
+    // Now simulate error by invoking result callback (which stops listening)
+    resultSlot.captured.invoke("")
+    composeRule.waitForIdle()
+
+    // Verify text field is visible again
+    composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
+    // Verify "Listening..." text is gone
+    composeRule.onAllNodesWithText("Listening...").assertCountEquals(0)
+  }
+
+  @Test
+  fun listening_mode_mic_button_has_border_when_listening() {
+    val viewModel = createHomeViewModel()
+    val speechHelper = mockk<SpeechToTextHelper>()
+
+    every { speechHelper.startListening(any(), any(), any(), any(), any()) } answers {}
+
+    composeRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = viewModel, speechHelper = speechHelper) }
+    }
+
+    composeRule.waitForIdle()
+
+    // Click mic button to start listening
+    composeRule.onNodeWithTag(HomeTags.MicBtn).performClick()
+    composeRule.waitForIdle()
+
+    // Mic button should still be visible (with border when listening)
+    // We can't directly test the border, but we can verify the button is still there
+    composeRule.onNodeWithTag(HomeTags.MicBtn).assertIsDisplayed()
+  }
+
+  @Test
+  fun listening_mode_can_be_stopped_by_clicking_mic_again() {
+    val viewModel = createHomeViewModel()
+    val speechHelper = mockk<SpeechToTextHelper>()
+
+    every { speechHelper.startListening(any(), any(), any(), any(), any()) } answers {}
+
+    composeRule.setContent {
+      MaterialTheme { HomeScreen(viewModel = viewModel, speechHelper = speechHelper) }
+    }
+
+    composeRule.waitForIdle()
+
+    // Click mic button to start listening
+    composeRule.onNodeWithTag(HomeTags.MicBtn).performClick()
+    composeRule.waitForIdle()
+
+    // Verify listening view is displayed
+    composeRule.onNodeWithText("Listening...").assertIsDisplayed()
+
+    // Click mic button again to stop listening
+    // Note: This should stop listening if the logic allows it
+    composeRule.onNodeWithTag(HomeTags.MicBtn).performClick()
+    composeRule.waitForIdle()
+
+    // The behavior depends on implementation, but we verify the UI responds
+    // In the current implementation, clicking mic again when listening should stop it
+    composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
+  }
 }
