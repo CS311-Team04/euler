@@ -477,6 +477,8 @@ class HomeViewModelTest {
           whenever(conversationRepo.appendMessage(any(), any(), any(), anyOrNull()))
               .thenReturn("msg-123")
           whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
+          whenever(conversationRepo.conversationsFlow()).thenReturn(flowOf(emptyList()))
+          whenever(conversationRepo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
         }
 
         val viewModel = HomeViewModel(llmClient = fakeLlm, auth = auth, repo = conversationRepo)
@@ -507,6 +509,8 @@ class HomeViewModelTest {
           whenever(conversationRepo.appendMessage(any(), any(), any(), anyOrNull()))
               .thenReturn("msg-124")
           whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
+          whenever(conversationRepo.conversationsFlow()).thenReturn(flowOf(emptyList()))
+          whenever(conversationRepo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
         }
 
         val viewModel = HomeViewModel(llmClient = fakeLlm, auth = auth, repo = conversationRepo)
@@ -2076,6 +2080,8 @@ class HomeViewModelTest {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
       whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+      whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
+      whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
     }
 
     val viewModel = HomeViewModel(fakeLlm, auth, repo)
@@ -2109,6 +2115,8 @@ class HomeViewModelTest {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
       whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+      whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
+      whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
     }
 
     val viewModel = HomeViewModel(fakeLlm, auth, repo)
@@ -2215,6 +2223,8 @@ class HomeViewModelTest {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
       whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+      whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
+      whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
     }
 
     val viewModel = HomeViewModel(fakeLlm, auth, repo)
@@ -2246,6 +2256,8 @@ class HomeViewModelTest {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
       whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+      whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
+      whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
     }
 
     val viewModel = HomeViewModel(fakeLlm, auth, repo)
@@ -2276,6 +2288,8 @@ class HomeViewModelTest {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
       whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+      whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
+      whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
     }
 
     val viewModel = HomeViewModel(fakeLlm, auth, repo)
@@ -2305,6 +2319,8 @@ class HomeViewModelTest {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
       whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
+      whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
+      whenever(repo.messagesFlow(any())).thenReturn(flowOf(emptyList()))
     }
 
     val viewModel = HomeViewModel(fakeLlm, auth, repo)
