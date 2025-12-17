@@ -127,14 +127,16 @@ class ConnectorsE2ETest {
     composeRule.waitForIdle()
 
     // Step 3: Wait for Ed Connect screen to be displayed
-    // First wait for any element that indicates the screen has loaded
-    Thread.sleep(1500) // Allow navigation animation
+    // First verify the screen title appears (indicates navigation completed)
+    val screenTitle = Localization.t("settings_connectors_ed_title")
+    composeRule.waitUntilAtLeastOneExists(hasText(screenTitle), timeoutMillis = 10_000)
     composeRule.waitForIdle()
+    Thread.sleep(500) // Allow screen to fully render
 
     // Verify Ed Connect screen elements - use label text (not placeholder to avoid ambiguity)
     val labelText = Localization.t("settings_connectors_ed_paste_token_label")
-    // Wait for the label to appear with a longer timeout
-    composeRule.waitUntilAtLeastOneExists(hasText(labelText), timeoutMillis = 10_000)
+    // Wait for the label to appear
+    composeRule.waitUntilAtLeastOneExists(hasText(labelText), timeoutMillis = 5_000)
     composeRule.waitForIdle()
     // Verify the label is displayed - use onNode to avoid ambiguity with placeholder
     composeRule.onNode(hasText(labelText).and(!isEditable())).assertIsDisplayed()
@@ -184,11 +186,16 @@ class ConnectorsE2ETest {
     composeRule.waitUntilAtLeastOneExists(hasText("Ed"), timeoutMillis = 5_000)
     composeRule.onNodeWithText("Ed").performClick()
     composeRule.waitForIdle()
-    Thread.sleep(1500) // Allow navigation animation
 
     // Step 2: Verify Ed Connect screen is displayed
+    // First verify the screen title appears (indicates navigation completed)
+    val screenTitle = Localization.t("settings_connectors_ed_title")
+    composeRule.waitUntilAtLeastOneExists(hasText(screenTitle), timeoutMillis = 10_000)
+    composeRule.waitForIdle()
+    Thread.sleep(500) // Allow screen to fully render
+
     val labelText = Localization.t("settings_connectors_ed_paste_token_label")
-    composeRule.waitUntilAtLeastOneExists(hasText(labelText), timeoutMillis = 10_000)
+    composeRule.waitUntilAtLeastOneExists(hasText(labelText), timeoutMillis = 5_000)
     composeRule.waitForIdle()
 
     // Step 3: Enter a test token (simulating user input)
