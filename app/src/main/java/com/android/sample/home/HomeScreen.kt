@@ -354,27 +354,30 @@ fun HomeScreen(
               Column(
                   Modifier.fillMaxWidth().background(backgroundColor).padding(bottom = 16.dp),
                   horizontalAlignment = Alignment.CenterHorizontally) {
-                    // Horizontal scrollable row of suggestion chips (offline-friendly EPFL
-                    // questions)
+                    // Horizontal scrollable row of suggestion chips (Euler help questions)
                     val suggestions =
                         listOf(
-                            Localization.t("suggestion_what_is_epfl"),
-                            Localization.t("suggestion_where_epfl"),
-                            Localization.t("suggestion_epfl_founded"),
-                            Localization.t("suggestion_epfl_students"),
-                            Localization.t("suggestion_epfl_research"),
-                            Localization.t("suggestion_epfl_campus"))
+                            Localization.t("suggestion_euler_capabilities"),
+                            Localization.t("suggestion_new_conversation"),
+                            Localization.t("suggestion_offline_mode"),
+                            Localization.t("suggestion_previous_chats"),
+                            Localization.t("suggestion_voice_input"),
+                            Localization.t("suggestion_change_theme"),
+                            Localization.t("suggestion_privacy"))
 
                     val scrollState = rememberScrollState()
 
-                    // Hide suggestions once a message is sent (user message exists or is sending)
-                    // This ensures suggestions disappear immediately when user sends a request
-                    val hasUserSentMessage =
-                        ui.messages.any { it.type == ChatType.USER } || ui.isSending
+                    // Determine suggestion chip visibility:
+                    // - Always hide while actively sending
+                    // - In offline mode, keep visible to allow cached responses
+                    // - Online: hide after first user message
+                    val shouldShowSuggestions =
+                        !ui.isSending &&
+                            (ui.isOffline || !ui.messages.any { it.type == ChatType.USER })
 
-                    // Animate visibility of suggestions - hide after user sends a message
+                    // Animate visibility of suggestions
                     AnimatedVisibility(
-                        visible = !hasUserSentMessage,
+                        visible = shouldShowSuggestions,
                         enter = fadeIn(tween(300)) + slideInVertically(initialOffsetY = { 20 }),
                         exit = fadeOut(tween(300)) + slideOutVertically(targetOffsetY = { -20 })) {
                           Row(
