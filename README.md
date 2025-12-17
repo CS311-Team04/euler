@@ -144,6 +144,15 @@ euler/
 
 ## Architecture
 
+### Architecture Diagram
+
+<!-- TODO: Add architecture diagram here -->
+<div align="center">
+
+*Architecture diagram coming soon*
+
+</div>
+
 ### Design Pattern
 The app follows the **MVVM (Model-View-ViewModel)** design pattern:
 
