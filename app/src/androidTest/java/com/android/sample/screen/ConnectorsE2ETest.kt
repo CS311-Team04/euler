@@ -1,30 +1,23 @@
 package com.android.sample.screen
 
-import android.content.Context
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isEditable
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.android.sample.MainActivity
 import com.android.sample.authentification.AuthTags
 import com.android.sample.home.DrawerTags
 import com.android.sample.home.HomeTags
 import com.android.sample.settings.Localization
-import com.google.firebase.FirebaseApp
-import com.google.firebase.FirebaseOptions
+import com.android.sample.settings.connectors.EdConnectTags
 import org.junit.Before
-import org.junit.BeforeClass
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -37,35 +30,11 @@ import org.junit.runner.RunWith
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
-class ConnectorsE2ETest {
-
-  @get:Rule val composeRule = createAndroidComposeRule<MainActivity>()
+class ConnectorsE2ETest : BaseE2ETest() {
 
   @Before
   fun setup() {
     navigateToHomeScreen()
-  }
-
-  companion object {
-    @BeforeClass
-    @JvmStatic
-    fun setupFirebase() {
-      ensureFirebaseInitialized()
-    }
-
-    @JvmStatic
-    private fun ensureFirebaseInitialized() {
-      val context = ApplicationProvider.getApplicationContext<Context>()
-      if (FirebaseApp.getApps(context).isEmpty()) {
-        val options =
-            FirebaseOptions.Builder()
-                .setApplicationId("1:1234567890:android:integration-test")
-                .setProjectId("integration-test")
-                .setApiKey("fake-api-key")
-                .build()
-        FirebaseApp.initializeApp(context, options)
-      }
-    }
   }
 
   private fun navigateToHomeScreen() {
@@ -128,24 +97,23 @@ class ConnectorsE2ETest {
 
     // Step 3: Wait for Ed Connect screen to be displayed
     // First verify the screen title appears (indicates navigation completed)
-    val screenTitle = Localization.t("settings_connectors_ed_title")
-    composeRule.waitUntilAtLeastOneExists(hasText(screenTitle), timeoutMillis = 15_000)
+    composeRule.waitUntilAtLeastOneExists(hasTestTag(EdConnectTags.Title), timeoutMillis = 15_000)
     composeRule.waitForIdle()
     Thread.sleep(500) // Allow screen to fully render
 
     // Verify Ed Connect screen elements - use label text (not placeholder to avoid ambiguity)
-    val labelText = Localization.t("settings_connectors_ed_paste_token_label")
     // Wait for the label to appear
-    composeRule.waitUntilAtLeastOneExists(hasText(labelText), timeoutMillis = 10_000)
+    composeRule.waitUntilAtLeastOneExists(
+        hasTestTag(EdConnectTags.TokenLabel), timeoutMillis = 10_000)
     composeRule.waitForIdle()
     // Verify the label is displayed - use onNode to avoid ambiguity with placeholder
-    composeRule.onNode(hasText(labelText).and(!isEditable())).performScrollTo().assertIsDisplayed()
+    composeRule.onNodeWithTag(EdConnectTags.TokenLabel).performScrollTo().assertIsDisplayed()
 
     // Verify "Get Token" button is present - use exact text match to avoid ambiguity
-    val getTokenButtonText = Localization.t("settings_connectors_ed_get_token_button")
-    composeRule.waitUntilAtLeastOneExists(hasText(getTokenButtonText), timeoutMillis = 10_000)
+    composeRule.waitUntilAtLeastOneExists(
+        hasTestTag(EdConnectTags.GetTokenButton), timeoutMillis = 10_000)
     composeRule.waitForIdle()
-    composeRule.onNode(hasText(getTokenButtonText)).performScrollTo().assertIsDisplayed()
+    composeRule.onNodeWithTag(EdConnectTags.GetTokenButton).performScrollTo().assertIsDisplayed()
   }
 
   @Test
@@ -189,44 +157,43 @@ class ConnectorsE2ETest {
 
     // Step 2: Verify Ed Connect screen is displayed
     // First verify the screen title appears (indicates navigation completed)
-    val screenTitle = Localization.t("settings_connectors_ed_title")
-    composeRule.waitUntilAtLeastOneExists(hasText(screenTitle), timeoutMillis = 15_000)
+    composeRule.waitUntilAtLeastOneExists(hasTestTag(EdConnectTags.Title), timeoutMillis = 15_000)
     composeRule.waitForIdle()
     Thread.sleep(500) // Allow screen to fully render
 
-    val labelText = Localization.t("settings_connectors_ed_paste_token_label")
-    composeRule.waitUntilAtLeastOneExists(hasText(labelText), timeoutMillis = 10_000)
+    composeRule.waitUntilAtLeastOneExists(
+        hasTestTag(EdConnectTags.TokenLabel), timeoutMillis = 10_000)
     composeRule.waitForIdle()
-    composeRule.onNode(hasText(labelText).and(!isEditable())).performScrollTo()
+    composeRule.onNodeWithTag(EdConnectTags.TokenLabel).performScrollTo()
 
     // Step 3: Enter a test token (simulating user input)
     val testToken = "test_token_1234567890"
 
     // Find the editable TextField - wait for it to be available
-    composeRule.waitUntilAtLeastOneExists(isEditable(), timeoutMillis = 10_000)
+    composeRule.waitUntilAtLeastOneExists(
+        hasTestTag(EdConnectTags.TokenField), timeoutMillis = 10_000)
     composeRule.waitForIdle()
 
     // Use the editable matcher to find and interact with the TextField
     // onNode is a method on ComposeTestRule that takes a SemanticsMatcher
-    val editableMatcher = isEditable()
-    composeRule.onNode(editableMatcher).performTextInput(testToken)
+    composeRule
+        .onNodeWithTag(EdConnectTags.TokenField)
+        .performScrollTo()
+        .performTextInput(testToken)
     composeRule.waitForIdle()
 
     // Step 4: Verify Connect button is enabled and clickable
-    val connectButtonText = Localization.t("connect")
-    composeRule.waitUntilAtLeastOneExists(hasText(connectButtonText), timeoutMillis = 10_000)
+    composeRule.waitUntilAtLeastOneExists(
+        hasTestTag(EdConnectTags.ConnectButton), timeoutMillis = 10_000)
     composeRule.waitForIdle()
     // Find the Connect button - it should be clickable and not editable
     // Use onNode to find the button specifically (not a text field)
-    composeRule
-        .onNode(hasText(connectButtonText).and(!isEditable()))
-        .performScrollTo()
-        .assertIsDisplayed()
+    composeRule.onNodeWithTag(EdConnectTags.ConnectButton).performScrollTo().assertIsDisplayed()
 
     // Step 5: Click Connect button to trigger connection process
     // Note: This will attempt to connect, but may fail without valid credentials
     // The test verifies that the connection process is triggered
-    composeRule.onNode(hasText(connectButtonText).and(!isEditable())).performClick()
+    composeRule.onNodeWithTag(EdConnectTags.ConnectButton).performClick()
     composeRule.waitForIdle()
 
     // Step 6: Verify that connection process started (loading state or error)
