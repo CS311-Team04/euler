@@ -1274,7 +1274,18 @@ class HomeViewModel(
             if (conversationId != null) {
               try {
                 // Use repository method which handles timestamps correctly
-                repo.appendMessage(conversationId, "assistant", reply.reply)
+                // Include source metadata for persistence across conversation switches
+                val sourceMetadata =
+                    sourceMeta?.url?.let { url ->
+                      com.android.sample.conversations.MessageSourceMetadata(
+                          url = url, compactType = sourceMeta.compactType.name)
+                    }
+                repo.appendMessage(
+                    conversationId = conversationId,
+                    role = "assistant",
+                    text = reply.reply,
+                    edCardId = null,
+                    sourceMetadata = sourceMetadata)
               } catch (e: Exception) {
                 Log.w(TAG, "Failed to persist assistant message: ${e.message}")
                 handleSendMessageError(e, messageId)
@@ -1540,12 +1551,35 @@ class HomeViewModel(
   // ============ BACKEND CHAT ============
 
   // mapping MessageDTO -> UI
-  private fun MessageDTO.toUi(messageId: String): ChatUIModel =
-      ChatUIModel(
-          id = messageId, // Use Firestore document ID for stable message IDs
-          text = this.text,
-          timestamp = this.createdAt?.toDate()?.time ?: System.currentTimeMillis(),
-          type = if (this.role == "user") ChatType.USER else ChatType.AI)
+  private fun MessageDTO.toUi(messageId: String): ChatUIModel {
+    // Restore source metadata if present (for RAG sources persistence)
+    // Derive label from URL to avoid trusting stored labels
+    val sourceMeta =
+        if (this.sourceUrl != null) {
+          val compactType =
+              try {
+                this.sourceCompactType?.let { CompactSourceType.valueOf(it) }
+                    ?: CompactSourceType.NONE
+              } catch (e: IllegalArgumentException) {
+                CompactSourceType.NONE
+              }
+          // Derive site label from URL domain for consistency
+          val derivedLabel =
+              runCatching {
+                    android.net.Uri.parse(this.sourceUrl).host?.removePrefix("www.")
+                        ?: this.sourceUrl
+                  }
+                  .getOrNull() ?: this.sourceUrl
+          SourceMeta(siteLabel = derivedLabel, url = this.sourceUrl, compactType = compactType)
+        } else null
+
+    return ChatUIModel(
+        id = messageId, // Use Firestore document ID for stable message IDs
+        text = this.text,
+        timestamp = this.createdAt?.toDate()?.time ?: System.currentTimeMillis(),
+        type = if (this.role == "user") ChatType.USER else ChatType.AI,
+        source = sourceMeta)
+  }
 
   /** Make a short provisional title from the first prompt. */
   override fun onCleared() {

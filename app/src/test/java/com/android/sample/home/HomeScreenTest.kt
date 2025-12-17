@@ -1026,7 +1026,7 @@ class HomeScreenComposeInteractionsTest {
   }
 
   @Test
-  fun homeScreen_displays_full_rag_source_card_with_visit_button() {
+  fun homeScreen_displays_compact_rag_source_badge() {
     val viewModel = createViewModel()
     val messageWithRag =
         ChatUIModel(
@@ -1045,10 +1045,10 @@ class HomeScreenComposeInteractionsTest {
     composeRule.setContent { HomeScreen(viewModel = viewModel) }
     composeRule.waitForIdle()
 
-    // Should display full RAG card with "Retrieved from" text
-    composeRule.onNodeWithText("Retrieved from", substring = true).assertExists()
-    // Should have Visit button
-    composeRule.onNodeWithText("Visit", substring = true).assertExists()
+    // Should display compact RAG badge with domain name
+    composeRule.onNodeWithTag("source_card_rag").assertExists()
+    // Should show domain text
+    composeRule.onNodeWithText("epfl.ch", substring = true).assertExists()
   }
 
   @Test
