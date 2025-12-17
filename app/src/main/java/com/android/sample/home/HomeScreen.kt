@@ -70,6 +70,7 @@ import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.ui.components.EdPostConfirmationModal
 import com.android.sample.ui.components.EdPostedCard
 import com.android.sample.ui.components.GuestProfileWarningModal
+import com.android.sample.ui.theme.Dimensions
 import com.android.sample.ui.theme.Dimensions.InputHeight
 import com.android.sample.ui.theme.Dimensions.InputHorizontal
 import com.android.sample.ui.theme.EdPostDimensions
@@ -1334,19 +1335,23 @@ private fun RagSourceBadge(url: String, onClick: () -> Unit) {
 
   Surface(
       onClick = onClick,
-      shape = RoundedCornerShape(20.dp),
+      shape = RoundedCornerShape(Dimensions.SourceBadgeCornerRadius),
       color = colorScheme.surfaceVariant,
       modifier = Modifier.testTag("source_card_rag")) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+            modifier =
+                Modifier.padding(
+                    horizontal = Dimensions.SourceBadgePaddingHorizontal,
+                    vertical = Dimensions.SourceBadgePaddingVertical),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            horizontalArrangement = Arrangement.spacedBy(Dimensions.SourceBadgeContentSpacing)) {
               // EPFL "E" logo in white rounded square
-              // Note: Replace with R.drawable.e_logo when the E_logo resource is added
               Image(
                   painter = painterResource(id = R.drawable.e_logo),
                   contentDescription = "EPFL",
-                  modifier = Modifier.size(18.dp).clip(RoundedCornerShape(3.dp)),
+                  modifier =
+                      Modifier.size(Dimensions.SourceBadgeLogoSize)
+                          .clip(RoundedCornerShape(Dimensions.SourceBadgeLogoCornerRadius)),
                   contentScale = ContentScale.Fit)
               // Domain text
               Text(
@@ -1379,16 +1384,18 @@ private fun SourceCard(
         }
     Row(
         modifier =
-            Modifier.clip(RoundedCornerShape(8.dp))
+            Modifier.clip(RoundedCornerShape(Dimensions.CompactIndicatorCornerRadius))
                 .background(colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                .padding(
+                    horizontal = Dimensions.CompactIndicatorPaddingHorizontal,
+                    vertical = Dimensions.CompactIndicatorPaddingVertical),
         verticalAlignment = Alignment.CenterVertically) {
           Icon(
               imageVector = Icons.Default.CheckCircle,
               contentDescription = null,
               tint = com.android.sample.ui.theme.EulerGreen,
-              modifier = Modifier.size(12.dp))
-          Spacer(Modifier.width(6.dp))
+              modifier = Modifier.size(Dimensions.CompactIndicatorIconSize))
+          Spacer(Modifier.width(Dimensions.CompactIndicatorSpacing))
           Text(
               text = "$emoji $siteLabel",
               color = colorScheme.onSurfaceVariant,
