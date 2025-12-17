@@ -1455,6 +1455,7 @@ class HomeScreenTestCov {
     val speechHelper = mockk<SpeechToTextHelper>()
 
     every { speechHelper.startListening(any(), any(), any(), any(), any()) } answers {}
+    every { speechHelper.stopListening() } answers {}
 
     composeRule.setContent {
       MaterialTheme { HomeScreen(viewModel = viewModel, speechHelper = speechHelper) }
@@ -1470,12 +1471,13 @@ class HomeScreenTestCov {
     composeRule.onNodeWithText("Listening...").assertIsDisplayed()
 
     // Click mic button again to stop listening
-    // Note: This should stop listening if the logic allows it
+    // This should call stopListening() and set isListening = false
     composeRule.onNodeWithTag(HomeTags.MicBtn).performClick()
     composeRule.waitForIdle()
 
-    // The behavior depends on implementation, but we verify the UI responds
-    // In the current implementation, clicking mic again when listening should stop it
+    // Verify text field is visible again (listening stopped)
     composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
+    // Verify "Listening..." text is gone
+    composeRule.onAllNodesWithText("Listening...").assertCountEquals(0)
   }
 }
