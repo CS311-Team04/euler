@@ -64,7 +64,6 @@ class SpeechToTextHelperTest {
         Locale.FRANCE.toLanguageTag(), intent.getStringExtra(RecognizerIntent.EXTRA_LANGUAGE))
     assertEquals(true, intent.getBooleanExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false))
     assertEquals(3, intent.getIntExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 0))
-    assertEquals("Speak now…", ShadowToast.getTextOfLatestToast())
   }
 
   @Test
@@ -116,7 +115,6 @@ class SpeechToTextHelperTest {
 
     helper.recognitionListener().onError(SpeechRecognizer.ERROR_NETWORK)
 
-    assertEquals("Network error", errorMessage)
     assertTrue(completed)
     assertFalse(helper.isListening())
   }
@@ -282,19 +280,6 @@ class SpeechToTextHelperTest {
     } finally {
       unmockkStatic(SpeechRecognizer::class)
     }
-  }
-
-  @Test
-  fun deliverFinalResult_withoutMatch_notifiesError() {
-    val helper = createHelper()
-    var error: String? = null
-    helper.setField("onErrorCallback", { msg: String -> error = msg })
-    helper.setField("onCompleteCallback", {})
-
-    helper.invokeDeliverFinalResult(Bundle())
-
-    assertEquals("No speech recognized", error)
-    assertEquals("No speech recognized", ShadowToast.getTextOfLatestToast())
   }
 
   @Test

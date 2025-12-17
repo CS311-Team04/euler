@@ -153,7 +153,6 @@ class SpeechToTextHelper(
           putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
         }
 
-    Toast.makeText(context, "Speak now…", Toast.LENGTH_SHORT).show()
     isListening = true
     speechRecognizer?.startListening(intent)
   }
@@ -184,7 +183,7 @@ class SpeechToTextHelper(
         override fun onError(error: Int) {
           isListening = false
           Log.w(TAG, "Speech recognition error: $error")
-          notifyError(errorMessageForCode(error))
+          // notifyError(errorMessageForCode(error))
           onCompleteCallback?.invoke()
         }
 
@@ -214,8 +213,6 @@ class SpeechToTextHelper(
     if (!bestMatch.isNullOrBlank()) {
       mainHandler.post { onResultCallback?.invoke(bestMatch) }
       onCompleteCallback?.let { mainHandler.post(it) }
-    } else {
-      notifyError("No speech recognized")
     }
   }
 
