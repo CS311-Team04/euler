@@ -1138,6 +1138,174 @@ class HomeViewModelTest {
   }
 
   @Test
+  fun messageDto_toUi_with_sourceUrl_creates_sourceMeta() {
+    val viewModel = HomeViewModel()
+    val method =
+        HomeViewModel::class
+            .java
+            .getDeclaredMethod("toUi", MessageDTO::class.java, String::class.java)
+    method.isAccessible = true
+    val dto =
+        MessageDTO(
+            role = "assistant",
+            text = "RAG answer",
+            sourceUrl = "https://www.epfl.ch/page",
+            sourceCompactType = "NONE")
+
+    val chat = method.invoke(viewModel, dto, "msg-123") as ChatUIModel
+    assertNotNull("Source should not be null", chat.source)
+    assertEquals("epfl.ch", chat.source?.siteLabel)
+    assertEquals("https://www.epfl.ch/page", chat.source?.url)
+    assertEquals(CompactSourceType.NONE, chat.source?.compactType)
+  }
+
+  @Test
+  fun messageDto_toUi_with_sourceUrl_no_compactType_defaults_to_none() {
+    val viewModel = HomeViewModel()
+    val method =
+        HomeViewModel::class
+            .java
+            .getDeclaredMethod("toUi", MessageDTO::class.java, String::class.java)
+    method.isAccessible = true
+    val dto = MessageDTO(role = "assistant", text = "Answer", sourceUrl = "https://epfl.ch")
+
+    val chat = method.invoke(viewModel, dto, "msg-123") as ChatUIModel
+    assertNotNull("Source should not be null", chat.source)
+    assertEquals(CompactSourceType.NONE, chat.source?.compactType)
+  }
+
+  @Test
+  fun messageDto_toUi_with_sourceUrl_schedule_compactType() {
+    val viewModel = HomeViewModel()
+    val method =
+        HomeViewModel::class
+            .java
+            .getDeclaredMethod("toUi", MessageDTO::class.java, String::class.java)
+    method.isAccessible = true
+    val dto =
+        MessageDTO(
+            role = "assistant",
+            text = "Schedule info",
+            sourceUrl = "https://epfl.ch/schedule",
+            sourceCompactType = "SCHEDULE")
+
+    val chat = method.invoke(viewModel, dto, "msg-123") as ChatUIModel
+    assertNotNull("Source should not be null", chat.source)
+    assertEquals(CompactSourceType.SCHEDULE, chat.source?.compactType)
+  }
+
+  @Test
+  fun messageDto_toUi_with_sourceUrl_food_compactType() {
+    val viewModel = HomeViewModel()
+    val method =
+        HomeViewModel::class
+            .java
+            .getDeclaredMethod("toUi", MessageDTO::class.java, String::class.java)
+    method.isAccessible = true
+    val dto =
+        MessageDTO(
+            role = "assistant",
+            text = "Food info",
+            sourceUrl = "https://epfl.ch/food",
+            sourceCompactType = "FOOD")
+
+    val chat = method.invoke(viewModel, dto, "msg-123") as ChatUIModel
+    assertNotNull("Source should not be null", chat.source)
+    assertEquals(CompactSourceType.FOOD, chat.source?.compactType)
+  }
+
+  @Test
+  fun messageDto_toUi_with_invalid_compactType_defaults_to_none() {
+    val viewModel = HomeViewModel()
+    val method =
+        HomeViewModel::class
+            .java
+            .getDeclaredMethod("toUi", MessageDTO::class.java, String::class.java)
+    method.isAccessible = true
+    val dto =
+        MessageDTO(
+            role = "assistant",
+            text = "Answer",
+            sourceUrl = "https://epfl.ch",
+            sourceCompactType = "INVALID_TYPE")
+
+    val chat = method.invoke(viewModel, dto, "msg-123") as ChatUIModel
+    assertNotNull("Source should not be null", chat.source)
+    assertEquals(CompactSourceType.NONE, chat.source?.compactType)
+  }
+
+  @Test
+  fun messageDto_toUi_without_sourceUrl_has_null_source() {
+    val viewModel = HomeViewModel()
+    val method =
+        HomeViewModel::class
+            .java
+            .getDeclaredMethod("toUi", MessageDTO::class.java, String::class.java)
+    method.isAccessible = true
+    val dto = MessageDTO(role = "assistant", text = "Answer")
+
+    val chat = method.invoke(viewModel, dto, "msg-123") as ChatUIModel
+    assertNull("Source should be null when no sourceUrl", chat.source)
+  }
+
+  @Test
+  fun messageDto_toUi_derives_label_from_url_with_www() {
+    val viewModel = HomeViewModel()
+    val method =
+        HomeViewModel::class
+            .java
+            .getDeclaredMethod("toUi", MessageDTO::class.java, String::class.java)
+    method.isAccessible = true
+    val dto =
+        MessageDTO(
+            role = "assistant",
+            text = "Answer",
+            sourceUrl = "https://www.example.com/page",
+            sourceCompactType = "NONE")
+
+    val chat = method.invoke(viewModel, dto, "msg-123") as ChatUIModel
+    assertEquals("example.com", chat.source?.siteLabel)
+  }
+
+  @Test
+  fun messageDto_toUi_derives_label_from_url_without_www() {
+    val viewModel = HomeViewModel()
+    val method =
+        HomeViewModel::class
+            .java
+            .getDeclaredMethod("toUi", MessageDTO::class.java, String::class.java)
+    method.isAccessible = true
+    val dto =
+        MessageDTO(
+            role = "assistant",
+            text = "Answer",
+            sourceUrl = "https://example.com/page",
+            sourceCompactType = "NONE")
+
+    val chat = method.invoke(viewModel, dto, "msg-123") as ChatUIModel
+    assertEquals("example.com", chat.source?.siteLabel)
+  }
+
+  @Test
+  fun messageDto_toUi_handles_invalid_url_gracefully() {
+    val viewModel = HomeViewModel()
+    val method =
+        HomeViewModel::class
+            .java
+            .getDeclaredMethod("toUi", MessageDTO::class.java, String::class.java)
+    method.isAccessible = true
+    val invalidUrl = "not-a-valid-url"
+    val dto =
+        MessageDTO(
+            role = "assistant", text = "Answer", sourceUrl = invalidUrl, sourceCompactType = "NONE")
+
+    val chat = method.invoke(viewModel, dto, "msg-123") as ChatUIModel
+    assertNotNull("Source should not be null", chat.source)
+    assertEquals(invalidUrl, chat.source?.siteLabel) // Should fallback to original URL
+    assertEquals(invalidUrl, chat.source?.url)
+  }
+
+  @Test
   fun selectConversation_sets_current_and_exits_local_placeholder() {
     val viewModel = HomeViewModel()
     viewModel.setPrivateField("isInLocalNewChat", true)
