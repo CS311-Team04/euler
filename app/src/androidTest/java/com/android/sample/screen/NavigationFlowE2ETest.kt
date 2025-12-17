@@ -18,6 +18,7 @@ import com.android.sample.home.HomeTags
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import org.junit.Before
+import org.junit.BeforeClass
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,21 +38,29 @@ class NavigationFlowE2ETest {
 
   @Before
   fun setup() {
-    ensureFirebaseInitialized()
     // Navigate to home screen as guest for testing
     navigateToHomeScreen()
   }
 
-  private fun ensureFirebaseInitialized() {
-    val context = ApplicationProvider.getApplicationContext<Context>()
-    if (FirebaseApp.getApps(context).isEmpty()) {
-      val options =
-          FirebaseOptions.Builder()
-              .setApplicationId("1:1234567890:android:integration-test")
-              .setProjectId("integration-test")
-              .setApiKey("fake-api-key")
-              .build()
-      FirebaseApp.initializeApp(context, options)
+  companion object {
+    @BeforeClass
+    @JvmStatic
+    fun setupFirebase() {
+      ensureFirebaseInitialized()
+    }
+
+    @JvmStatic
+    private fun ensureFirebaseInitialized() {
+      val context = ApplicationProvider.getApplicationContext<Context>()
+      if (FirebaseApp.getApps(context).isEmpty()) {
+        val options =
+            FirebaseOptions.Builder()
+                .setApplicationId("1:1234567890:android:integration-test")
+                .setProjectId("integration-test")
+                .setApiKey("fake-api-key")
+                .build()
+        FirebaseApp.initializeApp(context, options)
+      }
     }
   }
 

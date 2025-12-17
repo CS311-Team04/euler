@@ -23,6 +23,7 @@ import com.android.sample.settings.Localization
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import org.junit.Before
+import org.junit.BeforeClass
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -42,20 +43,28 @@ class ConnectorsE2ETest {
 
   @Before
   fun setup() {
-    ensureFirebaseInitialized()
     navigateToHomeScreen()
   }
 
-  private fun ensureFirebaseInitialized() {
-    val context = ApplicationProvider.getApplicationContext<Context>()
-    if (FirebaseApp.getApps(context).isEmpty()) {
-      val options =
-          FirebaseOptions.Builder()
-              .setApplicationId("1:1234567890:android:integration-test")
-              .setProjectId("integration-test")
-              .setApiKey("fake-api-key")
-              .build()
-      FirebaseApp.initializeApp(context, options)
+  companion object {
+    @BeforeClass
+    @JvmStatic
+    fun setupFirebase() {
+      ensureFirebaseInitialized()
+    }
+
+    @JvmStatic
+    private fun ensureFirebaseInitialized() {
+      val context = ApplicationProvider.getApplicationContext<Context>()
+      if (FirebaseApp.getApps(context).isEmpty()) {
+        val options =
+            FirebaseOptions.Builder()
+                .setApplicationId("1:1234567890:android:integration-test")
+                .setProjectId("integration-test")
+                .setApiKey("fake-api-key")
+                .build()
+        FirebaseApp.initializeApp(context, options)
+      }
     }
   }
 
