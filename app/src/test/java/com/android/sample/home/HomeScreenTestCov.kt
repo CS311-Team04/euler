@@ -964,8 +964,9 @@ class HomeScreenTestCov {
 
     composeRule.setContent { MaterialTheme { HomeScreen(viewModel = viewModel) } }
 
-    composeRule.onNode(hasText("Retrieved from", substring = true)).assertIsDisplayed()
-    composeRule.onNodeWithText("Visit").assertIsDisplayed()
+    // Compact RAG badge should be displayed with domain name
+    composeRule.onNodeWithTag("source_card_rag").assertIsDisplayed()
+    composeRule.onNodeWithText("epfl.ch", substring = true).assertIsDisplayed()
   }
 
   @Test

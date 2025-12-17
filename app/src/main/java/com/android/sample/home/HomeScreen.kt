@@ -34,7 +34,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -44,7 +43,6 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -62,7 +60,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -104,6 +101,7 @@ import com.android.sample.ui.theme.Dimensions.ChatInputVoiceModeButtonAlpha
 import com.android.sample.ui.theme.Dimensions.ChatInputVoiceSendButtonOffsetY
 import com.android.sample.ui.theme.Dimensions.ChatInputVoiceSendButtonSize
 import com.android.sample.ui.theme.Dimensions.ChatInputVoiceSendIconSize
+import com.android.sample.ui.theme.Dimensions
 import com.android.sample.ui.theme.Dimensions.InputHeight
 import com.android.sample.ui.theme.Dimensions.InputHorizontal
 import com.android.sample.ui.theme.EdPostDimensions
@@ -207,7 +205,7 @@ fun HomeScreen(
     }
   }
 
-  // Synchronize ViewModel state <-> Drawer component
+  // Synchronize ViewModel state <=> Drawer component
   LaunchedEffect(ui.isDrawerOpen) {
     if (ui.isDrawerOpen && !drawerState.isOpen) {
       drawerState.open()
@@ -554,7 +552,7 @@ fun HomeScreen(
                                   val audioState =
                                       audioController.audioStateFor(msg, ui.streamingMessageId)
 
-                                  // First render the chat bubble (for USER/AI text)
+                                  // Render the chat bubble with source inline
                                   ChatMessage(
                                       message = msg,
                                       modifier = Modifier.fillMaxWidth(),
@@ -566,35 +564,28 @@ fun HomeScreen(
                                       },
                                       onDownloadAttachment = { attachment ->
                                         startPdfDownload(context, attachment)
+                                      },
+                                      onSourceClick = { url ->
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                        context.startActivity(intent)
                                       })
 
-                                  // Then show the source card AFTER the answer (if any)
-                                  if (msg.source != null && !msg.isThinking) {
+                                  // Show compact source indicators for schedule/food (after the
+                                  // message)
+                                  if (msg.source != null &&
+                                      !msg.isThinking &&
+                                      msg.source.compactType != CompactSourceType.NONE) {
                                     Spacer(Modifier.height(8.dp))
-                                    val context = androidx.compose.ui.platform.LocalContext.current
                                     val sourceSiteLabel =
                                         msg.source.siteLabelRes?.let { stringResource(id = it) }
                                             ?: msg.source.siteLabel.orEmpty()
-                                    val sourceTitle =
-                                        msg.source.titleRes?.let { stringResource(id = it) }
-                                            ?: msg.source.title.orEmpty()
                                     SourceCard(
                                         siteLabel = sourceSiteLabel,
-                                        title = sourceTitle,
+                                        title = "",
                                         url = msg.source.url,
                                         retrievedAt = msg.source.retrievedAt,
                                         compactType = msg.source.compactType,
-                                        onVisit =
-                                            if (msg.source.url != null &&
-                                                msg.source.compactType == CompactSourceType.NONE) {
-                                              {
-                                                val intent =
-                                                    Intent(
-                                                        Intent.ACTION_VIEW,
-                                                        Uri.parse(msg.source.url))
-                                                context.startActivity(intent)
-                                              }
-                                            } else null)
+                                        onVisit = null)
                                   }
                                 }
                                 is TimelineItem.CardItem -> {
@@ -1482,91 +1473,20 @@ private fun SourceCard(
         }
     Row(
         modifier =
-            Modifier.clip(RoundedCornerShape(8.dp))
+            Modifier.clip(RoundedCornerShape(Dimensions.CompactIndicatorCornerRadius))
                 .background(colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                .padding(
+                    horizontal = Dimensions.CompactIndicatorPaddingHorizontal,
+                    vertical = Dimensions.CompactIndicatorPaddingVertical),
         verticalAlignment = Alignment.CenterVertically) {
-          Icon(
-              imageVector = Icons.Default.CheckCircle,
-              contentDescription = null,
-              tint = com.android.sample.ui.theme.EulerGreen,
-              modifier = Modifier.size(12.dp))
-          Spacer(Modifier.width(6.dp))
           Text(
               text = "$emoji $siteLabel",
               color = colorScheme.onSurfaceVariant,
               style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp))
         }
-  } else {
-    // Full RAG source card with Visit button
-    Column(
-        modifier =
-            Modifier.fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(colorScheme.surfaceVariant)
-                .padding(horizontal = 12.dp, vertical = 6.dp)) {
-          // Top line: "Retrieved from EPFL.ch Website"
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = Icons.Default.CheckCircle,
-                contentDescription = null,
-                tint = com.android.sample.ui.theme.EulerGreen,
-                modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(4.dp))
-            Text(
-                text = "Retrieved from  $siteLabel",
-                color = colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp))
-          }
-
-          Spacer(Modifier.height(4.dp))
-
-          Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            // URL (ellipsized to one line)
-            Text(
-                text = url ?: "",
-                color = colorScheme.onSurface,
-                style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f))
-
-            Spacer(Modifier.width(6.dp))
-
-            if (onVisit != null && url != null) {
-              Button(
-                  onClick = onVisit,
-                  shape = RoundedCornerShape(6.dp),
-                  contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                  colors = ButtonDefaults.buttonColors(containerColor = colorScheme.primary)) {
-                    Text("Visit", color = colorScheme.onPrimary)
-                    Spacer(Modifier.width(6.dp))
-                    Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Outlined.OpenInNew,
-                        contentDescription = null,
-                        modifier = Modifier.size(10.dp),
-                        tint = colorScheme.onPrimary)
-                  }
-            }
-          }
-
-          Spacer(Modifier.height(2.dp))
-
-          // Retrieved date
-          val dateStr =
-              remember(retrievedAt) {
-                val d =
-                    java.time.Instant.ofEpochMilli(retrievedAt)
-                        .atZone(java.time.ZoneId.systemDefault())
-                        .toLocalDate()
-                "%02d/%02d/%02d".format(d.dayOfMonth, d.monthValue, d.year % 100)
-              }
-          Text(
-              text = "Retrieved on $dateStr",
-              color = colorScheme.onSurfaceVariant,
-              style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp))
-        }
   }
+  // Note: RAG sources (compactType == NONE) are now handled by RagSourceBadge inline with audio
+  // button
 }
 
 @Preview(showBackground = true, backgroundColor = 0x000000)

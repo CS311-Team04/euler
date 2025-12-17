@@ -45,4 +45,18 @@ object Dimensions {
   // Text field dimensions
   val ChatInputCornerRadius = 50.dp
   val ChatInputMaxLines = 5
+  // RAG Source Badge dimensions
+  val SourceBadgeCornerRadius = 20.dp
+  val SourceBadgePaddingHorizontal = 8.dp
+  val SourceBadgePaddingVertical = 5.dp
+  val SourceBadgeContentSpacing = 6.dp
+  val SourceBadgeLogoSize = 18.dp
+  val SourceBadgeLogoCornerRadius = 3.dp
+
+  // Compact indicator dimensions
+  val CompactIndicatorCornerRadius = 8.dp
+  val CompactIndicatorPaddingHorizontal = 10.dp
+  val CompactIndicatorPaddingVertical = 6.dp
+  val CompactIndicatorIconSize = 12.dp
+  val CompactIndicatorSpacing = 6.dp
 }
