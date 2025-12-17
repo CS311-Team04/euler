@@ -175,7 +175,14 @@ class HomeViewModelOfflineCacheCoverageTest {
 
     // Verify repo.appendMessage was called to persist the cached response
     verify(repo, atLeastOnce())
-        .appendMessage(eq("existing-conv-123"), eq("assistant"), eq(cachedResponse), anyOrNull())
+        .appendMessage(
+            eq("existing-conv-123"),
+            eq("assistant"),
+            eq(cachedResponse),
+            anyOrNull(),
+            anyOrNull(),
+            anyOrNull(),
+            anyOrNull())
   }
 
   @Test
@@ -198,14 +205,18 @@ class HomeViewModelOfflineCacheCoverageTest {
     vm.awaitStreamingCompletion()
 
     // Verify repo.appendMessage was NOT called for assistant messages
-    verify(repo, never()).appendMessage(any(), eq("assistant"), any(), anyOrNull())
+    verify(repo, never())
+        .appendMessage(
+            any(), eq("assistant"), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull())
   }
 
   @Test
   fun `offline with cached response handles persist exception gracefully`() = runTest {
     val cachedResponse = "Cached response"
     whenever(cacheRepo.getCachedResponse(any(), eq(true))).thenReturn(cachedResponse)
-    whenever(repo.appendMessage(any(), any(), any(), anyOrNull()))
+    whenever(
+            repo.appendMessage(
+                any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
         .thenThrow(RuntimeException("Persist failed"))
 
     val vm =
@@ -434,7 +445,10 @@ class HomeViewModelOfflineCacheCoverageTest {
 
     // Need to mock conversation creation for signed-in user
     whenever(repo.startNewConversation(any())).thenReturn("new-conv-123")
-    whenever(repo.appendMessage(any(), any(), any(), anyOrNull())).thenReturn("msg-id-cache")
+    whenever(
+            repo.appendMessage(
+                any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+        .thenReturn("msg-id-cache")
 
     val vm =
         HomeViewModel(llmClient, auth, repo, networkMonitor = networkMonitor, cacheRepo = cacheRepo)
