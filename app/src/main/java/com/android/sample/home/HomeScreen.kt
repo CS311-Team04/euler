@@ -76,6 +76,7 @@ import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.ui.components.EdPostConfirmationModal
 import com.android.sample.ui.components.EdPostedCard
 import com.android.sample.ui.components.GuestProfileWarningModal
+import com.android.sample.ui.theme.Dimensions
 import com.android.sample.ui.theme.Dimensions.ChatInputButtonRowPaddingEnd
 import com.android.sample.ui.theme.Dimensions.ChatInputButtonSpacing
 import com.android.sample.ui.theme.Dimensions.ChatInputCornerRadius
@@ -101,7 +102,6 @@ import com.android.sample.ui.theme.Dimensions.ChatInputVoiceModeButtonAlpha
 import com.android.sample.ui.theme.Dimensions.ChatInputVoiceSendButtonOffsetY
 import com.android.sample.ui.theme.Dimensions.ChatInputVoiceSendButtonSize
 import com.android.sample.ui.theme.Dimensions.ChatInputVoiceSendIconSize
-import com.android.sample.ui.theme.Dimensions
 import com.android.sample.ui.theme.Dimensions.InputHeight
 import com.android.sample.ui.theme.Dimensions.InputHorizontal
 import com.android.sample.ui.theme.EdPostDimensions

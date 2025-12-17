@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -39,6 +40,16 @@ import com.android.sample.ui.theme.ed1
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+
+object EdConnectTags {
+  const val Root = "ed_connect_root"
+  const val Title = "ed_connect_title"
+  const val TokenLabel = "ed_connect_token_label"
+  const val TokenField = "ed_connect_token_field"
+  const val GetTokenButton = "ed_connect_get_token_button"
+  const val ConnectButton = "ed_connect_connect_button"
+  const val ErrorMessage = "ed_connect_error_message"
+}
 
 /**
  * Screen for connecting to the ED connector by entering an API token. Displays instructions, a
@@ -83,47 +94,51 @@ fun EdConnectScreen(onBackClick: () -> Unit = {}, viewModel: ConnectorsViewModel
     }
   }
 
-  Box(modifier = Modifier.fillMaxSize().background(connectorState.colors.background)) {
-    Column(modifier = Modifier.fillMaxSize()) {
-      EdConnectTopBar(onBackClick = onBackClick, colors = connectorState.colors)
-      Column(
-          modifier =
-              Modifier.fillMaxSize()
-                  .padding(horizontal = Dimens.ScreenHorizontalPadding)
-                  .verticalScroll(rememberScrollState()),
-          verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Spacer(modifier = Modifier.height(8.dp))
-            EdConnectorInfoCard(colors = connectorState.colors)
-            Spacer(modifier = Modifier.height(8.dp))
-            HowToConnectCard(colors = connectorState.colors)
-            Spacer(modifier = Modifier.height(8.dp))
-            EdConnectOpenTokenButton(
-                enabled = !uiState.isEdConnecting,
-                context = context,
-                colors = connectorState.colors)
-            Spacer(modifier = Modifier.height(8.dp))
-            EdConnectTokenInput(
-                token = token,
-                onTokenChange = { token = it },
-                enabled = !uiState.isEdConnecting,
-                colors = connectorState.colors)
-            EdConnectError(error = uiState.edConnectError, colors = connectorState.colors)
-            Spacer(modifier = Modifier.height(16.dp))
-            EdConnectButton(
-                token = token,
-                isConnecting = uiState.isEdConnecting,
-                onClick = { viewModel.confirmEdConnect(token.trim(), null) },
-                colors = connectorState.colors)
-            Spacer(modifier = Modifier.height(24.dp))
-          }
-    }
-    EdConnectClipboardBanner(
-        uiState = uiState,
-        connectorState = connectorState,
-        viewModel = viewModel,
-        onTokenChange = { token = it },
-        modifier = Modifier.align(Alignment.BottomCenter))
-  }
+  Box(
+      modifier =
+          Modifier.fillMaxSize()
+              .background(connectorState.colors.background)
+              .testTag(EdConnectTags.Root)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+          EdConnectTopBar(onBackClick = onBackClick, colors = connectorState.colors)
+          Column(
+              modifier =
+                  Modifier.fillMaxSize()
+                      .padding(horizontal = Dimens.ScreenHorizontalPadding)
+                      .verticalScroll(rememberScrollState()),
+              verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Spacer(modifier = Modifier.height(8.dp))
+                EdConnectorInfoCard(colors = connectorState.colors)
+                Spacer(modifier = Modifier.height(8.dp))
+                HowToConnectCard(colors = connectorState.colors)
+                Spacer(modifier = Modifier.height(8.dp))
+                EdConnectOpenTokenButton(
+                    enabled = !uiState.isEdConnecting,
+                    context = context,
+                    colors = connectorState.colors)
+                Spacer(modifier = Modifier.height(8.dp))
+                EdConnectTokenInput(
+                    token = token,
+                    onTokenChange = { token = it },
+                    enabled = !uiState.isEdConnecting,
+                    colors = connectorState.colors)
+                EdConnectError(error = uiState.edConnectError, colors = connectorState.colors)
+                Spacer(modifier = Modifier.height(16.dp))
+                EdConnectButton(
+                    token = token,
+                    isConnecting = uiState.isEdConnecting,
+                    onClick = { viewModel.confirmEdConnect(token.trim(), null) },
+                    colors = connectorState.colors)
+                Spacer(modifier = Modifier.height(24.dp))
+              }
+        }
+        EdConnectClipboardBanner(
+            uiState = uiState,
+            connectorState = connectorState,
+            viewModel = viewModel,
+            onTokenChange = { token = it },
+            modifier = Modifier.align(Alignment.BottomCenter))
+      }
 
   // Handle successful connection - navigate back after state is updated
   LaunchedEffect(uiState.connectors, uiState.isEdConnecting) {
@@ -152,7 +167,7 @@ private fun EdConnectOpenTokenButton(
         context.startActivity(intent)
       },
       enabled = enabled,
-      modifier = Modifier.fillMaxWidth(),
+      modifier = Modifier.fillMaxWidth().testTag(EdConnectTags.GetTokenButton),
       colors = ButtonDefaults.buttonColors(containerColor = ed1, contentColor = Color.White),
       shape = RoundedCornerShape(Dimens.DialogButtonCornerRadius)) {
         Text(
@@ -174,7 +189,8 @@ private fun EdConnectTokenInput(
         text = Localization.t("settings_connectors_ed_paste_token_label"),
         color = colors.textPrimary,
         fontSize = 14.sp,
-        fontWeight = FontWeight.Medium)
+        fontWeight = FontWeight.Medium,
+        modifier = Modifier.testTag(EdConnectTags.TokenLabel))
     OutlinedTextField(
         value = token,
         onValueChange = onTokenChange,
@@ -194,7 +210,7 @@ private fun EdConnectTokenInput(
         keyboardOptions =
             KeyboardOptions(
                 autoCorrect = false, keyboardType = KeyboardType.Text, imeAction = ImeAction.Done),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().testTag(EdConnectTags.TokenField),
         colors =
             OutlinedTextFieldDefaults.colors(
                 focusedTextColor = colors.textPrimary,
@@ -211,7 +227,7 @@ private fun EdConnectError(error: String?, colors: ConnectorsColors) {
         text = it,
         color = colors.accentRed,
         fontSize = 12.sp,
-        modifier = Modifier.padding(top = 8.dp))
+        modifier = Modifier.padding(top = 8.dp).testTag(EdConnectTags.ErrorMessage))
   }
 }
 
@@ -226,7 +242,7 @@ private fun EdConnectButton(
   Button(
       onClick = onClick,
       enabled = isEnabled,
-      modifier = Modifier.fillMaxWidth(),
+      modifier = Modifier.fillMaxWidth().testTag(EdConnectTags.ConnectButton),
       colors =
           ButtonDefaults.buttonColors(
               containerColor = if (isEnabled) ed1 else colors.accentRed,
@@ -293,7 +309,8 @@ internal fun EdConnectTopBar(onBackClick: () -> Unit, colors: ConnectorsColors) 
             color = colors.textPrimary,
             fontSize = Dimens.TopBarTitleFontSize,
             fontWeight = FontWeight.SemiBold,
-            letterSpacing = Dimens.TopBarTitleLetterSpacing)
+            letterSpacing = Dimens.TopBarTitleLetterSpacing,
+            modifier = Modifier.testTag(EdConnectTags.Title))
       }
 }
 
