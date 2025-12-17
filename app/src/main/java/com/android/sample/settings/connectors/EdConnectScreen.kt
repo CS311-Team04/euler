@@ -48,6 +48,7 @@ object EdConnectTags {
   const val TokenField = "ed_connect_token_field"
   const val GetTokenButton = "ed_connect_get_token_button"
   const val ConnectButton = "ed_connect_connect_button"
+  const val ErrorMessage = "ed_connect_error_message"
 }
 
 /**
@@ -226,7 +227,7 @@ private fun EdConnectError(error: String?, colors: ConnectorsColors) {
         text = it,
         color = colors.accentRed,
         fontSize = 12.sp,
-        modifier = Modifier.padding(top = 8.dp))
+        modifier = Modifier.padding(top = 8.dp).testTag(EdConnectTags.ErrorMessage))
   }
 }
 

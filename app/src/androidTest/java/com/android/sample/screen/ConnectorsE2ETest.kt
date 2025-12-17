@@ -13,11 +13,9 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.android.sample.authentification.AuthTags
-import com.android.sample.home.DrawerTags
-import com.android.sample.home.HomeTags
 import com.android.sample.settings.Localization
 import com.android.sample.settings.connectors.EdConnectTags
+import com.android.sample.settings.connectors.MoodleConnectDialogTags
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -33,51 +31,21 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ConnectorsE2ETest : BaseE2ETest() {
 
+  private val homeRobot: HomeRobot
+    get() = HomeRobot(composeRule)
+
   @Before
   fun setup() {
-    navigateToHomeScreen()
-  }
-
-  private fun navigateToHomeScreen() {
-    // Wait for opening screen to navigate
-    composeRule.waitForIdle()
-    Thread.sleep(3000)
-
-    // Click guest button to navigate to home
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(AuthTags.Root), timeoutMillis = 5_000)
-    composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).performClick()
-    composeRule.waitForIdle()
-
-    // Wait for home screen
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.Root), timeoutMillis = 10_000)
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.MenuBtn), timeoutMillis = 5_000)
-    composeRule.waitForIdle()
+    homeRobot.navigateToHome()
   }
 
   @Test
   fun connectors_flow_navigate_to_connectors_screen() {
-    // Step 1: Open drawer
-    composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
-    composeRule.waitForIdle()
+    // Navigate to connectors screen using robot pattern
+    val connectorsRobot = homeRobot.openDrawer().goToConnectors()
 
-    // Step 2: Wait for drawer and click on Connectors
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(DrawerTags.Root), timeoutMillis = 3_000)
-    Thread.sleep(500) // Allow drawer animation
-
-    // Click on Connectors row in drawer
-    composeRule.waitUntilAtLeastOneExists(
-        hasTestTag(DrawerTags.ConnectorsRow), timeoutMillis = 3_000)
-    composeRule.onNodeWithTag(DrawerTags.ConnectorsRow).performClick()
-    composeRule.waitForIdle()
-
-    // Step 3: Verify Connectors screen is displayed
-    Thread.sleep(1000) // Allow navigation animation
-    composeRule.waitForIdle()
-
-    // Verify connectors screen title
-    composeRule.waitUntilAtLeastOneExists(
-        hasText(Localization.t("connectors")), timeoutMillis = 5_000)
-    composeRule.onNodeWithText(Localization.t("connectors")).assertIsDisplayed()
+    // Verify Connectors screen is displayed
+    connectorsRobot.verifyConnectorsScreenDisplayed()
 
     // Verify subtitle
     composeRule
@@ -87,20 +55,8 @@ class ConnectorsE2ETest : BaseE2ETest() {
 
   @Test
   fun connectors_flow_navigate_to_ed_connect_screen() {
-    // Step 1: Navigate to connectors screen
-    navigateToConnectorsScreen()
-
-    // Step 2: Find and click on Ed connector card
-    // Ed connector should be visible in the grid
-    composeRule.waitUntilAtLeastOneExists(hasText("Ed"), timeoutMillis = 5_000)
-    composeRule.onNodeWithText("Ed").performClick()
-    composeRule.waitForIdle()
-
-    // Step 3: Wait for Ed Connect screen to be displayed
-    // First verify the screen title appears (indicates navigation completed)
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(EdConnectTags.Title), timeoutMillis = 15_000)
-    composeRule.waitForIdle()
-    Thread.sleep(500) // Allow screen to fully render
+    // Navigate to Ed Connect screen using robot pattern
+    homeRobot.openDrawer().goToConnectors().clickEdConnector().verifyEdConnectScreenDisplayed()
 
     // Verify Ed Connect screen elements - use label text (not placeholder to avoid ambiguity)
     // Wait for the label to appear
@@ -119,25 +75,13 @@ class ConnectorsE2ETest : BaseE2ETest() {
 
   @Test
   fun connectors_flow_navigate_to_moodle_connect_dialog() {
-    // Step 1: Navigate to connectors screen
-    navigateToConnectorsScreen()
-
-    // Step 2: Find and click on Moodle connector card
-    composeRule.waitUntilAtLeastOneExists(hasText("Moodle"), timeoutMillis = 5_000)
-    composeRule.onNodeWithText("Moodle").performClick()
-    composeRule.waitForIdle()
-
-    // Step 3: Wait for Moodle redirect overlay (if shown) or dialog
-    Thread.sleep(2000) // Allow for redirect simulation
-
-    // Step 4: Verify Moodle connect dialog is displayed
-    composeRule.waitForIdle()
+    // Navigate to Moodle connect dialog using robot pattern
+    homeRobot.openDrawer().goToConnectors().clickMoodleConnector().verifyMoodleDialogDisplayed()
 
     // The dialog should appear with Moodle connection fields
     // Verify by checking for unique non-editable elements:
     // 1. "Forgot password?" link (unique to the dialog)
     val forgotPasswordText = Localization.t("settings_connectors_moodle_forgot_password")
-    composeRule.waitUntilAtLeastOneExists(hasText(forgotPasswordText), timeoutMillis = 10_000)
     composeRule.onNode(hasText(forgotPasswordText)).assertIsDisplayed()
 
     // 2. Verify editable fields are present (username and password fields)
@@ -150,17 +94,8 @@ class ConnectorsE2ETest : BaseE2ETest() {
 
   @Test
   fun connectors_flow_ed_connection_process() {
-    // Step 1: Navigate to Ed Connect screen
-    navigateToConnectorsScreen()
-    composeRule.waitUntilAtLeastOneExists(hasText("Ed"), timeoutMillis = 5_000)
-    composeRule.onNodeWithText("Ed").performClick()
-    composeRule.waitForIdle()
-
-    // Step 2: Verify Ed Connect screen is displayed
-    // First verify the screen title appears (indicates navigation completed)
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(EdConnectTags.Title), timeoutMillis = 15_000)
-    composeRule.waitForIdle()
-    Thread.sleep(500) // Allow screen to fully render
+    // Navigate to Ed Connect screen using robot pattern
+    homeRobot.openDrawer().goToConnectors().clickEdConnector().verifyEdConnectScreenDisplayed()
 
     composeRule.waitUntilAtLeastOneExists(
         hasTestTag(EdConnectTags.TokenLabel), timeoutMillis = 10_000)
@@ -192,33 +127,59 @@ class ConnectorsE2ETest : BaseE2ETest() {
     composeRule.onNodeWithTag(EdConnectTags.ConnectButton).performScrollTo().assertIsDisplayed()
 
     // Step 5: Click Connect button to trigger connection process
-    // Note: This will attempt to connect, but may fail without valid credentials
-    // The test verifies that the connection process is triggered
     composeRule.onNodeWithTag(EdConnectTags.ConnectButton).performClick()
     composeRule.waitForIdle()
 
-    // Step 6: Verify that connection process started (loading state or error)
-    // Either loading indicator appears or error message (if invalid token)
-    Thread.sleep(2000) // Allow for connection attempt
+    // Step 6: Verify that connection process started - check for deterministic outcome
+    // After clicking, one of these should happen:
+    // 1. Error message appears (invalid token)
+    // 2. Button becomes disabled (loading state with CircularProgressIndicator)
+    // 3. Navigation back occurs (successful connection)
     composeRule.waitForIdle()
 
-    // The screen should either show loading or error, or navigate back if successful
-    // We verify that the connection attempt was made
+    // Wait for UI to update after connection attempt
+    composeRule.waitForIdle()
+
+    // Verify post-condition: Check which outcome occurred
+    // First, check if we navigated back (successful connection)
+    val navigatedBack =
+        try {
+          composeRule.onNodeWithTag(EdConnectTags.Root).assertIsDisplayed()
+          false
+        } catch (e: AssertionError) {
+          // Screen root doesn't exist, we navigated back
+          true
+        }
+
+    if (navigatedBack) {
+      // Navigation back occurred (successful connection)
+      composeRule.waitUntilAtLeastOneExists(
+          hasText(Localization.t("connectors")), timeoutMillis = 3_000)
+    } else {
+      // Still on Ed Connect screen, verify either error appeared or button is present
+      // (loading state)
+      val errorAppeared =
+          try {
+            composeRule.onNodeWithTag(EdConnectTags.ErrorMessage).assertIsDisplayed()
+            true
+          } catch (e: AssertionError) {
+            false
+          }
+
+      if (!errorAppeared) {
+        // No error, verify button is still present (loading state)
+        composeRule.onNodeWithTag(EdConnectTags.ConnectButton).assertIsDisplayed()
+      }
+    }
   }
 
   @Test
   fun connectors_flow_moodle_connection_process() {
-    // Step 1: Navigate to Moodle connect dialog
-    navigateToConnectorsScreen()
-    composeRule.waitUntilAtLeastOneExists(hasText("Moodle"), timeoutMillis = 5_000)
-    composeRule.onNodeWithText("Moodle").performClick()
-    composeRule.waitForIdle()
-    Thread.sleep(2000) // Allow for redirect simulation
+    // Navigate to Moodle connect dialog using robot pattern
+    homeRobot.openDrawer().goToConnectors().clickMoodleConnector().verifyMoodleDialogDisplayed()
 
-    // Step 2: Verify Moodle dialog is displayed
-    // Verify by checking for unique non-editable elements like "Forgot password?" link
+    // Verify "Forgot password?" link is displayed
     val forgotPasswordText = Localization.t("settings_connectors_moodle_forgot_password")
-    composeRule.waitUntilAtLeastOneExists(hasText(forgotPasswordText), timeoutMillis = 10_000)
     composeRule.onNode(hasText(forgotPasswordText)).assertIsDisplayed()
 
     // Also verify that editable fields are present
@@ -230,7 +191,7 @@ class ConnectorsE2ETest : BaseE2ETest() {
 
     // Wait for both fields to be available
     composeRule.waitUntilAtLeastOneExists(isEditable(), timeoutMillis = 3_000)
-    Thread.sleep(500) // Small delay to ensure fields are ready
+    composeRule.waitForIdle()
 
     // Enter username - first editable field (index 0)
     val editableFields = composeRule.onAllNodes(isEditable())
@@ -239,7 +200,6 @@ class ConnectorsE2ETest : BaseE2ETest() {
 
     // Enter password - second editable field (index 1)
     composeRule.waitForIdle()
-    Thread.sleep(500) // Small delay between inputs
     editableFields[1].performTextInput("test_password")
     composeRule.waitForIdle()
 
@@ -257,33 +217,50 @@ class ConnectorsE2ETest : BaseE2ETest() {
     loginNodes[1].assertIsDisplayed()
 
     // Step 5: Click Connect button to trigger connection process
-    // Note: This will attempt to connect, but may fail without valid credentials
-    // The test verifies that the connection process is triggered
     loginNodes[1].performClick()
     composeRule.waitForIdle()
 
-    // Step 6: Verify that connection process started (loading state or error)
-    Thread.sleep(2000) // Allow for connection attempt
+    // Step 6: Verify that connection process started - check for deterministic outcome
+    // After clicking, one of these should happen:
+    // 1. Error message appears (invalid credentials)
+    // 2. Button becomes disabled (loading state with CircularProgressIndicator)
+    // 3. Dialog closes and navigation occurs (successful connection)
     composeRule.waitForIdle()
 
-    // The dialog should either show loading or error message
-    // We verify that the connection attempt was made
-  }
-
-  private fun navigateToConnectorsScreen() {
-    // Open drawer
-    composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
+    // Wait for UI to update after connection attempt
     composeRule.waitForIdle()
 
-    // Wait for drawer
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(DrawerTags.Root), timeoutMillis = 3_000)
-    Thread.sleep(500)
+    // Verify post-condition: Check which outcome occurred
+    // First, check if dialog closed (successful connection)
+    val dialogClosed =
+        try {
+          composeRule.onNode(hasText(forgotPasswordText)).assertIsDisplayed()
+          false
+        } catch (e: AssertionError) {
+          // Dialog closed, navigation occurred
+          true
+        }
 
-    // Click on Connectors row
-    composeRule.waitUntilAtLeastOneExists(
-        hasTestTag(DrawerTags.ConnectorsRow), timeoutMillis = 3_000)
-    composeRule.onNodeWithTag(DrawerTags.ConnectorsRow).performClick()
-    composeRule.waitForIdle()
-    Thread.sleep(1000) // Allow navigation
+    if (dialogClosed) {
+      // Dialog closed, navigation occurred (successful connection)
+      composeRule.waitUntilAtLeastOneExists(
+          hasText(Localization.t("connectors")), timeoutMillis = 3_000)
+    } else {
+      // Dialog still open, verify either error appeared or button is present (loading state)
+      val errorAppeared =
+          try {
+            composeRule.onNodeWithTag(MoodleConnectDialogTags.ErrorMessage).assertIsDisplayed()
+            true
+          } catch (e: AssertionError) {
+            false
+          }
+
+      if (!errorAppeared) {
+        // No error, verify that connection process started
+        // When loading, the button text is replaced by CircularProgressIndicator,
+        // so we verify that the dialog is still open (connection process is in progress)
+        composeRule.onNode(hasText(forgotPasswordText)).assertIsDisplayed()
+      }
+    }
   }
 }

@@ -45,12 +45,18 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.sample.ui.components.GuestProfileWarningModal
+
+/** Test tags for Settings screen. */
+object SettingsTags {
+  const val Root = "settings_root"
+}
 
 @Composable
 fun SettingsPage(
@@ -74,7 +80,7 @@ fun SettingsPage(
   val language by AppSettings.languageState
   val appearanceMode by AppSettings.appearanceState
 
-  Box(modifier = Modifier.fillMaxSize().background(background)) {
+  Box(modifier = Modifier.fillMaxSize().background(background).testTag(SettingsTags.Root)) {
     Column(
         modifier =
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 48.dp)) {

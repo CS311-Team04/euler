@@ -25,14 +25,29 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class GuestAuthenticationFlowE2ETest : BaseE2ETest() {
 
-  @Test
-  fun guest_authentication_flow_complete_journey() {
-    // Step 1: Wait for Opening Screen to appear (it auto-navigates after 2.5 seconds)
+  /**
+   * Helper function to navigate from app launch to home screen as a guest. Encapsulates the common
+   * flow: Opening Screen -> Sign In Screen -> Guest Login -> Home Screen.
+   */
+  private fun goToHomeAsGuest() {
+    // Step 1: Wait for Opening Screen to navigate to Sign In screen
     // The opening screen will automatically navigate to Sign In
     composeRule.waitForIdle()
-    Thread.sleep(3000) // Wait for opening screen navigation
+    composeRule.waitUntilAtLeastOneExists(hasTestTag(AuthTags.Root), timeoutMillis = 5_000)
 
-    // Step 2: Verify Sign In Screen is displayed
+    // Step 2: Click on "Continue as a guest" button
+    composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).performClick()
+    composeRule.waitForIdle()
+
+    // Step 3: Wait for navigation to Home Screen
+    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.Root), timeoutMillis = 10_000)
+    composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
+  }
+
+  @Test
+  fun guest_authentication_flow_complete_journey() {
+    // Step 1: Wait for Opening Screen to navigate to Sign In screen and verify it
+    composeRule.waitForIdle()
     composeRule.waitUntilAtLeastOneExists(hasTestTag(AuthTags.Root), timeoutMillis = 5_000)
     composeRule.onNodeWithTag(AuthTags.Root).assertIsDisplayed()
 
@@ -42,15 +57,10 @@ class GuestAuthenticationFlowE2ETest : BaseE2ETest() {
     composeRule.onNodeWithTag(AuthTags.BtnMicrosoft).assertIsDisplayed()
     composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsDisplayed()
 
-    // Step 3: Click on "Continue as a guest" button
-    composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).performClick()
-    composeRule.waitForIdle()
+    // Step 2: Navigate to home as guest
+    goToHomeAsGuest()
 
-    // Step 4: Wait for navigation to Home Screen
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.Root), timeoutMillis = 10_000)
-    composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
-
-    // Step 5: Verify Home Screen elements are displayed
+    // Step 3: Verify Home Screen elements are displayed
     composeRule.onNodeWithTag(HomeTags.MenuBtn).assertIsDisplayed()
     composeRule.onNodeWithTag(HomeTags.TopRightBtn).assertIsDisplayed()
     composeRule.onNodeWithTag(HomeTags.MessageField).assertIsDisplayed()
@@ -61,21 +71,8 @@ class GuestAuthenticationFlowE2ETest : BaseE2ETest() {
 
   @Test
   fun guest_authentication_flow_verifies_guest_mode() {
-    // Navigate through the flow
-    composeRule.waitForIdle()
-    Thread.sleep(3000) // Wait for opening screen navigation
-
-    // Verify Sign In Screen
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(AuthTags.Root), timeoutMillis = 5_000)
-    composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).assertIsDisplayed()
-
-    // Click guest button
-    composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).performClick()
-    composeRule.waitForIdle()
-
-    // Verify Home Screen is in guest mode
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.Root), timeoutMillis = 10_000)
-    composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
+    // Navigate to home as guest
+    goToHomeAsGuest()
 
     // Verify that suggestion chips are available (guest mode should still show these)
     composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.Action1Btn), timeoutMillis = 5_000)

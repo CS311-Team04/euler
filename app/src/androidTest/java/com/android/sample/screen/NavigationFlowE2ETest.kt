@@ -6,11 +6,10 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
+import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
-import com.android.sample.authentification.AuthTags
-import com.android.sample.home.DrawerTags
 import com.android.sample.home.HomeTags
+import com.android.sample.settings.SettingsTags
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -26,86 +25,41 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class NavigationFlowE2ETest : BaseE2ETest() {
 
+  private val homeRobot: HomeRobot
+    get() = HomeRobot(composeRule)
+
   @Before
   fun setup() {
     // Navigate to home screen as guest for testing
-    navigateToHomeScreen()
-  }
-
-  private fun navigateToHomeScreen() {
-    // Wait for opening screen to navigate
-    composeRule.waitForIdle()
-    Thread.sleep(3000)
-
-    // Click guest button to navigate to home
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(AuthTags.Root), timeoutMillis = 5_000)
-    composeRule.onNodeWithTag(AuthTags.BtnSwitchEdu).performClick()
-    composeRule.waitForIdle()
-
-    // Wait for home screen root
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.Root), timeoutMillis = 10_000)
-
+    homeRobot.navigateToHome()
     // Wait for home screen elements to be fully loaded
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.MenuBtn), timeoutMillis = 5_000)
     composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.MessageField), timeoutMillis = 5_000)
     composeRule.waitForIdle()
   }
 
   @Test
   fun navigation_flow_home_to_settings_and_back() {
-    // Step 1: Verify Home Screen is displayed and wait for menu button
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.Root), timeoutMillis = 5_000)
-    composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
+    // Step 1: Verify Home Screen is displayed
+    homeRobot.verifyHomeScreenDisplayed()
 
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.MenuBtn), timeoutMillis = 5_000)
-    composeRule.onNodeWithTag(HomeTags.MenuBtn).assertIsDisplayed()
+    // Step 2-5: Open drawer and navigate to Settings using robot pattern
+    val drawerRobot = homeRobot.openDrawer().verifyDrawerDisplayed()
+    drawerRobot.goToSettings()
 
-    // Step 2: Open the drawer by clicking menu button
-    composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
+    // Step 6-7: Verify Settings screen is displayed
+    composeRule.waitUntilAtLeastOneExists(hasTestTag(SettingsTags.Root), timeoutMillis = 5_000)
+    composeRule.onNodeWithTag(SettingsTags.Root).assertIsDisplayed()
     composeRule.waitForIdle()
 
-    // Step 3: Wait for drawer to open and verify it's displayed
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(DrawerTags.Root), timeoutMillis = 3_000)
-    composeRule.onNodeWithTag(DrawerTags.Root).assertIsDisplayed()
-
-    // Step 4: Verify drawer content is visible
+    // Step 8: Use Espresso pressBack() to return to home
+    Espresso.pressBack()
     composeRule.waitForIdle()
-    Thread.sleep(500) // Allow drawer animation to complete
-
-    // Step 5: Click on Settings icon in drawer footer
-    composeRule.waitUntilAtLeastOneExists(
-        hasTestTag(DrawerTags.UserSettings), timeoutMillis = 3_000)
-    composeRule.onNodeWithTag(DrawerTags.UserSettings).assertIsDisplayed()
-    composeRule.onNodeWithTag(DrawerTags.UserSettings).performClick()
-    composeRule.waitForIdle()
-
-    // Step 6: Wait for Settings screen to appear
-    // Settings screen should be displayed (we verify by checking drawer is closed)
-    Thread.sleep(1000) // Allow navigation animation
-    composeRule.waitForIdle()
-
-    // Step 7: Verify navigation to Settings occurred
-    // The drawer should be closed after navigation
-    // We verify this by checking that the drawer root is no longer visible
-    composeRule.waitForIdle()
-
-    // Step 8: Use activity back press to return to home (must be on main thread)
-    InstrumentationRegistry.getInstrumentation().runOnMainSync {
-      composeRule.activity.onBackPressedDispatcher.onBackPressed()
-    }
-    composeRule.waitForIdle()
-    Thread.sleep(500) // Allow navigation animation
 
     // Step 9: Verify we're back on Home Screen
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.Root), timeoutMillis = 5_000)
-    composeRule.onNodeWithTag(HomeTags.Root).assertIsDisplayed()
+    homeRobot.verifyHomeScreenDisplayed()
 
     // Verify we can open drawer again
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(HomeTags.MenuBtn), timeoutMillis = 5_000)
-    composeRule.onNodeWithTag(HomeTags.MenuBtn).performClick()
-    composeRule.waitForIdle()
-    composeRule.waitUntilAtLeastOneExists(hasTestTag(DrawerTags.Root), timeoutMillis = 3_000)
-    composeRule.onNodeWithTag(DrawerTags.Root).assertIsDisplayed()
+    homeRobot.openDrawer().verifyDrawerDisplayed()
   }
 
   @Test

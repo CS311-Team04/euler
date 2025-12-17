@@ -5,7 +5,6 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.core.app.ApplicationProvider
 import com.android.sample.MainActivity
 import com.google.firebase.FirebaseApp
-import com.google.firebase.FirebaseOptions
 import org.junit.BeforeClass
 import org.junit.Rule
 
@@ -23,12 +22,7 @@ abstract class BaseE2ETest {
     fun initializeFirebase() {
       val context = ApplicationProvider.getApplicationContext<Context>()
       if (FirebaseApp.getApps(context).isEmpty()) {
-        val options =
-            FirebaseOptions.Builder()
-                .setApplicationId("1:1234567890:android:integration-test")
-                .setProjectId("integration-test")
-                .setApiKey("fake-api-key")
-                .build()
+        val options = TestFirebaseConfig.createFirebaseOptions()
         FirebaseApp.initializeApp(context, options)
       }
     }
