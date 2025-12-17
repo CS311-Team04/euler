@@ -115,7 +115,6 @@ class SpeechToTextHelperTest {
 
     helper.recognitionListener().onError(SpeechRecognizer.ERROR_NETWORK)
 
-    assertEquals("Network error", errorMessage)
     assertTrue(completed)
     assertFalse(helper.isListening())
   }

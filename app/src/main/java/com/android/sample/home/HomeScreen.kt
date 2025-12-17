@@ -450,6 +450,8 @@ fun HomeScreen(
                                 onError = { _ -> isListening = false },
                                 onComplete = { isListening = false })
                           } else if (!ui.isOffline) {
+                            // User clicked mic while already listening - stop the recognition
+                            speechHelper?.stopListening()
                             isListening = false
                           }
                         },

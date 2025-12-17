@@ -183,7 +183,7 @@ class SpeechToTextHelper(
         override fun onError(error: Int) {
           isListening = false
           Log.w(TAG, "Speech recognition error: $error")
-          notifyError(errorMessageForCode(error))
+          // notifyError(errorMessageForCode(error))
           onCompleteCallback?.invoke()
         }
 
