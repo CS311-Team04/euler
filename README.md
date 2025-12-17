@@ -279,6 +279,22 @@ The project uses ktfmt for Kotlin code formatting:
 
 ---
 
+## Team
+
+Euler is developed and maintained by a dedicated team of software engineering students:
+
+| Name | GitHub |
+|------|--------|
+| Moncef | [@hfzmoncef2](https://github.com/hfzmoncef2) |
+| Hamza | [@hamzammt](https://github.com/hamzammt) |
+| Yassine | [@babbahy](https://github.com/babbahy) |
+| Ziyad | [@ziyad-m97](https://github.com/ziyad-m97) |
+| Yahya | [@treaks0](https://github.com/treaks0) |
+| Marc | [@marcoff62](https://github.com/marcoff62) |
+| Haytam | [@kaspro-coder](https://github.com/kaspro-coder) |
+
+---
+
 ## License
 
 This project is part of the CS-311 course at EPFL.
