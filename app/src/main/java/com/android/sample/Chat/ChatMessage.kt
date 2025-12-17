@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import com.android.sample.R
 import com.android.sample.settings.connectors.ConnectorsDimensions as Dimens
 import com.android.sample.ui.components.MarkdownText
+import com.android.sample.ui.theme.Dimensions
 import com.android.sample.ui.theme.EulerAudioButtonLoadingColor
 import com.android.sample.ui.theme.EulerAudioButtonTint
 import com.android.sample.ui.theme.EulerAudioButtonTintSemiTransparent
@@ -91,7 +92,7 @@ fun ChatMessage(
     maxUserBubbleWidthFraction: Float = 0.78f,
     onOpenAttachment: (ChatAttachment) -> Unit = {},
     onDownloadAttachment: (ChatAttachment) -> Unit = {},
-    sourceContent: @Composable (() -> Unit)? = null
+    onSourceClick: ((String) -> Unit)? = null
 ) {
   val isUser = message.type == ChatType.USER
 
@@ -112,7 +113,7 @@ fun ChatMessage(
         audioState = audioState,
         onOpenAttachment = onOpenAttachment,
         onDownloadAttachment = onDownloadAttachment,
-        sourceContent = sourceContent,
+        onSourceClick = onSourceClick,
         modifier = modifier)
   }
 }
@@ -165,7 +166,7 @@ private fun AiMessageColumn(
     audioState: MessageAudioState?,
     onOpenAttachment: (ChatAttachment) -> Unit,
     onDownloadAttachment: (ChatAttachment) -> Unit,
-    sourceContent: @Composable (() -> Unit)? = null,
+    onSourceClick: ((String) -> Unit)?,
     modifier: Modifier = Modifier
 ) {
   val moodleState = rememberMoodleParseState(message.text)
@@ -179,7 +180,7 @@ private fun AiMessageColumn(
               message = message,
               moodleState = moodleState,
               audioState = audioState,
-              sourceContent = sourceContent,
+              onSourceClick = onSourceClick,
               onOpenAttachment = onOpenAttachment,
               onDownloadAttachment = onDownloadAttachment)
     }
@@ -214,13 +215,14 @@ private fun AiMessageContent(
     message: ChatUIModel,
     moodleState: MoodleParseState,
     audioState: MessageAudioState?,
-    sourceContent: @Composable (() -> Unit)?,
+    onSourceClick: ((String) -> Unit)?,
     onOpenAttachment: (ChatAttachment) -> Unit,
     onDownloadAttachment: (ChatAttachment) -> Unit
 ) {
   Column(modifier = Modifier.fillMaxWidth()) {
     AiMessageTextContent(message = message, moodleState = moodleState)
-    AiMessageAudioControls(audioState = audioState, sourceContent = sourceContent)
+    AiMessageAudioControls(
+        message = message, audioState = audioState, onSourceClick = onSourceClick)
     AiMessageAttachment(
         attachment = message.attachment,
         onOpenAttachment = onOpenAttachment,
@@ -245,18 +247,27 @@ private fun AiMessageTextContent(message: ChatUIModel, moodleState: MoodleParseS
 
 @Composable
 private fun AiMessageAudioControls(
+    message: ChatUIModel,
     audioState: MessageAudioState?,
-    sourceContent: @Composable (() -> Unit)?
+    onSourceClick: ((String) -> Unit)?
 ) {
-  if (audioState == null && sourceContent == null) return
+  val source = message.source
+  val shouldShowSource =
+      source != null &&
+          !message.isThinking &&
+          source.compactType == com.android.sample.home.CompactSourceType.NONE &&
+          source.url != null
+
+  if (audioState == null && !shouldShowSource) return
   Spacer(modifier = Modifier.height(4.dp))
   Row(
       modifier = Modifier.fillMaxWidth(),
       horizontalArrangement = Arrangement.SpaceBetween,
       verticalAlignment = Alignment.CenterVertically) {
         // Source badge on the left
-        if (sourceContent != null) {
-          sourceContent()
+        if (shouldShowSource && onSourceClick != null && source != null) {
+          val sourceUrl = source.url!!
+          RagSourceBadge(url = sourceUrl, onClick = { onSourceClick(sourceUrl) })
         } else {
           Spacer(modifier = Modifier.weight(1f))
         }
@@ -376,6 +387,45 @@ private fun AudioPlaybackButton(
       }
     }
   }
+}
+
+/** Compact RAG source badge - small clickable pill with E_logo and domain name */
+@Composable
+private fun RagSourceBadge(url: String, onClick: () -> Unit) {
+  val colorScheme = MaterialTheme.colorScheme
+  val domain =
+      remember(url) {
+        runCatching { android.net.Uri.parse(url).host?.removePrefix("www.") }.getOrNull() ?: url
+      }
+
+  Surface(
+      onClick = onClick,
+      shape = RoundedCornerShape(Dimensions.SourceBadgeCornerRadius),
+      color = colorScheme.surfaceVariant,
+      modifier = Modifier.testTag("source_card_rag")) {
+        Row(
+            modifier =
+                Modifier.padding(
+                    horizontal = Dimensions.SourceBadgePaddingHorizontal,
+                    vertical = Dimensions.SourceBadgePaddingVertical),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Dimensions.SourceBadgeContentSpacing)) {
+              // EPFL "E" logo in white rounded square
+              Image(
+                  painter = painterResource(id = R.drawable.e_logo),
+                  contentDescription = "Source website",
+                  modifier =
+                      Modifier.size(Dimensions.SourceBadgeLogoSize)
+                          .clip(RoundedCornerShape(Dimensions.SourceBadgeLogoCornerRadius)),
+                  contentScale = ContentScale.Fit)
+              // Domain text
+              Text(
+                  text = domain,
+                  color = colorScheme.onSurfaceVariant,
+                  style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
+                  maxLines = 1)
+            }
+      }
 }
 
 @Composable

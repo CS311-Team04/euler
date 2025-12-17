@@ -511,25 +511,6 @@ fun HomeScreen(
                                   val audioState =
                                       audioController.audioStateFor(msg, ui.streamingMessageId)
 
-                                  // Build source content for RAG answers (compact pill badge)
-                                  val sourceContent: @Composable (() -> Unit)? =
-                                      if (msg.source != null &&
-                                          !msg.isThinking &&
-                                          msg.source.compactType == CompactSourceType.NONE &&
-                                          msg.source.url != null) {
-                                        {
-                                          RagSourceBadge(
-                                              url = msg.source.url,
-                                              onClick = {
-                                                val intent =
-                                                    Intent(
-                                                        Intent.ACTION_VIEW,
-                                                        Uri.parse(msg.source.url))
-                                                context.startActivity(intent)
-                                              })
-                                        }
-                                      } else null
-
                                   // Render the chat bubble with source inline
                                   ChatMessage(
                                       message = msg,
@@ -543,7 +524,10 @@ fun HomeScreen(
                                       onDownloadAttachment = { attachment ->
                                         startPdfDownload(context, attachment)
                                       },
-                                      sourceContent = sourceContent)
+                                      onSourceClick = { url ->
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                        context.startActivity(intent)
+                                      })
 
                                   // Show compact source indicators for schedule/food (after the
                                   // message)
@@ -1327,45 +1311,6 @@ private fun OfflineMessageBanner(onDismiss: () -> Unit, modifier: Modifier = Mod
       }
 }
 
-/** Compact RAG source badge - small clickable pill with E_logo and domain name */
-@Composable
-private fun RagSourceBadge(url: String, onClick: () -> Unit) {
-  val colorScheme = MaterialTheme.colorScheme
-  val domain =
-      remember(url) {
-        runCatching { android.net.Uri.parse(url).host?.removePrefix("www.") }.getOrNull() ?: url
-      }
-
-  Surface(
-      onClick = onClick,
-      shape = RoundedCornerShape(Dimensions.SourceBadgeCornerRadius),
-      color = colorScheme.surfaceVariant,
-      modifier = Modifier.testTag("source_card_rag")) {
-        Row(
-            modifier =
-                Modifier.padding(
-                    horizontal = Dimensions.SourceBadgePaddingHorizontal,
-                    vertical = Dimensions.SourceBadgePaddingVertical),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimensions.SourceBadgeContentSpacing)) {
-              // EPFL "E" logo in white rounded square
-              Image(
-                  painter = painterResource(id = R.drawable.e_logo),
-                  contentDescription = "EPFL",
-                  modifier =
-                      Modifier.size(Dimensions.SourceBadgeLogoSize)
-                          .clip(RoundedCornerShape(Dimensions.SourceBadgeLogoCornerRadius)),
-                  contentScale = ContentScale.Fit)
-              // Domain text
-              Text(
-                  text = domain,
-                  color = colorScheme.onSurfaceVariant,
-                  style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
-                  maxLines = 1)
-            }
-      }
-}
-
 @Composable
 private fun SourceCard(
     siteLabel: String,
@@ -1400,7 +1345,7 @@ private fun SourceCard(
               modifier = Modifier.size(Dimensions.CompactIndicatorIconSize))
           Spacer(Modifier.width(Dimensions.CompactIndicatorSpacing))
           Text(
-              text = "$emoji $siteLabel",
+              text = "EPFL",
               color = colorScheme.onSurfaceVariant,
               style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp))
         }

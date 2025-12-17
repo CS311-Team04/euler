@@ -33,6 +33,23 @@ data class Conversation(
 )
 
 /**
+ * Source metadata for RAG answers, stored as part of MessageDTO.
+ *
+ * Note: sourceSiteLabel is derived from sourceUrl at persistence time to avoid trusting UI-provided
+ * labels. The label is stored for display efficiency but can be regenerated from the URL if needed.
+ */
+data class MessageSourceMetadata(
+    val url: String,
+    val compactType: String // "NONE", "SCHEDULE", or "FOOD"
+) {
+  /** Derives a display label from the URL domain. */
+  fun deriveLabel(): String {
+    return runCatching { android.net.Uri.parse(url).host?.removePrefix("www.") ?: url }.getOrNull()
+        ?: url
+  }
+}
+
+/**
  * Lightweight message transfer object stored under:
  *
  * users/{ownerUid}/conversations/{conversationId}/messages/{messageId}
@@ -42,21 +59,20 @@ data class Conversation(
  * - text : String (full message content)
  * - createdAt : Timestamp (server timestamp for ordering and time labels)
  * - edCardId : String? (optional ID of associated EdCard stored in edCards subcollection)
- * - sourceSiteLabel : String? (optional label for RAG source, e.g. "epfl.ch")
  * - sourceUrl : String? (optional URL for RAG source)
  * - sourceCompactType : String? (optional compact type: "NONE", "SCHEDULE", "FOOD")
  *
  * Notes:
- * - Keep this DTO minimal for efficient real-time updates.
+ * - Source metadata is stored as separate fields for Firestore compatibility.
  * - Use `orderBy("createdAt", ASC)` when streaming a conversation.
  * - EdCard is stored in messages/{messageId}/edCards/{edCardId} subcollection.
+ * - sourceSiteLabel was removed; derive display labels from sourceUrl when needed.
  */
 data class MessageDTO(
     val role: String = "",
     val text: String = "",
     val createdAt: Timestamp? = null,
     val edCardId: String? = null,
-    val sourceSiteLabel: String? = null,
     val sourceUrl: String? = null,
     val sourceCompactType: String? = null
 )

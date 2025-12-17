@@ -290,9 +290,7 @@ class VoiceChatViewModelTest {
 
         runBlocking {
           whenever(repo.startNewConversation(any())).thenReturn("new-conv-id")
-          whenever(
-                  repo.appendMessage(
-                      any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
               .thenReturn("msg-id-1")
         }
 
@@ -324,9 +322,7 @@ class VoiceChatViewModelTest {
 
         runBlocking {
           whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-          whenever(
-                  repo.appendMessage(
-                      any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
               .thenReturn("msg-id-2")
         }
 
@@ -352,9 +348,7 @@ class VoiceChatViewModelTest {
 
         runBlocking {
           whenever(repo.startNewConversation(any())).thenReturn("conv-456")
-          whenever(
-                  repo.appendMessage(
-                      any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
               .thenReturn("msg-id-3")
         }
 
@@ -394,9 +388,7 @@ class VoiceChatViewModelTest {
         runBlocking { verify(repo, never()).startNewConversation(any()) }
         // Verify no messages were persisted
         runBlocking {
-          verify(repo, never())
-              .appendMessage(
-                  any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull())
+          verify(repo, never()).appendMessage(any(), any(), any(), anyOrNull(), anyOrNull())
         }
       }
 
@@ -408,9 +400,7 @@ class VoiceChatViewModelTest {
 
         runBlocking {
           whenever(repo.startNewConversation(any())).thenReturn("conv-789")
-          whenever(
-                  repo.appendMessage(
-                      any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
               .thenReturn("msg-id-4")
         }
 
@@ -445,9 +435,7 @@ class VoiceChatViewModelTest {
         val repo = mock<ConversationRepository>()
 
         runBlocking {
-          whenever(
-                  repo.appendMessage(
-                      any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
               .thenReturn("msg-id-5")
         }
 
@@ -481,9 +469,7 @@ class VoiceChatViewModelTest {
 
         runBlocking {
           whenever(repo.startNewConversation(any())).thenReturn("conv-error")
-          whenever(
-                  repo.appendMessage(
-                      any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
               .thenThrow(RuntimeException("Firestore error"))
         }
 
@@ -567,23 +553,11 @@ class VoiceChatViewModelTest {
           whenever(repo.startNewConversation(any())).thenReturn("conv-id")
           whenever(
                   repo.appendMessage(
-                      eq("conv-id"),
-                      eq("user"),
-                      eq("Test"),
-                      anyOrNull(),
-                      anyOrNull(),
-                      anyOrNull(),
-                      anyOrNull()))
+                      eq("conv-id"), eq("user"), eq("Test"), anyOrNull(), anyOrNull()))
               .thenThrow(RuntimeException("Persistence error"))
           whenever(
                   repo.appendMessage(
-                      eq("conv-id"),
-                      eq("assistant"),
-                      any(),
-                      anyOrNull(),
-                      anyOrNull(),
-                      anyOrNull(),
-                      anyOrNull()))
+                      eq("conv-id"), eq("assistant"), any(), anyOrNull(), anyOrNull()))
               .thenReturn("msg-id-6")
         }
 
@@ -614,23 +588,11 @@ class VoiceChatViewModelTest {
           whenever(repo.startNewConversation(any())).thenReturn("conv-id")
           whenever(
                   repo.appendMessage(
-                      eq("conv-id"),
-                      eq("user"),
-                      eq("Test"),
-                      anyOrNull(),
-                      anyOrNull(),
-                      anyOrNull(),
-                      anyOrNull()))
+                      eq("conv-id"), eq("user"), eq("Test"), anyOrNull(), anyOrNull()))
               .thenReturn("msg-id-7")
           whenever(
                   repo.appendMessage(
-                      eq("conv-id"),
-                      eq("assistant"),
-                      eq("Reply"),
-                      anyOrNull(),
-                      anyOrNull(),
-                      anyOrNull(),
-                      anyOrNull()))
+                      eq("conv-id"), eq("assistant"), eq("Reply"), anyOrNull(), anyOrNull()))
               .thenThrow(RuntimeException("Persistence error"))
         }
 
@@ -658,9 +620,7 @@ class VoiceChatViewModelTest {
 
         runBlocking {
           whenever(repo.startNewConversation(any())).thenReturn("conv-title-upgrade")
-          whenever(
-                  repo.appendMessage(
-                      any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
               .thenReturn("msg-id-8")
           whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
         }
@@ -703,9 +663,7 @@ class VoiceChatViewModelTest {
 
         runBlocking {
           whenever(repo.startNewConversation(any())).thenReturn("conv-title-fail")
-          whenever(
-                  repo.appendMessage(
-                      any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
               .thenReturn("msg-id-9")
         }
 

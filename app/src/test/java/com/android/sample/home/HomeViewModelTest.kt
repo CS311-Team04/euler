@@ -474,9 +474,7 @@ class HomeViewModelTest {
         val conversationRepo = mock<ConversationRepository>()
         runBlocking {
           whenever(conversationRepo.startNewConversation(any())).thenReturn("conv-123")
-          whenever(
-                  conversationRepo.appendMessage(
-                      any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+          whenever(conversationRepo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
               .thenReturn("msg-123")
           whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
           whenever(conversationRepo.conversationsFlow()).thenReturn(flowOf(emptyList()))
@@ -508,9 +506,7 @@ class HomeViewModelTest {
         val conversationRepo = mock<ConversationRepository>()
         runBlocking {
           whenever(conversationRepo.startNewConversation(any())).thenReturn("conv-123")
-          whenever(
-                  conversationRepo.appendMessage(
-                      any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+          whenever(conversationRepo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
               .thenReturn("msg-124")
           whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
           whenever(conversationRepo.conversationsFlow()).thenReturn(flowOf(emptyList()))
@@ -1214,9 +1210,7 @@ class HomeViewModelTest {
         val repo = mock<ConversationRepository>()
         runBlocking { whenever(repo.startNewConversation(any())).thenReturn("conv-123") }
         runBlocking {
-          whenever(
-                  repo.appendMessage(
-                      any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
               .thenReturn("msg-id")
         }
         runBlocking { whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit) }
@@ -1250,9 +1244,7 @@ class HomeViewModelTest {
         val repo = mock<ConversationRepository>()
         runBlocking { whenever(repo.startNewConversation(any())).thenReturn("conv-999") }
         runBlocking {
-          whenever(
-                  repo.appendMessage(
-                      any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
               .thenReturn("msg-id")
         }
         runBlocking { whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit) }
@@ -1505,10 +1497,9 @@ class HomeViewModelTest {
             }
 
         runBlocking {
-          whenever(
-                  repo.appendMessage(
-                      any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
-              .thenAnswer { throw mockException }
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull())).thenAnswer {
+            throw mockException
+          }
           whenever(repo.startNewConversation(any())).thenReturn("conv-123")
         }
 
@@ -1611,9 +1602,7 @@ class HomeViewModelTest {
         // First message succeeds
         runBlocking {
           whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-          whenever(
-                  repo.appendMessage(
-                      any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
               .thenReturn("msg-id")
         }
 
@@ -1627,10 +1616,9 @@ class HomeViewModelTest {
 
         // Second message fails
         runBlocking {
-          whenever(
-                  repo.appendMessage(
-                      any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
-              .thenAnswer { throw RuntimeException("Test error") }
+          whenever(repo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull())).thenAnswer {
+            throw RuntimeException("Test error")
+          }
         }
 
         viewModel.updateMessageDraft("Second message")
@@ -2093,9 +2081,7 @@ class HomeViewModelTest {
     val repo = mock<ConversationRepository>()
     runBlocking {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(
-              repo.appendMessage(
-                  any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
           .thenReturn("msg-id")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
       whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
@@ -2131,9 +2117,7 @@ class HomeViewModelTest {
     val repo = mock<ConversationRepository>()
     runBlocking {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(
-              repo.appendMessage(
-                  any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
           .thenReturn("msg-id")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
       whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
@@ -2173,9 +2157,7 @@ class HomeViewModelTest {
     val repo = mock<ConversationRepository>()
     runBlocking {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(
-              repo.appendMessage(
-                  any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
           .thenReturn("msg-id")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
     }
@@ -2214,9 +2196,7 @@ class HomeViewModelTest {
     val repo = mock<ConversationRepository>()
     runBlocking {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(
-              repo.appendMessage(
-                  any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
           .thenReturn("msg-id")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
     }
@@ -2248,9 +2228,7 @@ class HomeViewModelTest {
     val repo = mock<ConversationRepository>()
     runBlocking {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(
-              repo.appendMessage(
-                  any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
           .thenReturn("msg-id")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
       whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
@@ -2284,9 +2262,7 @@ class HomeViewModelTest {
     val repo = mock<ConversationRepository>()
     runBlocking {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(
-              repo.appendMessage(
-                  any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
           .thenReturn("msg-id")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
       whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
@@ -2319,9 +2295,7 @@ class HomeViewModelTest {
     val repo = mock<ConversationRepository>()
     runBlocking {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(
-              repo.appendMessage(
-                  any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
           .thenReturn("msg-id")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
       whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
@@ -2353,9 +2327,7 @@ class HomeViewModelTest {
     val repo = mock<ConversationRepository>()
     runBlocking {
       whenever(repo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(
-              repo.appendMessage(
-                  any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+      whenever(repo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
           .thenReturn("msg-id")
       whenever(repo.updateConversationTitle(any(), any())).thenReturn(Unit)
       whenever(repo.conversationsFlow()).thenReturn(flowOf(emptyList()))
@@ -2455,9 +2427,7 @@ class HomeViewModelTest {
     val conversationRepo = mock<ConversationRepository>()
     runBlocking {
       whenever(conversationRepo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(
-              conversationRepo.appendMessage(
-                  any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+      whenever(conversationRepo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
           .thenReturn("msg-id")
       whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
     }
@@ -2500,9 +2470,7 @@ class HomeViewModelTest {
     val conversationRepo = mock<ConversationRepository>()
     runBlocking {
       whenever(conversationRepo.startNewConversation(any())).thenReturn("conv-123")
-      whenever(
-              conversationRepo.appendMessage(
-                  any(), any(), any(), anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+      whenever(conversationRepo.appendMessage(any(), any(), any(), anyOrNull(), anyOrNull()))
           .thenReturn("msg-id")
       whenever(conversationRepo.updateConversationTitle(any(), any())).thenReturn(Unit)
     }
