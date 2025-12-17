@@ -143,6 +143,9 @@ class ConversationRepository(private val auth: FirebaseAuth, private val db: Fir
    * @param text Message body.
    * @param edCardId Optional ID of associated EdCard (for assistant messages that generate
    *   EdCards).
+   * @param sourceSiteLabel Optional label for RAG source (e.g. "epfl.ch").
+   * @param sourceUrl Optional URL for RAG source.
+   * @param sourceCompactType Optional compact type: "NONE", "SCHEDULE", "FOOD".
    * @return The Firestore document ID of the created message.
    * @throws AuthNotReadyException if user is signed out.
    */
@@ -150,7 +153,10 @@ class ConversationRepository(private val auth: FirebaseAuth, private val db: Fir
       conversationId: String,
       role: String,
       text: String,
-      edCardId: String? = null
+      edCardId: String? = null,
+      sourceSiteLabel: String? = null,
+      sourceUrl: String? = null,
+      sourceCompactType: String? = null
   ): String {
     val convRef = convCol().document(conversationId)
     val msgRef = msgCol(conversationId).document()
@@ -160,6 +166,15 @@ class ConversationRepository(private val auth: FirebaseAuth, private val db: Fir
             "role" to role, "text" to text, "content" to text, "createdAt" to now)
     if (edCardId != null) {
       messageData["edCardId"] = edCardId
+    }
+    if (sourceSiteLabel != null) {
+      messageData["sourceSiteLabel"] = sourceSiteLabel
+    }
+    if (sourceUrl != null) {
+      messageData["sourceUrl"] = sourceUrl
+    }
+    if (sourceCompactType != null) {
+      messageData["sourceCompactType"] = sourceCompactType
     }
     db.runBatch { b ->
           b.set(msgRef, messageData)

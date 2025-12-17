@@ -1237,7 +1237,15 @@ class HomeViewModel(
             if (conversationId != null) {
               try {
                 // Use repository method which handles timestamps correctly
-                repo.appendMessage(conversationId, "assistant", reply.reply)
+                // Include source metadata for persistence across conversation switches
+                repo.appendMessage(
+                    conversationId = conversationId,
+                    role = "assistant",
+                    text = reply.reply,
+                    edCardId = null,
+                    sourceSiteLabel = sourceMeta?.siteLabel,
+                    sourceUrl = sourceMeta?.url,
+                    sourceCompactType = sourceMeta?.compactType?.name)
               } catch (e: Exception) {
                 Log.w(TAG, "Failed to persist assistant message: ${e.message}")
                 handleSendMessageError(e, messageId)
@@ -1503,12 +1511,28 @@ class HomeViewModel(
   // ============ BACKEND CHAT ============
 
   // mapping MessageDTO -> UI
-  private fun MessageDTO.toUi(messageId: String): ChatUIModel =
-      ChatUIModel(
-          id = messageId, // Use Firestore document ID for stable message IDs
-          text = this.text,
-          timestamp = this.createdAt?.toDate()?.time ?: System.currentTimeMillis(),
-          type = if (this.role == "user") ChatType.USER else ChatType.AI)
+  private fun MessageDTO.toUi(messageId: String): ChatUIModel {
+    // Restore source metadata if present (for RAG sources persistence)
+    val sourceMeta =
+        if (this.sourceSiteLabel != null || this.sourceUrl != null) {
+          val compactType =
+              try {
+                this.sourceCompactType?.let { CompactSourceType.valueOf(it) }
+                    ?: CompactSourceType.NONE
+              } catch (e: IllegalArgumentException) {
+                CompactSourceType.NONE
+              }
+          SourceMeta(
+              siteLabel = this.sourceSiteLabel, url = this.sourceUrl, compactType = compactType)
+        } else null
+
+    return ChatUIModel(
+        id = messageId, // Use Firestore document ID for stable message IDs
+        text = this.text,
+        timestamp = this.createdAt?.toDate()?.time ?: System.currentTimeMillis(),
+        type = if (this.role == "user") ChatType.USER else ChatType.AI,
+        source = sourceMeta)
+  }
 
   /** Make a short provisional title from the first prompt. */
   override fun onCleared() {

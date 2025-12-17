@@ -42,6 +42,9 @@ data class Conversation(
  * - text : String (full message content)
  * - createdAt : Timestamp (server timestamp for ordering and time labels)
  * - edCardId : String? (optional ID of associated EdCard stored in edCards subcollection)
+ * - sourceSiteLabel : String? (optional label for RAG source, e.g. "epfl.ch")
+ * - sourceUrl : String? (optional URL for RAG source)
+ * - sourceCompactType : String? (optional compact type: "NONE", "SCHEDULE", "FOOD")
  *
  * Notes:
  * - Keep this DTO minimal for efficient real-time updates.
@@ -52,5 +55,8 @@ data class MessageDTO(
     val role: String = "",
     val text: String = "",
     val createdAt: Timestamp? = null,
-    val edCardId: String? = null
+    val edCardId: String? = null,
+    val sourceSiteLabel: String? = null,
+    val sourceUrl: String? = null,
+    val sourceCompactType: String? = null
 )

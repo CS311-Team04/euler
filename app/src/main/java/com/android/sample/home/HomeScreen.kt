@@ -28,7 +28,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -38,7 +37,6 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -56,7 +54,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -510,7 +507,26 @@ fun HomeScreen(
                                   val audioState =
                                       audioController.audioStateFor(msg, ui.streamingMessageId)
 
-                                  // First render the chat bubble (for USER/AI text)
+                                  // Build source content for RAG answers (compact pill badge)
+                                  val sourceContent: @Composable (() -> Unit)? =
+                                      if (msg.source != null &&
+                                          !msg.isThinking &&
+                                          msg.source.compactType == CompactSourceType.NONE &&
+                                          msg.source.url != null) {
+                                        {
+                                          RagSourceBadge(
+                                              url = msg.source.url,
+                                              onClick = {
+                                                val intent =
+                                                    Intent(
+                                                        Intent.ACTION_VIEW,
+                                                        Uri.parse(msg.source.url))
+                                                context.startActivity(intent)
+                                              })
+                                        }
+                                      } else null
+
+                                  // Render the chat bubble with source inline
                                   ChatMessage(
                                       message = msg,
                                       modifier = Modifier.fillMaxWidth(),
@@ -522,35 +538,25 @@ fun HomeScreen(
                                       },
                                       onDownloadAttachment = { attachment ->
                                         startPdfDownload(context, attachment)
-                                      })
+                                      },
+                                      sourceContent = sourceContent)
 
-                                  // Then show the source card AFTER the answer (if any)
-                                  if (msg.source != null && !msg.isThinking) {
+                                  // Show compact source indicators for schedule/food (after the
+                                  // message)
+                                  if (msg.source != null &&
+                                      !msg.isThinking &&
+                                      msg.source.compactType != CompactSourceType.NONE) {
                                     Spacer(Modifier.height(8.dp))
-                                    val context = androidx.compose.ui.platform.LocalContext.current
                                     val sourceSiteLabel =
                                         msg.source.siteLabelRes?.let { stringResource(id = it) }
                                             ?: msg.source.siteLabel.orEmpty()
-                                    val sourceTitle =
-                                        msg.source.titleRes?.let { stringResource(id = it) }
-                                            ?: msg.source.title.orEmpty()
                                     SourceCard(
                                         siteLabel = sourceSiteLabel,
-                                        title = sourceTitle,
+                                        title = "",
                                         url = msg.source.url,
                                         retrievedAt = msg.source.retrievedAt,
                                         compactType = msg.source.compactType,
-                                        onVisit =
-                                            if (msg.source.url != null &&
-                                                msg.source.compactType == CompactSourceType.NONE) {
-                                              {
-                                                val intent =
-                                                    Intent(
-                                                        Intent.ACTION_VIEW,
-                                                        Uri.parse(msg.source.url))
-                                                context.startActivity(intent)
-                                              }
-                                            } else null)
+                                        onVisit = null)
                                   }
                                 }
                                 is TimelineItem.CardItem -> {
@@ -1317,6 +1323,41 @@ private fun OfflineMessageBanner(onDismiss: () -> Unit, modifier: Modifier = Mod
       }
 }
 
+/** Compact RAG source badge - small clickable pill with E_logo and domain name */
+@Composable
+private fun RagSourceBadge(url: String, onClick: () -> Unit) {
+  val colorScheme = MaterialTheme.colorScheme
+  val domain =
+      remember(url) {
+        runCatching { android.net.Uri.parse(url).host?.removePrefix("www.") }.getOrNull() ?: url
+      }
+
+  Surface(
+      onClick = onClick,
+      shape = RoundedCornerShape(20.dp),
+      color = colorScheme.surfaceVariant,
+      modifier = Modifier.testTag("source_card_rag")) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+              // EPFL "E" logo in white rounded square
+              // Note: Replace with R.drawable.e_logo when the E_logo resource is added
+              Image(
+                  painter = painterResource(id = R.drawable.e_logo),
+                  contentDescription = "EPFL",
+                  modifier = Modifier.size(18.dp).clip(RoundedCornerShape(3.dp)),
+                  contentScale = ContentScale.Fit)
+              // Domain text
+              Text(
+                  text = domain,
+                  color = colorScheme.onSurfaceVariant,
+                  style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
+                  maxLines = 1)
+            }
+      }
+}
+
 @Composable
 private fun SourceCard(
     siteLabel: String,
@@ -1353,76 +1394,9 @@ private fun SourceCard(
               color = colorScheme.onSurfaceVariant,
               style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp))
         }
-  } else {
-    // Full RAG source card with Visit button
-    Column(
-        modifier =
-            Modifier.fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(colorScheme.surfaceVariant)
-                .padding(horizontal = 12.dp, vertical = 6.dp)) {
-          // Top line: "Retrieved from EPFL.ch Website"
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = Icons.Default.CheckCircle,
-                contentDescription = null,
-                tint = com.android.sample.ui.theme.EulerGreen,
-                modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(4.dp))
-            Text(
-                text = "Retrieved from  $siteLabel",
-                color = colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp))
-          }
-
-          Spacer(Modifier.height(4.dp))
-
-          Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            // URL (ellipsized to one line)
-            Text(
-                text = url ?: "",
-                color = colorScheme.onSurface,
-                style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f))
-
-            Spacer(Modifier.width(6.dp))
-
-            if (onVisit != null && url != null) {
-              Button(
-                  onClick = onVisit,
-                  shape = RoundedCornerShape(6.dp),
-                  contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                  colors = ButtonDefaults.buttonColors(containerColor = colorScheme.primary)) {
-                    Text("Visit", color = colorScheme.onPrimary)
-                    Spacer(Modifier.width(6.dp))
-                    Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Outlined.OpenInNew,
-                        contentDescription = null,
-                        modifier = Modifier.size(10.dp),
-                        tint = colorScheme.onPrimary)
-                  }
-            }
-          }
-
-          Spacer(Modifier.height(2.dp))
-
-          // Retrieved date
-          val dateStr =
-              remember(retrievedAt) {
-                val d =
-                    java.time.Instant.ofEpochMilli(retrievedAt)
-                        .atZone(java.time.ZoneId.systemDefault())
-                        .toLocalDate()
-                "%02d/%02d/%02d".format(d.dayOfMonth, d.monthValue, d.year % 100)
-              }
-          Text(
-              text = "Retrieved on $dateStr",
-              color = colorScheme.onSurfaceVariant,
-              style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp))
-        }
   }
+  // Note: RAG sources (compactType == NONE) are now handled by RagSourceBadge inline with audio
+  // button
 }
 
 @Preview(showBackground = true, backgroundColor = 0x000000)

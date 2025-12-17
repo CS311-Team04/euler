@@ -90,7 +90,8 @@ fun ChatMessage(
     aiText: Color = Color(0xFFEDEDED),
     maxUserBubbleWidthFraction: Float = 0.78f,
     onOpenAttachment: (ChatAttachment) -> Unit = {},
-    onDownloadAttachment: (ChatAttachment) -> Unit = {}
+    onDownloadAttachment: (ChatAttachment) -> Unit = {},
+    sourceContent: @Composable (() -> Unit)? = null
 ) {
   val isUser = message.type == ChatType.USER
 
@@ -111,6 +112,7 @@ fun ChatMessage(
         audioState = audioState,
         onOpenAttachment = onOpenAttachment,
         onDownloadAttachment = onDownloadAttachment,
+        sourceContent = sourceContent,
         modifier = modifier)
   }
 }
@@ -163,6 +165,7 @@ private fun AiMessageColumn(
     audioState: MessageAudioState?,
     onOpenAttachment: (ChatAttachment) -> Unit,
     onDownloadAttachment: (ChatAttachment) -> Unit,
+    sourceContent: @Composable (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
   val moodleState = rememberMoodleParseState(message.text)
@@ -176,6 +179,7 @@ private fun AiMessageColumn(
               message = message,
               moodleState = moodleState,
               audioState = audioState,
+              sourceContent = sourceContent,
               onOpenAttachment = onOpenAttachment,
               onDownloadAttachment = onDownloadAttachment)
     }
@@ -210,12 +214,13 @@ private fun AiMessageContent(
     message: ChatUIModel,
     moodleState: MoodleParseState,
     audioState: MessageAudioState?,
+    sourceContent: @Composable (() -> Unit)?,
     onOpenAttachment: (ChatAttachment) -> Unit,
     onDownloadAttachment: (ChatAttachment) -> Unit
 ) {
   Column(modifier = Modifier.fillMaxWidth()) {
     AiMessageTextContent(message = message, moodleState = moodleState)
-    AiMessageAudioControls(audioState = audioState)
+    AiMessageAudioControls(audioState = audioState, sourceContent = sourceContent)
     AiMessageAttachment(
         attachment = message.attachment,
         onOpenAttachment = onOpenAttachment,
@@ -239,14 +244,26 @@ private fun AiMessageTextContent(message: ChatUIModel, moodleState: MoodleParseS
 }
 
 @Composable
-private fun AiMessageAudioControls(audioState: MessageAudioState?) {
-  if (audioState == null) return
+private fun AiMessageAudioControls(
+    audioState: MessageAudioState?,
+    sourceContent: @Composable (() -> Unit)?
+) {
+  if (audioState == null && sourceContent == null) return
   Spacer(modifier = Modifier.height(4.dp))
   Row(
       modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.End,
+      horizontalArrangement = Arrangement.SpaceBetween,
       verticalAlignment = Alignment.CenterVertically) {
-        AudioPlaybackButton(state = audioState, tint = EulerAudioButtonTintSemiTransparent)
+        // Source badge on the left
+        if (sourceContent != null) {
+          sourceContent()
+        } else {
+          Spacer(modifier = Modifier.weight(1f))
+        }
+        // Audio button on the right
+        if (audioState != null) {
+          AudioPlaybackButton(state = audioState, tint = EulerAudioButtonTintSemiTransparent)
+        }
       }
 }
 
