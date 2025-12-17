@@ -2,7 +2,7 @@
 
 import * as logger from "firebase-functions/logger";
 
-// Helper function to normalize URLs (imported from core/openai.ts pattern)
+// Helper function to normalize URLs (imported from core/llm.ts pattern)
 function withV1(url?: string): string {
   const u = (url ?? "").trim();
   if (!u) return "https://api.publicai.co/v1";

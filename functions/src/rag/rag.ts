@@ -6,7 +6,7 @@ import { embedInBatches } from "./embeddings";
 import { qdrantSearchHybrid, MAX_CANDIDATES, MAX_DOCS, MAX_PER_DOC, CONTEXT_BUDGET, SNIPPET_LIMIT, SCORE_GATE, SMALL_TALK } from "./qdrant";
 import { getScheduleContextCore } from "../features/schedule";
 import { answerFoodQuestionCore } from "../features/food";
-import { getChatClient, EPFL_SYSTEM_PROMPT } from "../core/openai";
+import { getChatClient, EPFL_SYSTEM_PROMPT } from "../core/llm";
 
 export type AnswerWithRagInput = {
   question: string;

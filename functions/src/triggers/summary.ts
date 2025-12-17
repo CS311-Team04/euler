@@ -3,7 +3,7 @@
 import * as logger from "firebase-functions/logger";
 import admin from "firebase-admin";
 import { db } from "../core/firebase";
-import { getChatClient } from "../core/openai";
+import { getChatClient } from "../core/llm";
 import OpenAI from "openai";
 
 export type ChatTurn = { role: "user" | "assistant"; content: string };

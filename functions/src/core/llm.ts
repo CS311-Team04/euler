@@ -1,4 +1,4 @@
-// functions/src/core/openai.ts
+// functions/src/core/llm.ts
 
 import * as logger from "firebase-functions/logger";
 import OpenAI from "openai";
@@ -11,22 +11,22 @@ function withV1(url?: string): string {
 }
 
 /* ---------- clients ---------- */
-// Chat = PublicAI (Apertus)
-let chatClient: OpenAI | null = null;
+// LLM client for Apertus (PublicAI)
+let llmClient: OpenAI | null = null;
 export function getChatClient(): OpenAI {
-  if (!chatClient) {
-    chatClient = new OpenAI({
+  if (!llmClient) {
+    llmClient = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY!,
       baseURL: withV1(process.env.OPENAI_BASE_URL),
       defaultHeaders: { "User-Agent": "euler-mvp/1.0 (genkit-functions)" },
     });
   }
-  return chatClient;
+  return llmClient;
 }
 
 // For testing: allow overriding the client
 export function setChatClient(client: OpenAI | null) {
-  chatClient = client;
+  llmClient = client;
 }
 
 /* ---------- EPFL system prompt (EULER) ---------- */
@@ -56,7 +56,7 @@ export const EPFL_SYSTEM_PROMPT =
   ].join("\n");
 
 /* =========================================================
- *                         CHAT (optional)
+ *                         CHAT (Apertus)
  * ======================================================= */
 export async function apertusChatFnCore({
   messages, model, temperature, client,

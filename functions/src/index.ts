@@ -8,7 +8,7 @@ import * as logger from "firebase-functions/logger";
 import * as functions from "firebase-functions/v1";
 import admin from "firebase-admin";
 import { db, europeFunctions, requireAuth, checkKey } from "./core/firebase";
-import { generateTitleCore, apertusChatFnCore, type GenerateTitleInput } from "./core/openai";
+import { generateTitleCore, apertusChatFnCore, type GenerateTitleInput } from "./core/llm";
 import { indexChunksCore, type IndexChunksInput } from "./rag/indexChunks";
 import { answerWithRagCore, type AnswerWithRagInput } from "./rag/rag";
 import { edBrainSearchCore } from "./features/ed";
@@ -805,5 +805,5 @@ export const onMessageCreate = europeFunctions.firestore
 
 // Re-export core functions for tests
 export { answerWithRagCore } from "./rag/rag";
-export { generateTitleCore } from "./core/openai";
+export { generateTitleCore } from "./core/llm";
 export { indexChunksCore } from "./rag/indexChunks";
