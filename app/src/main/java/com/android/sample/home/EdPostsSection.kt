@@ -40,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -104,7 +105,7 @@ fun EdPostsSection(
   val maxScrollableHeight = (configuration.screenHeightDp * 0.40f).dp // ⬅️ hauteur max
 
   Card(
-      modifier = modifier.fillMaxWidth().wrapContentHeight(),
+      modifier = modifier.fillMaxWidth().wrapContentHeight().testTag("ed_posts_section"),
       shape = RoundedCornerShape(24.dp),
       colors = CardDefaults.cardColors(containerColor = panelBg),
       elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),

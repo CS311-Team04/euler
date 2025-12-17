@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -73,7 +74,8 @@ fun EdPostConfirmationModal(
               .fillMaxWidth()
               .padding(
                   horizontal = EdPostDimensions.ContainerHorizontalPadding,
-                  vertical = EdPostDimensions.ContainerVerticalPadding),
+                  vertical = EdPostDimensions.ContainerVerticalPadding)
+              .testTag("ed_post_confirmation_modal"),
       verticalArrangement = Arrangement.spacedBy(EdPostDimensions.ContainerVerticalSpacing)) {
 
         // Gradient frame
