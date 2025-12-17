@@ -59,7 +59,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.offset
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -74,13 +73,14 @@ import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.ui.components.EdPostConfirmationModal
 import com.android.sample.ui.components.EdPostedCard
 import com.android.sample.ui.components.GuestProfileWarningModal
+import com.android.sample.ui.theme.Dimensions.InputHeight
+import com.android.sample.ui.theme.Dimensions.InputHorizontal
 import com.android.sample.ui.theme.EdPostDimensions
 import com.android.sample.ui.theme.EulerRed
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.Request
 
 object HomeTags {
   const val Root = "home_root"
@@ -812,9 +812,11 @@ private fun ChatInputBar(
             fontSize = 15.sp,
             fontWeight = FontWeight.Normal)
       },
-      modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp).height(52.dp),
+      modifier =
+          modifier.fillMaxWidth().padding(horizontal = InputHorizontal).heightIn(min = InputHeight),
       enabled = enabled,
-      singleLine = true,
+      singleLine = false,
+      maxLines = 5,
       textStyle =
           MaterialTheme.typography.bodyMedium.copy(
               fontSize = 15.sp, fontWeight = FontWeight.Normal),

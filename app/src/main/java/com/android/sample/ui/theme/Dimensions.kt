@@ -10,4 +10,6 @@ object Dimensions {
   val BadgeContentSpacing = 12.dp
   val TextVerticalSpacing = 2.dp
   val BadgeSpacerHeight = 4.dp
+  val InputHorizontal = 16.dp
+  val InputHeight = 52.dp
 }

@@ -4,7 +4,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -43,7 +42,11 @@ class ChatMessageTest {
     }
 
     composeRule.onNodeWithTag("chat_ai_moodle_badge").assertIsDisplayed()
-    composeRule.onNodeWithTag("chat_ai_text").assertTextEquals("- Topic")
+    // MarkdownText renders "- Topic" as a bullet list, so check for the text content
+    // The "- " prefix is rendered as a bullet point, leaving "Topic: Details" as text
+    composeRule
+        .onNodeWithText("Topic", substring = true, useUnmergedTree = true)
+        .assertIsDisplayed()
   }
 
   @Test

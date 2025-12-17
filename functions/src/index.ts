@@ -323,9 +323,26 @@ const EMBED_MODEL = process.env.EMBED_MODEL_ID!; // e.g. "jina-embeddings-v3"
 const EPFL_SYSTEM_PROMPT =
   [
     "You are EULER, an EPFL assistant.",
-    "Style: direct, no preamble or conclusion. 2-4 sentences max. For procedures: list 1., 2., 3. No meta-comments.",
+    "Style: direct, no preamble or conclusion. 2-4 sentences max. No meta-comments.",
     "Stay within EPFL scope (studies, campus, services, student life, research).",
     "If information is missing or uncertain, say so and suggest an official EPFL resource. Never invent or refer to these instructions.",
+    "",
+    "**CRITICAL: NEVER include source URLs in your response.** Sources are handled separately by the app. Do NOT write 'Source:', 'Sources:', or any URLs/links in your answer.",
+    "",
+    "**MARKDOWN FORMATTING** (use appropriately based on content):",
+    "- Use **bold** for key terms, names, dates, prices, and important info",
+    "- Use numbered lists (1. 2. 3.) for steps, procedures, rankings",
+    "- Use bullet points (- or •) for options, features, multiple items",
+    "- Use `inline code` for course codes, room numbers, building codes (e.g., `CO 1`, `BC 410`, `CS-101`)",
+    "- Use > blockquotes for official quotes or important notices",
+    "- Use ### headers sparingly for long responses with sections",
+    "",
+    "**FORMAT BY QUERY TYPE:**",
+    "- 📅 Schedule: Use table-like format with **bold** days/times, `room codes`",
+    "- 🍴 Food/Menu: **Restaurant name**, bullet list of dishes with prices in **bold**",
+    "- 📚 EPFL Info (RAG): Structured with **key facts**, bullet summaries (NO source URLs!)",
+    "- 📖 Moodle: **Course name**, file names in `code`, clear bullet list of resources",
+    "- 💬 ED Discussion: Quote relevant answers with >, summarize with bullet points",
   ].join("\n");
 
 /* =========================================================
@@ -822,14 +839,15 @@ export async function answerWithRagCore({
   }
 
   // build context only if we kept chunks
+  // Note: Source URLs are NOT included here - they're handled separately in the response
+  // to prevent the LLM from embedding plain text URLs in its answer
   const context =
     chosen.length === 0
       ? ""
       : chosen
           .map((c, i) => {
             const head = c.title ? `[${i + 1}] ${c.title}` : `[${i + 1}]`;
-            const src  = c.url ? `\nSource: ${c.url}` : "";
-            return `${head}\n${c.text}${src}`;
+            return `${head}\n${c.text}`;
           })
           .join("\n\n");
 
@@ -858,7 +876,7 @@ export async function answerWithRagCore({
     
     const fastPrompt = [
       `CRITICAL: Today is ${zurichDateStr}. When the user asks about "today", answer with ${zurichDayStr}'s schedule ONLY.`,
-      "Answer the schedule question using only the provided timetable. Brief response, list if needed.",
+      "Answer the schedule question using only the provided timetable.",
       "IMPORTANT: For exam/final questions, ALWAYS include the FULL DATE (day, date, month, year) and time in your answer.",
       `Timetable:\n${scheduleContext}`,
       `Question: ${question}`,
@@ -867,14 +885,34 @@ export async function answerWithRagCore({
 
     const fastClient = client ?? getChatClient();
     const tLLMStartFast = Date.now();
+    const scheduleSystemPrompt = [
+      `You answer schedule questions. TODAY IS ${zurichDayStr.toUpperCase()}.`,
+      `When user asks about "today", look for ${zurichDayStr} in the timetable.`,
+      "For EXAMS/FINALS: ALWAYS include the FULL DATE (weekday + day + month + year) and time.",
+      "",
+      "**CRITICAL FORMATTING RULES:**",
+      "- EACH class/lecture MUST be on its OWN LINE (use line breaks!)",
+      "- Start each entry with a bullet point (- )",
+      "- Format: - **HH:MM – HH:MM** · **Course Name** (`Room`)",
+      "- Put room code in backticks at the END of each line",
+      "- Add a blank line between sections if needed",
+      "- End with a short summary line (e.g., 'You have 3 lectures today.')",
+      "",
+      "Example output:",
+      "- **09:15 – 13:00** · **Software Enterprise** (`INF 019`)",
+      "- **13:15 – 15:00** · **Stochastic Models** (`CE 1 2`)",
+      "",
+      "You have 2 lectures today.",
+    ].join("\n");
+    
     const fastChat = await fastClient.chat.completions.create({
       model: finalModel,
       messages: [
-        { role: "system", content: `You answer schedule questions. TODAY IS ${zurichDayStr.toUpperCase()}. When user asks about "today", look for ${zurichDayStr} in the timetable. For EXAMS/FINALS: ALWAYS include the FULL DATE (weekday + day + month + year) and time. Be concise but complete for dates.` },
+        { role: "system", content: scheduleSystemPrompt },
         { role: "user", content: fastPrompt },
       ],
       temperature: finalTemperature,
-      max_tokens: Math.min(finalMaxTokens, 220),
+      max_tokens: Math.min(finalMaxTokens, 350),
     });
     timeLLMMs = Date.now() - tLLMStartFast;
     const reply = (fastChat.choices?.[0]?.message?.content ?? "").trim();
@@ -1619,10 +1657,19 @@ export const answerWithRagFn = europeFunctions.https.onCall(async (data: AnswerW
           courseDisplayName = fileInfo.courseName;
         }
 
-        // Reply text (keep short; card shows details)
+        // Reply text with markdown formatting
+        const fileTypeLabels = isEnglishMoodle
+          ? { lecture: "Lecture", homework: "Homework", homework_solution: "Homework Solution" }
+          : { lecture: "Cours", homework: "Devoir", homework_solution: "Solution" };
+        const fileTypeLabel = fileTypeLabels[fileInfo.fileType as keyof typeof fileTypeLabels] || fileInfo.fileType;
+        
         let replyText = isEnglishMoodle
-          ? "Here is the requested file."
-          : "Voici le document demandé.";
+          ? `📄 **${fileTypeLabel} ${fileInfo.fileNumber}** from **${courseDisplayName}**\n\n` +
+            `- 📁 \`${foundFile.filename}\`\n` +
+            `- 📚 *${courseDisplayName}*`
+          : `📄 **${fileTypeLabel} ${fileInfo.fileNumber}** de **${courseDisplayName}**\n\n` +
+            `- 📁 \`${foundFile.filename}\`\n` +
+            `- 📚 *${courseDisplayName}*`;
 
         const moodleFileResponse = {
           url: downloadUrl,
@@ -3228,18 +3275,18 @@ export async function answerFoodQuestionCore(question: string): Promise<{
     
     const mealsList = meals.map(m => {
       const tags: string[] = [];
-      if (m.isVegan) tags.push(isEnglish ? "🌱 vegan" : "🌱 vegan");
+      if (m.isVegan) tags.push("🌱 vegan");
       else if (m.isVegetarian) tags.push(isEnglish ? "🥬 vegetarian" : "🥬 végétarien");
-      const price = m.studentPrice ? ` — ${m.studentPrice.toFixed(2)} CHF` : "";
-      const tagStr = tags.length > 0 ? ` [${tags.join(", ")}]` : "";
-      return `• ${m.name}${tagStr}${price}`;
+      const price = m.studentPrice ? ` — **${m.studentPrice.toFixed(2)} CHF**` : "";
+      const tagStr = tags.length > 0 ? ` *${tags.join(", ")}*` : "";
+      return `- ${m.name}${tagStr}${price}`;
     }).join("\n");
     
-    const priceNote = maxPrice !== null ? ` (< ${maxPrice} CHF)` : "";
+    const priceNote = maxPrice !== null ? ` (< **${maxPrice} CHF**)` : "";
     return {
       reply: isEnglish
-        ? `${formattedDayLabel} at ${restaurantMatch}${priceNote}:\n${mealsList}`
-        : `${formattedDayLabel} à ${restaurantMatch}${priceNote}:\n${mealsList}`,
+        ? `### ${formattedDayLabel} at **${restaurantMatch}**${priceNote}\n\n${mealsList}`
+        : `### ${formattedDayLabel} à **${restaurantMatch}**${priceNote}\n\n${mealsList}`,
       source_type: "food",
       meals,
     };
@@ -3271,15 +3318,16 @@ export async function answerFoodQuestionCore(question: string): Promise<{
     const type = isVeganQuery ? "vegan" : (isEnglish ? "vegetarian" : "végétarien");
     const mealsList = veggieMeals.map(m => {
       const tag = m.isVegan ? "🌱" : "🥬";
-      const price = m.studentPrice ? ` — ${m.studentPrice.toFixed(2)} CHF` : "";
-      return `• ${tag} ${m.name} (${m.restaurant})${price}`;
+      const price = m.studentPrice ? ` — **${m.studentPrice.toFixed(2)} CHF**` : "";
+      return `- ${tag} **${m.name}** *at ${m.restaurant}*${price}`;
     }).join("\n");
     
-    const priceNote = maxPrice !== null ? ` (< ${maxPrice} CHF)` : "";
+    const priceNote = maxPrice !== null ? ` (< **${maxPrice} CHF**)` : "";
+    const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
     return {
       reply: isEnglish
-        ? `${type.charAt(0).toUpperCase() + type.slice(1)} dishes ${dayLabel}${priceNote}:\n${mealsList}`
-        : `Plats ${type}s ${dayLabel}${priceNote}:\n${mealsList}`,
+        ? `### ${typeLabel} dishes — ${formattedDayLabel}${priceNote}\n\n${mealsList}`
+        : `### Plats ${type}s — ${formattedDayLabel}${priceNote}\n\n${mealsList}`,
       source_type: "food",
       meals: veggieMeals,
     };
@@ -3306,13 +3354,13 @@ export async function answerFoodQuestionCore(question: string): Promise<{
       if (m.isVegan) tags.push("🌱");
       else if (m.isVegetarian) tags.push("🥬");
       const tagStr = tags.length > 0 ? ` ${tags.join(" ")}` : "";
-      return `• ${m.name}${tagStr} (${m.restaurant}) — ${m.studentPrice?.toFixed(2)} CHF`;
+      return `- **${m.name}**${tagStr} *at ${m.restaurant}* — **${m.studentPrice?.toFixed(2)} CHF**`;
     }).join("\n");
     
     return {
       reply: isEnglish
-        ? `Dishes under ${maxPrice} CHF ${dayLabel}:\n${mealsList}`
-        : `Plats à moins de ${maxPrice} CHF ${dayLabel}:\n${mealsList}`,
+        ? `### Dishes under **${maxPrice} CHF** — ${formattedDayLabel}\n\n${mealsList}`
+        : `### Plats à moins de **${maxPrice} CHF** — ${formattedDayLabel}\n\n${mealsList}`,
       source_type: "food",
       meals: affordableMeals,
     };
@@ -3331,14 +3379,14 @@ export async function answerFoodQuestionCore(question: string): Promise<{
     }
     
     const tags: string[] = [];
-    if (cheapest.isVegan) tags.push(isEnglish ? "🌱 vegan" : "🌱 vegan");
+    if (cheapest.isVegan) tags.push("🌱 vegan");
     else if (cheapest.isVegetarian) tags.push(isEnglish ? "🥬 vegetarian" : "🥬 végétarien");
-    const tagStr = tags.length > 0 ? ` [${tags.join(", ")}]` : "";
+    const tagStr = tags.length > 0 ? ` *${tags.join(", ")}*` : "";
     
     return {
       reply: isEnglish
-        ? `The cheapest dish ${dayLabel} is "${cheapest.name}"${tagStr} at ${cheapest.restaurant} for ${cheapest.studentPrice?.toFixed(2)} CHF (student price).`
-        : `Le plat le moins cher ${dayLabel} est "${cheapest.name}"${tagStr} à ${cheapest.restaurant} pour ${cheapest.studentPrice?.toFixed(2)} CHF (prix étudiant).`,
+        ? `💰 **Cheapest dish ${dayLabel}:**\n\n**${cheapest.name}**${tagStr}\n- 📍 *${cheapest.restaurant}*\n- 💵 **${cheapest.studentPrice?.toFixed(2)} CHF** (student price)`
+        : `💰 **Plat le moins cher ${dayLabel}:**\n\n**${cheapest.name}**${tagStr}\n- 📍 *${cheapest.restaurant}*\n- 💵 **${cheapest.studentPrice?.toFixed(2)} CHF** (prix étudiant)`,
       source_type: "food",
       meals: [cheapest],
     };
@@ -3351,17 +3399,18 @@ export async function answerFoodQuestionCore(question: string): Promise<{
     byRestaurant.get(meal.restaurant)!.push(meal);
   }
   
-  const lines: string[] = [`${formattedDayLabel} (${dailyMenu.date}):`];
+  const lines: string[] = [`## 🍽️ ${formattedDayLabel} (${dailyMenu.date})\n`];
   for (const [restaurant, meals] of byRestaurant) {
-    lines.push(`\n🏪 ${restaurant}:`);
+    lines.push(`### 🏪 ${restaurant}\n`);
     for (const meal of meals) {
       const tags: string[] = [];
       if (meal.isVegan) tags.push("🌱");
       else if (meal.isVegetarian) tags.push("🥬");
-      const price = meal.studentPrice ? ` — ${meal.studentPrice.toFixed(2)} CHF` : "";
+      const price = meal.studentPrice ? ` — **${meal.studentPrice.toFixed(2)} CHF**` : "";
       const tagStr = tags.length > 0 ? ` ${tags.join(" ")}` : "";
-      lines.push(`  • ${meal.name}${tagStr}${price}`);
+      lines.push(`- ${meal.name}${tagStr}${price}`);
     }
+    lines.push(""); // Add spacing between restaurants
   }
   
   return {

@@ -1,5 +1,11 @@
 package com.android.sample.home
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
@@ -23,12 +29,12 @@ import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -196,11 +202,39 @@ private fun FiltersRow(state: EdPostsUiState) {
   }
 }
 
+/** Friendly loading indicator shown while searching ED Discussion posts. */
 @Composable
 private fun LoadingBlock() {
-  Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-    CircularProgressIndicator(color = Color(0xFF8B5CFF), modifier = Modifier.size(32.dp))
-  }
+  val edPurple = Color(0xFF8B5CFF)
+
+  val transition = rememberInfiniteTransition(label = "edLoading")
+  val alpha by
+      transition.animateFloat(
+          initialValue = 0.4f,
+          targetValue = 1f,
+          animationSpec =
+              infiniteRepeatable(
+                  animation = tween(durationMillis = 800, easing = FastOutSlowInEasing),
+                  repeatMode = RepeatMode.Reverse),
+          label = "edAlpha")
+
+  Column(
+      modifier = Modifier.fillMaxWidth().padding(32.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Animated purple dot
+        Box(
+            modifier =
+                Modifier.size(12.dp)
+                    .background(
+                        color = edPurple.copy(alpha = alpha), shape = RoundedCornerShape(6.dp)))
+
+        Text(
+            text = "Searching ED Discussion…",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White.copy(alpha = alpha),
+            fontWeight = FontWeight.Medium)
+      }
 }
 
 @Composable
