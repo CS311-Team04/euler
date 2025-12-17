@@ -1,7 +1,17 @@
-# Euler
-Unifying EPFL's Digital Ecosystem Through Conversational AI.
+<div align="center">
+<img src="app/src/main/res/drawable/euler_logo.png" alt="Euler Logo" width="80" height="80" style="vertical-align: middle; margin-right: 15px;">
+
+## Unifying EPFL's Digital Ecosystem Through Conversational AI
 
 Euler helps students navigate EPFL's digital services through natural language. Instead of switching between Moodle, Ed Discussion, EPFL webpages, PocketCampus etc.. students ask questions and Euler executes actions automatically across campus services.
+
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=CS311-Team04_euler&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=CS311-Team04_euler)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=CS311-Team04_euler&metric=coverage)](https://sonarcloud.io/summary/new_code?id=CS311-Team04_euler)
+[![CI - Test Runner](https://github.com/CS311-Team04/euler/actions/workflows/ci.yml/badge.svg)](https://github.com/CS311-Team04/euler/actions/workflows/ci.yml)
+[![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-blue.svg)](https://kotlinlang.org/)
+[![Platform](https://img.shields.io/badge/Platform-Android-green.svg)](https://www.android.com/)
+
+</div>
 
 ---
 
@@ -280,3 +290,7 @@ This project is part of the CS-311 course at EPFL.
 - Full architecture details available on the Wiki
 - Backend API documentation in `functions/src/`
 - UI component documentation in `app/src/main/java/com/android/sample/ui/`
+
+---
+
+**Quick Links:** [Features](#features) • [Setup & Installation](#setup--installation) • [Architecture](#architecture) • [Contributing](CONTRIBUTING.md)
