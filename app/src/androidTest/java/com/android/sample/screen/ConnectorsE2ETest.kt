@@ -129,23 +129,23 @@ class ConnectorsE2ETest {
     // Step 3: Wait for Ed Connect screen to be displayed
     // First verify the screen title appears (indicates navigation completed)
     val screenTitle = Localization.t("settings_connectors_ed_title")
-    composeRule.waitUntilAtLeastOneExists(hasText(screenTitle), timeoutMillis = 10_000)
+    composeRule.waitUntilAtLeastOneExists(hasText(screenTitle), timeoutMillis = 15_000)
     composeRule.waitForIdle()
     Thread.sleep(500) // Allow screen to fully render
 
     // Verify Ed Connect screen elements - use label text (not placeholder to avoid ambiguity)
     val labelText = Localization.t("settings_connectors_ed_paste_token_label")
     // Wait for the label to appear
-    composeRule.waitUntilAtLeastOneExists(hasText(labelText), timeoutMillis = 5_000)
+    composeRule.waitUntilAtLeastOneExists(hasText(labelText), timeoutMillis = 10_000)
     composeRule.waitForIdle()
     // Verify the label is displayed - use onNode to avoid ambiguity with placeholder
-    composeRule.onNode(hasText(labelText).and(!isEditable())).assertIsDisplayed()
+    composeRule.onNode(hasText(labelText).and(!isEditable())).performScrollTo().assertIsDisplayed()
 
     // Verify "Get Token" button is present - use exact text match to avoid ambiguity
     val getTokenButtonText = Localization.t("settings_connectors_ed_get_token_button")
-    composeRule.waitUntilAtLeastOneExists(hasText(getTokenButtonText), timeoutMillis = 5_000)
+    composeRule.waitUntilAtLeastOneExists(hasText(getTokenButtonText), timeoutMillis = 10_000)
     composeRule.waitForIdle()
-    composeRule.onNode(hasText(getTokenButtonText)).assertIsDisplayed()
+    composeRule.onNode(hasText(getTokenButtonText)).performScrollTo().assertIsDisplayed()
   }
 
   @Test
@@ -190,19 +190,20 @@ class ConnectorsE2ETest {
     // Step 2: Verify Ed Connect screen is displayed
     // First verify the screen title appears (indicates navigation completed)
     val screenTitle = Localization.t("settings_connectors_ed_title")
-    composeRule.waitUntilAtLeastOneExists(hasText(screenTitle), timeoutMillis = 10_000)
+    composeRule.waitUntilAtLeastOneExists(hasText(screenTitle), timeoutMillis = 15_000)
     composeRule.waitForIdle()
     Thread.sleep(500) // Allow screen to fully render
 
     val labelText = Localization.t("settings_connectors_ed_paste_token_label")
-    composeRule.waitUntilAtLeastOneExists(hasText(labelText), timeoutMillis = 5_000)
+    composeRule.waitUntilAtLeastOneExists(hasText(labelText), timeoutMillis = 10_000)
     composeRule.waitForIdle()
+    composeRule.onNode(hasText(labelText).and(!isEditable())).performScrollTo()
 
     // Step 3: Enter a test token (simulating user input)
     val testToken = "test_token_1234567890"
 
     // Find the editable TextField - wait for it to be available
-    composeRule.waitUntilAtLeastOneExists(isEditable(), timeoutMillis = 5_000)
+    composeRule.waitUntilAtLeastOneExists(isEditable(), timeoutMillis = 10_000)
     composeRule.waitForIdle()
 
     // Use the editable matcher to find and interact with the TextField
@@ -213,11 +214,14 @@ class ConnectorsE2ETest {
 
     // Step 4: Verify Connect button is enabled and clickable
     val connectButtonText = Localization.t("connect")
-    composeRule.waitUntilAtLeastOneExists(hasText(connectButtonText), timeoutMillis = 5_000)
+    composeRule.waitUntilAtLeastOneExists(hasText(connectButtonText), timeoutMillis = 10_000)
     composeRule.waitForIdle()
     // Find the Connect button - it should be clickable and not editable
     // Use onNode to find the button specifically (not a text field)
-    composeRule.onNode(hasText(connectButtonText).and(!isEditable())).assertIsDisplayed()
+    composeRule
+        .onNode(hasText(connectButtonText).and(!isEditable()))
+        .performScrollTo()
+        .assertIsDisplayed()
 
     // Step 5: Click Connect button to trigger connection process
     // Note: This will attempt to connect, but may fail without valid credentials

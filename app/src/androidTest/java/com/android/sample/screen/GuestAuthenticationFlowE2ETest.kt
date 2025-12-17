@@ -1,24 +1,16 @@
 package com.android.sample.screen
 
-import android.content.Context
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.android.sample.MainActivity
 import com.android.sample.TestConstants
 import com.android.sample.authentification.AuthTags
 import com.android.sample.home.HomeTags
-import com.google.firebase.FirebaseApp
-import com.google.firebase.FirebaseOptions
-import org.junit.BeforeClass
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -31,31 +23,7 @@ import org.junit.runner.RunWith
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
-class GuestAuthenticationFlowE2ETest {
-
-  @get:Rule val composeRule = createAndroidComposeRule<MainActivity>()
-
-  companion object {
-    @BeforeClass
-    @JvmStatic
-    fun setupFirebase() {
-      ensureFirebaseInitialized()
-    }
-
-    @JvmStatic
-    private fun ensureFirebaseInitialized() {
-      val context = ApplicationProvider.getApplicationContext<Context>()
-      if (FirebaseApp.getApps(context).isEmpty()) {
-        val options =
-            FirebaseOptions.Builder()
-                .setApplicationId("1:1234567890:android:integration-test")
-                .setProjectId("integration-test")
-                .setApiKey("fake-api-key")
-                .build()
-        FirebaseApp.initializeApp(context, options)
-      }
-    }
-  }
+class GuestAuthenticationFlowE2ETest : BaseE2ETest() {
 
   @Test
   fun guest_authentication_flow_complete_journey() {
