@@ -186,6 +186,120 @@ class ConversationRepositoryTest {
   }
 
   @Test
+  fun appendMessage_with_sourceMetadata_saves_source_fields() = runTest {
+    val msgDocument: DocumentReference = mock()
+    val batch: WriteBatch = mock()
+    whenever(conversationsCollection.document("conv-x")).thenReturn(conversationDocument)
+    whenever(conversationDocument.collection("messages")).thenReturn(messagesCollection)
+    whenever(messagesCollection.document()).thenReturn(msgDocument)
+    whenever(msgDocument.id).thenReturn("msg-id")
+
+    doAnswer { invocation ->
+          val lambda = invocation.arguments[0]
+          val method =
+              lambda::class.java.methods.firstOrNull { m ->
+                (m.name == "apply" || m.name == "invoke") &&
+                    m.parameterTypes.size == 1 &&
+                    WriteBatch::class.java.isAssignableFrom(m.parameterTypes[0])
+              } ?: error("No suitable method found on runBatch lambda")
+          method.isAccessible = true
+          method.invoke(lambda, batch)
+          Tasks.forResult<Void>(null)
+        }
+        .whenever(firestore)
+        .runBatch(any())
+
+    val messageDataCaptor = argumentCaptor<Map<String, Any>>()
+    whenever(batch.set(any<DocumentReference>(), messageDataCaptor.capture())).thenReturn(batch)
+    whenever(batch.update(any<DocumentReference>(), any<Map<String, Any>>())).thenReturn(batch)
+
+    val sourceMetadata =
+        MessageSourceMetadata(url = "https://www.epfl.ch/page", compactType = "NONE")
+    repository.appendMessage(
+        "conv-x", role = "assistant", text = "RAG answer", sourceMetadata = sourceMetadata)
+
+    val messageData = messageDataCaptor.firstValue
+    assertEquals("assistant", messageData["role"])
+    assertEquals("RAG answer", messageData["text"])
+    assertEquals("https://www.epfl.ch/page", messageData["sourceUrl"])
+    assertEquals("NONE", messageData["sourceCompactType"])
+  }
+
+  @Test
+  fun appendMessage_without_sourceMetadata_does_not_save_source_fields() = runTest {
+    val msgDocument: DocumentReference = mock()
+    val batch: WriteBatch = mock()
+    whenever(conversationsCollection.document("conv-x")).thenReturn(conversationDocument)
+    whenever(conversationDocument.collection("messages")).thenReturn(messagesCollection)
+    whenever(messagesCollection.document()).thenReturn(msgDocument)
+    whenever(msgDocument.id).thenReturn("msg-id")
+
+    doAnswer { invocation ->
+          val lambda = invocation.arguments[0]
+          val method =
+              lambda::class.java.methods.firstOrNull { m ->
+                (m.name == "apply" || m.name == "invoke") &&
+                    m.parameterTypes.size == 1 &&
+                    WriteBatch::class.java.isAssignableFrom(m.parameterTypes[0])
+              } ?: error("No suitable method found on runBatch lambda")
+          method.isAccessible = true
+          method.invoke(lambda, batch)
+          Tasks.forResult<Void>(null)
+        }
+        .whenever(firestore)
+        .runBatch(any())
+
+    val messageDataCaptor = argumentCaptor<Map<String, Any>>()
+    whenever(batch.set(any<DocumentReference>(), messageDataCaptor.capture())).thenReturn(batch)
+    whenever(batch.update(any<DocumentReference>(), any<Map<String, Any>>())).thenReturn(batch)
+
+    repository.appendMessage("conv-x", role = "user", text = "User message")
+
+    val messageData = messageDataCaptor.firstValue
+    assertEquals("user", messageData["role"])
+    assertEquals("User message", messageData["text"])
+    assertTrue(!messageData.containsKey("sourceUrl"))
+    assertTrue(!messageData.containsKey("sourceCompactType"))
+  }
+
+  @Test
+  fun appendMessage_with_sourceMetadata_compactType_schedule() = runTest {
+    val msgDocument: DocumentReference = mock()
+    val batch: WriteBatch = mock()
+    whenever(conversationsCollection.document("conv-x")).thenReturn(conversationDocument)
+    whenever(conversationDocument.collection("messages")).thenReturn(messagesCollection)
+    whenever(messagesCollection.document()).thenReturn(msgDocument)
+    whenever(msgDocument.id).thenReturn("msg-id")
+
+    doAnswer { invocation ->
+          val lambda = invocation.arguments[0]
+          val method =
+              lambda::class.java.methods.firstOrNull { m ->
+                (m.name == "apply" || m.name == "invoke") &&
+                    m.parameterTypes.size == 1 &&
+                    WriteBatch::class.java.isAssignableFrom(m.parameterTypes[0])
+              } ?: error("No suitable method found on runBatch lambda")
+          method.isAccessible = true
+          method.invoke(lambda, batch)
+          Tasks.forResult<Void>(null)
+        }
+        .whenever(firestore)
+        .runBatch(any())
+
+    val messageDataCaptor = argumentCaptor<Map<String, Any>>()
+    whenever(batch.set(any<DocumentReference>(), messageDataCaptor.capture())).thenReturn(batch)
+    whenever(batch.update(any<DocumentReference>(), any<Map<String, Any>>())).thenReturn(batch)
+
+    val sourceMetadata =
+        MessageSourceMetadata(url = "https://epfl.ch/schedule", compactType = "SCHEDULE")
+    repository.appendMessage(
+        "conv-x", role = "assistant", text = "Schedule info", sourceMetadata = sourceMetadata)
+
+    val messageData = messageDataCaptor.firstValue
+    assertEquals("SCHEDULE", messageData["sourceCompactType"])
+  }
+
+  @Test
   fun deleteConversation_deletes_messages_and_conversation_doc() = runTest {
     val msgSnapshot: QuerySnapshot = mock()
     val msgDoc: QueryDocumentSnapshot = mock()

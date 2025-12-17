@@ -143,6 +143,8 @@ class ConversationRepository(private val auth: FirebaseAuth, private val db: Fir
    * @param text Message body.
    * @param edCardId Optional ID of associated EdCard (for assistant messages that generate
    *   EdCards).
+   * @param sourceMetadata Optional source metadata for RAG answers. Label is derived from URL to
+   *   avoid trusting UI-provided values.
    * @return The Firestore document ID of the created message.
    * @throws AuthNotReadyException if user is signed out.
    */
@@ -150,7 +152,8 @@ class ConversationRepository(private val auth: FirebaseAuth, private val db: Fir
       conversationId: String,
       role: String,
       text: String,
-      edCardId: String? = null
+      edCardId: String? = null,
+      sourceMetadata: MessageSourceMetadata? = null
   ): String {
     val convRef = convCol().document(conversationId)
     val msgRef = msgCol(conversationId).document()
@@ -160,6 +163,10 @@ class ConversationRepository(private val auth: FirebaseAuth, private val db: Fir
             "role" to role, "text" to text, "content" to text, "createdAt" to now)
     if (edCardId != null) {
       messageData["edCardId"] = edCardId
+    }
+    if (sourceMetadata != null) {
+      messageData["sourceUrl"] = sourceMetadata.url
+      messageData["sourceCompactType"] = sourceMetadata.compactType
     }
     db.runBatch { b ->
           b.set(msgRef, messageData)

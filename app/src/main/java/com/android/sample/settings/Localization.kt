@@ -258,20 +258,21 @@ object Localization {
           "euler_thinking" to "Euler is thinking",
           "ask_euler_anything" to "Ask Euler Anything",
 
-          // Home Screen - Suggestions (offline-friendly general EPFL knowledge)
-          "suggestion_what_is_epfl" to "What is EPFL?",
-          "suggestion_where_epfl" to "Where is EPFL located?",
-          "suggestion_epfl_founded" to "When was EPFL founded?",
-          "suggestion_epfl_students" to "How many students at EPFL?",
-          "suggestion_epfl_research" to "What are EPFL's research areas?",
-          "suggestion_epfl_campus" to "Tell me about EPFL campus",
+          // Home Screen - Suggestions (Euler help questions)
+          "suggestion_euler_capabilities" to "What can Euler do for me?",
+          "suggestion_new_conversation" to "How do I start a new conversation?",
+          "suggestion_offline_mode" to "How do I use offline mode?",
+          "suggestion_previous_chats" to "How do I find my previous chats?",
+          "suggestion_voice_input" to "How do I use voice input?",
+          "suggestion_change_theme" to "How do I change the theme?",
+          "suggestion_privacy" to "How does Euler handle my privacy?",
 
           // Home Screen - Animated Intro Suggestions
-          "intro_suggestion_1" to "What is EPFL?",
-          "intro_suggestion_2" to "Where is EPFL located?",
-          "intro_suggestion_3" to "When was EPFL founded?",
-          "intro_suggestion_4" to "How many students at EPFL?",
-          "intro_suggestion_5" to "Tell me about EPFL campus",
+          "intro_suggestion_1" to "What can Euler do for me?",
+          "intro_suggestion_2" to "How do I start a conversation?",
+          "intro_suggestion_3" to "How do I use voice input?",
+          "intro_suggestion_4" to "How do I find my chats?",
+          "intro_suggestion_5" to "How do I change the theme?",
 
           // Home Screen - Actions
           "share" to "Share",
@@ -374,20 +375,21 @@ object Localization {
           "euler_thinking" to "Euler réfléchit",
           "ask_euler_anything" to "Demandez n'importe quoi à Euler",
 
-          // Home Screen - Suggestions (offline-friendly general EPFL knowledge)
-          "suggestion_what_is_epfl" to "Qu'est-ce que l'EPFL ?",
-          "suggestion_where_epfl" to "Où se trouve l'EPFL ?",
-          "suggestion_epfl_founded" to "Quand l'EPFL a-t-elle été fondée ?",
-          "suggestion_epfl_students" to "Combien d'étudiants à l'EPFL ?",
-          "suggestion_epfl_research" to "Quels sont les domaines de recherche de l'EPFL ?",
-          "suggestion_epfl_campus" to "Parle-moi du campus de l'EPFL",
+          // Home Screen - Suggestions (Euler help questions)
+          "suggestion_euler_capabilities" to "Que peut faire Euler pour moi ?",
+          "suggestion_new_conversation" to "Comment démarrer une conversation ?",
+          "suggestion_offline_mode" to "Comment utiliser le mode hors ligne ?",
+          "suggestion_previous_chats" to "Comment retrouver mes chats ?",
+          "suggestion_voice_input" to "Comment utiliser la saisie vocale ?",
+          "suggestion_change_theme" to "Comment changer le thème ?",
+          "suggestion_privacy" to "Comment Euler gère ma vie privée ?",
 
           // Home Screen - Animated Intro Suggestions
-          "intro_suggestion_1" to "Qu'est-ce que l'EPFL ?",
-          "intro_suggestion_2" to "Où se trouve l'EPFL ?",
-          "intro_suggestion_3" to "Quand l'EPFL a-t-elle été fondée ?",
-          "intro_suggestion_4" to "Combien d'étudiants à l'EPFL ?",
-          "intro_suggestion_5" to "Parle-moi du campus de l'EPFL",
+          "intro_suggestion_1" to "Que peut faire Euler ?",
+          "intro_suggestion_2" to "Comment démarrer une conversation ?",
+          "intro_suggestion_3" to "Comment utiliser la voix ?",
+          "intro_suggestion_4" to "Comment retrouver mes chats ?",
+          "intro_suggestion_5" to "Comment changer le thème ?",
 
           // Home Screen - Actions
           "share" to "Partager",
@@ -506,20 +508,21 @@ object Localization {
           "euler_thinking" to "Euler denkt nach",
           "ask_euler_anything" to "Fragen Sie Euler alles",
 
-          // Home Screen - Suggestions (offline-friendly general EPFL knowledge)
-          "suggestion_what_is_epfl" to "Was ist EPFL?",
-          "suggestion_where_epfl" to "Wo befindet sich die EPFL?",
-          "suggestion_epfl_founded" to "Wann wurde die EPFL gegründet?",
-          "suggestion_epfl_students" to "Wie viele Studenten hat die EPFL?",
-          "suggestion_epfl_research" to "Was sind die Forschungsbereiche der EPFL?",
-          "suggestion_epfl_campus" to "Erzähl mir vom EPFL Campus",
+          // Home Screen - Suggestions (Euler help questions)
+          "suggestion_euler_capabilities" to "Was kann Euler für mich tun?",
+          "suggestion_new_conversation" to "Wie starte ich eine Unterhaltung?",
+          "suggestion_offline_mode" to "Wie nutze ich den Offline-Modus?",
+          "suggestion_previous_chats" to "Wie finde ich meine Chats?",
+          "suggestion_voice_input" to "Wie nutze ich die Spracheingabe?",
+          "suggestion_change_theme" to "Wie ändere ich das Design?",
+          "suggestion_privacy" to "Wie schützt Euler meine Daten?",
 
           // Home Screen - Animated Intro Suggestions
-          "intro_suggestion_1" to "Was ist EPFL?",
-          "intro_suggestion_2" to "Wo befindet sich die EPFL?",
-          "intro_suggestion_3" to "Wann wurde die EPFL gegründet?",
-          "intro_suggestion_4" to "Wie viele Studenten hat die EPFL?",
-          "intro_suggestion_5" to "Erzähl mir vom EPFL Campus",
+          "intro_suggestion_1" to "Was kann Euler?",
+          "intro_suggestion_2" to "Wie starte ich eine Unterhaltung?",
+          "intro_suggestion_3" to "Wie nutze ich die Spracheingabe?",
+          "intro_suggestion_4" to "Wie finde ich meine Chats?",
+          "intro_suggestion_5" to "Wie ändere ich das Design?",
 
           // Home Screen - Actions
           "share" to "Teilen",
@@ -604,20 +607,21 @@ object Localization {
           "euler_thinking" to "Euler está pensando",
           "ask_euler_anything" to "Pregunta a Euler cualquier cosa",
 
-          // Home Screen - Suggestions (offline-friendly general EPFL knowledge)
-          "suggestion_what_is_epfl" to "¿Qué es EPFL?",
-          "suggestion_where_epfl" to "¿Dónde está ubicada EPFL?",
-          "suggestion_epfl_founded" to "¿Cuándo se fundó EPFL?",
-          "suggestion_epfl_students" to "¿Cuántos estudiantes tiene EPFL?",
-          "suggestion_epfl_research" to "¿Cuáles son las áreas de investigación de EPFL?",
-          "suggestion_epfl_campus" to "Cuéntame sobre el campus de EPFL",
+          // Home Screen - Suggestions (Euler help questions)
+          "suggestion_euler_capabilities" to "¿Qué puede hacer Euler por mí?",
+          "suggestion_new_conversation" to "¿Cómo inicio una conversación?",
+          "suggestion_offline_mode" to "¿Cómo uso el modo sin conexión?",
+          "suggestion_previous_chats" to "¿Cómo encuentro mis chats?",
+          "suggestion_voice_input" to "¿Cómo uso la entrada de voz?",
+          "suggestion_change_theme" to "¿Cómo cambio el tema?",
+          "suggestion_privacy" to "¿Cómo maneja Euler mi privacidad?",
 
           // Home Screen - Animated Intro Suggestions
-          "intro_suggestion_1" to "¿Qué es EPFL?",
-          "intro_suggestion_2" to "¿Dónde está ubicada EPFL?",
-          "intro_suggestion_3" to "¿Cuándo se fundó EPFL?",
-          "intro_suggestion_4" to "¿Cuántos estudiantes tiene EPFL?",
-          "intro_suggestion_5" to "Cuéntame sobre el campus de EPFL",
+          "intro_suggestion_1" to "¿Qué puede hacer Euler?",
+          "intro_suggestion_2" to "¿Cómo inicio una conversación?",
+          "intro_suggestion_3" to "¿Cómo uso la voz?",
+          "intro_suggestion_4" to "¿Cómo encuentro mis chats?",
+          "intro_suggestion_5" to "¿Cómo cambio el tema?",
 
           // Home Screen - Actions
           "share" to "Compartir",
@@ -702,20 +706,21 @@ object Localization {
           "euler_thinking" to "Euler sta pensando",
           "ask_euler_anything" to "Chiedi qualsiasi cosa a Euler",
 
-          // Home Screen - Suggestions (offline-friendly general EPFL knowledge)
-          "suggestion_what_is_epfl" to "Cos'è l'EPFL?",
-          "suggestion_where_epfl" to "Dove si trova l'EPFL?",
-          "suggestion_epfl_founded" to "Quando è stata fondata l'EPFL?",
-          "suggestion_epfl_students" to "Quanti studenti ha l'EPFL?",
-          "suggestion_epfl_research" to "Quali sono le aree di ricerca dell'EPFL?",
-          "suggestion_epfl_campus" to "Parlami del campus EPFL",
+          // Home Screen - Suggestions (Euler help questions)
+          "suggestion_euler_capabilities" to "Cosa può fare Euler per me?",
+          "suggestion_new_conversation" to "Come inizio una conversazione?",
+          "suggestion_offline_mode" to "Come uso la modalità offline?",
+          "suggestion_previous_chats" to "Come trovo le mie chat?",
+          "suggestion_voice_input" to "Come uso l'input vocale?",
+          "suggestion_change_theme" to "Come cambio il tema?",
+          "suggestion_privacy" to "Come gestisce Euler la mia privacy?",
 
           // Home Screen - Animated Intro Suggestions
-          "intro_suggestion_1" to "Cos'è l'EPFL?",
-          "intro_suggestion_2" to "Dove si trova l'EPFL?",
-          "intro_suggestion_3" to "Quando è stata fondata l'EPFL?",
-          "intro_suggestion_4" to "Quanti studenti ha l'EPFL?",
-          "intro_suggestion_5" to "Parlami del campus EPFL",
+          "intro_suggestion_1" to "Cosa può fare Euler?",
+          "intro_suggestion_2" to "Come inizio una conversazione?",
+          "intro_suggestion_3" to "Come uso la voce?",
+          "intro_suggestion_4" to "Come trovo le mie chat?",
+          "intro_suggestion_5" to "Come cambio il tema?",
 
           // Home Screen - Actions
           "share" to "Condividi",
@@ -799,20 +804,21 @@ object Localization {
           "euler_thinking" to "Euler está pensando",
           "ask_euler_anything" to "Pergunte qualquer coisa ao Euler",
 
-          // Home Screen - Suggestions (offline-friendly general EPFL knowledge)
-          "suggestion_what_is_epfl" to "O que é a EPFL?",
-          "suggestion_where_epfl" to "Onde fica a EPFL?",
-          "suggestion_epfl_founded" to "Quando a EPFL foi fundada?",
-          "suggestion_epfl_students" to "Quantos estudantes a EPFL tem?",
-          "suggestion_epfl_research" to "Quais são as áreas de pesquisa da EPFL?",
-          "suggestion_epfl_campus" to "Conte-me sobre o campus da EPFL",
+          // Home Screen - Suggestions (Euler help questions)
+          "suggestion_euler_capabilities" to "O que Euler pode fazer por mim?",
+          "suggestion_new_conversation" to "Como inicio uma conversa?",
+          "suggestion_offline_mode" to "Como uso o modo offline?",
+          "suggestion_previous_chats" to "Como encontro meus chats?",
+          "suggestion_voice_input" to "Como uso a entrada de voz?",
+          "suggestion_change_theme" to "Como mudo o tema?",
+          "suggestion_privacy" to "Como Euler cuida da minha privacidade?",
 
           // Home Screen - Animated Intro Suggestions
-          "intro_suggestion_1" to "O que é a EPFL?",
-          "intro_suggestion_2" to "Onde fica a EPFL?",
-          "intro_suggestion_3" to "Quando a EPFL foi fundada?",
-          "intro_suggestion_4" to "Quantos estudantes a EPFL tem?",
-          "intro_suggestion_5" to "Conte-me sobre o campus da EPFL",
+          "intro_suggestion_1" to "O que Euler pode fazer?",
+          "intro_suggestion_2" to "Como inicio uma conversa?",
+          "intro_suggestion_3" to "Como uso a voz?",
+          "intro_suggestion_4" to "Como encontro meus chats?",
+          "intro_suggestion_5" to "Como mudo o tema?",
 
           // Home Screen - Actions
           "share" to "Compartilhar",
@@ -896,20 +902,21 @@ object Localization {
           "euler_thinking" to "Euler 正在思考",
           "ask_euler_anything" to "向 Euler 提问任何问题",
 
-          // Home Screen - Suggestions (offline-friendly general EPFL knowledge)
-          "suggestion_what_is_epfl" to "什么是 EPFL？",
-          "suggestion_where_epfl" to "EPFL 在哪里？",
-          "suggestion_epfl_founded" to "EPFL 是什么时候成立的？",
-          "suggestion_epfl_students" to "EPFL 有多少学生？",
-          "suggestion_epfl_research" to "EPFL 的研究领域有哪些？",
-          "suggestion_epfl_campus" to "介绍一下 EPFL 校园",
+          // Home Screen - Suggestions (Euler help questions)
+          "suggestion_euler_capabilities" to "Euler 能为我做什么？",
+          "suggestion_new_conversation" to "如何开始新对话？",
+          "suggestion_offline_mode" to "如何使用离线模式？",
+          "suggestion_previous_chats" to "如何找到我的聊天记录？",
+          "suggestion_voice_input" to "如何使用语音输入？",
+          "suggestion_change_theme" to "如何更改主题？",
+          "suggestion_privacy" to "Euler 如何保护我的隐私？",
 
           // Home Screen - Animated Intro Suggestions
-          "intro_suggestion_1" to "什么是 EPFL？",
-          "intro_suggestion_2" to "EPFL 在哪里？",
-          "intro_suggestion_3" to "EPFL 是什么时候成立的？",
-          "intro_suggestion_4" to "EPFL 有多少学生？",
-          "intro_suggestion_5" to "介绍一下 EPFL 校园",
+          "intro_suggestion_1" to "Euler 能做什么？",
+          "intro_suggestion_2" to "如何开始对话？",
+          "intro_suggestion_3" to "如何使用语音？",
+          "intro_suggestion_4" to "如何找到聊天记录？",
+          "intro_suggestion_5" to "如何更改主题？",
 
           // Home Screen - Actions
           "share" to "分享",
