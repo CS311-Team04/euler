@@ -175,7 +175,7 @@ fun HomeScreen(
     }
   }
 
-  // Synchronize ViewModel state <-> Drawer component
+  // Synchronize ViewModel state <=> Drawer component
   LaunchedEffect(ui.isDrawerOpen) {
     if (ui.isDrawerOpen && !drawerState.isOpen) {
       drawerState.open()
