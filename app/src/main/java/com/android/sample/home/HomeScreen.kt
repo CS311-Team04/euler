@@ -1338,14 +1338,8 @@ private fun SourceCard(
                     horizontal = Dimensions.CompactIndicatorPaddingHorizontal,
                     vertical = Dimensions.CompactIndicatorPaddingVertical),
         verticalAlignment = Alignment.CenterVertically) {
-          Icon(
-              imageVector = Icons.Default.CheckCircle,
-              contentDescription = null,
-              tint = com.android.sample.ui.theme.EulerGreen,
-              modifier = Modifier.size(Dimensions.CompactIndicatorIconSize))
-          Spacer(Modifier.width(Dimensions.CompactIndicatorSpacing))
           Text(
-              text = "EPFL",
+              text = "$emoji $siteLabel",
               color = colorScheme.onSurfaceVariant,
               style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp))
         }
