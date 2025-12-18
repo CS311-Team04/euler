@@ -183,6 +183,52 @@ class HomeViewModel(
     fun getPredefinedResponse(canonicalQuestion: String): String? =
         PREDEFINED_RESPONSES[canonicalQuestion]
 
+    // ============ DEMO / PRESENTATION HARDCODED RESPONSES ============
+    // Hardcoded responses for presentation/demo purposes.
+    // These take precedence over LLM responses and work both online and offline.
+    // Add your demo interactions here. Matching is case-insensitive and handles variations.
+    //
+    // HOW TO USE:
+    // 1. Add key-value pairs where the key is the user question (or part of it) and value is the
+    // response
+    // 2. Matching is flexible: exact match, partial match, or contains match will work
+    // 3. Case-insensitive: "What is Euler?" matches "what is euler"
+    // 4. Examples:
+    //    - "what is euler" will match "What is Euler?", "Tell me what is Euler", etc.
+    //    - "schedule" will match "Show me my schedule", "What's on my schedule today?", etc.
+    //
+    // IMPORTANT: These responses will be used INSTEAD of calling the LLM backend.
+    // Remove or comment out entries when you're done with the presentation.
+    private val DEMO_RESPONSES: Map<String, String> =
+        mapOf(
+            // Add your demo questions and responses below:
+            "what is euler" to
+                "Euler is a conversational AI assistant that helps EPFL students navigate campus services through natural language.",
+            "show me my schedule" to
+                "Here's your schedule for today:\n\n• 9:00 AM - CS-311 Lecture\n• 2:00 PM - Project Meeting\n• 4:00 PM - Lab Session",
+            "what can you do" to
+                "I can help you with:\n• Accessing Moodle course files\n• Searching Ed Discussion forums\n• Checking your EPFL schedule\n• Finding cafeteria menus\n• Answering questions about EPFL services",
+            // Add more demo interactions as needed for your presentation
+        )
+
+    /**
+     * Checks if a user message matches any demo responses (case-insensitive). Returns the hardcoded
+     * response if found, null otherwise.
+     */
+    private fun getDemoResponse(userMessage: String): String? {
+      val normalized = userMessage.trim().lowercase()
+      return DEMO_RESPONSES.entries
+          .firstOrNull { (key, _) ->
+            // Exact match (case-insensitive)
+            key.trim().lowercase() == normalized ||
+                // Partial match - message contains the key
+                normalized.contains(key.trim().lowercase()) ||
+                // Key contains the message (for shorter queries matching longer keys)
+                key.trim().lowercase().contains(normalized)
+          }
+          ?.value
+    }
+
     /**
      * Finds the canonical English question for a given localized suggestion text. Returns the input
      * text if no match is found (for non-suggestion queries).
@@ -929,6 +975,10 @@ class HomeViewModel(
       try {
         Log.d(TAG, "sendMessage: starting, message='${msg.take(50)}...'")
 
+        // Check for demo/presentation hardcoded responses first (highest priority)
+        // These work both online and offline and take precedence over everything else
+        if (handleDemoResponse(msg, aiMessageId)) return@launch
+
         if (handlePredefinedResponse(msg, aiMessageId)) return@launch
 
         val isOffline = current.isOffline || networkMonitor?.isCurrentlyOnline() == false
@@ -999,6 +1049,32 @@ class HomeViewModel(
     }
 
     return userMsg to aiMessageId
+  }
+
+  private suspend fun handleDemoResponse(msg: String, aiMessageId: String): Boolean {
+    val demoResponse = getDemoResponse(msg)
+    if (demoResponse != null) {
+      Log.d(TAG, "sendMessage: using demo hardcoded response for: ${msg.take(50)}...")
+
+      // Add a delay to show the thinking indicator (similar to RAG queries)
+      // This makes the demo feel more natural and consistent with real LLM responses
+      delay(1200) // 1.2 seconds of "thinking" time
+
+      simulateStreamingFromText(aiMessageId, demoResponse)
+      clearStreamingState(aiMessageId)
+
+      // Persist to conversation if we have one (for signed-in users)
+      val cid = _uiState.value.currentConversationId
+      if (cid != null && !isGuest()) {
+        try {
+          repo.appendMessage(cid, "assistant", demoResponse)
+        } catch (e: Exception) {
+          Log.w(TAG, "Failed to persist demo response to conversation", e)
+        }
+      }
+      return true
+    }
+    return false
   }
 
   private suspend fun handlePredefinedResponse(msg: String, aiMessageId: String): Boolean {
