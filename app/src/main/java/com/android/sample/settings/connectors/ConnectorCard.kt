@@ -9,11 +9,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import com.android.sample.settings.Localization
 import com.android.sample.settings.connectors.ConnectorsDimensions as Dimens
+
+/** Test tags for connector cards. */
+object ConnectorCardTags {
+  fun card(connectorId: String): String = "connector_card_$connectorId"
+}
 
 /** Logo section of the connector card. */
 @Composable
@@ -133,6 +139,7 @@ fun ConnectorCard(
         onClick = onConnectClick,
         modifier =
             Modifier.fillMaxSize()
+                .testTag(ConnectorCardTags.card(connector.id))
                 .shadow(
                     elevation = getCardElevation(isDark),
                     shape = RoundedCornerShape(Dimens.CardCornerRadius),

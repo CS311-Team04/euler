@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -39,6 +40,11 @@ import com.android.sample.ui.theme.previewBgColor
 
 const val ED_CONNECTOR_ID = "ed"
 const val ED_API_TOKENS_URL = "https://eu.edstem.org/settings/api-tokens"
+
+/** Test tags for Moodle connect dialog. */
+object MoodleConnectDialogTags {
+  const val ErrorMessage = "moodle_connect_error_message"
+}
 
 /** Data class representing a connector with its connection status. */
 data class Connector(
@@ -643,7 +649,10 @@ internal fun MoodleConnectDialog(
                           fontSize = 15.sp,
                           textAlign = TextAlign.Center,
                           lineHeight = 22.sp,
-                          modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp))
+                          modifier =
+                              Modifier.fillMaxWidth()
+                                  .padding(bottom = 16.dp)
+                                  .testTag(MoodleConnectDialogTags.ErrorMessage))
                     }
 
                     // Connect button - Full width, Moodle blue

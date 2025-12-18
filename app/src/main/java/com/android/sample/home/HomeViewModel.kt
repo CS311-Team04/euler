@@ -293,8 +293,8 @@ class HomeViewModel(
               _uiState.update { state ->
                 val wasOffline = state.isOffline
                 val newState = state.copy(isOffline = !isOnline)
-                // Show offline message when going offline, but only if user is signed in
-                if (!isOnline && !wasOffline && auth.currentUser != null) {
+                // Show offline message on transition to offline (guest or signed-in)
+                if (!isOnline && !wasOffline) {
                   newState.copy(showOfflineMessage = true)
                 } else if (isOnline && wasOffline) {
                   // Hide offline message when back online
