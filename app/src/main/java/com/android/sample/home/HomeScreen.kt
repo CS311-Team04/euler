@@ -575,8 +575,7 @@ fun HomeScreen(
                                       !msg.isThinking &&
                                       msg.source.compactType != CompactSourceType.NONE) {
                                     Spacer(Modifier.height(8.dp))
-                                    val sourceSiteLabel =
-                                        msg.source.siteLabel.orEmpty()
+                                    val sourceSiteLabel = msg.source.siteLabel.orEmpty()
                                     SourceCard(
                                         siteLabel = sourceSiteLabel,
                                         title = "",

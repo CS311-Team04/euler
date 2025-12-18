@@ -16,8 +16,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import com.android.sample.settings.Localization
 import com.android.sample.home.EdCourse
+import com.android.sample.settings.Localization
 import com.android.sample.ui.theme.DarkBackground
 import com.android.sample.ui.theme.EdPostBorderSecondary
 import com.android.sample.ui.theme.EdPostDimensions
