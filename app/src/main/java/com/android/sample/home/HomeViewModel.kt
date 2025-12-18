@@ -122,7 +122,6 @@ class HomeViewModel(
     private const val TAG = "HomeViewModel"
     private const val DEFAULT_USER_NAME = "Student"
     private const val ED_INTENT_POST_QUESTION = "post_question"
-    private const val USER_FACING_ERROR_MESSAGE = "Something went wrong. Please try again."
     // Fallback English strings for non-Android contexts (e.g., unit tests)
     private const val FALLBACK_SCHEDULE_LABEL = "Your EPFL Schedule"
     private const val FALLBACK_SCHEDULE_TITLE = "Retrieved from your connected calendar"
@@ -879,17 +878,21 @@ class HomeViewModel(
    * message and clears streaming state.
    */
   private suspend fun handleSendMessageError(error: Throwable, aiMessageId: String) {
-    // Log technical details for debugging; display user-friendly message only
     val details: String? = (error as? FirebaseFunctionsException)?.details as? String
     val code: String? = (error as? FirebaseFunctionsException)?.code?.name
-    Log.e(TAG, "Send message error [code=$code, details=$details]: ${error.message}", error)
+    val errText = buildString {
+      append("Error")
+      if (!code.isNullOrBlank()) append(" [").append(code).append("]")
+      append(": ")
+      append(details ?: error.message ?: "request failed")
+    }
     try {
       _uiState.update { state ->
         state.copy(
             messages =
                 state.messages.map { msg ->
                   if (msg.id == aiMessageId) {
-                    msg.copy(text = USER_FACING_ERROR_MESSAGE, isThinking = false)
+                    msg.copy(text = errText, isThinking = false)
                   } else {
                     msg
                   }
@@ -1428,7 +1431,7 @@ class HomeViewModel(
               messages =
                   state.messages.map { msg ->
                     if (msg.id == messageId) {
-                      msg.copy(text = USER_FACING_ERROR_MESSAGE, isThinking = false)
+                      msg.copy(text = "Error: ${t.message ?: "Unknown error"}", isThinking = false)
                     } else {
                       msg
                     }
@@ -1536,8 +1539,8 @@ class HomeViewModel(
       }
 
   private suspend fun setStreamingError(messageId: String, error: Throwable) {
-    // Technical details already logged in caller; show user-friendly message only
-    setStreamingText(messageId, USER_FACING_ERROR_MESSAGE)
+    val message = error.message?.takeIf { it.isNotBlank() } ?: "request failed"
+    setStreamingText(messageId, "Erreur: $message")
   }
 
   private suspend fun simulateStreamingFromText(messageId: String, fullText: String) {
