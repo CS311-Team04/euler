@@ -102,7 +102,7 @@ fun EdPostsSection(
   val panelBorder = Color(0xFF8B5CFF)
 
   val configuration = LocalConfiguration.current
-  val maxScrollableHeight = (configuration.screenHeightDp * 0.40f).dp // ⬅️ hauteur max
+  val maxScrollableHeight = (configuration.screenHeightDp * 0.40f).dp // max height
 
   Card(
       modifier = modifier.fillMaxWidth().wrapContentHeight().testTag("ed_posts_section"),
