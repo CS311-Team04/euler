@@ -45,7 +45,7 @@ The project design is available on Figma:
 - Firebase Authentication
 - Guest mode support
 - Multi-account support
-- MoodleCloud Authentification (for testing: username:test & password: Eulerpassword1)
+- MoodleCloud Authentification (for testing: username: `test` & password: `Eulerpassword2`)
 - ED Authentification
 
 ---
