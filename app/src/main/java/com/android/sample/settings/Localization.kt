@@ -7,6 +7,7 @@ package com.android.sample.settings
 object Localization {
   private const val BASE_URL_OPTIONAL_DE = "Basis-URL (optional)"
   private const val BASE_URL_OPTIONAL_ES = "URL base (opcional)"
+  private const val LOGO_EULER = "Logo Euler"
 
   /**
    * Translate a key to the current language string. Falls back to English if the key is not found
@@ -426,7 +427,7 @@ object Localization {
           "cancel" to "Annuler",
 
           // Drawer
-          "euler_logo" to "Logo Euler",
+          "euler_logo" to LOGO_EULER,
           "new_chat" to "Nouveau chat",
           "recents" to "RÉCENTS",
           "view_all_chats" to "Voir tous les chats",
@@ -835,7 +836,7 @@ object Localization {
           "cancel" to "Annulla",
 
           // Drawer
-          "euler_logo" to "Logo Euler",
+          "euler_logo" to LOGO_EULER,
           "new_chat" to "Nuova chat",
           "recents" to "RECENTI",
           "view_all_chats" to "Visualizza tutte le chat",
@@ -959,7 +960,7 @@ object Localization {
           "cancel" to "Cancelar",
 
           // Drawer
-          "euler_logo" to "Logo Euler",
+          "euler_logo" to LOGO_EULER,
           "new_chat" to "Novo chat",
           "recents" to "RECENTES",
           "view_all_chats" to "Ver todos os chats",

@@ -386,7 +386,11 @@ class HomeViewModel(
     dataStarted = true
     Log.d(TAG, "startData(): attaching listeners (isInLocalNewChat=$isInLocalNewChat)")
 
-    // 1) Conversation list
+    observeConversations()
+    collectMessages()
+  }
+
+  private fun observeConversations() {
     conversationsJob?.cancel()
     conversationsJob =
         viewModelScope.launch {
@@ -395,138 +399,157 @@ class HomeViewModel(
                 TAG,
                 "conversationsFlow -> size=${list.size}, current=${_uiState.value.currentConversationId}, isInLocalNewChat=$isInLocalNewChat")
             _uiState.update { it.copy(conversations = list) }
-
-            val currentId = _uiState.value.currentConversationId
-            val hasCurrent = currentId != null && list.any { it.id == currentId }
-
-            when {
-              hasCurrent -> Log.d(TAG, "Keeping current conversation $currentId")
-              currentId == null && list.isNotEmpty() && !isInLocalNewChat -> {
-                val next = list.first().id
-                Log.d(TAG, "Auto-selecting conversation $next (not in local placeholder mode)")
-                isInLocalNewChat = false
-                _uiState.update { it.copy(currentConversationId = next) }
-              }
-              list.isEmpty() -> {
-                Log.d(TAG, "No remote conversations available; staying with null selection")
-                _uiState.update { it.copy(currentConversationId = null) }
-              }
-              else -> Log.d(TAG, "Local new chat active; leaving selection as null")
-            }
+            reconcileCurrentSelection(list)
           }
         }
+  }
 
-    // 2) Messages for the selected conversation (flatMapLatest strategy)
+  private fun reconcileCurrentSelection(list: List<com.android.sample.conversations.Conversation>) {
+    val currentId = _uiState.value.currentConversationId
+    val hasCurrent = currentId != null && list.any { it.id == currentId }
+
+    when {
+      hasCurrent -> Log.d(TAG, "Keeping current conversation $currentId")
+      currentId == null && list.isNotEmpty() && !isInLocalNewChat -> {
+        val next = list.first().id
+        Log.d(TAG, "Auto-selecting conversation $next (not in local placeholder mode)")
+        isInLocalNewChat = false
+        _uiState.update { it.copy(currentConversationId = next) }
+      }
+      list.isEmpty() -> {
+        Log.d(TAG, "No remote conversations available; staying with null selection")
+        _uiState.update { it.copy(currentConversationId = null) }
+      }
+      else -> Log.d(TAG, "Local new chat active; leaving selection as null")
+    }
+  }
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  private fun collectMessages() {
     messagesJob?.cancel()
     messagesJob =
         viewModelScope.launch(Dispatchers.IO) {
           uiState
               .map { it.currentConversationId }
               .distinctUntilChanged()
-              .flatMapLatest { cid ->
-                // Use emptyFlow() when no conversation is selected to avoid
-                // race conditions where stale emissions could clear local messages
-                if (cid == null) emptyFlow() else repo.messagesFlow(cid)
-              }
+              .flatMapLatest { cid -> if (cid == null) emptyFlow() else repo.messagesFlow(cid) }
               .flowOn(Dispatchers.IO)
               .collect { msgs ->
-                val streamingId = _uiState.value.streamingMessageId
-                if (streamingId != null) {
-
-                  return@collect
-                }
-
-                val conversationId = _uiState.value.currentConversationId
-
-                // Don't overwrite local messages when no conversation is selected
-                // and incoming messages are empty. This preserves offline messages
-                // that haven't been persisted yet. We always skip in this case
-                // because updating with empty messages is either a no-op (if messages
-                // are already empty) or destructive (if we have local messages).
-                if (conversationId == null && msgs.isEmpty()) {
-                  return@collect
-                }
-                // Load all EdCards (both EdPostCard and EdPostsCard) before updating state
-                val loadedEdCards = mutableListOf<EdPostCard>()
-                val loadedEdPostsCards = mutableListOf<EdPostsCard>()
-
-                if (conversationId != null && !isGuest()) {
-                  val (newEdCards, newEdPostsCards) =
-                      loadEdCardsForMessages(conversationId, msgs, repo = repo)
-                  loadedEdCards.addAll(newEdCards)
-                  loadedEdPostsCards.addAll(newEdPostsCards)
-                }
-
-                withContext(Dispatchers.Main) {
-                  _uiState.update { currentState ->
-                    // Merge loaded EdCards with existing ones (avoid duplicates)
-                    val allEdCards =
-                        (currentState.edPostCards + loadedEdCards)
-                            .distinctBy { it.id }
-                            .sortedBy { it.createdAt }
-
-                    // Merge loaded EdPostsCards with existing ones (avoid duplicates)
-                    val allEdPostsCards =
-                        (currentState.edPostsCards + loadedEdPostsCards)
-                            .distinctBy { it.id }
-                            .sortedBy { it.createdAt }
-
-                    val firestoreMessages = msgs.map { (dto, messageId) -> dto.toUi(messageId) }
-
-                    // Detect if we're switching conversations or syncing the same one
-                    val firestoreTexts =
-                        firestoreMessages
-                            .mapNotNull { it.text.takeIf { t -> t.isNotBlank() } }
-                            .toSet()
-                    val localTexts =
-                        currentState.messages
-                            .mapNotNull { it.text.takeIf { t -> t.isNotBlank() } }
-                            .toSet()
-                    val isSameConversation = firestoreTexts.any { it in localTexts }
-
-                    if (!isSameConversation) {
-                      // Switching conversations - don't preserve local source/attachment
-                      return@update currentState.copy(
-                          messages = firestoreMessages,
-                          edPostCards = allEdCards,
-                          edPostsCards = allEdPostsCards)
-                    }
-
-                    // Same conversation - preserve source/attachment from local state
-                    val localSourceByText =
-                        currentState.messages
-                            .filter { it.type == ChatType.AI && it.source != null }
-                            .associateBy { it.text }
-                    val localAttachmentByText =
-                        currentState.messages
-                            .filter { it.type == ChatType.AI && it.attachment != null }
-                            .associateBy { it.text }
-
-                    val finalMessages =
-                        firestoreMessages.map { msg ->
-                          if (msg.type == ChatType.AI) {
-                            val localSource = localSourceByText[msg.text]?.source
-                            val localAttachment = localAttachmentByText[msg.text]?.attachment
-                            if (localSource != null || localAttachment != null) {
-                              msg.copy(
-                                  source = localSource ?: msg.source,
-                                  attachment = localAttachment ?: msg.attachment)
-                            } else {
-                              msg
-                            }
-                          } else {
-                            msg
-                          }
-                        }
-
-                    currentState.copy(
-                        messages = finalMessages,
-                        edPostCards = allEdCards,
-                        edPostsCards = allEdPostsCards)
-                  }
-                }
+                if (shouldSkipMessageUpdate(msgs)) return@collect
+                updateMessagesWithEdCards(msgs)
               }
         }
+  }
+
+  /**
+   * Guardrail to prevent state corruption during streaming. Skips Firestore message updates when
+   * streaming is active (to avoid overwriting the in-flight placeholder/partial assistant message)
+   * or when there's no current conversation and no incoming messages. These skips are intentional
+   * to preserve local optimistic UI state and maintain consistency while streaming.
+   */
+  private fun shouldSkipMessageUpdate(msgs: List<Pair<MessageDTO, String>>): Boolean {
+    val streamingId = _uiState.value.streamingMessageId
+    if (streamingId != null) return true
+
+    val conversationId = _uiState.value.currentConversationId
+    if (conversationId == null && msgs.isEmpty()) return true
+
+    return false
+  }
+
+  private suspend fun updateMessagesWithEdCards(msgs: List<Pair<MessageDTO, String>>) {
+    val conversationId = _uiState.value.currentConversationId
+    val (loadedEdCards, loadedEdPostsCards) = loadEdCardsIfNeeded(conversationId, msgs)
+
+    withContext(Dispatchers.Main) {
+      _uiState.update { currentState ->
+        val allEdCards = mergeEdCards(currentState.edPostCards, loadedEdCards)
+        val allEdPostsCards = mergeEdPostsCards(currentState.edPostsCards, loadedEdPostsCards)
+        val firestoreMessages = msgs.map { (dto, messageId) -> dto.toUi(messageId) }
+        val finalMessages = mergeMessagesWithLocalState(currentState, firestoreMessages)
+
+        currentState.copy(
+            messages = finalMessages, edPostCards = allEdCards, edPostsCards = allEdPostsCards)
+      }
+    }
+  }
+
+  private suspend fun loadEdCardsIfNeeded(
+      conversationId: String?,
+      msgs: List<Pair<MessageDTO, String>>
+  ): Pair<List<EdPostCard>, List<EdPostsCard>> {
+    if (conversationId == null || isGuest()) {
+      return Pair(emptyList(), emptyList())
+    }
+    return loadEdCardsForMessages(conversationId, msgs, repo = repo)
+  }
+
+  private fun mergeEdCards(existing: List<EdPostCard>, loaded: List<EdPostCard>): List<EdPostCard> {
+    return (existing + loaded).distinctBy { it.id }.sortedBy { it.createdAt }
+  }
+
+  private fun mergeEdPostsCards(
+      existing: List<EdPostsCard>,
+      loaded: List<EdPostsCard>
+  ): List<EdPostsCard> {
+    return (existing + loaded).distinctBy { it.id }.sortedBy { it.createdAt }
+  }
+
+  private fun mergeMessagesWithLocalState(
+      currentState: HomeUiState,
+      firestoreMessages: List<ChatUIModel>
+  ): List<ChatUIModel> {
+    val isSameConversation = detectSameConversation(currentState.messages, firestoreMessages)
+
+    if (!isSameConversation) {
+      return firestoreMessages
+    }
+
+    return preserveLocalSourceAndAttachment(currentState.messages, firestoreMessages)
+  }
+
+  /**
+   * Heuristic to detect if local and Firestore messages belong to the same conversation by checking
+   * for overlapping message text. This is fragile: duplicate/common texts, edits, or formatting
+   * differences may cause false positives/negatives. We use this because stable conversation IDs
+   * are not reliably available in this sync context. If a stable ID or marker becomes available,
+   * prefer that over text-based matching.
+   */
+  private fun detectSameConversation(
+      localMessages: List<ChatUIModel>,
+      firestoreMessages: List<ChatUIModel>
+  ): Boolean {
+    val firestoreTexts =
+        firestoreMessages.mapNotNull { it.text.takeIf { t -> t.isNotBlank() } }.toSet()
+    val localTexts = localMessages.mapNotNull { it.text.takeIf { t -> t.isNotBlank() } }.toSet()
+    return firestoreTexts.any { it in localTexts }
+  }
+
+  private fun preserveLocalSourceAndAttachment(
+      localMessages: List<ChatUIModel>,
+      firestoreMessages: List<ChatUIModel>
+  ): List<ChatUIModel> {
+    val localSourceByText =
+        localMessages.filter { it.type == ChatType.AI && it.source != null }.associateBy { it.text }
+    val localAttachmentByText =
+        localMessages
+            .filter { it.type == ChatType.AI && it.attachment != null }
+            .associateBy { it.text }
+
+    return firestoreMessages.map { msg ->
+      if (msg.type == ChatType.AI) {
+        val localSource = localSourceByText[msg.text]?.source
+        val localAttachment = localAttachmentByText[msg.text]?.attachment
+        if (localSource != null || localAttachment != null) {
+          msg.copy(
+              source = localSource ?: msg.source, attachment = localAttachment ?: msg.attachment)
+        } else {
+          msg
+        }
+      } else {
+        msg
+      }
+    }
   }
 
   /**
@@ -890,22 +913,55 @@ class HomeViewModel(
    */
   fun sendMessage(message: String? = null) {
     val current = _uiState.value
-    if (current.isSending || current.streamingMessageId != null) return
+    if (shouldAbortSend(current)) return
 
-    // Use provided message or fall back to draft
-    val msg = (message?.trim() ?: current.messageDraft.trim())
+    val msg = normalizeMessageInput(message, current.messageDraft)
     if (msg.isEmpty()) return
 
-    // Note: We allow sending even when offline to support suggestion chips working offline.
-    // Network errors will be caught and displayed to the user.
-    // Still update offline message state if needed, but don't block sending.
-    if (current.isOffline) {
-      // Update state to show offline message if not already shown
-      if (!current.showOfflineMessage && auth.currentUser != null) {
-        _uiState.update { it.copy(showOfflineMessage = true) }
+    updateOfflineStateIfNeeded(current)
+    val (userMsg, aiMessageId) = appendUserMessageToUi(msg)
+
+    viewModelScope.launch(exceptionHandler) {
+      try {
+        Log.d(TAG, "sendMessage: starting, message='${msg.take(50)}...'")
+
+        if (handlePredefinedResponse(msg, aiMessageId)) return@launch
+
+        val isOffline = current.isOffline || networkMonitor?.isCurrentlyOnline() == false
+        if (isOffline && handleOfflineCachedResponse(msg, aiMessageId)) return@launch
+
+        if (isGuest()) {
+          handleGuestModeSend(msg, aiMessageId)
+          return@launch
+        }
+
+        performSignedInSend(msg, userMsg, aiMessageId)
+      } catch (_: AuthNotReadyException) {
+        handleAuthNotReadyError(aiMessageId)
+      } catch (e: Exception) {
+        Log.e(TAG, "Error sending message", e)
+        handleSendMessageError(e, aiMessageId)
+      } catch (t: Throwable) {
+        Log.e(TAG, "Unexpected error sending message", t)
+        handleSendMessageError(t, aiMessageId)
+      } finally {
+        finalizeSend()
       }
     }
-    // Double-check actual connectivity and update state, but don't block sending
+  }
+
+  private fun shouldAbortSend(current: HomeUiState): Boolean {
+    return current.isSending || current.streamingMessageId != null
+  }
+
+  private fun normalizeMessageInput(message: String?, draft: String): String {
+    return (message?.trim() ?: draft.trim())
+  }
+
+  private fun updateOfflineStateIfNeeded(current: HomeUiState) {
+    if (current.isOffline && !current.showOfflineMessage && auth.currentUser != null) {
+      _uiState.update { it.copy(showOfflineMessage = true) }
+    }
     if (networkMonitor?.isCurrentlyOnline() == false) {
       _uiState.update {
         it.copy(
@@ -913,7 +969,9 @@ class HomeViewModel(
             showOfflineMessage = if (auth.currentUser != null) true else it.showOfflineMessage)
       }
     }
+  }
 
+  private fun appendUserMessageToUi(msg: String): Pair<ChatUIModel, String> {
     val now = System.currentTimeMillis()
     val userMsg =
         ChatUIModel(
@@ -927,7 +985,6 @@ class HomeViewModel(
             type = ChatType.AI,
             isThinking = true)
 
-    // Optimistic UI: add user + placeholder, clear input, mark streaming state
     _uiState.update { st ->
       st.copy(
           messages = st.messages + userMsg + placeholder,
@@ -937,198 +994,212 @@ class HomeViewModel(
           streamingSequence = st.streamingSequence + 1)
     }
 
-    viewModelScope.launch(exceptionHandler) {
+    return userMsg to aiMessageId
+  }
+
+  private suspend fun handlePredefinedResponse(msg: String, aiMessageId: String): Boolean {
+    val canonicalQuestion = getCanonicalQuestion(msg)
+    val predefinedResponse = getPredefinedResponse(canonicalQuestion)
+    if (predefinedResponse != null) {
+      Log.d(TAG, "sendMessage: using predefined response for: $canonicalQuestion")
+      simulateStreamingFromText(aiMessageId, predefinedResponse)
+      clearStreamingState(aiMessageId)
+      return true
+    }
+    return false
+  }
+
+  private suspend fun handleOfflineCachedResponse(msg: String, aiMessageId: String): Boolean {
+    Log.d(TAG, "sendMessage: offline mode, checking Firestore cache")
+
+    if (isGuest()) {
+      handleOfflineError(aiMessageId)
+      return true
+    }
+
+    return try {
+      val canonicalQuestion = getCanonicalQuestion(msg)
+      val cachedResponse = cacheRepo.getCachedResponse(canonicalQuestion, preferCache = true)
+      if (cachedResponse != null && cachedResponse.isNotBlank()) {
+        Log.d(TAG, "sendMessage: found cached response in Firestore local cache")
+        simulateStreamingFromText(aiMessageId, cachedResponse)
+        clearStreamingState(aiMessageId)
+        persistCachedResponseToConversation(cachedResponse)
+        true
+      } else {
+        handleOfflineError(aiMessageId)
+        true
+      }
+    } catch (e: Exception) {
+      Log.w(TAG, "Error checking Firestore local cache", e)
+      handleOfflineError(aiMessageId)
+      true
+    }
+  }
+
+  private suspend fun persistCachedResponseToConversation(cachedResponse: String) {
+    val cid = _uiState.value.currentConversationId
+    if (cid != null) {
       try {
-        Log.d(TAG, "sendMessage: starting, message='${msg.take(50)}...'")
+        repo.appendMessage(cid, "assistant", cachedResponse)
+      } catch (e: Exception) {
+        Log.w(TAG, "Failed to persist cached response to conversation", e)
+      }
+    }
+  }
 
-        // Check for predefined responses first (works both online and offline)
-        // This ensures suggestion bubbles always return consistent answers
-        val canonicalQuestion = getCanonicalQuestion(msg)
-        val predefinedResponse = getPredefinedResponse(canonicalQuestion)
-        if (predefinedResponse != null) {
-          Log.d(TAG, "sendMessage: using predefined response for: $canonicalQuestion")
-          simulateStreamingFromText(aiMessageId, predefinedResponse)
-          clearStreamingState(aiMessageId)
-          return@launch
+  private suspend fun handleOfflineError(aiMessageId: String) {
+    Log.d(TAG, "sendMessage: no offline response available")
+    handleSendMessageError(
+        IOException(
+            "No offline response available for this question. Please connect to the internet."),
+        aiMessageId)
+  }
+
+  private suspend fun handleGuestModeSend(msg: String, aiMessageId: String) {
+    Log.d(TAG, "sendMessage: guest mode, starting streaming")
+    val currentProfile = resolveProfile()
+    val profileContext = buildProfileContext(currentProfile)
+    Log.d(
+        TAG,
+        "sendMessage: Guest mode - profileContext built, hasContext=${profileContext != null}, contextLength=${profileContext?.length ?: 0}")
+    startStreaming(
+        question = msg,
+        messageId = aiMessageId,
+        conversationId = null,
+        summary = null,
+        transcript = null,
+        profileContext = profileContext,
+        userMessageFirestoreId = null)
+  }
+
+  private suspend fun performSignedInSend(msg: String, userMsg: ChatUIModel, aiMessageId: String) {
+    val cid = ensureConversationExists(msg)
+    val userMessageFirestoreId = persistUserMessage(cid, msg, aiMessageId)
+    updateUserMessageId(userMsg.id, userMessageFirestoreId)
+
+    val streamingContext = buildStreamingContextForSend(cid, userMsg.id)
+    startStreaming(
+        question = msg,
+        messageId = aiMessageId,
+        conversationId = cid,
+        summary = streamingContext.summary,
+        transcript = streamingContext.transcript,
+        profileContext = streamingContext.profileContext,
+        userMessageFirestoreId = userMessageFirestoreId)
+  }
+
+  private suspend fun ensureConversationExists(msg: String): String {
+    val existingId = _uiState.value.currentConversationId
+    if (existingId != null) {
+      isInLocalNewChat = false
+      return existingId
+    }
+
+    val quickTitle = ConversationTitleFormatter.localTitleFrom(msg)
+    val newId = repo.startNewConversation(quickTitle)
+    _uiState.update { it.copy(currentConversationId = newId) }
+    isInLocalNewChat = false
+
+    viewModelScope.launch {
+      try {
+        val good = ConversationTitleFormatter.fetchTitle(functions, msg, TAG)
+        if (good.isNotBlank() && good != quickTitle) {
+          repo.updateConversationTitle(newId, good)
         }
+      } catch (_: Exception) {
+        /* keep provisional */
+      }
+    }
 
-        // Handle offline mode for non-predefined questions
-        val isOffline = current.isOffline || networkMonitor?.isCurrentlyOnline() == false
-        if (isOffline) {
-          Log.d(TAG, "sendMessage: offline mode, checking Firestore cache")
+    return newId
+  }
 
-          // For signed-in users, try Firestore local cache
-          if (!isGuest()) {
-            try {
-              val cachedResponse =
-                  cacheRepo.getCachedResponse(canonicalQuestion, preferCache = true)
-              if (cachedResponse != null && cachedResponse.isNotBlank()) {
-                Log.d(TAG, "sendMessage: found cached response in Firestore local cache")
-                simulateStreamingFromText(aiMessageId, cachedResponse)
-                clearStreamingState(aiMessageId)
+  private suspend fun persistUserMessage(cid: String, msg: String, aiMessageId: String): String {
+    return try {
+      repo.appendMessage(cid, "user", msg)
+    } catch (e: Exception) {
+      Log.e(TAG, "Failed to persist user message: ${e.message}", e)
+      // handleSendMessageError is the single source of truth for UI error updates.
+      // Rethrow so caller can abort/cleanup; caller must NOT duplicate error UI handling.
+      handleSendMessageError(e, aiMessageId)
+      throw e
+    }
+  }
 
-                // Persist to conversation if we have one
-                val cid = _uiState.value.currentConversationId
-                if (cid != null) {
-                  try {
-                    repo.appendMessage(cid, "assistant", cachedResponse)
-                  } catch (e: Exception) {
-                    Log.w(TAG, "Failed to persist cached response to conversation", e)
-                  }
+  private fun updateUserMessageId(localId: String, firestoreId: String) {
+    _uiState.update { state ->
+      state.copy(
+          messages =
+              state.messages.map { message ->
+                if (message.id == localId && message.type == ChatType.USER) {
+                  message.copy(id = firestoreId)
+                } else {
+                  message
                 }
-                return@launch
-              }
-            } catch (e: Exception) {
-              Log.w(TAG, "Error checking Firestore local cache", e)
-            }
-          }
+              })
+    }
+  }
 
-          // No cached response available - show error
-          Log.d(TAG, "sendMessage: no offline response available")
-          handleSendMessageError(
-              IOException(
-                  "No offline response available for this question. Please connect to the internet."),
-              aiMessageId)
-          return@launch
-        }
+  /**
+   * Context data passed to the LLM for streaming responses.
+   *
+   * @property summary Condensed history of prior messages in the conversation for continuity.
+   * @property transcript Recent voice/text input transcript to provide immediate context.
+   * @property profileContext User profile info (name, role, academic details) for personalization.
+   */
+  private data class SendStreamingContext(
+      val summary: String?,
+      val transcript: String?,
+      val profileContext: String?
+  )
 
-        // GUEST: no Firestore, just streaming UI
-        if (isGuest()) {
-          Log.d(TAG, "sendMessage: guest mode, starting streaming")
-          val currentProfile = resolveProfile()
-          val profileContext = buildProfileContext(currentProfile)
+  private suspend fun buildStreamingContextForSend(
+      conversationId: String,
+      userMessageId: String
+  ): SendStreamingContext {
+    val uid = auth.currentUser?.uid
+
+    val summary: String? =
+        if (uid != null) {
+          val prior = fetchPriorSummary(uid, conversationId, userMessageId)
+          val source = if (prior != null) "prior" else "none"
           Log.d(
               TAG,
-              "sendMessage: Guest mode - profileContext built, hasContext=${profileContext != null}, contextLength=${profileContext?.length ?: 0}")
-          startStreaming(
-              question = msg,
-              messageId = aiMessageId,
-              conversationId = null,
-              summary = null,
-              transcript = null,
-              profileContext = profileContext,
-              userMessageFirestoreId = null)
-          return@launch
-        }
+              "answerWithRagFn summarySource=$source len=${prior?.length ?: 0} " +
+                  "head='${prior?.take(2000) ?: ""}'")
+          prior
+        } else null
 
-        // CONNECTED: ensure we have a conversation and persist the USER message immediately (repo)
-        val cid =
-            _uiState.value.currentConversationId
-                ?: run {
-                  val quickTitle = ConversationTitleFormatter.localTitleFrom(msg)
-                  val newId = repo.startNewConversation(quickTitle)
-                  _uiState.update { it.copy(currentConversationId = newId) }
-                  isInLocalNewChat = false
+    val recentTranscript: String? =
+        if (uid != null) {
+          buildRecentTranscript(uid, conversationId, userMessageId)
+        } else null
 
-                  // Upgrade title in background (ONE time)
-                  launch {
-                    try {
-                      val good = ConversationTitleFormatter.fetchTitle(functions, msg, TAG)
-                      if (good.isNotBlank() && good != quickTitle) {
-                        repo.updateConversationTitle(newId, good)
-                      }
-                    } catch (_: Exception) {
-                      /* keep provisional */
-                    }
-                  }
-                  newId
-                }
+    val currentProfile = resolveProfile()
+    val profileContext = buildProfileContext(currentProfile)
+    Log.d(
+        TAG,
+        "sendMessage: profileContext built, hasProfile=${currentProfile != null}, hasContext=${profileContext != null}, contextLength=${profileContext?.length ?: 0}")
 
-        isInLocalNewChat = false
-        // Persist USER message to repo immediately
-        // Store the Firestore message ID for potential use in EdCard association
-        val userMessageFirestoreId =
-            try {
-              repo.appendMessage(cid, "user", msg)
-            } catch (e: Exception) {
-              Log.e(TAG, "Failed to persist user message: ${e.message}", e)
-              handleSendMessageError(e, aiMessageId)
-              return@launch
-            }
+    return SendStreamingContext(summary, recentTranscript, profileContext)
+  }
 
-        // Update the local user message ID with the Firestore ID
-        _uiState.update { state ->
-          state.copy(
-              messages =
-                  state.messages.map { message ->
-                    if (message.id == userMsg.id && message.type == ChatType.USER) {
-                      message.copy(id = userMessageFirestoreId)
-                    } else {
-                      message
-                    }
-                  })
-        }
+  private suspend fun handleAuthNotReadyError(aiMessageId: String) {
+    try {
+      setStreamingError(aiMessageId, AuthNotReadyException())
+      clearStreamingState(aiMessageId)
+    } catch (ex: Exception) {
+      Log.e(TAG, "Error setting streaming error state", ex)
+      _uiState.update { it.copy(isSending = false, streamingMessageId = null) }
+    }
+  }
 
-        // ---------- Firestore + RAG (from second snippet) ----------
-
-        // Note: User message is already persisted via repo.appendMessage() above
-        // The direct Firestore write was removed to avoid duplicate writes and timestamp type
-        // conflicts
-
-        val uid = auth.currentUser?.uid
-        val conversationId = cid // unify naming
-
-        // Retrieve previous rolling summary if available
-        val summary: String? =
-            if (uid != null && conversationId != null) {
-              val prior = fetchPriorSummary(uid, conversationId, userMsg.id)
-              val source = if (prior != null) "prior" else "none"
-              Log.d(
-                  TAG,
-                  "answerWithRagFn summarySource=$source len=${prior?.length ?: 0} " +
-                      "head='${prior?.take(2000) ?: ""}'")
-              prior
-            } else null
-
-        // Build a recent transcript if needed
-        val recentTranscript: String? =
-            if (uid != null && conversationId != null) {
-              buildRecentTranscript(uid, conversationId, userMsg.id)
-            } else null
-
-        // Resolve profile (loads if not already in state)
-        val currentProfile = resolveProfile()
-
-        // Build the user profile context
-        val profileContext = buildProfileContext(currentProfile)
-        Log.d(
-            TAG,
-            "sendMessage: profileContext built, hasProfile=${currentProfile != null}, hasContext=${profileContext != null}, contextLength=${profileContext?.length ?: 0}")
-
-        // Appel RAG
-        startStreaming(
-            question = msg,
-            messageId = aiMessageId,
-            conversationId = conversationId,
-            summary = summary,
-            transcript = recentTranscript,
-            profileContext = profileContext,
-            userMessageFirestoreId = userMessageFirestoreId)
-      } catch (_: AuthNotReadyException) {
-        // Auth not ready: signal streaming/send error in UI
-        try {
-          setStreamingError(aiMessageId, AuthNotReadyException())
-          clearStreamingState(aiMessageId)
-        } catch (ex: Exception) {
-          Log.e(TAG, "Error setting streaming error state", ex)
-          _uiState.update { it.copy(isSending = false, streamingMessageId = null) }
-        }
-      } catch (e: Exception) {
-        // Erreurs back-end / Functions
-        Log.e(TAG, "Error sending message", e)
-        handleSendMessageError(e, aiMessageId)
-      } catch (t: Throwable) {
-        // Catch any other Throwable (Error, etc.) to prevent crashes
-        Log.e(TAG, "Unexpected error sending message", t)
-        handleSendMessageError(t, aiMessageId)
-      } finally {
-        // Always stop the global sending indicator
-        try {
-          _uiState.update { it.copy(isSending = false) }
-        } catch (ex: Exception) {
-          Log.e(TAG, "Error updating isSending state in finally", ex)
-        }
-      }
+  private fun finalizeSend() {
+    try {
+      _uiState.update { it.copy(isSending = false) }
+    } catch (ex: Exception) {
+      Log.e(TAG, "Error updating isSending state in finally", ex)
     }
   }
   /** Streaming helper using [LlmClient] and optional summary/transcript/profile context. */
@@ -1145,189 +1216,238 @@ class HomeViewModel(
     userCancelledStream = false
 
     activeStreamJob =
-        viewModelScope.launch(exceptionHandler) {
-          try {
-            Log.d(
-                TAG,
-                "startStreaming: calling llmClient.generateReply for messageId=$messageId, question='${question.take(50)}...'")
-            val reply =
-                try {
-                  withContext(Dispatchers.IO) {
-                    llmClient.generateReply(
-                        prompt = question,
-                        summary = summary,
-                        transcript = transcript,
-                        profileContext = profileContext)
-                  }
-                } catch (e: FirebaseFunctionsException) {
-                  Log.e(
-                      TAG,
-                      "Firebase Functions exception in startStreaming: code=${e.code}, message=${e.message}",
-                      e)
-                  throw e
-                } catch (e: Exception) {
-                  Log.e(TAG, "Exception in llmClient.generateReply: ${e.javaClass.simpleName}", e)
-                  throw e
-                } catch (t: Throwable) {
-                  Log.e(
-                      TAG,
-                      "Unexpected throwable in llmClient.generateReply: ${t.javaClass.simpleName}",
-                      t)
-                  throw t
-                }
-            Log.d(
-                TAG,
-                "startStreaming: received reply, length=${reply.reply.length}, edIntentDetected=${reply.edIntent.detected}, edIntent=${reply.edIntent.intent}, edFetchIntentDetected=${reply.edFetchIntent.detected}, edFetchQuery=${reply.edFetchIntent.query}")
+        startStreamingJob(
+            question,
+            messageId,
+            conversationId,
+            summary,
+            transcript,
+            profileContext,
+            userMessageFirestoreId)
+  }
 
-            // Handle ED fetch intent detection first (takes precedence)
-            // Use the Firestore ID if provided, otherwise find the last USER message in the current
-            // state
-            val userMessageId =
-                userMessageFirestoreId
-                    ?: _uiState.value.messages.lastOrNull { it.type == ChatType.USER }?.id
-            if (handleEdFetchIntent(reply, question, messageId, userMessageId)) {
-              Log.d(TAG, "startStreaming: ED fetch intent handled, skipping normal streaming")
-              // Skip normal streaming; ED fetch flow takes over
-              return@launch
-            } else {
-              Log.d(
-                  TAG,
-                  "startStreaming: No ED fetch intent detected, continuing with normal streaming")
-            }
+  private fun startStreamingJob(
+      question: String,
+      messageId: String,
+      conversationId: String?,
+      summary: String?,
+      transcript: String?,
+      profileContext: String?,
+      userMessageFirestoreId: String?
+  ): Job {
+    return viewModelScope.launch(exceptionHandler) {
+      try {
+        val reply = generateLlmReply(question, summary, transcript, profileContext)
+        processStreamingReply(reply, question, messageId, conversationId, userMessageFirestoreId)
+      } catch (ce: CancellationException) {
+        handleStreamingCancellation(messageId, ce)
+      } catch (t: Throwable) {
+        handleStreamingError(messageId, t)
+      } finally {
+        finalizeStreaming(messageId)
+      }
+    }
+  }
 
-            // Handle ED intent detection - create PostOnEd pending action
-            val postHandled = handleEdIntent(reply, question, messageId)
-            if (postHandled) {
-              // Skip normal streaming; ED flow takes over
-              return@launch
-            }
+  private suspend fun generateLlmReply(
+      question: String,
+      summary: String?,
+      transcript: String?,
+      profileContext: String?
+  ): BotReply {
+    Log.d(
+        TAG,
+        "startStreaming: calling llmClient.generateReply for question='${question.take(50)}...'")
+    return try {
+      withContext(Dispatchers.IO) {
+        llmClient.generateReply(
+            prompt = question,
+            summary = summary,
+            transcript = transcript,
+            profileContext = profileContext)
+      }
+    } catch (e: FirebaseFunctionsException) {
+      Log.e(
+          TAG,
+          "Firebase Functions exception in startStreaming: code=${e.code}, message=${e.message}",
+          e)
+      throw e
+    } catch (e: Exception) {
+      Log.e(TAG, "Exception in llmClient.generateReply: ${e.javaClass.simpleName}", e)
+      throw e
+    } catch (t: Throwable) {
+      Log.e(TAG, "Unexpected throwable in llmClient.generateReply: ${t.javaClass.simpleName}", t)
+      throw t
+    }
+  }
 
-            // simulate stream into the placeholder AI message
-            simulateStreamingFromText(messageId, reply.reply)
+  private suspend fun processStreamingReply(
+      reply: BotReply,
+      question: String,
+      messageId: String,
+      conversationId: String?,
+      userMessageFirestoreId: String?
+  ) {
+    Log.d(
+        TAG,
+        "startStreaming: received reply, length=${reply.reply.length}, edIntentDetected=${reply.edIntent.detected}, edIntent=${reply.edIntent.intent}, edFetchIntentDetected=${reply.edFetchIntent.detected}, edFetchQuery=${reply.edFetchIntent.query}")
 
-            // Build attachment if backend returned a PDF URL
-            val attachment: ChatAttachment? =
-                reply.url?.takeIf { isPdfUrl(it) }?.let { pdfUrl -> ChatAttachment(url = pdfUrl) }
+    val userMessageId =
+        userMessageFirestoreId
+            ?: _uiState.value.messages.lastOrNull { it.type == ChatType.USER }?.id
 
-            // Build optional source card based on source type
-            val sourceMeta: SourceMeta? =
-                when (reply.sourceType) {
-                  SourceType.SCHEDULE -> {
-                    // Schedule source - show a small indicator
-                    SourceMeta(
-                        siteLabel = Localization.t("source_label_epfl_schedule"),
-                        title = Localization.t("source_label_schedule_description"),
-                        url = null,
-                        isScheduleSource = true,
-                        compactType = CompactSourceType.SCHEDULE)
-                  }
-                  SourceType.FOOD -> {
-                    // Food source - show a small indicator
-                    SourceMeta(
-                        siteLabel = Localization.t("source_label_epfl_restaurants"),
-                        title = Localization.t("source_label_food_description"),
-                        url = reply.url,
-                        isScheduleSource = true,
-                        compactType = CompactSourceType.FOOD)
-                  }
-                  SourceType.RAG -> {
-                    // RAG source - show the web source card if URL exists
-                    reply.url?.let { url ->
-                      SourceMeta(
-                          siteLabel = buildSiteLabel(url),
-                          title = buildFallbackTitle(url),
-                          url = url,
-                          isScheduleSource = false,
-                          compactType = CompactSourceType.NONE)
-                    }
-                  }
-                  SourceType.NONE -> null
-                }
+    if (handleEdFetchIntent(reply, question, messageId, userMessageId)) {
+      Log.d(TAG, "startStreaming: ED fetch intent handled, skipping normal streaming")
+      return
+    }
 
-            // Update the existing AI message with attachment and/or source (instead of creating new
-            // messages)
-            if (attachment != null || sourceMeta != null) {
-              _uiState.update { state ->
-                val updated =
-                    state.messages.map { msg ->
-                      if (msg.id == messageId) {
-                        msg.copy(
-                            attachment = attachment ?: msg.attachment,
-                            source = sourceMeta ?: msg.source)
-                      } else {
-                        msg
-                      }
-                    }
-                state.copy(messages = updated, streamingSequence = state.streamingSequence + 1)
-              }
-            }
+    if (handleEdIntent(reply, question, messageId)) {
+      Log.d(TAG, "startStreaming: ED post intent handled, skipping normal streaming")
+      return
+    }
 
-            // Persist assistant message if we are signed in
-            if (conversationId != null) {
-              try {
-                // Use repository method which handles timestamps correctly
-                // Include source metadata for persistence across conversation switches
-                val sourceMetadata =
-                    sourceMeta?.url?.let { url ->
-                      com.android.sample.conversations.MessageSourceMetadata(
-                          url = url, compactType = sourceMeta.compactType.name)
-                    }
-                repo.appendMessage(
-                    conversationId = conversationId,
-                    role = "assistant",
-                    text = reply.reply,
-                    edCardId = null,
-                    sourceMetadata = sourceMetadata)
-              } catch (e: Exception) {
-                Log.w(TAG, "Failed to persist assistant message: ${e.message}")
-                handleSendMessageError(e, messageId)
-                return@launch
-              }
-            }
-          } catch (ce: CancellationException) {
-            if (!userCancelledStream) {
-              try {
-                setStreamingError(messageId, ce)
-              } catch (ex: Exception) {
-                Log.e(TAG, "Error setting streaming error for cancellation", ex)
-              }
-            }
-          } catch (t: Throwable) {
-            Log.e(TAG, "Unexpected error during streaming", t)
-            if (!userCancelledStream) {
-              try {
-                setStreamingError(messageId, t)
-              } catch (ex: Exception) {
-                Log.e(TAG, "Error setting streaming error", ex)
-                // Fallback: directly update UI state
-                _uiState.update { state ->
-                  state.copy(
-                      messages =
-                          state.messages.map { msg ->
-                            if (msg.id == messageId) {
-                              msg.copy(
-                                  text = "Error: ${t.message ?: "Unknown error"}",
-                                  isThinking = false)
-                            } else {
-                              msg
-                            }
-                          },
-                      streamingMessageId = null,
-                      isSending = false)
-                }
-              }
-            }
-          } finally {
-            try {
-              clearStreamingState(messageId)
-            } catch (ex: Exception) {
-              Log.e(TAG, "Error clearing streaming state", ex)
-              _uiState.update { it.copy(streamingMessageId = null, isSending = false) }
-            }
-            activeStreamJob = null
-            userCancelledStream = false
-          }
+    simulateStreamingFromText(messageId, reply.reply)
+
+    val attachment = buildAttachment(reply.url)
+    val sourceMeta = buildSourceMetadata(reply)
+
+    if (attachment != null || sourceMeta != null) {
+      updateMessageWithAttachmentAndSource(messageId, attachment, sourceMeta)
+    }
+
+    if (conversationId != null) {
+      persistAssistantMessage(conversationId, reply.reply, sourceMeta, messageId)
+    }
+  }
+
+  private fun buildAttachment(url: String?): ChatAttachment? {
+    return url?.takeIf { isPdfUrl(it) }?.let { pdfUrl -> ChatAttachment(url = pdfUrl) }
+  }
+
+  private fun buildSourceMetadata(reply: BotReply): SourceMeta? {
+    return when (reply.sourceType) {
+      SourceType.SCHEDULE -> {
+        SourceMeta(
+            siteLabel = FALLBACK_SCHEDULE_LABEL,
+            siteLabelRes = R.string.source_label_epfl_schedule,
+            title = FALLBACK_SCHEDULE_TITLE,
+            titleRes = R.string.source_label_schedule_description,
+            url = null,
+            isScheduleSource = true,
+            compactType = CompactSourceType.SCHEDULE)
+      }
+      SourceType.FOOD -> {
+        SourceMeta(
+            siteLabel = FALLBACK_FOOD_LABEL,
+            siteLabelRes = R.string.source_label_epfl_restaurants,
+            title = FALLBACK_FOOD_TITLE,
+            titleRes = R.string.source_label_food_description,
+            url = reply.url,
+            isScheduleSource = true,
+            compactType = CompactSourceType.FOOD)
+      }
+      SourceType.RAG -> {
+        reply.url?.let { url ->
+          SourceMeta(
+              siteLabel = buildSiteLabel(url),
+              title = buildFallbackTitle(url),
+              url = url,
+              isScheduleSource = false,
+              compactType = CompactSourceType.NONE)
         }
+      }
+      SourceType.NONE -> null
+    }
+  }
+
+  private fun updateMessageWithAttachmentAndSource(
+      messageId: String,
+      attachment: ChatAttachment?,
+      sourceMeta: SourceMeta?
+  ) {
+    _uiState.update { state ->
+      val updated =
+          state.messages.map { msg ->
+            if (msg.id == messageId) {
+              msg.copy(attachment = attachment ?: msg.attachment, source = sourceMeta ?: msg.source)
+            } else {
+              msg
+            }
+          }
+      state.copy(messages = updated, streamingSequence = state.streamingSequence + 1)
+    }
+  }
+
+  private suspend fun persistAssistantMessage(
+      conversationId: String,
+      replyText: String,
+      sourceMeta: SourceMeta?,
+      messageId: String
+  ) {
+    try {
+      val sourceMetadata =
+          sourceMeta?.url?.let { url ->
+            com.android.sample.conversations.MessageSourceMetadata(
+                url = url, compactType = sourceMeta.compactType.name)
+          }
+      repo.appendMessage(
+          conversationId = conversationId,
+          role = "assistant",
+          text = replyText,
+          edCardId = null,
+          sourceMetadata = sourceMetadata)
+    } catch (e: Exception) {
+      Log.w(TAG, "Failed to persist assistant message: ${e.message}")
+      // handleSendMessageError is the single source of truth for UI error updates.
+      // Rethrow so caller can abort/cleanup; caller must NOT duplicate error UI handling.
+      handleSendMessageError(e, messageId)
+      throw e
+    }
+  }
+
+  private suspend fun handleStreamingCancellation(messageId: String, ce: CancellationException) {
+    if (!userCancelledStream) {
+      try {
+        setStreamingError(messageId, ce)
+      } catch (ex: Exception) {
+        Log.e(TAG, "Error setting streaming error for cancellation", ex)
+      }
+    }
+  }
+
+  private suspend fun handleStreamingError(messageId: String, t: Throwable) {
+    Log.e(TAG, "Unexpected error during streaming", t)
+    if (!userCancelledStream) {
+      try {
+        setStreamingError(messageId, t)
+      } catch (ex: Exception) {
+        Log.e(TAG, "Error setting streaming error", ex)
+        _uiState.update { state ->
+          state.copy(
+              messages =
+                  state.messages.map { msg ->
+                    if (msg.id == messageId) {
+                      msg.copy(text = "Error: ${t.message ?: "Unknown error"}", isThinking = false)
+                    } else {
+                      msg
+                    }
+                  },
+              streamingMessageId = null,
+              isSending = false)
+        }
+      }
+    }
+  }
+
+  private suspend fun finalizeStreaming(messageId: String) {
+    try {
+      clearStreamingState(messageId)
+    } catch (ex: Exception) {
+      Log.e(TAG, "Error clearing streaming state", ex)
+      _uiState.update { it.copy(streamingMessageId = null, isSending = false) }
+    }
+    activeStreamJob = null
+    userCancelledStream = false
   }
 
   private fun buildSiteLabel(url: String): String {
