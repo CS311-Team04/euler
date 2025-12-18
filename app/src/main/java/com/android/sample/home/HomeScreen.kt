@@ -57,7 +57,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -577,8 +576,7 @@ fun HomeScreen(
                                       msg.source.compactType != CompactSourceType.NONE) {
                                     Spacer(Modifier.height(8.dp))
                                     val sourceSiteLabel =
-                                        msg.source.siteLabelRes?.let { stringResource(id = it) }
-                                            ?: msg.source.siteLabel.orEmpty()
+                                        msg.source.siteLabel.orEmpty()
                                     SourceCard(
                                         siteLabel = sourceSiteLabel,
                                         title = "",
@@ -748,19 +746,19 @@ internal fun EdPostResultBanner(result: EdPostResult, onDismiss: () -> Unit = {}
     is EdPostResult.Published -> {
       bg = MaterialTheme.colorScheme.surfaceVariant
       icon = Icons.Default.CheckCircle
-      title = stringResource(R.string.ed_post_published_title)
-      subtitle = stringResource(R.string.ed_post_published_subtitle)
+      title = Localization.t("ed_post_published_title")
+      subtitle = Localization.t("ed_post_published_subtitle")
     }
     is EdPostResult.Cancelled -> {
       bg = MaterialTheme.colorScheme.surfaceVariant
       icon = Icons.Default.Close
-      title = stringResource(R.string.ed_post_cancelled_title)
-      subtitle = stringResource(R.string.ed_post_cancelled_subtitle)
+      title = Localization.t("ed_post_cancelled_title")
+      subtitle = Localization.t("ed_post_cancelled_subtitle")
     }
     is EdPostResult.Failed -> {
       bg = MaterialTheme.colorScheme.errorContainer
       icon = Icons.Default.Error
-      title = stringResource(R.string.ed_post_failed_title)
+      title = Localization.t("ed_post_failed_title")
       subtitle = result.message
     }
     else -> {
@@ -788,7 +786,7 @@ internal fun EdPostResultBanner(result: EdPostResult, onDismiss: () -> Unit = {}
                 }
               }
               IconButton(onClick = onDismiss) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.dismiss))
+                Icon(Icons.Default.Close, contentDescription = Localization.t("dismiss"))
               }
             }
       }

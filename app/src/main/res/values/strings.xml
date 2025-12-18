@@ -2,31 +2,4 @@
     <string name="app_name">SampleApp</string>
     <string name="title_activity_main">MainActivity</string>
     <string name="title_activity_second">SecondActivity</string>
-    
-    <!-- EPFL Campus Connector -->
-    <string name="error_invalid_url">Invalid URL</string>
-    <string name="error_failed_to_disconnect">Failed to disconnect</string>
-    <string name="error_could_not_open_epfl_campus">Could not open EPFL Campus</string>
-    
-    <!-- Source Labels -->
-    <string name="source_label_epfl_schedule">Your EPFL Schedule</string>
-    <string name="source_label_schedule_description">Retrieved from your connected calendar</string>
-    <string name="source_label_epfl_restaurants">EPFL Restaurants</string>
-    <string name="source_label_food_description">Retrieved from Pocket Campus</string>
-    
-    <!-- ED Post Confirmation Modal -->
-    <string name="ed_post_title_placeholder">Titre</string>
-    <string name="ed_post_body_placeholder">Votre question pour ED…</string>
-    <string name="ed_post_cancel_button">Cancel</string>
-    <string name="ed_post_post_button">Post</string>
-    <string name="select_course">Select a course</string>
-    <string name="post_anonymously">Post anonymously</string>
-    <string name="ed_post_published_title">Posted to Ed</string>
-    <string name="ed_post_published_subtitle">Your question was published.</string>
-    <string name="ed_post_cancelled_title">Post cancelled</string>
-    <string name="ed_post_cancelled_subtitle">Draft was discarded.</string>
-    <string name="ed_post_failed_title">Failed to post on Ed</string>
-    <string name="ed_post_failed_default">Failed to post to Ed</string>
-    <string name="dismiss">Dismiss</string>
-
 </resources>

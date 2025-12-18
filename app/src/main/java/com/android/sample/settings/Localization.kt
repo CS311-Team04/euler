@@ -318,7 +318,33 @@ object Localization {
           "epfl_connected_info" to "Your schedule is now connected to the AI assistant.",
           "epfl_clipboard_detected" to "ICS URL detected!",
           "not_now" to "Not now",
-          "use_this_url" to "Use this URL") +
+          "use_this_url" to "Use this URL",
+
+          // EPFL Campus Connector - Errors
+          "error_invalid_url" to "Invalid URL",
+          "error_failed_to_disconnect" to "Failed to disconnect",
+          "error_could_not_open_epfl_campus" to "Could not open EPFL Campus",
+
+          // Source Labels
+          "source_label_epfl_schedule" to "Your EPFL Schedule",
+          "source_label_schedule_description" to "Retrieved from your connected calendar",
+          "source_label_epfl_restaurants" to "EPFL Restaurants",
+          "source_label_food_description" to "Retrieved from Pocket Campus",
+
+          // ED Post Confirmation Modal
+          "ed_post_title_placeholder" to "Title",
+          "ed_post_body_placeholder" to "Your question for ED…",
+          "ed_post_cancel_button" to "Cancel",
+          "ed_post_post_button" to "Post",
+          "select_course" to "Select a course",
+          "post_anonymously" to "Post anonymously",
+          "ed_post_published_title" to "Posted to Ed",
+          "ed_post_published_subtitle" to "Your question was published.",
+          "ed_post_cancelled_title" to "Post cancelled",
+          "ed_post_cancelled_subtitle" to "Draft was discarded.",
+          "ed_post_failed_title" to "Failed to post on Ed",
+          "ed_post_failed_default" to "Failed to post to Ed",
+          "dismiss" to "Dismiss") +
           edTranslationsEn() +
           mapOf(
               "moodle_connect_generic_error" to "Failed to connect to Moodle. Please try again.",
@@ -437,7 +463,33 @@ object Localization {
               "Votre emploi du temps est maintenant connecté à l'assistant IA.",
           "epfl_clipboard_detected" to "URL ICS détectée !",
           "not_now" to "Plus tard",
-          "use_this_url" to "Utiliser cette URL") +
+          "use_this_url" to "Utiliser cette URL",
+
+          // EPFL Campus Connector - Errors
+          "error_invalid_url" to "URL invalide",
+          "error_failed_to_disconnect" to "Échec de la déconnexion",
+          "error_could_not_open_epfl_campus" to "Impossible d'ouvrir EPFL Campus",
+
+          // Source Labels
+          "source_label_epfl_schedule" to "Votre emploi du temps EPFL",
+          "source_label_schedule_description" to "Récupéré depuis votre calendrier connecté",
+          "source_label_epfl_restaurants" to "Restaurants EPFL",
+          "source_label_food_description" to "Récupéré depuis Pocket Campus",
+
+          // ED Post Confirmation Modal
+          "ed_post_title_placeholder" to "Titre",
+          "ed_post_body_placeholder" to "Votre question pour ED…",
+          "ed_post_cancel_button" to "Annuler",
+          "ed_post_post_button" to "Publier",
+          "select_course" to "Sélectionner un cours",
+          "post_anonymously" to "Publier anonymement",
+          "ed_post_published_title" to "Publié sur Ed",
+          "ed_post_published_subtitle" to "Votre question a été publiée.",
+          "ed_post_cancelled_title" to "Publication annulée",
+          "ed_post_cancelled_subtitle" to "Le brouillon a été supprimé.",
+          "ed_post_failed_title" to "Échec de la publication sur Ed",
+          "ed_post_failed_default" to "Échec de la publication sur Ed",
+          "dismiss" to "Fermer") +
           edTranslationsFr() +
           mapOf(
               "moodle_connect_generic_error" to
@@ -548,7 +600,33 @@ object Localization {
           "recent_cs220_exam" to "CS220 Abschlussprüfung Abruf",
           "recent_linear_algebra" to "Lineare Algebra Hilfe",
           "recent_deadline" to "Projekt-Frist Anfrage",
-          "recent_registration" to "Kursanmeldung Info") +
+          "recent_registration" to "Kursanmeldung Info",
+
+          // EPFL Campus Connector - Errors
+          "error_invalid_url" to "Ungültige URL",
+          "error_failed_to_disconnect" to "Trennung fehlgeschlagen",
+          "error_could_not_open_epfl_campus" to "EPFL Campus konnte nicht geöffnet werden",
+
+          // Source Labels
+          "source_label_epfl_schedule" to "Ihr EPFL-Stundenplan",
+          "source_label_schedule_description" to "Aus Ihrem verbundenen Kalender abgerufen",
+          "source_label_epfl_restaurants" to "EPFL Restaurants",
+          "source_label_food_description" to "Von Pocket Campus abgerufen",
+
+          // ED Post Confirmation Modal
+          "ed_post_title_placeholder" to "Titel",
+          "ed_post_body_placeholder" to "Ihre Frage für ED…",
+          "ed_post_cancel_button" to "Abbrechen",
+          "ed_post_post_button" to "Veröffentlichen",
+          "select_course" to "Kurs auswählen",
+          "post_anonymously" to "Anonym veröffentlichen",
+          "ed_post_published_title" to "Auf Ed veröffentlicht",
+          "ed_post_published_subtitle" to "Ihre Frage wurde veröffentlicht.",
+          "ed_post_cancelled_title" to "Veröffentlichung abgebrochen",
+          "ed_post_cancelled_subtitle" to "Der Entwurf wurde verworfen.",
+          "ed_post_failed_title" to "Veröffentlichung auf Ed fehlgeschlagen",
+          "ed_post_failed_default" to "Veröffentlichung auf Ed fehlgeschlagen",
+          "dismiss" to "Schließen") +
           edTranslationsDe() +
           mapOf(
               "moodle_connect_generic_error" to
@@ -647,7 +725,33 @@ object Localization {
           "recent_cs220_exam" to "Recuperación examen final CS220",
           "recent_linear_algebra" to "Ayuda con álgebra lineal",
           "recent_deadline" to "Consulta fecha límite proyecto",
-          "recent_registration" to "Info inscripción cursos") +
+          "recent_registration" to "Info inscripción cursos",
+
+          // EPFL Campus Connector - Errors
+          "error_invalid_url" to "URL inválida",
+          "error_failed_to_disconnect" to "Error al desconectar",
+          "error_could_not_open_epfl_campus" to "No se pudo abrir EPFL Campus",
+
+          // Source Labels
+          "source_label_epfl_schedule" to "Tu horario EPFL",
+          "source_label_schedule_description" to "Obtenido de tu calendario conectado",
+          "source_label_epfl_restaurants" to "Restaurantes EPFL",
+          "source_label_food_description" to "Obtenido de Pocket Campus",
+
+          // ED Post Confirmation Modal
+          "ed_post_title_placeholder" to "Título",
+          "ed_post_body_placeholder" to "Tu pregunta para ED…",
+          "ed_post_cancel_button" to "Cancelar",
+          "ed_post_post_button" to "Publicar",
+          "select_course" to "Seleccionar un curso",
+          "post_anonymously" to "Publicar anónimamente",
+          "ed_post_published_title" to "Publicado en Ed",
+          "ed_post_published_subtitle" to "Tu pregunta fue publicada.",
+          "ed_post_cancelled_title" to "Publicación cancelada",
+          "ed_post_cancelled_subtitle" to "El borrador fue descartado.",
+          "ed_post_failed_title" to "Error al publicar en Ed",
+          "ed_post_failed_default" to "Error al publicar en Ed",
+          "dismiss" to "Cerrar") +
           edTranslationsEs() +
           mapOf(
               "moodle_connect_generic_error" to
@@ -746,7 +850,33 @@ object Localization {
           "recent_cs220_exam" to "Recupero esame finale CS220",
           "recent_linear_algebra" to "Aiuto con algebra lineare",
           "recent_deadline" to "Richiesta scadenza progetto",
-          "recent_registration" to "Info iscrizione corsi") +
+          "recent_registration" to "Info iscrizione corsi",
+
+          // EPFL Campus Connector - Errors
+          "error_invalid_url" to "URL non valido",
+          "error_failed_to_disconnect" to "Disconnessione fallita",
+          "error_could_not_open_epfl_campus" to "Impossibile aprire EPFL Campus",
+
+          // Source Labels
+          "source_label_epfl_schedule" to "Il tuo orario EPFL",
+          "source_label_schedule_description" to "Recuperato dal tuo calendario connesso",
+          "source_label_epfl_restaurants" to "Ristoranti EPFL",
+          "source_label_food_description" to "Recuperato da Pocket Campus",
+
+          // ED Post Confirmation Modal
+          "ed_post_title_placeholder" to "Titolo",
+          "ed_post_body_placeholder" to "La tua domanda per ED…",
+          "ed_post_cancel_button" to "Annulla",
+          "ed_post_post_button" to "Pubblica",
+          "select_course" to "Seleziona un corso",
+          "post_anonymously" to "Pubblica in modo anonimo",
+          "ed_post_published_title" to "Pubblicato su Ed",
+          "ed_post_published_subtitle" to "La tua domanda è stata pubblicata.",
+          "ed_post_cancelled_title" to "Pubblicazione annullata",
+          "ed_post_cancelled_subtitle" to "La bozza è stata eliminata.",
+          "ed_post_failed_title" to "Pubblicazione su Ed fallita",
+          "ed_post_failed_default" to "Pubblicazione su Ed fallita",
+          "dismiss" to "Chiudi") +
           edTranslationsIt() +
           mapOf(
               "moodle_connect_generic_error" to "Connessione a Moodle fallita. Riprova.",
@@ -844,7 +974,33 @@ object Localization {
           "recent_cs220_exam" to "Recuperação exame final CS220",
           "recent_linear_algebra" to "Ajuda com álgebra linear",
           "recent_deadline" to "Consulta prazo projeto",
-          "recent_registration" to "Info inscrição cursos") +
+          "recent_registration" to "Info inscrição cursos",
+
+          // EPFL Campus Connector - Errors
+          "error_invalid_url" to "URL inválida",
+          "error_failed_to_disconnect" to "Falha ao desconectar",
+          "error_could_not_open_epfl_campus" to "Não foi possível abrir EPFL Campus",
+
+          // Source Labels
+          "source_label_epfl_schedule" to "Seu horário EPFL",
+          "source_label_schedule_description" to "Recuperado do seu calendário conectado",
+          "source_label_epfl_restaurants" to "Restaurantes EPFL",
+          "source_label_food_description" to "Recuperado do Pocket Campus",
+
+          // ED Post Confirmation Modal
+          "ed_post_title_placeholder" to "Título",
+          "ed_post_body_placeholder" to "Sua pergunta para ED…",
+          "ed_post_cancel_button" to "Cancelar",
+          "ed_post_post_button" to "Publicar",
+          "select_course" to "Selecionar um curso",
+          "post_anonymously" to "Publicar anonimamente",
+          "ed_post_published_title" to "Publicado no Ed",
+          "ed_post_published_subtitle" to "Sua pergunta foi publicada.",
+          "ed_post_cancelled_title" to "Publicação cancelada",
+          "ed_post_cancelled_subtitle" to "O rascunho foi descartado.",
+          "ed_post_failed_title" to "Falha ao publicar no Ed",
+          "ed_post_failed_default" to "Falha ao publicar no Ed",
+          "dismiss" to "Fechar") +
           edTranslationsPt() +
           mapOf(
               "moodle_connect_generic_error" to "Falha ao conectar ao Moodle. Tente novamente.",
@@ -941,7 +1097,33 @@ object Localization {
           "recent_cs220_exam" to "CS220 期末考试检索",
           "recent_linear_algebra" to "线性代数帮助",
           "recent_deadline" to "项目截止日期查询",
-          "recent_registration" to "课程注册信息") +
+          "recent_registration" to "课程注册信息",
+
+          // EPFL Campus Connector - Errors
+          "error_invalid_url" to "无效的URL",
+          "error_failed_to_disconnect" to "断开连接失败",
+          "error_could_not_open_epfl_campus" to "无法打开EPFL Campus",
+
+          // Source Labels
+          "source_label_epfl_schedule" to "您的EPFL课程表",
+          "source_label_schedule_description" to "从您连接的日历中获取",
+          "source_label_epfl_restaurants" to "EPFL餐厅",
+          "source_label_food_description" to "从Pocket Campus获取",
+
+          // ED Post Confirmation Modal
+          "ed_post_title_placeholder" to "标题",
+          "ed_post_body_placeholder" to "您在ED上的问题…",
+          "ed_post_cancel_button" to "取消",
+          "ed_post_post_button" to "发布",
+          "select_course" to "选择课程",
+          "post_anonymously" to "匿名发布",
+          "ed_post_published_title" to "已发布到Ed",
+          "ed_post_published_subtitle" to "您的问题已发布。",
+          "ed_post_cancelled_title" to "发布已取消",
+          "ed_post_cancelled_subtitle" to "草稿已删除。",
+          "ed_post_failed_title" to "发布到Ed失败",
+          "ed_post_failed_default" to "发布到Ed失败",
+          "dismiss" to "关闭") +
           edTranslationsZh() +
           mapOf(
               "moodle_connect_generic_error" to "连接到 Moodle 失败。请重试。",

@@ -14,10 +14,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import com.android.sample.R
+import com.android.sample.settings.Localization
 import com.android.sample.home.EdCourse
 import com.android.sample.ui.theme.DarkBackground
 import com.android.sample.ui.theme.EdPostBorderSecondary
@@ -144,7 +143,7 @@ private fun CourseDropdown(
           val selectedCourse = courses.find { it.id == selectedCourseId }
           val displayText =
               selectedCourse?.let { "${it.code ?: ""} ${it.name}".trim() }
-                  ?: stringResource(R.string.select_course)
+                  ?: Localization.t("select_course")
 
           OutlinedTextField(
               value = displayText,
@@ -154,7 +153,7 @@ private fun CourseDropdown(
               modifier = Modifier.fillMaxWidth().menuAnchor(),
               placeholder = {
                 Text(
-                    text = stringResource(R.string.select_course),
+                    text = Localization.t("select_course"),
                     color = textSecondary,
                     fontSize = EdPostDimensions.TextFieldPlaceholderFontSize)
               },
@@ -216,7 +215,7 @@ private fun EdPostTitleField(
       modifier = Modifier.fillMaxWidth(),
       placeholder = {
         Text(
-            text = stringResource(R.string.ed_post_title_placeholder),
+            text = Localization.t("ed_post_title_placeholder"),
             color = textSecondary,
             fontSize = EdPostDimensions.TextFieldPlaceholderFontSize)
       },
@@ -263,7 +262,7 @@ private fun EdPostBodyField(
                   max = EdPostDimensions.TextFieldBodyMaxHeight),
       placeholder = {
         Text(
-            text = stringResource(R.string.ed_post_body_placeholder),
+            text = Localization.t("ed_post_body_placeholder"),
             color = textSecondary,
             fontSize = EdPostDimensions.TextFieldPlaceholderFontSize)
       },
@@ -299,7 +298,7 @@ private fun AnonymousToggle(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.SpaceBetween) {
         Text(
-            text = stringResource(R.string.post_anonymously),
+            text = Localization.t("post_anonymously"),
             style =
                 MaterialTheme.typography.bodyMedium.copy(
                     fontSize = EdPostDimensions.TextFieldBodyFontSize, color = EdPostTextPrimary))
@@ -338,7 +337,7 @@ private fun EdPostActionButtons(
             shape = RoundedCornerShape(EdPostDimensions.ButtonCancelCornerRadius),
             border = BorderStroke(EdPostDimensions.ButtonBorderWidth, EdPostBorderSecondary)) {
               Text(
-                  text = stringResource(R.string.ed_post_cancel_button),
+                  text = Localization.t("ed_post_cancel_button"),
                   fontSize = EdPostDimensions.ButtonTextFontSize,
                   fontWeight = FontWeight.Medium)
             }
@@ -363,7 +362,7 @@ private fun EdPostActionButtons(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically) {
                           Text(
-                              text = stringResource(R.string.ed_post_post_button),
+                              text = Localization.t("ed_post_post_button"),
                               fontSize = EdPostDimensions.ButtonTextFontSize,
                               fontWeight = FontWeight.Bold,
                               color = EdPostTextPrimary)

@@ -2,7 +2,6 @@ package com.android.sample.home
 
 import android.net.Uri
 import android.util.Log
-import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,7 +9,6 @@ import com.android.sample.BuildConfig
 import com.android.sample.Chat.ChatAttachment
 import com.android.sample.Chat.ChatType
 import com.android.sample.Chat.ChatUIModel
-import com.android.sample.R
 import com.android.sample.conversations.AuthNotReadyException
 import com.android.sample.conversations.CachedResponseRepository
 import com.android.sample.conversations.ConversationRepository
@@ -84,9 +82,7 @@ private fun isRunningOnEmulator(): Boolean {
 
 data class SourceMeta(
     val siteLabel: String? = null, // e.g. "EPFL.ch Website" or "Your Schedule"
-    @StringRes val siteLabelRes: Int? = null,
     val title: String? = null, // e.g. "Projet de Semestre – Bachelor"
-    @StringRes val titleRes: Int? = null,
     val url: String? = null, // null for schedule sources
     val retrievedAt: Long = System.currentTimeMillis(),
     val isScheduleSource: Boolean = false, // DEPRECATED: use compactType instead
@@ -1219,10 +1215,8 @@ class HomeViewModel(
                   SourceType.SCHEDULE -> {
                     // Schedule source - show a small indicator
                     SourceMeta(
-                        siteLabel = FALLBACK_SCHEDULE_LABEL,
-                        siteLabelRes = R.string.source_label_epfl_schedule,
-                        title = FALLBACK_SCHEDULE_TITLE,
-                        titleRes = R.string.source_label_schedule_description,
+                        siteLabel = Localization.t("source_label_epfl_schedule"),
+                        title = Localization.t("source_label_schedule_description"),
                         url = null,
                         isScheduleSource = true,
                         compactType = CompactSourceType.SCHEDULE)
@@ -1230,10 +1224,8 @@ class HomeViewModel(
                   SourceType.FOOD -> {
                     // Food source - show a small indicator
                     SourceMeta(
-                        siteLabel = FALLBACK_FOOD_LABEL,
-                        siteLabelRes = R.string.source_label_epfl_restaurants,
-                        title = FALLBACK_FOOD_TITLE,
-                        titleRes = R.string.source_label_food_description,
+                        siteLabel = Localization.t("source_label_epfl_restaurants"),
+                        title = Localization.t("source_label_food_description"),
                         url = reply.url,
                         isScheduleSource = true,
                         compactType = CompactSourceType.FOOD)
