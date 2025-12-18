@@ -16,7 +16,6 @@ import com.android.sample.home.HomeScreen
 import com.android.sample.home.HomeTags
 import com.android.sample.home.HomeViewModel
 import com.google.firebase.FirebaseApp
-import com.google.firebase.FirebaseOptions
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -40,12 +39,7 @@ class HomeScreenE2ETest {
   private fun ensureFirebaseInitialized() {
     val context = ApplicationProvider.getApplicationContext<Context>()
     if (FirebaseApp.getApps(context).isEmpty()) {
-      val options =
-          FirebaseOptions.Builder()
-              .setApplicationId("1:1234567890:android:integration-test")
-              .setProjectId("integration-test")
-              .setApiKey("fake-api-key")
-              .build()
+      val options = TestFirebaseConfig.createFirebaseOptions()
       FirebaseApp.initializeApp(context, options)
     }
   }
