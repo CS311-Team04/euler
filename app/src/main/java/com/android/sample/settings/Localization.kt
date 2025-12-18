@@ -336,7 +336,33 @@ object Localization {
                   "Enter your Moodle credentials to connect. Your password will be securely sent to your Moodle server.",
               "settings_connectors_moodle_load_error" to "Failed to load Moodle connector status",
               "settings_connectors_moodle_status_error" to
-                  "Unable to load Moodle connector status. Please try again later.")
+                  "Unable to load Moodle connector status. Please try again later.",
+
+              // EPFL Campus errors
+              "error_invalid_url" to "Invalid URL",
+              "error_failed_to_disconnect" to "Failed to disconnect",
+              "error_could_not_open_epfl_campus" to "Could not open EPFL Campus",
+
+              // Source labels
+              "source_label_epfl_schedule" to "Your EPFL Schedule",
+              "source_label_schedule_description" to "Retrieved from your connected calendar",
+              "source_label_epfl_restaurants" to "EPFL Restaurants",
+              "source_label_food_description" to "Retrieved from Pocket Campus",
+
+              // ED Post Confirmation
+              "ed_post_title_placeholder" to "Title",
+              "ed_post_body_placeholder" to "Your question for ED...",
+              "ed_post_cancel_button" to "Cancel",
+              "ed_post_post_button" to "Post",
+              "select_course" to "Select a course",
+              "post_anonymously" to "Post anonymously",
+              "ed_post_published_title" to "Posted to Ed",
+              "ed_post_published_subtitle" to "Your question was published.",
+              "ed_post_cancelled_title" to "Post cancelled",
+              "ed_post_cancelled_subtitle" to "Draft was discarded.",
+              "ed_post_failed_title" to "Failed to post on Ed",
+              "ed_post_failed_default" to "Failed to post to Ed",
+              "dismiss" to "Dismiss")
 
   private fun french() =
       mapOf(
@@ -457,7 +483,33 @@ object Localization {
               "settings_connectors_moodle_load_error" to
                   "Échec du chargement du statut du connecteur Moodle",
               "settings_connectors_moodle_status_error" to
-                  "Impossible de charger le statut du connecteur Moodle. Veuillez réessayer plus tard.")
+                  "Impossible de charger le statut du connecteur Moodle. Veuillez réessayer plus tard.",
+
+              // EPFL Campus errors
+              "error_invalid_url" to "URL invalide",
+              "error_failed_to_disconnect" to "Échec de la déconnexion",
+              "error_could_not_open_epfl_campus" to "Impossible d'ouvrir EPFL Campus",
+
+              // Source labels
+              "source_label_epfl_schedule" to "Votre emploi du temps EPFL",
+              "source_label_schedule_description" to "Récupéré de votre calendrier connecté",
+              "source_label_epfl_restaurants" to "Restaurants EPFL",
+              "source_label_food_description" to "Récupéré de Pocket Campus",
+
+              // ED Post Confirmation
+              "ed_post_title_placeholder" to "Titre",
+              "ed_post_body_placeholder" to "Votre question pour ED...",
+              "ed_post_cancel_button" to "Annuler",
+              "ed_post_post_button" to "Publier",
+              "select_course" to "Sélectionner un cours",
+              "post_anonymously" to "Publier anonymement",
+              "ed_post_published_title" to "Publié sur Ed",
+              "ed_post_published_subtitle" to "Votre question a été publiée.",
+              "ed_post_cancelled_title" to "Publication annulée",
+              "ed_post_cancelled_subtitle" to "Le brouillon a été supprimé.",
+              "ed_post_failed_title" to "Échec de la publication sur Ed",
+              "ed_post_failed_default" to "Échec de la publication sur Ed",
+              "dismiss" to "Fermer")
 
   private fun german() =
       mapOf(
@@ -568,7 +620,33 @@ object Localization {
               "settings_connectors_moodle_load_error" to
                   "Fehler beim Laden des Moodle-Connector-Status",
               "settings_connectors_moodle_status_error" to
-                  "Moodle-Connector-Status konnte nicht geladen werden. Bitte versuchen Sie es später erneut.")
+                  "Moodle-Connector-Status konnte nicht geladen werden. Bitte versuchen Sie es später erneut.",
+
+              // EPFL Campus errors
+              "error_invalid_url" to "Ungültige URL",
+              "error_failed_to_disconnect" to "Trennung fehlgeschlagen",
+              "error_could_not_open_epfl_campus" to "EPFL Campus konnte nicht geöffnet werden",
+
+              // Source labels
+              "source_label_epfl_schedule" to "Ihr EPFL-Stundenplan",
+              "source_label_schedule_description" to "Aus Ihrem verbundenen Kalender abgerufen",
+              "source_label_epfl_restaurants" to "EPFL Restaurants",
+              "source_label_food_description" to "Von Pocket Campus abgerufen",
+
+              // ED Post Confirmation
+              "ed_post_title_placeholder" to "Titel",
+              "ed_post_body_placeholder" to "Ihre Frage für ED...",
+              "ed_post_cancel_button" to "Abbrechen",
+              "ed_post_post_button" to "Veröffentlichen",
+              "select_course" to "Kurs auswählen",
+              "post_anonymously" to "Anonym veröffentlichen",
+              "ed_post_published_title" to "Auf Ed veröffentlicht",
+              "ed_post_published_subtitle" to "Ihre Frage wurde veröffentlicht.",
+              "ed_post_cancelled_title" to "Veröffentlichung abgebrochen",
+              "ed_post_cancelled_subtitle" to "Der Entwurf wurde verworfen.",
+              "ed_post_failed_title" to "Veröffentlichung auf Ed fehlgeschlagen",
+              "ed_post_failed_default" to "Veröffentlichung auf Ed fehlgeschlagen",
+              "dismiss" to "Schließen")
 
   private fun spanish() =
       mapOf(
@@ -667,7 +745,33 @@ object Localization {
               "settings_connectors_moodle_load_error" to
                   "Error al cargar el estado del conector Moodle",
               "settings_connectors_moodle_status_error" to
-                  "No se pudo cargar el estado del conector Moodle. Por favor, inténtelo más tarde.")
+                  "No se pudo cargar el estado del conector Moodle. Por favor, inténtelo más tarde.",
+
+              // EPFL Campus errors
+              "error_invalid_url" to "URL inválida",
+              "error_failed_to_disconnect" to "Error al desconectar",
+              "error_could_not_open_epfl_campus" to "No se pudo abrir EPFL Campus",
+
+              // Source labels
+              "source_label_epfl_schedule" to "Tu horario EPFL",
+              "source_label_schedule_description" to "Obtenido de tu calendario conectado",
+              "source_label_epfl_restaurants" to "Restaurantes EPFL",
+              "source_label_food_description" to "Obtenido de Pocket Campus",
+
+              // ED Post Confirmation
+              "ed_post_title_placeholder" to "Título",
+              "ed_post_body_placeholder" to "Tu pregunta para ED...",
+              "ed_post_cancel_button" to "Cancelar",
+              "ed_post_post_button" to "Publicar",
+              "select_course" to "Seleccionar un curso",
+              "post_anonymously" to "Publicar anónimamente",
+              "ed_post_published_title" to "Publicado en Ed",
+              "ed_post_published_subtitle" to "Tu pregunta fue publicada.",
+              "ed_post_cancelled_title" to "Publicación cancelada",
+              "ed_post_cancelled_subtitle" to "El borrador fue descartado.",
+              "ed_post_failed_title" to "Error al publicar en Ed",
+              "ed_post_failed_default" to "Error al publicar en Ed",
+              "dismiss" to "Cerrar")
 
   private fun italian() =
       mapOf(
@@ -765,7 +869,33 @@ object Localization {
               "settings_connectors_moodle_load_error" to
                   "Errore nel caricamento dello stato del connettore Moodle",
               "settings_connectors_moodle_status_error" to
-                  "Impossibile caricare lo stato del connettore Moodle. Riprova più tardi.")
+                  "Impossibile caricare lo stato del connettore Moodle. Riprova più tardi.",
+
+              // EPFL Campus errors
+              "error_invalid_url" to "URL non valido",
+              "error_failed_to_disconnect" to "Disconnessione fallita",
+              "error_could_not_open_epfl_campus" to "Impossibile aprire EPFL Campus",
+
+              // Source labels
+              "source_label_epfl_schedule" to "Il tuo orario EPFL",
+              "source_label_schedule_description" to "Recuperato dal tuo calendario connesso",
+              "source_label_epfl_restaurants" to "Ristoranti EPFL",
+              "source_label_food_description" to "Recuperato da Pocket Campus",
+
+              // ED Post Confirmation
+              "ed_post_title_placeholder" to "Titolo",
+              "ed_post_body_placeholder" to "La tua domanda per ED...",
+              "ed_post_cancel_button" to "Annulla",
+              "ed_post_post_button" to "Pubblica",
+              "select_course" to "Seleziona un corso",
+              "post_anonymously" to "Pubblica in modo anonimo",
+              "ed_post_published_title" to "Pubblicato su Ed",
+              "ed_post_published_subtitle" to "La tua domanda è stata pubblicata.",
+              "ed_post_cancelled_title" to "Pubblicazione annullata",
+              "ed_post_cancelled_subtitle" to "La bozza è stata eliminata.",
+              "ed_post_failed_title" to "Pubblicazione su Ed fallita",
+              "ed_post_failed_default" to "Pubblicazione su Ed fallita",
+              "dismiss" to "Chiudi")
 
   private fun portuguese() =
       mapOf(
@@ -863,7 +993,33 @@ object Localization {
               "settings_connectors_moodle_load_error" to
                   "Falha ao carregar o status do conector Moodle",
               "settings_connectors_moodle_status_error" to
-                  "Não foi possível carregar o status do conector Moodle. Tente novamente mais tarde.")
+                  "Não foi possível carregar o status do conector Moodle. Tente novamente mais tarde.",
+
+              // EPFL Campus errors
+              "error_invalid_url" to "URL inválida",
+              "error_failed_to_disconnect" to "Falha ao desconectar",
+              "error_could_not_open_epfl_campus" to "Não foi possível abrir EPFL Campus",
+
+              // Source labels
+              "source_label_epfl_schedule" to "Seu horário EPFL",
+              "source_label_schedule_description" to "Recuperado do seu calendário conectado",
+              "source_label_epfl_restaurants" to "Restaurantes EPFL",
+              "source_label_food_description" to "Recuperado do Pocket Campus",
+
+              // ED Post Confirmation
+              "ed_post_title_placeholder" to "Título",
+              "ed_post_body_placeholder" to "Sua pergunta para ED...",
+              "ed_post_cancel_button" to "Cancelar",
+              "ed_post_post_button" to "Publicar",
+              "select_course" to "Selecionar um curso",
+              "post_anonymously" to "Publicar anonimamente",
+              "ed_post_published_title" to "Publicado no Ed",
+              "ed_post_published_subtitle" to "Sua pergunta foi publicada.",
+              "ed_post_cancelled_title" to "Publicação cancelada",
+              "ed_post_cancelled_subtitle" to "O rascunho foi descartado.",
+              "ed_post_failed_title" to "Falha ao publicar no Ed",
+              "ed_post_failed_default" to "Falha ao publicar no Ed",
+              "dismiss" to "Fechar")
 
   private fun chinese() =
       mapOf(
@@ -957,5 +1113,31 @@ object Localization {
               "settings_connectors_moodle_login_instructions" to
                   "输入您的 Moodle 凭据以连接。您的密码将安全地发送到您的 Moodle 服务器。",
               "settings_connectors_moodle_load_error" to "加载 Moodle 连接器状态失败",
-              "settings_connectors_moodle_status_error" to "无法加载 Moodle 连接器状态。请稍后再试。")
+              "settings_connectors_moodle_status_error" to "无法加载 Moodle 连接器状态。请稍后再试。",
+
+              // EPFL Campus errors
+              "error_invalid_url" to "无效的 URL",
+              "error_failed_to_disconnect" to "断开连接失败",
+              "error_could_not_open_epfl_campus" to "无法打开 EPFL Campus",
+
+              // Source labels
+              "source_label_epfl_schedule" to "您的 EPFL 课程表",
+              "source_label_schedule_description" to "从您连接的日历中检索",
+              "source_label_epfl_restaurants" to "EPFL 餐厅",
+              "source_label_food_description" to "从 Pocket Campus 检索",
+
+              // ED Post Confirmation
+              "ed_post_title_placeholder" to "标题",
+              "ed_post_body_placeholder" to "您向 ED 提出的问题...",
+              "ed_post_cancel_button" to "取消",
+              "ed_post_post_button" to "发布",
+              "select_course" to "选择课程",
+              "post_anonymously" to "匿名发布",
+              "ed_post_published_title" to "已发布到 Ed",
+              "ed_post_published_subtitle" to "您的问题已发布。",
+              "ed_post_cancelled_title" to "发布已取消",
+              "ed_post_cancelled_subtitle" to "草稿已删除。",
+              "ed_post_failed_title" to "发布到 Ed 失败",
+              "ed_post_failed_default" to "发布到 Ed 失败",
+              "dismiss" to "关闭")
 }

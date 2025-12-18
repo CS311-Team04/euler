@@ -57,7 +57,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -76,6 +75,7 @@ import com.android.sample.speech.SpeechToTextHelper
 import com.android.sample.ui.components.EdPostConfirmationModal
 import com.android.sample.ui.components.EdPostedCard
 import com.android.sample.ui.components.GuestProfileWarningModal
+import com.android.sample.ui.theme.Dimensions
 import com.android.sample.ui.theme.Dimensions.ChatInputButtonRowPaddingEnd
 import com.android.sample.ui.theme.Dimensions.ChatInputButtonSpacing
 import com.android.sample.ui.theme.Dimensions.ChatInputCornerRadius
@@ -101,7 +101,6 @@ import com.android.sample.ui.theme.Dimensions.ChatInputVoiceModeButtonAlpha
 import com.android.sample.ui.theme.Dimensions.ChatInputVoiceSendButtonOffsetY
 import com.android.sample.ui.theme.Dimensions.ChatInputVoiceSendButtonSize
 import com.android.sample.ui.theme.Dimensions.ChatInputVoiceSendIconSize
-import com.android.sample.ui.theme.Dimensions
 import com.android.sample.ui.theme.Dimensions.InputHeight
 import com.android.sample.ui.theme.Dimensions.InputHorizontal
 import com.android.sample.ui.theme.EdPostDimensions
@@ -577,7 +576,7 @@ fun HomeScreen(
                                       msg.source.compactType != CompactSourceType.NONE) {
                                     Spacer(Modifier.height(8.dp))
                                     val sourceSiteLabel =
-                                        msg.source.siteLabelRes?.let { stringResource(id = it) }
+                                        msg.source.siteLabelKey?.let { Localization.t(it) }
                                             ?: msg.source.siteLabel.orEmpty()
                                     SourceCard(
                                         siteLabel = sourceSiteLabel,
@@ -748,19 +747,19 @@ internal fun EdPostResultBanner(result: EdPostResult, onDismiss: () -> Unit = {}
     is EdPostResult.Published -> {
       bg = MaterialTheme.colorScheme.surfaceVariant
       icon = Icons.Default.CheckCircle
-      title = stringResource(R.string.ed_post_published_title)
-      subtitle = stringResource(R.string.ed_post_published_subtitle)
+      title = Localization.t("ed_post_published_title")
+      subtitle = Localization.t("ed_post_published_subtitle")
     }
     is EdPostResult.Cancelled -> {
       bg = MaterialTheme.colorScheme.surfaceVariant
       icon = Icons.Default.Close
-      title = stringResource(R.string.ed_post_cancelled_title)
-      subtitle = stringResource(R.string.ed_post_cancelled_subtitle)
+      title = Localization.t("ed_post_cancelled_title")
+      subtitle = Localization.t("ed_post_cancelled_subtitle")
     }
     is EdPostResult.Failed -> {
       bg = MaterialTheme.colorScheme.errorContainer
       icon = Icons.Default.Error
-      title = stringResource(R.string.ed_post_failed_title)
+      title = Localization.t("ed_post_failed_title")
       subtitle = result.message
     }
     else -> {
@@ -788,7 +787,7 @@ internal fun EdPostResultBanner(result: EdPostResult, onDismiss: () -> Unit = {}
                 }
               }
               IconButton(onClick = onDismiss) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.dismiss))
+                Icon(Icons.Default.Close, contentDescription = Localization.t("dismiss"))
               }
             }
       }
