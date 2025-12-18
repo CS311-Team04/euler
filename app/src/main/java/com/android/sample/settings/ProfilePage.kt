@@ -311,82 +311,22 @@ private fun EditableInfoRow(
     textSecondary: Color,
     backgroundColor: Color
 ) {
-  val iconBackground = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f)
-  val dropdownBackground = MaterialTheme.colorScheme.surfaceVariant
   val contentAlpha = if (field.enabled) 1f else 0.5f
   Column(
       modifier = Modifier.fillMaxWidth().alpha(contentAlpha),
       verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-              Surface(
-                  modifier = Modifier.size(40.dp), shape = CircleShape, color = iconBackground) {
-                    Box(contentAlignment = Alignment.Center) {
-                      Icon(
-                          imageVector = field.definition.icon,
-                          contentDescription = field.definition.label,
-                          tint = textPrimary,
-                          modifier = Modifier.size(20.dp))
-                    }
-                  }
-              Text(text = field.definition.label, color = textSecondary, fontSize = 13.sp)
-            }
+        FieldLabelRow(
+            icon = field.definition.icon,
+            label = field.definition.label,
+            textPrimary = textPrimary,
+            textSecondary = textSecondary)
 
         if (field.options != null) {
-          var expanded by rememberSaveable(field.definition.label) { mutableStateOf(false) }
-          val displayText =
-              if (field.value.isNotBlank()) field.value else field.definition.placeholder
-          val displayColor =
-              if (field.value.isNotBlank()) {
-                textPrimary
-              } else {
-                field.placeholderColor ?: textSecondary
-              }
-
-          Surface(
-              modifier =
-                  Modifier.fillMaxWidth().let {
-                    if (field.enabled) {
-                      it.clickable { expanded = true }
-                    } else {
-                      it
-                    }
-                  },
-              color = dropdownBackground,
-              shape = RoundedCornerShape(12.dp)) {
-                Row(
-                    modifier =
-                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween) {
-                      Text(text = displayText, color = displayColor, fontSize = 15.sp)
-                      Icon(
-                          imageVector = Icons.Filled.ExpandMore,
-                          contentDescription = null,
-                          tint = textSecondary)
-                    }
-              }
-
-          DropdownMenu(
-              expanded = expanded,
-              onDismissRequest = { expanded = false },
-              containerColor = backgroundColor,
-              properties =
-                  androidx.compose.ui.window.PopupProperties(
-                      focusable = true,
-                      dismissOnClickOutside = true,
-                      usePlatformDefaultWidth = !AnimationConfig.disableAnimations)) {
-                field.options.forEach { option ->
-                  DropdownMenuItem(
-                      text = { Text(option, color = textPrimary) },
-                      onClick = {
-                        field.onValueChange(option)
-                        expanded = false
-                      },
-                      enabled = field.enabled)
-                }
-              }
+          DropdownFieldContent(
+              field = field,
+              textPrimary = textPrimary,
+              textSecondary = textSecondary,
+              backgroundColor = backgroundColor)
         } else {
           ProfileTextField(
               value = field.value,
@@ -397,14 +337,104 @@ private fun EditableInfoRow(
               enabled = field.enabled)
         }
 
-        if (field.supportingText != null &&
-            (!field.showSupportingTextWhenNotBlank || field.value.isNotBlank())) {
-          Text(
-              text = field.supportingText,
-              color = field.supportingTextColor ?: textSecondary.copy(alpha = 0.7f),
-              fontSize = 12.sp)
+        FieldSupportingText(field = field, textSecondary = textSecondary)
+      }
+}
+
+@Composable
+private fun FieldLabelRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    textPrimary: Color,
+    textSecondary: Color
+) {
+  val iconBackground = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f)
+  Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Surface(modifier = Modifier.size(40.dp), shape = CircleShape, color = iconBackground) {
+          Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = textPrimary,
+                modifier = Modifier.size(20.dp))
+          }
+        }
+        Text(text = label, color = textSecondary, fontSize = 13.sp)
+      }
+}
+
+@Composable
+private fun DropdownFieldContent(
+    field: ProfileFieldState,
+    textPrimary: Color,
+    textSecondary: Color,
+    backgroundColor: Color
+) {
+  var expanded by rememberSaveable(field.definition.label) { mutableStateOf(false) }
+  val dropdownBackground = MaterialTheme.colorScheme.surfaceVariant
+  val hasValue = field.value.isNotBlank()
+  val displayText = if (hasValue) field.value else field.definition.placeholder
+  val displayColor =
+      if (hasValue) {
+        textPrimary
+      } else {
+        field.placeholderColor ?: textSecondary
+      }
+  val clickableModifier =
+      if (field.enabled) {
+        Modifier.fillMaxWidth().clickable { expanded = true }
+      } else {
+        Modifier.fillMaxWidth()
+      }
+
+  Surface(
+      modifier = clickableModifier, color = dropdownBackground, shape = RoundedCornerShape(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween) {
+              Text(text = displayText, color = displayColor, fontSize = 15.sp)
+              Icon(
+                  imageVector = Icons.Filled.ExpandMore,
+                  contentDescription = null,
+                  tint = textSecondary)
+            }
+      }
+
+  DropdownMenu(
+      expanded = expanded,
+      onDismissRequest = { expanded = false },
+      containerColor = backgroundColor,
+      properties =
+          androidx.compose.ui.window.PopupProperties(
+              focusable = true,
+              dismissOnClickOutside = true,
+              usePlatformDefaultWidth = !AnimationConfig.disableAnimations)) {
+        field.options?.forEach { option ->
+          DropdownMenuItem(
+              text = { Text(option, color = textPrimary) },
+              onClick = {
+                field.onValueChange(option)
+                expanded = false
+              },
+              enabled = field.enabled)
         }
       }
+}
+
+@Composable
+private fun FieldSupportingText(field: ProfileFieldState, textSecondary: Color) {
+  val shouldShowSupportingText =
+      field.supportingText != null &&
+          (!field.showSupportingTextWhenNotBlank || field.value.isNotBlank())
+  if (shouldShowSupportingText) {
+    Text(
+        text = field.supportingText ?: "",
+        color = field.supportingTextColor ?: textSecondary.copy(alpha = 0.7f),
+        fontSize = 12.sp)
+  }
 }
 
 @Composable
