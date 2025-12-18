@@ -51,7 +51,7 @@ interface SpeechPlayback {
  */
 class TextToSpeechHelper(
     context: Context,
-    private val preferredLocale: Locale = Locale.FRENCH,
+    private val preferredLocale: Locale = Locale.ENGLISH,
     private val ttsFactory: (Context, TextToSpeech.OnInitListener) -> TextToSpeech =
         { ctx, listener ->
           TextToSpeech(ctx, listener)
@@ -303,7 +303,7 @@ class TextToSpeechHelper(
   private fun selectLanguage(): Boolean {
     val candidates = buildList {
       add(preferredLocale)
-      if (preferredLocale != Locale.FRANCE) add(Locale.FRANCE)
+      if (preferredLocale != Locale.ENGLISH) add(Locale.ENGLISH)
       val device = Locale.getDefault()
       if (!contains(device)) add(device)
     }
