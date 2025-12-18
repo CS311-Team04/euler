@@ -14,6 +14,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
@@ -38,6 +39,8 @@ class AndroidNetworkConnectivityMonitor(context: Context) : NetworkConnectivityM
         }
 
         override fun onLost(network: Network) {
+          // Immediately mark offline so the UI can react without waiting for a re-check
+          _isOnline.value = false
           // When network is lost, check immediately and also schedule a re-check
           updateConnectivity()
           // Double-check after a short delay to catch cases where the callback fires before
@@ -80,7 +83,7 @@ class AndroidNetworkConnectivityMonitor(context: Context) : NetworkConnectivityM
     // This is especially important when WiFi goes out while the app is running
     periodicCheckJob =
         scope.launch(Dispatchers.IO) {
-          while (true) {
+          while (isActive) {
             delay(1000) // Check every second for faster detection
             val currentState = _isOnline.value
             val newState = checkConnectivity()
