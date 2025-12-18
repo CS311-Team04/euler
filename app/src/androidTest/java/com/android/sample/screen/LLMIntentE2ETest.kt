@@ -152,13 +152,6 @@ class LLMIntentE2ETest : BaseE2ETest() {
     assert(aiNodes.isNotEmpty()) { "Expected at least one AI response" }
   }
 
-  /** Extension function to combine matchers with OR logic. */
-  private fun androidx.compose.ui.test.SemanticsMatcher.or(
-      other: androidx.compose.ui.test.SemanticsMatcher
-  ): androidx.compose.ui.test.SemanticsMatcher {
-    return this or other
-  }
-
   // ==================== GENERAL EPFL QUESTION TESTS ====================
 
   /**
