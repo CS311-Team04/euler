@@ -568,7 +568,7 @@ internal fun MoodleConnectDialog(
     onConfirm: (baseUrl: String, username: String, password: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-  var baseUrl by remember { mutableStateOf("https://euler-swent.moodlecloud.com") }
+  var baseUrl by remember { mutableStateOf("https://euler-04.moodlecloud.com") }
   var username by remember { mutableStateOf("") }
   var password by remember { mutableStateOf("") }
 

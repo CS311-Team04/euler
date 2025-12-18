@@ -384,7 +384,7 @@ class ConnectorsViewModelTest {
         advanceUntilIdle()
 
         viewModel.connectMoodleWithCredentials(
-            baseUrl = "https://euler-swent.moodlecloud.com",
+            baseUrl = "https://euler-04.moodlecloud.com",
             username = "testuser",
             password = "testpass")
         advanceUntilIdle()
@@ -421,7 +421,7 @@ class ConnectorsViewModelTest {
         advanceUntilIdle()
 
         viewModel.connectMoodleWithCredentials(
-            baseUrl = "https://euler-swent.moodlecloud.com",
+            baseUrl = "https://euler-04.moodlecloud.com",
             username = "testuser",
             password = "wrongpass")
         advanceUntilIdle()
@@ -458,7 +458,7 @@ class ConnectorsViewModelTest {
         advanceUntilIdle()
 
         viewModel.connectMoodleWithCredentials(
-            baseUrl = "https://euler-swent.moodlecloud.com",
+            baseUrl = "https://euler-04.moodlecloud.com",
             username = "wronguser",
             password = "wrongpass")
         advanceUntilIdle()
@@ -494,7 +494,7 @@ class ConnectorsViewModelTest {
     viewModel.connectConnector("moodle")
     advanceTimeBy(1000)
     advanceUntilIdle()
-    viewModel.confirmMoodleConnect("https://euler-swent.moodlecloud.com", "test-token")
+    viewModel.confirmMoodleConnect("https://euler-04.moodlecloud.com", "test-token")
     advanceUntilIdle()
 
     val uiState = viewModel.uiState.first()
@@ -529,7 +529,7 @@ class ConnectorsViewModelTest {
     viewModel.connectConnector("moodle")
     advanceTimeBy(1000)
     advanceUntilIdle()
-    viewModel.confirmMoodleConnect("https://euler-swent.moodlecloud.com", "invalid-token")
+    viewModel.confirmMoodleConnect("https://euler-04.moodlecloud.com", "invalid-token")
     advanceUntilIdle()
 
     val uiState = viewModel.uiState.first()
