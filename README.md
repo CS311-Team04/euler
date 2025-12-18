@@ -146,10 +146,9 @@ euler/
 
 ### Architecture Diagram
 
-<!-- TODO: Add architecture diagram here -->
 <div align="center">
 
-*Architecture diagram coming soon*
+<img src="app/src/main/res/drawable/arch_diag.png" alt="Architecture Diagram" width="800">
 
 </div>
 
