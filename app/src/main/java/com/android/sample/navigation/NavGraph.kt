@@ -14,7 +14,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavOptionsBuilder
 import androidx.navigation.compose.NavHost
@@ -329,267 +328,6 @@ internal fun VoiceChatComposableContent(nav: NavHostController, speechHelper: Sp
       homeViewModel = homeViewModel, speechHelper = speechHelper, onClose = { nav.popBackStack() })
 }
 
-/** Creates a ViewModelProvider.Factory for HomeViewModel with the given network monitor. */
-private fun createHomeViewModelFactory(
-    networkMonitor: AndroidNetworkConnectivityMonitor
-): ViewModelProvider.Factory {
-  return object : ViewModelProvider.Factory {
-    @Suppress("UNCHECKED_CAST")
-    override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-      return HomeViewModel(networkMonitor = networkMonitor) as T
-    }
-  }
-}
-
-/** Auth and opening routes graph. */
-private fun NavGraphBuilder.authGraph(
-    nav: NavHostController,
-    authState: AuthUiState,
-    authViewModel: AuthViewModel
-) {
-  composable(Routes.Opening) {
-    OpeningScreen(
-        authState = authState,
-        onNavigateToSignIn = {
-          navigateOpeningToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
-        },
-        onNavigateToHome = {
-          navigateOpeningToHome { route, builder -> nav.navigate(route) { builder(this) } }
-        })
-  }
-
-  composable(Routes.SignIn) {
-    val isOffline by authViewModel.isOffline.collectAsState()
-    AuthUIScreen(
-        state = authState,
-        onMicrosoftLogin = { authViewModel.onMicrosoftLoginClick() },
-        onSwitchEduLogin = { authViewModel.onSwitchEduLoginClick() },
-        isOffline = isOffline)
-  }
-}
-
-/** Onboarding routes graph. */
-private fun NavGraphBuilder.onboardingGraph(nav: NavHostController) {
-  composable(Routes.OnboardingPersonalInfo) {
-    OnboardingPersonalInfoScreen(
-        onContinue = {
-          nav.navigate(Routes.OnboardingRole) {
-            popUpTo(Routes.OnboardingPersonalInfo) { inclusive = false }
-            launchSingleTop = true
-          }
-        })
-  }
-
-  composable(Routes.OnboardingRole) {
-    OnboardingRoleScreen(
-        onContinue = {
-          nav.navigate(Routes.OnboardingAcademic) {
-            popUpTo(Routes.OnboardingRole) { inclusive = false }
-            launchSingleTop = true
-          }
-        })
-  }
-
-  composable(Routes.OnboardingAcademic) {
-    OnboardingAcademicScreen(
-        onContinue = {
-          nav.navigate(Routes.Home) {
-            popUpTo(Routes.SignIn) { inclusive = true }
-            launchSingleTop = true
-          }
-        })
-  }
-}
-
-/** Home routes graph (nested in home_root navigation). */
-@SuppressLint("UnrememberedGetBackStackEntry")
-private fun NavGraphBuilder.homeGraph(
-    nav: NavHostController,
-    networkMonitor: AndroidNetworkConnectivityMonitor,
-    authState: AuthUiState,
-    authViewModel: AuthViewModel,
-    speechHelper: SpeechToTextHelper,
-    ttsHelper: SpeechPlayback
-) {
-  composable(Routes.Home) {
-    val parentEntry = nav.getBackStackEntry("home_root")
-    val homeViewModel: HomeViewModel =
-        viewModel(parentEntry, factory = createHomeViewModelFactory(networkMonitor))
-    val homeUiState by homeViewModel.uiState.collectAsState()
-
-    LaunchedEffect(authState) {
-      when (authState) {
-        is AuthUiState.Guest -> homeViewModel.setGuestMode(true)
-        is AuthUiState.SignedIn -> {
-          homeViewModel.setGuestMode(false)
-          homeViewModel.refreshProfile()
-        }
-        else -> {}
-      }
-    }
-
-    HomeScreen(
-        viewModel = homeViewModel,
-        onAction1Click = { /* ... */},
-        onAction2Click = { /* ... */},
-        onSendMessage = { /* ... */},
-        speechHelper = speechHelper,
-        ttsHelper = ttsHelper,
-        onSignOut = {
-          android.util.Log.d("NavGraph", "Sign out button clicked")
-          homeViewModel.clearProfile()
-          authViewModel.signOut()
-          android.util.Log.d("NavGraph", "Navigating to SignIn")
-          val startRoute = nav.graph.startDestinationRoute ?: Routes.Opening
-          nav.navigate(Routes.SignIn) {
-            popUpTo(startRoute) { inclusive = true }
-            launchSingleTop = true
-            restoreState = false
-          }
-        },
-        onSettingsClick = { nav.navigate(Routes.Settings) },
-        onConnectorsClick = {
-          navigateToConnectors { route, builder -> nav.navigate(route) { builder(this) } }
-        },
-        onProfileClick = {
-          if (homeUiState.isGuest) {
-            homeViewModel.showGuestProfileWarning()
-          } else {
-            nav.navigate(Routes.Profile)
-          }
-        },
-        onVoiceChatClick = { nav.navigate(Routes.VoiceChat) })
-  }
-
-  composable(Routes.HomeWithDrawer) {
-    val parentEntry = nav.getBackStackEntry("home_root")
-    val homeViewModel: HomeViewModel =
-        viewModel(parentEntry, factory = createHomeViewModelFactory(networkMonitor))
-    val homeUiState by homeViewModel.uiState.collectAsState()
-
-    HomeScreen(
-        viewModel = homeViewModel,
-        onAction1Click = { /* ... */},
-        onAction2Click = { /* ... */},
-        onSendMessage = { /* ... */},
-        speechHelper = speechHelper,
-        ttsHelper = ttsHelper,
-        onSignOut = {
-          android.util.Log.d("NavGraph", "Sign out button clicked (HomeWithDrawer)")
-          homeViewModel.clearProfile()
-          authViewModel.signOut()
-          android.util.Log.d("NavGraph", "Navigating to SignIn (HomeWithDrawer)")
-          navigateSignOut(
-              navigate = { route, builder -> nav.navigate(route) { builder(this) } },
-              startDestinationRoute = nav.graph.startDestinationRoute)
-        },
-        onSettingsClick = {
-          navigateToSettings { route, builder -> nav.navigate(route) { builder(this) } }
-        },
-        onConnectorsClick = {
-          navigateToConnectors { route, builder -> nav.navigate(route) { builder(this) } }
-        },
-        onProfileClick = {
-          handleProfileClick(
-              isGuest = homeUiState.isGuest,
-              showGuestWarning = { homeViewModel.showGuestProfileWarning() },
-              navigateToProfile = {
-                navigateToProfile { route, builder -> nav.navigate(route) { builder(this) } }
-              })
-        },
-        onVoiceChatClick = {
-          navigateToVoiceChat { route, builder -> nav.navigate(route) { builder(this) } }
-        },
-        openDrawerOnStart = true)
-  }
-}
-
-/** Settings routes graph (nested in home_root navigation). */
-@SuppressLint("UnrememberedGetBackStackEntry")
-private fun NavGraphBuilder.settingsGraph(
-    nav: NavHostController,
-    networkMonitor: AndroidNetworkConnectivityMonitor,
-    authViewModel: AuthViewModel
-) {
-  composable(Routes.Settings) {
-    val parentEntry = nav.getBackStackEntry("home_root")
-    val homeViewModel: HomeViewModel =
-        viewModel(parentEntry, factory = createHomeViewModelFactory(networkMonitor))
-    val homeUiState by homeViewModel.uiState.collectAsState()
-
-    SettingsPage(
-        onBackClick = {
-          nav.navigate(Routes.HomeWithDrawer) { popUpTo(Routes.Home) { inclusive = false } }
-        },
-        onSignOut = {
-          android.util.Log.d("NavGraph", "Sign out button clicked (Settings)")
-          homeViewModel.clearProfile()
-          authViewModel.signOut()
-          android.util.Log.d("NavGraph", "Navigating to SignIn (Settings)")
-          val startRoute = nav.graph.startDestinationRoute ?: Routes.Opening
-          nav.navigate(Routes.SignIn) {
-            popUpTo(startRoute) { inclusive = true }
-            launchSingleTop = true
-            restoreState = false
-          }
-        },
-        onProfileClick = {
-          if (homeUiState.isGuest) {
-            homeViewModel.showGuestProfileWarning()
-          } else {
-            nav.navigate(Routes.Profile)
-          }
-        },
-        onProfileDisabledClick = { homeViewModel.showGuestProfileWarning() },
-        isProfileEnabled = !homeUiState.isGuest,
-        showProfileWarning = homeUiState.showGuestProfileWarning,
-        onDismissProfileWarning = { homeViewModel.hideGuestProfileWarning() },
-        onConnectorsClick = { nav.navigate(Routes.Connectors) })
-  }
-
-  composable(Routes.Profile) {
-    val parentEntry = nav.getBackStackEntry("home_root")
-    val homeViewModel: HomeViewModel =
-        viewModel(parentEntry, factory = createHomeViewModelFactory(networkMonitor))
-    val homeUiState by homeViewModel.uiState.collectAsState()
-
-    if (homeUiState.isGuest) {
-      LaunchedEffect(Unit) {
-        homeViewModel.showGuestProfileWarning()
-        nav.popBackStack()
-      }
-    } else {
-      ProfileScreen(onBackClick = { nav.popBackStack() })
-    }
-  }
-}
-
-/** Connectors routes graph (nested in home_root navigation). */
-private fun NavGraphBuilder.connectorsGraph(
-    nav: NavHostController,
-    speechHelper: SpeechToTextHelper
-) {
-  composable(Routes.Connectors) {
-    ConnectorsScreen(
-        onBackClick = { nav.popBackStack() },
-        onConnectorClick = { connectorId ->
-          when (connectorId) {
-            "ed" -> nav.navigate(Routes.EdConnect)
-            "epfl_campus" -> nav.navigate(Routes.EpflCampus)
-            else -> android.util.Log.d("NavGraph", "Connector clicked: $connectorId")
-          }
-        })
-  }
-
-  composable(Routes.EdConnect) { EdConnectScreen(onBackClick = { nav.popBackStack() }) }
-
-  composable(Routes.EpflCampus) {
-    com.android.sample.epfl.EpflCampusConnectorScreen(onBackClick = { nav.popBackStack() })
-  }
-
-  composable(Routes.VoiceChat) { VoiceChatComposableContent(nav, speechHelper) }
-}
-
 @SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
 fun AppNav(
@@ -660,12 +398,280 @@ fun AppNav(
   NavHost(
       navController = nav,
       startDestination = if (startOnSignedIn) Routes.Home else Routes.Opening) {
-        authGraph(nav, authState, authViewModel)
-        onboardingGraph(nav)
+        // Opening Screen (new flow)
+        composable(Routes.Opening) {
+          OpeningScreen(
+              authState = authState,
+              onNavigateToSignIn = {
+                navigateOpeningToSignIn { route, builder -> nav.navigate(route) { builder(this) } }
+              },
+              onNavigateToHome = {
+                navigateOpeningToHome { route, builder -> nav.navigate(route) { builder(this) } }
+              })
+        }
+
+        // SignIn Screen
+        composable(Routes.SignIn) {
+          val isOffline by authViewModel.isOffline.collectAsState()
+          AuthUIScreen(
+              state = authState,
+              onMicrosoftLogin = { authViewModel.onMicrosoftLoginClick() },
+              onSwitchEduLogin = { authViewModel.onSwitchEduLoginClick() },
+              isOffline = isOffline)
+        }
+
+        // Onboarding Personal Info Screen (Step 1)
+        composable(Routes.OnboardingPersonalInfo) {
+          OnboardingPersonalInfoScreen(
+              onContinue = {
+                // Navigate to step 2 (OnboardingRole)
+                nav.navigate(Routes.OnboardingRole) {
+                  popUpTo(Routes.OnboardingPersonalInfo) { inclusive = false }
+                  launchSingleTop = true
+                }
+              })
+        }
+
+        // Onboarding Role Screen (Step 2)
+        composable(Routes.OnboardingRole) {
+          OnboardingRoleScreen(
+              onContinue = {
+                // Navigate to step 3 (OnboardingAcademic)
+                nav.navigate(Routes.OnboardingAcademic) {
+                  popUpTo(Routes.OnboardingRole) { inclusive = false }
+                  launchSingleTop = true
+                }
+              })
+        }
+
+        // Onboarding Academic Screen (Step 3)
+        composable(Routes.OnboardingAcademic) {
+          OnboardingAcademicScreen(
+              onContinue = {
+                // Navigate to home after onboarding is complete
+                // Clear entire back stack so Home becomes the new root
+                nav.navigate(Routes.Home) {
+                  popUpTo(Routes.SignIn) { inclusive = true }
+                  launchSingleTop = true
+                }
+              })
+        }
         navigation(startDestination = Routes.Home, route = "home_root") {
-          homeGraph(nav, networkMonitor, authState, authViewModel, speechHelper, ttsHelper)
-          settingsGraph(nav, networkMonitor, authViewModel)
-          connectorsGraph(nav, speechHelper)
+          // Home Screen
+          composable(Routes.Home) {
+            val parentEntry = nav.getBackStackEntry("home_root")
+            val homeViewModel: HomeViewModel =
+                viewModel(
+                    parentEntry,
+                    factory =
+                        object : ViewModelProvider.Factory {
+                          @Suppress("UNCHECKED_CAST")
+                          override fun <T : androidx.lifecycle.ViewModel> create(
+                              modelClass: Class<T>
+                          ): T {
+                            return HomeViewModel(networkMonitor = networkMonitor) as T
+                          }
+                        })
+            val homeUiState by homeViewModel.uiState.collectAsState()
+
+            // LaunchedEffect for guest mode synchronization
+            LaunchedEffect(authState) {
+              when (authState) {
+                is AuthUiState.Guest -> homeViewModel.setGuestMode(true)
+                is AuthUiState.SignedIn -> {
+                  homeViewModel.setGuestMode(false)
+                  homeViewModel.refreshProfile()
+                }
+                else -> {}
+              }
+            }
+            HomeScreen(
+                viewModel = homeViewModel,
+                onAction1Click = { /* ... */},
+                onAction2Click = { /* ... */},
+                onSendMessage = { /* ... */},
+                speechHelper = speechHelper,
+                ttsHelper = ttsHelper,
+                onSignOut = {
+                  android.util.Log.d("NavGraph", "Sign out button clicked")
+                  homeViewModel.clearProfile()
+                  authViewModel.signOut()
+                  android.util.Log.d("NavGraph", "Navigating to SignIn")
+                  // Navigate to SignIn and clear entire back stack
+                  val startRoute = nav.graph.startDestinationRoute ?: Routes.Opening
+                  nav.navigate(Routes.SignIn) {
+                    popUpTo(startRoute) { inclusive = true }
+                    launchSingleTop = true
+                    restoreState = false
+                  }
+                },
+                onSettingsClick = { nav.navigate(Routes.Settings) },
+                onConnectorsClick = {
+                  navigateToConnectors { route, builder -> nav.navigate(route) { builder(this) } }
+                },
+                onProfileClick = {
+                  if (homeUiState.isGuest) {
+                    homeViewModel.showGuestProfileWarning()
+                  } else {
+                    nav.navigate(Routes.Profile)
+                  }
+                },
+                onVoiceChatClick = { nav.navigate(Routes.VoiceChat) })
+          }
+
+          // Home With Drawer
+          composable(Routes.HomeWithDrawer) {
+            val parentEntry = nav.getBackStackEntry("home_root")
+            val homeViewModel: HomeViewModel =
+                viewModel(
+                    parentEntry,
+                    factory =
+                        object : ViewModelProvider.Factory {
+                          @Suppress("UNCHECKED_CAST")
+                          override fun <T : androidx.lifecycle.ViewModel> create(
+                              modelClass: Class<T>
+                          ): T {
+                            return HomeViewModel(networkMonitor = networkMonitor) as T
+                          }
+                        })
+            val homeUiState by homeViewModel.uiState.collectAsState()
+
+            HomeScreen(
+                viewModel = homeViewModel,
+                onAction1Click = { /* ... */},
+                onAction2Click = { /* ... */},
+                onSendMessage = { /* ... */},
+                speechHelper = speechHelper,
+                ttsHelper = ttsHelper,
+                onSignOut = {
+                  android.util.Log.d("NavGraph", "Sign out button clicked (HomeWithDrawer)")
+                  homeViewModel.clearProfile()
+                  authViewModel.signOut()
+                  android.util.Log.d("NavGraph", "Navigating to SignIn (HomeWithDrawer)")
+                  // Navigate to SignIn and clear entire back stack
+                  navigateSignOut(
+                      navigate = { route, builder -> nav.navigate(route) { builder(this) } },
+                      startDestinationRoute = nav.graph.startDestinationRoute)
+                },
+                onSettingsClick = {
+                  navigateToSettings { route, builder -> nav.navigate(route) { builder(this) } }
+                },
+                onConnectorsClick = {
+                  navigateToConnectors { route, builder -> nav.navigate(route) { builder(this) } }
+                },
+                onProfileClick = {
+                  handleProfileClick(
+                      isGuest = homeUiState.isGuest,
+                      showGuestWarning = { homeViewModel.showGuestProfileWarning() },
+                      navigateToProfile = {
+                        navigateToProfile { route, builder ->
+                          nav.navigate(route) { builder(this) }
+                        }
+                      })
+                },
+                onVoiceChatClick = {
+                  navigateToVoiceChat { route, builder -> nav.navigate(route) { builder(this) } }
+                },
+                openDrawerOnStart = true)
+          }
+
+          // Settings
+          composable(Routes.Settings) {
+            val parentEntry = nav.getBackStackEntry("home_root")
+            val homeViewModel: HomeViewModel =
+                viewModel(
+                    parentEntry,
+                    factory =
+                        object : ViewModelProvider.Factory {
+                          @Suppress("UNCHECKED_CAST")
+                          override fun <T : androidx.lifecycle.ViewModel> create(
+                              modelClass: Class<T>
+                          ): T {
+                            return HomeViewModel(networkMonitor = networkMonitor) as T
+                          }
+                        })
+            val homeUiState by homeViewModel.uiState.collectAsState()
+
+            SettingsPage(
+                onBackClick = {
+                  nav.navigate(Routes.HomeWithDrawer) { popUpTo(Routes.Home) { inclusive = false } }
+                },
+                onSignOut = {
+                  android.util.Log.d("NavGraph", "Sign out button clicked (Settings)")
+                  homeViewModel.clearProfile()
+                  authViewModel.signOut()
+                  android.util.Log.d("NavGraph", "Navigating to SignIn (Settings)")
+                  // Navigate to SignIn and clear entire back stack
+                  val startRoute = nav.graph.startDestinationRoute ?: Routes.Opening
+                  nav.navigate(Routes.SignIn) {
+                    popUpTo(startRoute) { inclusive = true }
+                    launchSingleTop = true
+                    restoreState = false
+                  }
+                },
+                onProfileClick = {
+                  if (homeUiState.isGuest) {
+                    homeViewModel.showGuestProfileWarning()
+                  } else {
+                    nav.navigate(Routes.Profile)
+                  }
+                },
+                onProfileDisabledClick = { homeViewModel.showGuestProfileWarning() },
+                isProfileEnabled = !homeUiState.isGuest,
+                showProfileWarning = homeUiState.showGuestProfileWarning,
+                onDismissProfileWarning = { homeViewModel.hideGuestProfileWarning() },
+                onConnectorsClick = { nav.navigate(Routes.Connectors) })
+          }
+
+          composable(Routes.Profile) {
+            val parentEntry = nav.getBackStackEntry("home_root")
+            val homeViewModel: HomeViewModel =
+                viewModel(
+                    parentEntry,
+                    factory =
+                        object : ViewModelProvider.Factory {
+                          @Suppress("UNCHECKED_CAST")
+                          override fun <T : androidx.lifecycle.ViewModel> create(
+                              modelClass: Class<T>
+                          ): T {
+                            return HomeViewModel(networkMonitor = networkMonitor) as T
+                          }
+                        })
+            val homeUiState by homeViewModel.uiState.collectAsState()
+
+            if (homeUiState.isGuest) {
+              LaunchedEffect(Unit) {
+                homeViewModel.showGuestProfileWarning()
+                nav.popBackStack()
+              }
+            } else {
+              // Use ProfileScreen which manages its own ViewModel and loads profile from Firestore
+              ProfileScreen(onBackClick = { nav.popBackStack() })
+            }
+          }
+          // Connectors Screen
+          composable(Routes.Connectors) {
+            ConnectorsScreen(
+                onBackClick = { nav.popBackStack() },
+                onConnectorClick = { connectorId ->
+                  when (connectorId) {
+                    "ed" -> nav.navigate(Routes.EdConnect)
+                    "epfl_campus" -> nav.navigate(Routes.EpflCampus)
+                    else -> android.util.Log.d("NavGraph", "Connector clicked: $connectorId")
+                  }
+                })
+          }
+
+          // ED Connect Screen
+          composable(Routes.EdConnect) { EdConnectScreen(onBackClick = { nav.popBackStack() }) }
+
+          // Voice Chat Screen
+          // EPFL Campus Connector Screen
+          composable(Routes.EpflCampus) {
+            com.android.sample.epfl.EpflCampusConnectorScreen(onBackClick = { nav.popBackStack() })
+          }
+          // Uses VoiceChatComposableContent which is tested in NavGraphTest
+          composable(Routes.VoiceChat) { VoiceChatComposableContent(nav, speechHelper) }
         }
       }
 }
