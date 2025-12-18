@@ -122,6 +122,7 @@ class HomeViewModel(
     private const val TAG = "HomeViewModel"
     private const val DEFAULT_USER_NAME = "Student"
     private const val ED_INTENT_POST_QUESTION = "post_question"
+    private const val USER_FACING_ERROR_MESSAGE = "Something went wrong. Please try again."
     // Fallback English strings for non-Android contexts (e.g., unit tests)
     private const val FALLBACK_SCHEDULE_LABEL = "Your EPFL Schedule"
     private const val FALLBACK_SCHEDULE_TITLE = "Retrieved from your connected calendar"
@@ -445,6 +446,12 @@ class HomeViewModel(
         }
   }
 
+  /**
+   * Guardrail to prevent state corruption during streaming. Skips Firestore message updates when
+   * streaming is active (to avoid overwriting the in-flight placeholder/partial assistant message)
+   * or when there's no current conversation and no incoming messages. These skips are intentional
+   * to preserve local optimistic UI state and maintain consistency while streaming.
+   */
   private fun shouldSkipMessageUpdate(msgs: List<Pair<MessageDTO, String>>): Boolean {
     val streamingId = _uiState.value.streamingMessageId
     if (streamingId != null) return true
@@ -506,6 +513,13 @@ class HomeViewModel(
     return preserveLocalSourceAndAttachment(currentState.messages, firestoreMessages)
   }
 
+  /**
+   * Heuristic to detect if local and Firestore messages belong to the same conversation by checking
+   * for overlapping message text. This is fragile: duplicate/common texts, edits, or formatting
+   * differences may cause false positives/negatives. We use this because stable conversation IDs
+   * are not reliably available in this sync context. If a stable ID or marker becomes available,
+   * prefer that over text-based matching.
+   */
   private fun detectSameConversation(
       localMessages: List<ChatUIModel>,
       firestoreMessages: List<ChatUIModel>
@@ -865,21 +879,17 @@ class HomeViewModel(
    * message and clears streaming state.
    */
   private suspend fun handleSendMessageError(error: Throwable, aiMessageId: String) {
+    // Log technical details for debugging; display user-friendly message only
     val details: String? = (error as? FirebaseFunctionsException)?.details as? String
     val code: String? = (error as? FirebaseFunctionsException)?.code?.name
-    val errText = buildString {
-      append("Error")
-      if (!code.isNullOrBlank()) append(" [").append(code).append("]")
-      append(": ")
-      append(details ?: error.message ?: "request failed")
-    }
+    Log.e(TAG, "Send message error [code=$code, details=$details]: ${error.message}", error)
     try {
       _uiState.update { state ->
         state.copy(
             messages =
                 state.messages.map { msg ->
                   if (msg.id == aiMessageId) {
-                    msg.copy(text = errText, isThinking = false)
+                    msg.copy(text = USER_FACING_ERROR_MESSAGE, isThinking = false)
                   } else {
                     msg
                   }
@@ -1111,6 +1121,8 @@ class HomeViewModel(
       repo.appendMessage(cid, "user", msg)
     } catch (e: Exception) {
       Log.e(TAG, "Failed to persist user message: ${e.message}", e)
+      // handleSendMessageError is the single source of truth for UI error updates.
+      // Rethrow so caller can abort/cleanup; caller must NOT duplicate error UI handling.
       handleSendMessageError(e, aiMessageId)
       throw e
     }
@@ -1130,6 +1142,13 @@ class HomeViewModel(
     }
   }
 
+  /**
+   * Context data passed to the LLM for streaming responses.
+   *
+   * @property summary Condensed history of prior messages in the conversation for continuity.
+   * @property transcript Recent voice/text input transcript to provide immediate context.
+   * @property profileContext User profile info (name, role, academic details) for personalization.
+   */
   private data class SendStreamingContext(
       val summary: String?,
       val transcript: String?,
@@ -1380,6 +1399,8 @@ class HomeViewModel(
           sourceMetadata = sourceMetadata)
     } catch (e: Exception) {
       Log.w(TAG, "Failed to persist assistant message: ${e.message}")
+      // handleSendMessageError is the single source of truth for UI error updates.
+      // Rethrow so caller can abort/cleanup; caller must NOT duplicate error UI handling.
       handleSendMessageError(e, messageId)
       throw e
     }
@@ -1407,7 +1428,7 @@ class HomeViewModel(
               messages =
                   state.messages.map { msg ->
                     if (msg.id == messageId) {
-                      msg.copy(text = "Error: ${t.message ?: "Unknown error"}", isThinking = false)
+                      msg.copy(text = USER_FACING_ERROR_MESSAGE, isThinking = false)
                     } else {
                       msg
                     }
@@ -1515,8 +1536,8 @@ class HomeViewModel(
       }
 
   private suspend fun setStreamingError(messageId: String, error: Throwable) {
-    val message = error.message?.takeIf { it.isNotBlank() } ?: "request failed"
-    setStreamingText(messageId, "Erreur: $message")
+    // Technical details already logged in caller; show user-friendly message only
+    setStreamingText(messageId, USER_FACING_ERROR_MESSAGE)
   }
 
   private suspend fun simulateStreamingFromText(messageId: String, fullText: String) {
